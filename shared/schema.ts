@@ -32,6 +32,7 @@ export const users = pgTable("users", {
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
+  password: varchar("password"),
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role").notNull().default("customer"), // customer, manager, admin
   status: varchar("status").notNull().default("pending"), // pending, active, suspended

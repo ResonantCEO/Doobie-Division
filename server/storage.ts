@@ -28,13 +28,13 @@ export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  
+
   // Category operations
   getCategories(): Promise<Category[]>;
   createCategory(category: InsertCategory): Promise<Category>;
   updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category>;
   deleteCategory(id: number): Promise<void>;
-  
+
   // Product operations
   getProducts(filters?: { categoryId?: number; search?: string; status?: string }): Promise<(Product & { category: Category | null })[]>;
   getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined>;
@@ -43,13 +43,13 @@ export interface IStorage {
   deleteProduct(id: number): Promise<void>;
   adjustStock(productId: number, quantity: number, userId: string, reason: string): Promise<void>;
   getLowStockProducts(): Promise<Product[]>;
-  
+
   // Order operations
   getOrders(filters?: { status?: string; customerId?: string }): Promise<Order[]>;
   getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined>;
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
-  
+
   // Analytics operations
   getSalesMetrics(days: number): Promise<{
     totalSales: number;
@@ -58,12 +58,12 @@ export interface IStorage {
   }>;
   getTopProducts(limit: number): Promise<{ product: Product; sales: number; revenue: number }[]>;
   getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]>;
-  
+
   // Notification operations
   getNotifications(userId?: string): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
   markNotificationAsRead(id: number): Promise<void>;
-  
+
   // User management
   getUsersWithStats(): Promise<(User & { orderCount?: number })[]>;
   updateUserStatus(id: string, status: string): Promise<User>;
@@ -90,6 +90,31 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async createUserWithPassword(userData: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    password: string;
+    role: string;
+    status: string;
+  }) {
+    const [newUser] = await db
+      .insert(users)
+      .values(userData)
+      .returning();
+      return newUser;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
+
+    return user[0];
   }
 
   // Category operations
@@ -126,11 +151,11 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(categories, eq(products.categoryId, categories.id));
 
     const conditions = [];
-    
+
     if (filters?.categoryId) {
       conditions.push(eq(products.categoryId, filters.categoryId));
     }
-    
+
     if (filters?.search) {
       conditions.push(
         or(
@@ -140,7 +165,7 @@ export class DatabaseStorage implements IStorage {
         )
       );
     }
-    
+
     if (filters?.status === 'low_stock') {
       conditions.push(sql`${products.stock} <= ${products.minStockThreshold}`);
     } else if (filters?.status === 'out_of_stock') {
@@ -148,7 +173,7 @@ export class DatabaseStorage implements IStorage {
     } else if (filters?.status === 'in_stock') {
       conditions.push(sql`${products.stock} > ${products.minStockThreshold}`);
     }
-    
+
     if (conditions.length > 0) {
       query = query.where(and(...conditions));
     }
@@ -214,7 +239,7 @@ export class DatabaseStorage implements IStorage {
     if (newStock <= product.minStockThreshold && previousStock > product.minStockThreshold) {
       // Get all admin users for notification
       const adminUsers = await db.select().from(users).where(eq(users.role, 'admin'));
-      
+
       for (const admin of adminUsers) {
         await this.createNotification({
           userId: admin.id,
@@ -272,7 +297,7 @@ export class DatabaseStorage implements IStorage {
 
   async createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order> {
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-    
+
     const [newOrder] = await db
       .insert(orders)
       .values({ ...order, orderNumber })
@@ -377,11 +402,11 @@ export class DatabaseStorage implements IStorage {
   // Notification operations
   async getNotifications(userId?: string): Promise<Notification[]> {
     let query = db.select().from(notifications);
-    
+
     if (userId) {
       query = query.where(eq(notifications.userId, userId));
     }
-    
+
     return await query.orderBy(desc(notifications.createdAt));
   }
 
