@@ -28,12 +28,32 @@ const formSchema = insertProductSchema.extend({
 });
 
 type FormData = z.infer<typeof formSchema>;
+type CategoryWithChildren = Category & { children?: CategoryWithChildren[] };
 
 interface AddProductModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  categories: Category[];
+  categories: CategoryWithChildren[];
 }
+
+const renderCategoryOptions = (categories: CategoryWithChildren[], level = 0): JSX.Element[] => {
+  const result: JSX.Element[] = [];
+  
+  for (const category of categories) {
+    const prefix = "  ".repeat(level);
+    result.push(
+      <SelectItem key={category.id} value={category.id.toString()}>
+        {prefix}{level > 0 ? "└ " : ""}{category.name}
+      </SelectItem>
+    );
+    
+    if (category.children && category.children.length > 0) {
+      result.push(...renderCategoryOptions(category.children, level + 1));
+    }
+  }
+  
+  return result;
+};
 
 export default function AddProductModal({ open, onOpenChange, categories }: AddProductModalProps) {
   const { toast } = useToast();
@@ -147,11 +167,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id.toString()}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
+                        {renderCategoryOptions(categories)}
                       </SelectContent>
                     </Select>
                   </FormControl>

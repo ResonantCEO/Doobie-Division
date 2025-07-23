@@ -44,8 +44,11 @@ export const users = pgTable("users", {
 
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
-  name: varchar("name").notNull().unique(),
+  name: varchar("name").notNull(),
   description: text("description"),
+  parentId: integer("parent_id").references(() => categories.id),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -120,8 +123,16 @@ export const usersRelations = relations(users, ({ many }) => ({
   inventoryLogs: many(inventoryLogs),
 }));
 
-export const categoriesRelations = relations(categories, ({ many }) => ({
+export const categoriesRelations = relations(categories, ({ one, many }) => ({
   products: many(products),
+  parent: one(categories, {
+    fields: [categories.parentId],
+    references: [categories.id],
+    relationName: "categoryParent",
+  }),
+  children: many(categories, {
+    relationName: "categoryParent",
+  }),
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
@@ -179,6 +190,10 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export const insertCategorySchema = createInsertSchema(categories).omit({
   id: true,
   createdAt: true,
+}).extend({
+  parentId: z.number().nullable().optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().optional(),
 });
 
 export const insertProductSchema = createInsertSchema(products).omit({

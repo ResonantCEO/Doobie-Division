@@ -30,7 +30,7 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
 
   // Category operations
-  getCategories(): Promise<Category[]>;
+  getCategories(): Promise<(Category & { children?: Category[] })[]>;
   createCategory(category: InsertCategory): Promise<Category>;
   updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category>;
   deleteCategory(id: number): Promise<void>;
@@ -147,8 +147,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Category operations
-  async getCategories(): Promise<Category[]> {
-    return await db.select().from(categories).orderBy(categories.name);
+  async getCategories(): Promise<(Category & { children?: Category[] })[]> {
+    const allCategories = await db.select().from(categories)
+      .where(eq(categories.isActive, true))
+      .orderBy(categories.sortOrder, categories.name);
+
+    // Build hierarchical structure
+    const categoryMap = new Map<number, Category & { children: Category[] }>();
+    const rootCategories: (Category & { children: Category[] })[] = [];
+
+    // First pass: create all category objects
+    for (const category of allCategories) {
+      categoryMap.set(category.id, { ...category, children: [] });
+    }
+
+    // Second pass: build hierarchy
+    for (const category of allCategories) {
+      const categoryWithChildren = categoryMap.get(category.id)!;
+      if (category.parentId) {
+        const parent = categoryMap.get(category.parentId);
+        if (parent) {
+          parent.children.push(categoryWithChildren);
+        }
+      } else {
+        rootCategories.push(categoryWithChildren);
+      }
+    }
+
+    return rootCategories;
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
@@ -156,16 +182,28 @@ export class DatabaseStorage implements IStorage {
     return newCategory;
   }
 
-  async updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category> {
-    const [updated] = await db
+  async updateCategory(id: number, updates: Partial<InsertCategory>): Promise<Category> {
+    const [updatedCategory] = await db
       .update(categories)
-      .set(category)
+      .set({ ...updates, updatedAt: new Date() })
       .where(eq(categories.id, id))
       .returning();
-    return updated;
+    return updatedCategory;
   }
 
   async deleteCategory(id: number): Promise<void> {
+    // Check if category has children
+    const children = await db.select().from(categories).where(eq(categories.parentId, id));
+    if (children.length > 0) {
+      throw new Error("Cannot delete category with subcategories");
+    }
+
+    // Check if category has products
+    const productsInCategory = await db.select().from(products).where(eq(products.categoryId, id));
+    if (productsInCategory.length > 0) {
+      throw new Error("Cannot delete category with products");
+    }
+
     await db.delete(categories).where(eq(categories.id, id));
   }
 

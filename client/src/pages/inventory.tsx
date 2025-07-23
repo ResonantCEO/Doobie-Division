@@ -10,7 +10,8 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import InventoryTable from "@/components/inventory-table";
 import AddProductModal from "@/components/modals/add-product-modal";
 import StockAdjustmentModal from "@/components/modals/stock-adjustment-modal";
-import { Plus, QrCode, AlertTriangle } from "lucide-react";
+import CategoryManagementModal from "@/components/modals/category-management-modal";
+import { Plus, QrCode, AlertTriangle, Settings } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
 
 export default function InventoryPage() {
@@ -19,6 +20,7 @@ export default function InventoryPage() {
   const [stockFilter, setStockFilter] = useState<string>("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -88,6 +90,10 @@ export default function InventoryPage() {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Inventory Management</h2>
         <div className="flex space-x-3">
+          <Button onClick={() => setShowCategoryModal(true)} variant="outline">
+            <Settings className="h-4 w-4 mr-2" />
+            Manage Categories
+          </Button>
           <Button onClick={handleGenerateQR} variant="outline">
             <QrCode className="h-4 w-4 mr-2" />
             Generate QR Codes
@@ -193,6 +199,12 @@ export default function InventoryPage() {
         open={showStockModal}
         onOpenChange={setShowStockModal}
         product={selectedProduct}
+      />
+
+      <CategoryManagementModal
+        open={showCategoryModal}
+        onOpenChange={setShowCategoryModal}
+        categories={categories}
       />
     </div>
   );

@@ -53,6 +53,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/categories/:id', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const categoryData = insertCategorySchema.partial().parse(req.body);
+      const category = await storage.updateCategory(id, categoryData);
+      res.json(category);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid category data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update category" });
+    }
+  });
+
+  app.delete('/api/categories/:id', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteCategory(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to delete category" });
+    }
+  });
+
   // Product routes
   app.get('/api/products', async (req, res) => {
     try {
