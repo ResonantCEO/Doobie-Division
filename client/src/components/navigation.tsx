@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
-  DropdownMenuItem, 
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Bell, Settings, LogOut, ShoppingBag, Package, BarChart3, Users, Home } from "lucide-react";
+import { Bell, Settings, LogOut, ShoppingBag, Package, BarChart3, Users, Home, Search, ShoppingCart, User, ChevronDown } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
