@@ -1,8 +1,8 @@
-# EcomInventory - E-Commerce & Inventory Management System
+# Doobie Division! - E-Commerce & Inventory Management System
 
 ## Overview
 
-EcomInventory is a comprehensive full-stack web application that provides e-commerce storefront functionality combined with robust inventory management capabilities. The system serves multiple user roles (customers, managers, administrators) with different access levels and features including product catalog management, order processing, analytics, and user administration.
+Doobie Division! is a comprehensive full-stack web application that provides e-commerce storefront functionality combined with robust inventory management capabilities. The system serves multiple user roles (customers, managers, administrators) with different access levels and features including product catalog management, order processing, analytics, and user administration.
 
 ## User Preferences
 

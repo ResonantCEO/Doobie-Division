@@ -73,7 +73,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <Link href="/dashboard">
-                  <h1 className="text-2xl font-bold text-primary cursor-pointer">EcomInventory</h1>
+                  <h1 className="text-2xl font-bold text-primary cursor-pointer">Doobie Division!</h1>
                 </Link>
               </div>
             </div>
