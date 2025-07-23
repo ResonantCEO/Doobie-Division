@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,17 @@ import {
 
 export default function MobileWireframe() {
   const [currentScreen, setCurrentScreen] = useState<string>("storefront");
+
+  useEffect(() => {
+    const handleScreenChange = (event: CustomEvent) => {
+      setCurrentScreen(event.detail);
+    };
+
+    window.addEventListener('screenChange', handleScreenChange as EventListener);
+    return () => {
+      window.removeEventListener('screenChange', handleScreenChange as EventListener);
+    };
+  }, []);
 
   const screens = {
     storefront: {
@@ -103,24 +114,7 @@ export default function MobileWireframe() {
         </div>
       </div>
 
-      {/* Screen Selector */}
-      <div className="fixed top-20 right-4 bg-white rounded-lg shadow-lg p-2 z-40">
-        <div className="text-xs font-medium text-gray-600 mb-2">Screens:</div>
-        {Object.entries(screens).map(([key, screen]) => (
-          <button
-            key={key}
-            onClick={() => setCurrentScreen(key)}
-            className={`block w-full text-left text-xs py-1 px-2 rounded ${
-              currentScreen === key 
-                ? "bg-primary text-white" 
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            {screen.title}
-          </button>
-        ))}
       </div>
-    </div>
   );
 }
 

@@ -10,53 +10,82 @@ export default function WireframePage() {
           <p className="text-gray-600">Interactive mobile view of the e-commerce and inventory management system</p>
         </div>
         
-        <div className="flex justify-center gap-8">
+        <div className="flex justify-center gap-12 items-start">
           <div className="relative">
-            {/* Phone Frame - Larger Size */}
-            <div className="bg-black rounded-[3rem] p-3 shadow-2xl" style={{ transform: 'scale(1.5)' }}>
-              <div className="bg-white rounded-[2.5rem] overflow-hidden w-80 h-[600px]">
+            {/* Phone Frame - Normal Size */}
+            <div className="bg-black rounded-[2rem] p-2 shadow-2xl">
+              <div className="bg-white rounded-[1.5rem] overflow-hidden w-72 h-[640px]">
                 <MobileWireframe />
               </div>
             </div>
           </div>
           
-          {/* Phone Details - Moved to side */}
-          <div className="bg-white p-8 rounded-lg shadow-lg w-80 h-fit">
-            <h3 className="font-bold text-xl mb-6">App Features</h3>
-            <ul className="space-y-3 text-gray-600">
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                E-commerce storefront
-              </li>
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                Inventory management
-              </li>
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                Order tracking
-              </li>
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                Analytics dashboard
-              </li>
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                User management
-              </li>
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                Role-based access
-              </li>
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                Real-time notifications
-              </li>
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                Mobile-first design
-              </li>
-            </ul>
+          {/* Controls and Info Panel */}
+          <div className="space-y-6">
+            {/* Screen Selector */}
+            <div className="bg-white p-6 rounded-lg shadow-lg w-80">
+              <h3 className="font-bold text-lg mb-4">Screen Navigation</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries({
+                  storefront: "Storefront",
+                  inventory: "Inventory", 
+                  orders: "Orders",
+                  analytics: "Analytics",
+                  users: "Users"
+                }).map(([key, title]) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      // We need to communicate with the MobileWireframe component
+                      const event = new CustomEvent('screenChange', { detail: key });
+                      window.dispatchEvent(event);
+                    }}
+                    className="text-sm py-2 px-3 rounded border border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    {title}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* App Features */}
+            <div className="bg-white p-6 rounded-lg shadow-lg w-80">
+              <h3 className="font-bold text-lg mb-4">App Features</h3>
+              <ul className="space-y-3 text-gray-600 text-sm">
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                  E-commerce storefront
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                  Inventory management
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                  Order tracking
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                  Analytics dashboard
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                  User management
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                  Role-based access
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                  Real-time notifications
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                  Mobile-first design
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
         
