@@ -7,6 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
 import { 
   DollarSign, 
   ShoppingCart, 
@@ -14,7 +16,8 @@ import {
   TrendingUp, 
   Download, 
   BarChart3,
-  Package 
+  Package,
+  Calendar
 } from "lucide-react";
 import type { Product } from "@shared/schema";
 
@@ -48,6 +51,35 @@ export default function AnalyticsPage() {
   const { data: orderBreakdown = [] } = useQuery<{ status: string; count: number }[]>({
     queryKey: ["/api/analytics/order-status-breakdown"],
   });
+
+  // Sample sales data for charts (in a real app, this would come from an API)
+  const salesData = [
+    { date: "Jan 1", sales: 2400, orders: 24 },
+    { date: "Jan 8", sales: 1398, orders: 18 },
+    { date: "Jan 15", sales: 9800, orders: 42 },
+    { date: "Jan 22", sales: 3908, orders: 28 },
+    { date: "Jan 29", sales: 4800, orders: 35 },
+    { date: "Feb 5", sales: 3800, orders: 31 },
+    { date: "Feb 12", sales: 4300, orders: 37 },
+  ];
+
+  const chartConfig = {
+    sales: {
+      label: "Sales",
+      color: "hsl(var(--chart-1))",
+    },
+    orders: {
+      label: "Orders", 
+      color: "hsl(var(--chart-2))",
+    },
+  };
+
+  const categoryData = [
+    { name: "Flower", value: 45, fill: "#8884d8" },
+    { name: "Edibles", value: 30, fill: "#82ca9d" },
+    { name: "Concentrates", value: 15, fill: "#ffc658" },
+    { name: "Accessories", value: 10, fill: "#ff7c7c" },
+  ];
 
   const handleExportReport = () => {
     // In a real app, this would generate and download a report
@@ -175,7 +207,7 @@ export default function AnalyticsPage() {
 
       {/* Charts and Reports */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Sales Chart Placeholder */}
+        {/* Sales Overview Chart */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -184,13 +216,21 @@ export default function AnalyticsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 font-medium">Sales Chart</p>
-                <p className="text-sm text-gray-400">Chart integration with Chart.js or Recharts needed</p>
-              </div>
-            </div>
+            <ChartContainer config={chartConfig} className="h-64">
+              <AreaChart data={salesData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area
+                  type="monotone"
+                  dataKey="sales"
+                  stroke="var(--color-sales)"
+                  fill="var(--color-sales)"
+                  fillOpacity={0.2}
+                />
+              </AreaChart>
+            </ChartContainer>
           </CardContent>
         </Card>
 
@@ -243,6 +283,59 @@ export default function AnalyticsPage() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Additional Analytics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Orders by Category */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Sales by Category
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-64">
+              <PieChart>
+                <Pie
+                  data={categoryData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {categoryData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <ChartTooltip content={<ChartTooltipContent />} />
+              </PieChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Order Trends */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Order Trends
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-64">
+              <BarChart data={salesData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="orders" fill="var(--color-orders)" />
+              </BarChart>
+            </ChartContainer>
           </CardContent>
         </Card>
       </div>
