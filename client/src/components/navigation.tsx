@@ -11,8 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
-import { Bell, User, LogOut } from "lucide-react";
+import { Bell, User, LogOut, Search, ShoppingCart, ChevronDown } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
