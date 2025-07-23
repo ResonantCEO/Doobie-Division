@@ -1,5 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import express from "express";
+import path from "path";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema } from "@shared/schema";
@@ -20,6 +22,9 @@ const requireRole = (roles: string[]) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Static file serving for uploaded images
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  
   // Auth middleware
   await setupAuth(app);
 
@@ -306,6 +311,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(user);
     } catch (error) {
       res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  // ID verification routes
+  app.put('/api/users/:id/id-verification', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { status } = req.body;
+      
+      if (!['verified', 'rejected'].includes(status)) {
+        return res.status(400).json({ message: "Status must be 'verified' or 'rejected'" });
+      }
+      
+      const user = await storage.updateUserIdVerification(id, status);
+      
+      // If verified, also activate the user account
+      if (status === 'verified') {
+        await storage.updateUserStatus(id, 'active');
+      }
+      
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update ID verification status" });
+    }
+  });
+
+  app.get('/api/users/pending-verification', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const users = await storage.getUsersPendingVerification();
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch pending verifications" });
     }
   });
 

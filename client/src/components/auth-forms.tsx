@@ -17,6 +17,7 @@ export function AuthForms() {
     firstName: "",
     lastName: "",
   });
+  const [idFile, setIdFile] = useState<File | null>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -49,13 +50,28 @@ export function AuthForms() {
       password: string;
       firstName: string;
       lastName: string;
+      idFile: File | null;
     }) => {
-      const response = await apiRequest("/api/auth/register", {
+      const formData = new FormData();
+      formData.append("email", data.email);
+      formData.append("password", data.password);
+      formData.append("firstName", data.firstName);
+      formData.append("lastName", data.lastName);
+      if (data.idFile) {
+        formData.append("idImage", data.idFile);
+      }
+      
+      const response = await fetch("/api/auth/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: formData,
       });
-      return response;
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message);
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
@@ -77,7 +93,7 @@ export function AuthForms() {
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    registerMutation.mutate(registerData);
+    registerMutation.mutate({ ...registerData, idFile });
   };
 
   return (
@@ -177,6 +193,17 @@ export function AuthForms() {
                     required
                   />
                   <p className="text-sm text-muted-foreground">Must be at least 6 characters</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="idUpload">Photo ID</Label>
+                  <Input
+                    id="idUpload"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setIdFile(e.target.files?.[0] || null)}
+                    required
+                  />
+                  <p className="text-sm text-muted-foreground">Upload a clear photo of your government-issued ID</p>
                 </div>
                 <Button
                   type="submit"

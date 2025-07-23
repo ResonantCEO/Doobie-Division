@@ -4,9 +4,32 @@ import crypto from "crypto";
 import type { Express, RequestHandler } from "express";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { storage } from "./storage";
 
 const SALT_ROUNDS = 12;
+
+// Configure multer for file uploads
+const uploadDir = path.join(process.cwd(), 'uploads', 'id-images');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const upload = multer({
+  dest: uploadDir,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 const SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
 
 export function getSession() {
@@ -36,7 +59,7 @@ export async function setupAuth(app: Express) {
   app.use(getSession());
 
   // Register endpoint
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", upload.single('idImage'), async (req, res) => {
     try {
       const { email, password, firstName, lastName } = req.body;
 
@@ -59,14 +82,18 @@ export async function setupAuth(app: Express) {
 
       // Create user
       const userId = crypto.randomUUID();
+      const idImageUrl = req.file ? `/uploads/id-images/${req.file.filename}` : null;
+      
       await storage.createUserWithPassword({
         id: userId,
         email,
         firstName,
         lastName,
         password: hashedPassword,
+        idImageUrl,
+        idVerificationStatus: idImageUrl ? "pending" : "not_provided",
         role: "customer",
-        status: "active"
+        status: idImageUrl ? "pending" : "active"
       });
 
       // Create session

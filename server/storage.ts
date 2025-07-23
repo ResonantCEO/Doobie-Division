@@ -68,6 +68,8 @@ export interface IStorage {
   getUsersWithStats(): Promise<(User & { orderCount?: number })[]>;
   updateUserStatus(id: string, status: string): Promise<User>;
   updateUserRole(id: string, role: string): Promise<User>;
+  updateUserIdVerification(id: string, status: string): Promise<User>;
+  getUsersPendingVerification(): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -98,6 +100,8 @@ export class DatabaseStorage implements IStorage {
     firstName: string;
     lastName: string;
     password: string;
+    idImageUrl?: string | null;
+    idVerificationStatus?: string;
     role: string;
     status: string;
   }) {
@@ -453,6 +457,23 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return updated;
+  }
+
+  async updateUserIdVerification(id: string, status: string): Promise<User> {
+    const [updated] = await db
+      .update(users)
+      .set({ idVerificationStatus: status, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getUsersPendingVerification(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.idVerificationStatus, 'pending'))
+      .orderBy(desc(users.createdAt));
   }
 }
 
