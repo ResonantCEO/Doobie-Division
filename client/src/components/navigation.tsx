@@ -31,8 +31,25 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
 
   const unreadCount = notifications.filter((n: any) => !n.isRead).length;
 
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
+  const queryClient = useQueryClient();
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      queryClient.clear();
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      });
+      // Redirect to landing page
+      window.location.href = '/';
+    } catch (error) {
+      toast({
+        title: "Logout failed",
+        description: "An error occurred while logging out.",
+        variant: "destructive",
+      });
+    }
   };
 
   const tabs = [
