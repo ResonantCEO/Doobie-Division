@@ -21,7 +21,10 @@ function Router() {
           <Route path="/dashboard/:tab?" component={Dashboard} />
         </>
       )}
-      <Route component={NotFound} />
+      <Route path="/dashboard/*" component={Dashboard} />
+        <Route path="/wireframe" component={() => import("./pages/wireframe").then(m => m.default)} />
+        <Route path="/404" component={NotFound} />
+        <Route component={NotFound} />
     </Switch>
   );
 }
