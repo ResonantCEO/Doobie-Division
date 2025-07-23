@@ -105,6 +105,21 @@ export class DatabaseStorage implements IStorage {
     role: string;
     status: string;
   }) {
+    const userCount = await this.getUserCount();
+    let status = 'pending';
+    let role = 'user';
+
+    if (userCount === 0) {
+      status = 'active';
+      role = 'admin';
+    }
+
+    userData = {
+      ...userData,
+      status,
+      role
+    };
+
     const [newUser] = await db
       .insert(users)
       .values(userData)
@@ -119,6 +134,16 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.email, email));
 
     return result[0];
+  }
+
+  async getUserCount(): Promise<number> {
+    try {
+      const result = await db.select({ count: sql`count(*)` }).from(users);
+      return parseInt(result[0].count as string);
+    } catch (error) {
+      console.error("Error getting user count:", error);
+      throw new Error("Failed to get user count");
+    }
   }
 
   // Category operations

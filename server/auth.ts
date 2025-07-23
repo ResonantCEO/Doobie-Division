@@ -80,6 +80,10 @@ export async function setupAuth(app: Express) {
       // Hash password
       const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
+      // Check if this is the first user (should become admin)
+      const existingUserCount = await storage.getUserCount();
+      const isFirstUser = existingUserCount === 0;
+      
       // Create user
       const userId = crypto.randomUUID();
       const idImageUrl = req.file ? `/uploads/id-images/${req.file.filename}` : null;
@@ -91,16 +95,26 @@ export async function setupAuth(app: Express) {
         lastName,
         password: hashedPassword,
         idImageUrl,
-        idVerificationStatus: idImageUrl ? "pending" : "not_provided",
-        role: "customer",
-        status: "active"
+        idVerificationStatus: isFirstUser ? "verified" : (idImageUrl ? "pending" : "not_provided"),
+        role: isFirstUser ? "admin" : "customer",
+        status: isFirstUser ? "active" : "pending"
       });
 
-      // Create session
+      // Create session for first user only
       const user = await storage.getUser(userId);
-      (req.session as any).userId = userId;
       
-      res.status(201).json({ user, message: "User registered successfully" });
+      if (isFirstUser) {
+        (req.session as any).userId = userId;
+        res.status(201).json({ 
+          user, 
+          message: "Welcome! You are the first user and have been granted administrator privileges." 
+        });
+      } else {
+        res.status(201).json({ 
+          user: null, 
+          message: "Registration successful! Your account is pending approval by an administrator." 
+        });
+      }
     } catch (error) {
       console.error("Registration error:", error);
       res.status(500).json({ message: "Registration failed" });
@@ -123,6 +137,11 @@ export async function setupAuth(app: Express) {
       }
 
       if (user.status !== "active") {
+        if (user.status === "pending") {
+          return res.status(401).json({ 
+            message: "Account is pending approval. Please wait for an administrator to activate your account." 
+          });
+        }
         return res.status(401).json({ message: "Account is inactive" });
       }
 

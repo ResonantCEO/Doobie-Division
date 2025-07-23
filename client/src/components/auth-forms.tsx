@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -18,7 +17,8 @@ export function AuthForms() {
     lastName: "",
   });
   const [idFile, setIdFile] = useState<File | null>(null);
-  
+  const [activeTab, setActiveTab] = useState("login"); // Added state for active tab
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -29,12 +29,12 @@ export function AuthForms() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message);
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -66,22 +66,32 @@ export function AuthForms() {
       if (data.idFile) {
         formData.append("idImage", data.idFile);
       }
-      
+
       const response = await fetch("/api/auth/register", {
         method: "POST",
         body: formData,
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message);
       }
-      
+
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({ title: "Welcome!", description: "Your account has been created successfully." });
+    onSuccess: (response) => {
+      toast({
+        title: "Registration successful",
+        description: response.message,
+      });
+
+      // Only auto-login if user session was created (first user)
+      if (response.user) {
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      } else {
+        // For pending users, switch to login tab
+        setActiveTab("login");
+      }
     },
     onError: (error: any) => {
       toast({
@@ -104,12 +114,12 @@ export function AuthForms() {
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <Tabs defaultValue="login" className="w-full">
+      <Tabs defaultValue="login" className="w-full" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="login">Login</TabsTrigger>
           <TabsTrigger value="register">Register</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="login">
           <Card>
             <CardHeader>
@@ -149,7 +159,7 @@ export function AuthForms() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="register">
           <Card>
             <CardHeader>

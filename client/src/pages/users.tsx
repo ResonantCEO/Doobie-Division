@@ -337,8 +337,13 @@ export default function UsersPage() {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {user.firstName} {user.lastName}
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm font-medium text-gray-900">{user.firstName} {user.lastName}</span>
+                              {user.role === 'admin' && user.createdAt && new Date(user.createdAt).getTime() === Math.min(...users.map(u => new Date(u.createdAt || 0).getTime())) && (
+                                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                  Founder
+                                </Badge>
+                              )}
                             </div>
                             <div className="text-sm text-gray-500">{user.email}</div>
                           </div>
