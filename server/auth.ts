@@ -93,7 +93,7 @@ export async function setupAuth(app: Express) {
         idImageUrl,
         idVerificationStatus: idImageUrl ? "pending" : "not_provided",
         role: "customer",
-        status: idImageUrl ? "pending" : "active"
+        status: "active"
       });
 
       // Create session
