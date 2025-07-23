@@ -14,7 +14,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex-shrink-0">
-              <h1 className="text-2xl font-bold text-primary">EcomInventory</h1>
+              <h1 className="text-2xl font-bold text-primary">Doobie Division</h1>
             </div>
             <Button onClick={handleLogin} className="bg-primary hover:bg-primary/90">
               Sign In
@@ -141,7 +141,7 @@ export default function Landing() {
       <footer className="bg-white border-t">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-gray-600">
-            <p>&copy; 2024 EcomInventory. All rights reserved.</p>
+            <p>&copy; 2024 Doobie Division. All rights reserved.</p>
           </div>
         </div>
       </footer>
