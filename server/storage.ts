@@ -118,7 +118,7 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(eq(users.email, email));
 
-    return user[0];
+    return user;
   }
 
   // Category operations
