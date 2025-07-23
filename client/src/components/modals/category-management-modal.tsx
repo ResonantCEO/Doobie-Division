@@ -253,14 +253,14 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
                       <FormLabel>Parent Category (Optional)</FormLabel>
                       <FormControl>
                         <Select 
-                          value={field.value ? field.value.toString() : ""} 
-                          onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                          value={field.value ? field.value.toString() : "0"} 
+                          onValueChange={(value) => field.onChange(value && value !== "0" ? parseInt(value) : undefined)}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select parent category" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">No Parent (Root Category)</SelectItem>
+                            <SelectItem value="0">No Parent (Root Category)</SelectItem>
                             {allCategories
                               .filter(cat => mode === 'edit' ? cat.id !== selectedCategory?.id : true)
                               .map((category) => (
