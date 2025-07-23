@@ -318,6 +318,7 @@ export default function UsersPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>User</TableHead>
+                    <TableHead>Photo</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
@@ -348,6 +349,19 @@ export default function UsersPage() {
                             <div className="text-sm text-gray-500">{user.email}</div>
                           </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {user.idImageUrl ? (
+                          <img
+                            src={user.idImageUrl}
+                            alt={`${user.firstName} ${user.lastName} ID`}
+                            className="w-12 h-12 object-cover rounded border cursor-pointer"
+                            onClick={() => window.open(user.idImageUrl, '_blank')}
+                            title="Click to view full size"
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-sm">No photo</span>
+                        )}
                       </TableCell>
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
                       <TableCell>{getStatusBadge(user.status)}</TableCell>
