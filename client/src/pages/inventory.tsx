@@ -50,6 +50,14 @@ export default function InventoryPage() {
     setStockFilter("");
   };
 
+  const handleCategoryChange = (value: string) => {
+    setSelectedCategory(value === "all" ? "" : value);
+  };
+
+  const handleStockFilterChange = (value: string) => {
+    setStockFilter(value === "all" ? "" : value);
+  };
+
   const handleStockAdjustment = (product: Product) => {
     setSelectedProduct(product);
     setShowStockModal(true);
@@ -114,12 +122,12 @@ export default function InventoryPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <Select value={selectedCategory || "all"} onValueChange={handleCategoryChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="all">All Categories</SelectItem>
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id.toString()}>
                       {category.name}
@@ -131,12 +139,12 @@ export default function InventoryPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Stock Status</label>
-              <Select value={stockFilter} onValueChange={setStockFilter}>
+              <Select value={stockFilter || "all"} onValueChange={handleStockFilterChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Stock Levels" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Stock Levels</SelectItem>
+                  <SelectItem value="all">All Stock Levels</SelectItem>
                   <SelectItem value="in_stock">In Stock</SelectItem>
                   <SelectItem value="low_stock">Low Stock</SelectItem>
                   <SelectItem value="out_of_stock">Out of Stock</SelectItem>

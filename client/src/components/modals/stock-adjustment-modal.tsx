@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -61,7 +67,7 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const qty = parseInt(quantity);
     if (isNaN(qty) || !reason.trim()) {
       toast({
@@ -83,10 +89,10 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Adjust Stock
-          </DialogTitle>
+          <DialogTitle>Adjust Stock - {product?.name}</DialogTitle>
+          <DialogDescription>
+            Adjust the stock level for this product. Current stock: {product?.stock || 0} units
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
