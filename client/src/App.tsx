@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
+import WireframePage from "@/pages/wireframe";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -22,7 +23,7 @@ function Router() {
         </>
       )}
       <Route path="/dashboard/*" component={Dashboard} />
-        <Route path="/wireframe" component={() => import("./pages/wireframe").then(m => m.default)} />
+        <Route path="/wireframe" component={WireframePage} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
     </Switch>
