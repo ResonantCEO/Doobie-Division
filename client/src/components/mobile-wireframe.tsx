@@ -9,7 +9,6 @@ import {
   ShoppingCart, 
   BarChart3, 
   Users, 
-  Search, 
   Menu, 
   Bell, 
   User,
@@ -130,14 +129,7 @@ function StorefrontWireframe() {
         </CardContent>
       </Card>
 
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-        <input 
-          className="w-full pl-10 pr-4 py-2 border rounded-lg"
-          placeholder="Search products..."
-        />
-      </div>
+      
 
       {/* Categories */}
       <div>
@@ -204,13 +196,7 @@ function InventoryWireframe() {
       </Card>
 
       {/* Filters */}
-      <div className="flex space-x-2">
-        <div className="flex-1">
-          <input 
-            className="w-full px-3 py-2 border rounded-lg text-sm"
-            placeholder="Search products..."
-          />
-        </div>
+      <div className="flex justify-end">
         <Button variant="outline" size="sm">
           <Filter className="h-4 w-4" />
         </Button>
@@ -409,14 +395,7 @@ function UsersWireframe() {
         ))}
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-        <input 
-          className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
-          placeholder="Search users..."
-        />
-      </div>
+      
 
       {/* Users List */}
       <div className="space-y-3">
