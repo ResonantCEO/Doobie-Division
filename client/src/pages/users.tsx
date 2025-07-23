@@ -11,6 +11,12 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
@@ -33,6 +39,8 @@ import type { User } from "@shared/schema";
 export default function UsersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   // Fetch users with stats
   const { data: users = [], isLoading } = useQuery<(User & { orderCount?: number })[]>({
@@ -185,6 +193,11 @@ export default function UsersPage() {
       title: "Review Pending Users",
       description: "Pending user review modal would be opened here",
     });
+  };
+
+  const handlePhotoClick = (user: User) => {
+    setSelectedUser(user);
+    setPhotoModalOpen(true);
   };
 
   if (isLoading) {
@@ -355,8 +368,8 @@ export default function UsersPage() {
                           <img
                             src={user.idImageUrl}
                             alt={`${user.firstName} ${user.lastName} ID`}
-                            className="w-12 h-12 object-cover rounded border cursor-pointer"
-                            onClick={() => window.open(user.idImageUrl, '_blank')}
+                            className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => handlePhotoClick(user)}
                             title="Click to view full size"
                           />
                         ) : (
@@ -429,6 +442,26 @@ export default function UsersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Photo Enlargement Modal */}
+      <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] p-6">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedUser && `${selectedUser.firstName} ${selectedUser.lastName}'s ID Photo`}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center items-center">
+            {selectedUser?.idImageUrl && (
+              <img
+                src={selectedUser.idImageUrl}
+                alt={`${selectedUser.firstName} ${selectedUser.lastName} ID`}
+                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
