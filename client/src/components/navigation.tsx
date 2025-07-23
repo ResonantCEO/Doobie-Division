@@ -15,6 +15,7 @@ import { Bell, User, LogOut, Search, ShoppingCart, ChevronDown } from "lucide-re
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface NavigationProps {
   user: UserType;
@@ -23,6 +24,7 @@ interface NavigationProps {
 
 export default function Navigation({ user, currentTab }: NavigationProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const { toast } = useToast();
 
   // Fetch notifications
   const { data: notifications = [] } = useQuery({
