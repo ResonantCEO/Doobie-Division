@@ -12,7 +12,7 @@ export default function OrdersPage() {
 
   // Fetch orders
   const { data: orders = [], isLoading } = useQuery<Order[]>({
-    queryKey: ["/api/orders", { status: statusFilter || undefined }],
+    queryKey: ["/api/orders", { status: statusFilter === "all" ? undefined : statusFilter || undefined }],
   });
 
   // Fetch order status breakdown
@@ -76,7 +76,7 @@ export default function OrdersPage() {
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Orders</SelectItem>
+              <SelectItem value="all">All Orders</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
