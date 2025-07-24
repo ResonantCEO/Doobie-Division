@@ -1,15 +1,11 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ShoppingBag, Users, BarChart3, Package } from "lucide-react";
-import { AuthForms } from "@/components/auth-forms";
 
 export default function Landing() {
-  const [showAuthDialog, setShowAuthDialog] = useState(false);
 
   const handleLogin = () => {
-    setShowAuthDialog(true);
+    window.location.href = "/api/login";
   };
 
   return (
@@ -150,15 +146,6 @@ export default function Landing() {
           </div>
         </div>
       </footer>
-
-      <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Authentication</DialogTitle>
-          </DialogHeader>
-          <AuthForms/>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
