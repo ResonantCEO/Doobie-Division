@@ -1,7 +1,4 @@
-` tags.
 
-```
-<replit_final_file>
 import {
   users,
   categories,
