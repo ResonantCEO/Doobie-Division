@@ -8,7 +8,7 @@ export function useOrderNotifications() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Poll for notifications every 30 seconds
+    // Check for notifications only on initial load
     const checkForNewOrders = async () => {
       try {
         const response = await fetch('/api/notifications', {
@@ -45,12 +45,7 @@ export function useOrderNotifications() {
       }
     };
 
-    // Check immediately
+    // Check only once on component mount - no interval polling
     checkForNewOrders();
-
-    // Set up interval
-    const interval = setInterval(checkForNewOrders, 30000); // Check every 30 seconds
-
-    return () => clearInterval(interval);
   }, [queryClient, toast]);
 }
