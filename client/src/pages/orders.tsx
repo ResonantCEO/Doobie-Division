@@ -4,27 +4,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import OrderTable from "@/components/order-table";
+import { useOrderNotifications } from "@/hooks/useOrderNotifications";
 import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw } from "lucide-react";
 import type { Order } from "@shared/schema";
 
 export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const queryClient = useQueryClient();
+  
+  // Set up order notifications
+  useOrderNotifications();
 
   // Fetch orders
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders", { status: statusFilter === "all" ? undefined : statusFilter || undefined }],
-    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
-    refetchInterval: false, // Disable auto-refresh
+    staleTime: Infinity, // Never consider data stale
+    gcTime: Infinity, // Keep in cache indefinitely
   });
 
   // Fetch order status breakdown
   const { data: statusBreakdown = [] } = useQuery<{ status: string; count: number }[]>({
     queryKey: ["/api/analytics/order-status-breakdown"],
-    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
-    refetchInterval: false, // Disable auto-refresh
+    staleTime: Infinity, // Never consider data stale
+    gcTime: Infinity, // Keep in cache indefinitely
   });
 
   const getStatusStats = () => {
