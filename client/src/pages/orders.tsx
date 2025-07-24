@@ -1,23 +1,28 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import OrderTable from "@/components/order-table";
-import { ShoppingBag, Clock, Truck, CheckCircle, Download } from "lucide-react";
+import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw } from "lucide-react";
 import type { Order } from "@shared/schema";
 
 export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const queryClient = useQueryClient();
 
   // Fetch orders
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders", { status: statusFilter === "all" ? undefined : statusFilter || undefined }],
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
 
   // Fetch order status breakdown
   const { data: statusBreakdown = [] } = useQuery<{ status: string; count: number }[]>({
     queryKey: ["/api/analytics/order-status-breakdown"],
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
 
   const getStatusStats = () => {
@@ -47,6 +52,11 @@ export default function OrdersPage() {
   const handleExportOrders = () => {
     // In a real app, this would generate and download a CSV/Excel file
     alert("Orders export functionality would be implemented here");
+  };
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/analytics/order-status-breakdown"] });
   };
 
   if (isLoading) {
@@ -84,6 +94,10 @@ export default function OrdersPage() {
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
+          <Button onClick={handleRefresh} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
           <Button onClick={handleExportOrders} variant="outline">
             <Download className="h-4 w-4 mr-2" />
             Export Orders
