@@ -541,12 +541,6 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
-import { db } from "./db";
-import { categories, products, orders, orderItems, users, notifications, inventoryLogs } from "@shared/schema";
-import { eq, desc, asc, sql, and, or, like, count, sum } from "drizzle-orm";
-import { nanoid } from "nanoid";
-
-export const storage = {
   // Category operations
   async getCategories() {
     try {
@@ -996,5 +990,4 @@ export const storage = {
       console.error("Error fetching order status breakdown:", error);
       throw error;
     }
-  },
-};
+  
