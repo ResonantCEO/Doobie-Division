@@ -13,7 +13,6 @@ export default function OrdersPage() {
   // Fetch orders
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders", { status: statusFilter || undefined }],
-    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
   // Fetch order status breakdown
