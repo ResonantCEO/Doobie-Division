@@ -16,6 +16,7 @@ export default function OrdersPage() {
     queryKey: ["/api/orders", { status: statusFilter === "all" ? undefined : statusFilter || undefined }],
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    refetchInterval: false, // Disable auto-refresh
   });
 
   // Fetch order status breakdown
@@ -23,6 +24,7 @@ export default function OrdersPage() {
     queryKey: ["/api/analytics/order-status-breakdown"],
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    refetchInterval: false, // Disable auto-refresh
   });
 
   const getStatusStats = () => {
