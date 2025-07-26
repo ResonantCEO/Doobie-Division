@@ -27,8 +27,9 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
     country: "Canada",
   });
   const [idFile, setIdFile] = useState<File | null>(null);
+  const [verificationPhoto, setVerificationPhoto] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState("login"); // Added state for active tab
-  const [signupStep, setSignupStep] = useState(1); // Track signup step (1-3)
+  const [signupStep, setSignupStep] = useState(1); // Track signup step (1-4)
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
 
@@ -76,6 +77,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
       postalCode: string;
       country: string;
       idFile: File | null;
+      verificationPhoto: File | null;
     }) => {
       const formData = new FormData();
       formData.append("email", data.email);
@@ -89,6 +91,9 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
       formData.append("country", data.country);
       if (data.idFile) {
         formData.append("idImage", data.idFile);
+      }
+      if (data.verificationPhoto) {
+        formData.append("verificationPhoto", data.verificationPhoto);
       }
 
       const response = await fetch("/api/auth/register", {
@@ -139,8 +144,10 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
       setSignupStep(2);
     } else if (signupStep === 2) {
       setSignupStep(3);
+    } else if (signupStep === 3) {
+      setSignupStep(4);
     } else {
-      registerMutation.mutate({ ...registerData, idFile });
+      registerMutation.mutate({ ...registerData, idFile, verificationPhoto });
     }
   };
 
@@ -227,7 +234,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                 {signupStep === 1 ? (
                   <>
                     <div className="text-center mb-4">
-                      <p className="text-sm text-muted-foreground">Step 1 of 3 - Basic Information</p>
+                      <p className="text-sm text-muted-foreground">Step 1 of 4 - Basic Information</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -294,7 +301,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                 ) : signupStep === 2 ? (
                   <>
                     <div className="text-center mb-4">
-                      <p className="text-sm text-muted-foreground">Step 2 of 3 - Address Information</p>
+                      <p className="text-sm text-muted-foreground">Step 2 of 4 - Address Information</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="address">Address</Label>
@@ -363,7 +370,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                 ) : (
                   <>
                     <div className="text-center mb-4">
-                      <p className="text-sm text-muted-foreground">Step 3 of 3 - Photo ID Verification</p>
+                      <p className="text-sm text-muted-foreground">Step 3 of 4 - Photo ID Verification</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="idUpload">Photo ID</Label>
@@ -382,6 +389,39 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                         variant="outline"
                         className="w-full"
                         onClick={() => setSignupStep(2)}
+                      >
+                        Back
+                      </Button>
+                      <Button type="submit" className="w-full">
+                        Continue to Verification Photo
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-center mb-4">
+                      <p className="text-sm text-muted-foreground">Step 4 of 4 - Verification Photo</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="verificationUpload">Verification Photo</Label>
+                      <Input
+                        id="verificationUpload"
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setVerificationPhoto(e.target.files?.[0] || null)}
+                        required
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Upload a photo of yourself holding a sign that says "Doobie Division!" 
+                        Make sure your face and the sign are clearly visible.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => setSignupStep(3)}
                       >
                         Back
                       </Button>

@@ -58,7 +58,7 @@ export async function setupAuth(app: Express) {
   app.use(getSession());
 
   // Register endpoint
-  app.post("/api/auth/register", upload.single('idImage'), async (req, res) => {
+  app.post("/api/auth/register", upload.fields([{ name: 'idImage', maxCount: 1 }, { name: 'verificationPhoto', maxCount: 1 }]), async (req, res) => {
     try {
       const { email, password, firstName, lastName, address, city, state, postalCode, country } = req.body;
 
@@ -85,7 +85,8 @@ export async function setupAuth(app: Express) {
 
       // Create user
       const userId = crypto.randomUUID();
-      const idImageUrl = req.file ? `/uploads/id-images/${req.file.filename}` : null;
+      const idImageUrl = req.files && (req.files as any)['idImage'] ? `/uploads/id-images/${(req.files as any)['idImage'][0].filename}` : null;
+      const verificationPhotoUrl = req.files && (req.files as any)['verificationPhoto'] ? `/uploads/verification-photos/${(req.files as any)['verificationPhoto'][0].filename}` : null;
 
       await storage.createUserWithPassword({
         id: userId,
@@ -94,6 +95,7 @@ export async function setupAuth(app: Express) {
         lastName,
         password: hashedPassword,
         idImageUrl,
+        verificationPhotoUrl,
         address,
         city,
         state,
