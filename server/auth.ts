@@ -1,4 +1,3 @@
-
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import type { Express, RequestHandler } from "express";
@@ -40,7 +39,7 @@ export function getSession() {
     ttl: SESSION_TTL,
     tableName: "sessions",
   });
-  
+
   return session({
     secret: process.env.SESSION_SECRET || "your-secret-key-change-this",
     store: sessionStore,
@@ -61,7 +60,7 @@ export async function setupAuth(app: Express) {
   // Register endpoint
   app.post("/api/auth/register", upload.single('idImage'), async (req, res) => {
     try {
-      const { email, password, firstName, lastName } = req.body;
+      const { email, password, firstName, lastName, address, city, state, postalCode, country } = req.body;
 
       if (!email || !password || !firstName || !lastName) {
         return res.status(400).json({ message: "All fields are required" });
@@ -83,11 +82,11 @@ export async function setupAuth(app: Express) {
       // Check if this is the first user (should become admin)
       const existingUserCount = await storage.getUserCount();
       const isFirstUser = existingUserCount === 0;
-      
+
       // Create user
       const userId = crypto.randomUUID();
       const idImageUrl = req.file ? `/uploads/id-images/${req.file.filename}` : null;
-      
+
       await storage.createUserWithPassword({
         id: userId,
         email,
@@ -95,6 +94,11 @@ export async function setupAuth(app: Express) {
         lastName,
         password: hashedPassword,
         idImageUrl,
+        address,
+        city,
+        state,
+        postalCode,
+        country: country || 'Canada',
         idVerificationStatus: isFirstUser ? "verified" : (idImageUrl ? "pending" : "not_provided"),
         role: isFirstUser ? "admin" : "customer",
         status: isFirstUser ? "active" : "pending"
@@ -102,7 +106,7 @@ export async function setupAuth(app: Express) {
 
       // Create session for first user only
       const user = await storage.getUser(userId);
-      
+
       if (isFirstUser) {
         (req.session as any).userId = userId;
         res.status(201).json({ 
@@ -153,7 +157,7 @@ export async function setupAuth(app: Express) {
 
       // Create session
       (req.session as any).userId = user.id;
-      
+
       // Remove password from response
       const { password: _, ...userResponse } = user;
       res.json({ user: userResponse, message: "Login successful" });
@@ -181,7 +185,7 @@ export async function setupAuth(app: Express) {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      
+
       const { password: _, ...userResponse } = user;
       res.json(userResponse);
     } catch (error) {

@@ -20,6 +20,11 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
     password: "",
     firstName: "",
     lastName: "",
+    address: "",
+    city: "",
+    state: "",
+    postalCode: "",
+    country: "Canada",
   });
   const [idFile, setIdFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState("login"); // Added state for active tab
@@ -64,6 +69,11 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
       password: string;
       firstName: string;
       lastName: string;
+      address: string;
+      city: string;
+      state: string;
+      postalCode: string;
+      country: string;
       idFile: File | null;
     }) => {
       const formData = new FormData();
@@ -71,6 +81,11 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
       formData.append("password", data.password);
       formData.append("firstName", data.firstName);
       formData.append("lastName", data.lastName);
+      formData.append("address", data.address);
+      formData.append("city", data.city);
+      formData.append("state", data.state);
+      formData.append("postalCode", data.postalCode);
+      formData.append("country", data.country);
       if (data.idFile) {
         formData.append("idImage", data.idFile);
       }
@@ -250,6 +265,56 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">Must be at least 6 characters</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input
+                    id="address"
+                    value={registerData.address}
+                    onChange={(e) => setRegisterData({ ...registerData, address: e.target.value })}
+                    placeholder="123 Main Street"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      value={registerData.city}
+                      onChange={(e) => setRegisterData({ ...registerData, city: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="state">Province/State</Label>
+                    <Input
+                      id="state"
+                      value={registerData.state}
+                      onChange={(e) => setRegisterData({ ...registerData, state: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="postalCode">Postal Code</Label>
+                    <Input
+                      id="postalCode"
+                      value={registerData.postalCode}
+                      onChange={(e) => setRegisterData({ ...registerData, postalCode: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country">Country</Label>
+                    <Input
+                      id="country"
+                      value={registerData.country}
+                      onChange={(e) => setRegisterData({ ...registerData, country: e.target.value })}
+                      required
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="idUpload">Photo ID</Label>

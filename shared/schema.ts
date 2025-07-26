@@ -38,6 +38,11 @@ export const users = pgTable("users", {
   idVerificationStatus: varchar("id_verification_status").notNull().default("pending"), // pending, verified, rejected
   role: varchar("role").notNull().default("customer"), // customer, manager, admin
   status: varchar("status").notNull().default("pending"), // pending, active, suspended
+  address: text("address"),
+  city: varchar("city"),
+  state: varchar("state"),
+  postalCode: varchar("postal_code"),
+  country: varchar("country").default("Canada"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
