@@ -32,26 +32,18 @@ export default function InventoryPage() {
 
   // Fetch products with filters
   const { data: products = [], isLoading } = useQuery<(Product & { category: Category | null })[]>({
-    queryKey: ["/api/products", searchQuery, selectedCategory, stockFilter],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (searchQuery) params.append('search', searchQuery);
-      if (selectedCategory) params.append('categoryId', selectedCategory);
-      if (stockFilter) params.append('status', stockFilter);
-      
-      const response = await fetch(`/api/products?${params.toString()}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) throw new Error('Failed to fetch products');
-      return response.json();
-    },
-    // Remove auto-refresh to stop the 30-second refreshing
+    queryKey: ["/api/products", { 
+      search: searchQuery || undefined,
+      categoryId: selectedCategory ? parseInt(selectedCategory) : undefined,
+      status: stockFilter || undefined
+    }],
+    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
   });
 
   // Fetch low stock products for alerts
   const { data: lowStockProducts = [] } = useQuery<Product[]>({
     queryKey: ["/api/products/low-stock"],
-    // Remove auto-refresh to stop the automatic refreshing
+    refetchInterval: 60000, // Check every minute
   });
 
   const handleResetFilters = () => {

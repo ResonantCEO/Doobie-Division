@@ -1,32 +1,24 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import OrderTable from "@/components/order-table";
-import { useOrderNotifications } from "@/hooks/useOrderNotifications";
-import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw } from "lucide-react";
+import { ShoppingBag, Clock, Truck, CheckCircle, Download } from "lucide-react";
 import type { Order } from "@shared/schema";
 
 export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
-  const queryClient = useQueryClient();
-  
-  // Set up order notifications
-  useOrderNotifications();
 
   // Fetch orders
   const { data: orders = [], isLoading } = useQuery<Order[]>({
-    queryKey: ["/api/orders", { status: statusFilter === "all" ? undefined : statusFilter || undefined }],
-    staleTime: Infinity, // Never consider data stale
-    gcTime: Infinity, // Keep in cache indefinitely
+    queryKey: ["/api/orders", { status: statusFilter || undefined }],
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
   // Fetch order status breakdown
   const { data: statusBreakdown = [] } = useQuery<{ status: string; count: number }[]>({
     queryKey: ["/api/analytics/order-status-breakdown"],
-    staleTime: Infinity, // Never consider data stale
-    gcTime: Infinity, // Keep in cache indefinitely
   });
 
   const getStatusStats = () => {
@@ -58,11 +50,6 @@ export default function OrdersPage() {
     alert("Orders export functionality would be implemented here");
   };
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/analytics/order-status-breakdown"] });
-  };
-
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -90,7 +77,7 @@ export default function OrdersPage() {
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Orders</SelectItem>
+              <SelectItem value="">All Orders</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
@@ -98,10 +85,6 @@ export default function OrdersPage() {
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={handleRefresh} variant="outline">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
           <Button onClick={handleExportOrders} variant="outline">
             <Download className="h-4 w-4 mr-2" />
             Export Orders

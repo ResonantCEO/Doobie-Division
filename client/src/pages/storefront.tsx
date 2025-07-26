@@ -20,17 +20,10 @@ export default function StorefrontPage() {
 
   // Fetch products
   const { data: products = [], isLoading: productsLoading } = useQuery<(Product & { category: Category | null })[]>({
-    queryKey: ["/api/products"],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (searchQuery) params.append('search', searchQuery);
-      if (selectedCategory) params.append('categoryId', selectedCategory.toString());
-      
-      const url = `/api/products${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch products');
-      return response.json();
-    },
+    queryKey: ["/api/products", { 
+      search: searchQuery || undefined, 
+      categoryId: selectedCategory || undefined 
+    }],
   });
 
   const handleCategoryFilter = (categoryId: number | null) => {

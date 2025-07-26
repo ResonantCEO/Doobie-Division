@@ -156,7 +156,7 @@ export default function Landing() {
           <DialogHeader>
             <DialogTitle>Authentication</DialogTitle>
           </DialogHeader>
-          <AuthForms onSuccess={() => setShowAuthDialog(false)} />
+          <AuthForms/>
         </DialogContent>
       </Dialog>
     </div>

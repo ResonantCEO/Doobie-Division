@@ -1,5 +1,3 @@
-
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -20,7 +18,6 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { insertProductSchema } from "@shared/schema";
 import { z } from "zod";
-import { Upload, X } from "lucide-react";
 import type { Category } from "@shared/schema";
 
 const formSchema = insertProductSchema.extend({
@@ -61,8 +58,6 @@ const renderCategoryOptions = (categories: CategoryWithChildren[], level = 0): J
 export default function AddProductModal({ open, onOpenChange, categories }: AddProductModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -79,77 +74,14 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
     },
   });
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast({
-          title: "File too large",
-          description: "Please select an image smaller than 5MB",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Invalid file type",
-          description: "Please select an image file",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setSelectedFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeImage = () => {
-    setSelectedFile(null);
-    setImagePreview(null);
-    form.setValue("imageUrl", "");
-  };
-
-  const uploadImage = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append('image', file);
-
-    const response = await fetch('/api/upload/product-image', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to upload image');
-    }
-
-    const data = await response.json();
-    return data.imageUrl;
-  };
-
   const createProductMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      let imageUrl = "";
-      
-      // Upload image if selected
-      if (selectedFile) {
-        imageUrl = await uploadImage(selectedFile);
-      }
-
       const payload = {
         ...data,
         price: data.price,
         stock: parseInt(data.stock),
         minStockThreshold: parseInt(data.minStockThreshold),
         categoryId: data.categoryId || undefined,
-        imageUrl,
       };
       await apiRequest("POST", "/api/products", payload);
     },
@@ -161,8 +93,6 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       });
       onOpenChange(false);
       form.reset();
-      setSelectedFile(null);
-      setImagePreview(null);
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -190,7 +120,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Add New Product</DialogTitle>
         </DialogHeader>
@@ -304,48 +234,19 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
               )}
             />
 
-            {/* Image Upload Section */}
-            <div className="space-y-2">
-              <FormLabel>Product Image (Optional)</FormLabel>
-              
-              {!imagePreview ? (
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="mt-4">
-                    <label htmlFor="image-upload" className="cursor-pointer">
-                      <span className="mt-2 block text-sm font-medium text-gray-900">
-                        Click to upload an image
-                      </span>
-                      <span className="mt-1 block text-xs text-gray-500">
-                        PNG, JPG, GIF up to 5MB
-                      </span>
-                    </label>
-                    <input
-                      id="image-upload"
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleFileSelect}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="relative">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-full h-32 object-cover rounded-lg border"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeImage}
-                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
+            <FormField
+              control={form.control}
+              name="imageUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Image URL (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
-            </div>
+            />
 
             <div className="flex justify-end space-x-2 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

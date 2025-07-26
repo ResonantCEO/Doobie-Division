@@ -9,11 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Eye, EyeOff } from "lucide-react";
 
-interface AuthFormsProps {
-  onSuccess?: () => void;
-}
-
-export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
+export function AuthForms() {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({
     email: "",
@@ -47,7 +43,6 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Welcome back!", description: "You have been logged in successfully." });
-      onSuccess?.();
     },
     onError: (error: any) => {
       toast({
@@ -96,7 +91,6 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
       // Only auto-login if user session was created (first user)
       if (response.user) {
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        onSuccess?.();
       } else {
         // For pending users, switch to login tab
         setActiveTab("login");
