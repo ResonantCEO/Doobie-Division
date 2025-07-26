@@ -28,6 +28,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
   });
   const [idFile, setIdFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState("login"); // Added state for active tab
+  const [signupStep, setSignupStep] = useState(1); // Track signup step
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
 
@@ -113,8 +114,9 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
         onSuccess?.();
       } else {
-        // For pending users, switch to login tab
+        // For pending users, switch to login tab and reset signup step
         setActiveTab("login");
+        setSignupStep(1);
       }
     },
     onError: (error: any) => {
@@ -133,12 +135,24 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    registerMutation.mutate({ ...registerData, idFile });
+    if (signupStep === 1) {
+      setSignupStep(2);
+    } else {
+      registerMutation.mutate({ ...registerData, idFile });
+    }
   };
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <Tabs defaultValue="login" className="w-full" value={activeTab} onValueChange={setActiveTab}>
+      <Tabs 
+        defaultValue="login" 
+        className="w-full" 
+        value={activeTab} 
+        onValueChange={(value) => {
+          setActiveTab(value);
+          setSignupStep(1); // Reset to step 1 when switching tabs
+        }}
+      >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="login">Login</TabsTrigger>
           <TabsTrigger value="register">Register</TabsTrigger>
@@ -208,132 +222,158 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleRegister} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input
-                      id="firstName"
-                      value={registerData.firstName}
-                      onChange={(e) => setRegisterData({ ...registerData, firstName: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input
-                      id="lastName"
-                      value={registerData.lastName}
-                      onChange={(e) => setRegisterData({ ...registerData, lastName: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="registerEmail">Email</Label>
-                  <Input
-                    id="registerEmail"
-                    type="email"
-                    value={registerData.email}
-                    onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="registerPassword">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="registerPassword"
-                      type={showRegisterPassword ? "text" : "password"}
-                      value={registerData.password}
-                      onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                      minLength={6}
-                      required
-                      className="pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowRegisterPassword(!showRegisterPassword)}
-                    >
-                      {showRegisterPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                {signupStep === 1 ? (
+                  <>
+                    <div className="text-center mb-4">
+                      <p className="text-sm text-muted-foreground">Step 1 of 2 - Basic Information</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input
+                          id="firstName"
+                          value={registerData.firstName}
+                          onChange={(e) => setRegisterData({ ...registerData, firstName: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          value={registerData.lastName}
+                          onChange={(e) => setRegisterData({ ...registerData, lastName: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="registerEmail">Email</Label>
+                      <Input
+                        id="registerEmail"
+                        type="email"
+                        value={registerData.email}
+                        onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="registerPassword">Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="registerPassword"
+                          type={showRegisterPassword ? "text" : "password"}
+                          value={registerData.password}
+                          onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                          minLength={6}
+                          required
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                        >
+                          {showRegisterPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Must be at least 6 characters</p>
+                    </div>
+                    <Button type="submit" className="w-full">
+                      Continue to Address Information
                     </Button>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Must be at least 6 characters</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Input
-                    id="address"
-                    value={registerData.address}
-                    onChange={(e) => setRegisterData({ ...registerData, address: e.target.value })}
-                    placeholder="123 Main Street"
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      value={registerData.city}
-                      onChange={(e) => setRegisterData({ ...registerData, city: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="state">Province/State</Label>
-                    <Input
-                      id="state"
-                      value={registerData.state}
-                      onChange={(e) => setRegisterData({ ...registerData, state: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="postalCode">Postal Code</Label>
-                    <Input
-                      id="postalCode"
-                      value={registerData.postalCode}
-                      onChange={(e) => setRegisterData({ ...registerData, postalCode: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Input
-                      id="country"
-                      value={registerData.country}
-                      onChange={(e) => setRegisterData({ ...registerData, country: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="idUpload">Photo ID</Label>
-                  <Input
-                    id="idUpload"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setIdFile(e.target.files?.[0] || null)}
-                    required
-                  />
-                  <p className="text-sm text-muted-foreground">Upload a clear photo of your government-issued ID</p>
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={registerMutation.isPending}
-                >
-                  {registerMutation.isPending ? "Creating account..." : "Create Account"}
-                </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-center mb-4">
+                      <p className="text-sm text-muted-foreground">Step 2 of 2 - Address & Verification</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="address">Address</Label>
+                      <Input
+                        id="address"
+                        value={registerData.address}
+                        onChange={(e) => setRegisterData({ ...registerData, address: e.target.value })}
+                        placeholder="123 Main Street"
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="city">City</Label>
+                        <Input
+                          id="city"
+                          value={registerData.city}
+                          onChange={(e) => setRegisterData({ ...registerData, city: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="state">Province/State</Label>
+                        <Input
+                          id="state"
+                          value={registerData.state}
+                          onChange={(e) => setRegisterData({ ...registerData, state: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="postalCode">Postal Code</Label>
+                        <Input
+                          id="postalCode"
+                          value={registerData.postalCode}
+                          onChange={(e) => setRegisterData({ ...registerData, postalCode: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="country">Country</Label>
+                        <Input
+                          id="country"
+                          value={registerData.country}
+                          onChange={(e) => setRegisterData({ ...registerData, country: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="idUpload">Photo ID</Label>
+                      <Input
+                        id="idUpload"
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setIdFile(e.target.files?.[0] || null)}
+                        required
+                      />
+                      <p className="text-sm text-muted-foreground">Upload a clear photo of your government-issued ID</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => setSignupStep(1)}
+                      >
+                        Back
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={registerMutation.isPending}
+                      >
+                        {registerMutation.isPending ? "Creating account..." : "Create Account"}
+                      </Button>
+                    </div>
+                  </>
+                )}
               </form>
             </CardContent>
           </Card>
