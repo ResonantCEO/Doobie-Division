@@ -42,12 +42,12 @@
   --border: hsl(216, 34%, 17%);
   --input: hsl(216, 34%, 17%);
   --primary: hsl(207, 90%, 54%);
-  --primary-foreground: hsl(210, 40%, 98%);
+  --primary-foreground: hsl(222, 84%, 5%);
   --secondary: hsl(142, 69%, 40%);
   --secondary-foreground: hsl(142, 69%, 88%);
-  --accent: hsl(216, 34%, 17%);
+  --accent: hsl(0, 84%, 60%);
   --accent-foreground: hsl(210, 40%, 98%);
-  --destructive: hsl(0, 63%, 31%);
+  --destructive: hsl(0, 84%, 60%);
   --destructive-foreground: hsl(210, 40%, 98%);
   --ring: hsl(207, 90%, 54%);
   --chart-1: hsl(207, 90%, 54%);
@@ -56,8 +56,6 @@
   --chart-4: hsl(45, 93%, 47%);
   --chart-5: hsl(271, 81%, 56%);
 }
-
-
 
 @layer base {
   * {
