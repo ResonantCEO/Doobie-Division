@@ -13,9 +13,9 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Navigation */}
-      <nav className="bg-background shadow-sm border-b border-border">
+      <nav className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex-shrink-0">
@@ -35,14 +35,14 @@ export default function Landing() {
             <h1 className="text-4xl md:text-6xl font-bold mb-6">
               Rolling with the Division!
             </h1>
-            <p className="text-xl md:text-2xl mb-8 text-blue-100 dark:text-gray-300 max-w-3xl mx-auto">
+            <p className="text-xl md:text-2xl mb-8 text-blue-100 max-w-3xl mx-auto">
               Streamline your business with our comprehensive platform for product catalog, 
               inventory tracking, order management, and analytics.
             </p>
             <Button 
               onClick={handleLogin}
               size="lg"
-              className="bg-white dark:bg-gray-800 text-primary dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 text-lg px-8 py-3"
+              className="bg-white text-primary hover:bg-gray-100 text-lg px-8 py-3"
             >
               Get Started Today
             </Button>
