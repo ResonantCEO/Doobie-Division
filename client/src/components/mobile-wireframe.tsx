@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -128,13 +129,13 @@ function StorefrontWireframe() {
         </CardContent>
       </Card>
 
-
+      
 
       {/* Categories */}
       <div>
         <h3 className="font-semibold mb-3">Categories</h3>
         <div className="flex space-x-2 overflow-x-auto pb-2">
-          {["All", "Flower", "Concentrates", "Books", "Home"].map((cat) => (
+          {["All", "Electronics", "Clothing", "Books", "Home"].map((cat) => (
             <Button key={cat} variant="outline" size="sm" className="whitespace-nowrap">
               {cat}
             </Button>
@@ -394,7 +395,7 @@ function UsersWireframe() {
         ))}
       </div>
 
-
+      
 
       {/* Users List */}
       <div className="space-y-3">

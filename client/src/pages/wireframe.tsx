@@ -22,6 +22,32 @@ export default function WireframePage() {
           
           {/* Controls and Info Panel */}
           <div className="space-y-6">
+            {/* Screen Selector */}
+            <div className="bg-white p-6 rounded-lg shadow-lg w-80">
+              <h3 className="font-bold text-lg mb-4">Screen Navigation</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries({
+                  storefront: "Storefront",
+                  inventory: "Inventory", 
+                  orders: "Orders",
+                  analytics: "Analytics",
+                  users: "Users"
+                }).map(([key, title]) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      // We need to communicate with the MobileWireframe component
+                      const event = new CustomEvent('screenChange', { detail: key });
+                      window.dispatchEvent(event);
+                    }}
+                    className="text-sm py-2 px-3 rounded border border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    {title}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* App Features */}
             <div className="bg-white p-6 rounded-lg shadow-lg w-80">
               <h3 className="font-bold text-lg mb-4">App Features</h3>
