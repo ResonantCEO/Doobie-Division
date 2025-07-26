@@ -28,7 +28,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
   });
   const [idFile, setIdFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState("login"); // Added state for active tab
-  const [signupStep, setSignupStep] = useState(1); // Track signup step
+  const [signupStep, setSignupStep] = useState(1); // Track signup step (1-3)
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
 
@@ -137,6 +137,8 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
     e.preventDefault();
     if (signupStep === 1) {
       setSignupStep(2);
+    } else if (signupStep === 2) {
+      setSignupStep(3);
     } else {
       registerMutation.mutate({ ...registerData, idFile });
     }
@@ -225,7 +227,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                 {signupStep === 1 ? (
                   <>
                     <div className="text-center mb-4">
-                      <p className="text-sm text-muted-foreground">Step 1 of 2 - Basic Information</p>
+                      <p className="text-sm text-muted-foreground">Step 1 of 3 - Basic Information</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -289,10 +291,10 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                       Continue to Address Information
                     </Button>
                   </>
-                ) : (
+                ) : signupStep === 2 ? (
                   <>
                     <div className="text-center mb-4">
-                      <p className="text-sm text-muted-foreground">Step 2 of 2 - Address & Verification</p>
+                      <p className="text-sm text-muted-foreground">Step 2 of 3 - Address Information</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="address">Address</Label>
@@ -344,6 +346,25 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                         />
                       </div>
                     </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => setSignupStep(1)}
+                      >
+                        Back
+                      </Button>
+                      <Button type="submit" className="w-full">
+                        Continue to Verification
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-center mb-4">
+                      <p className="text-sm text-muted-foreground">Step 3 of 3 - Photo ID Verification</p>
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="idUpload">Photo ID</Label>
                       <Input
@@ -360,7 +381,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                         type="button"
                         variant="outline"
                         className="w-full"
-                        onClick={() => setSignupStep(1)}
+                        onClick={() => setSignupStep(2)}
                       >
                         Back
                       </Button>
