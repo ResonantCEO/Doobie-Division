@@ -2,6 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import express from "express";
 import path from "path";
+import multer from "multer";
+import { v4 as uuidv4 } from "uuid";
+import fs from "fs";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema } from "@shared/schema";
@@ -21,12 +24,57 @@ const requireRole = (roles: string[]) => {
   };
 };
 
+// Configure multer for image uploads
+const uploadDir = path.join(process.cwd(), 'uploads', 'product-images');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage_multer = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueId = uuidv4();
+    const extension = path.extname(file.originalname);
+    cb(null, `${uniqueId}${extension}`);
+  }
+});
+
+const upload = multer({
+  storage: storage_multer,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Static file serving for uploaded images
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
   
   // Auth middleware
   await setupAuth(app);
+
+  // Image upload endpoint
+  app.post('/api/upload/product-image', isAuthenticated, requireRole(['admin', 'manager']), upload.single('image'), (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No image file provided' });
+      }
+
+      const imageUrl = `/uploads/product-images/${req.file.filename}`;
+      res.json({ imageUrl });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to upload image' });
+    }
+  });
 
   // Auth routes are handled in setupAuth
 

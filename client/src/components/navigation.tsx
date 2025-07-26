@@ -12,10 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Bell, Settings, LogOut, ShoppingBag, Package, BarChart3, Users, Home, Search, ShoppingCart, User, ChevronDown } from "lucide-react";
+import { Bell, Settings, LogOut, ShoppingBag, Package, BarChart3, Users, Home, Search, ShoppingCart, User, ChevronDown, Sun, Moon } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme } from "@/contexts/theme-context";
+import { Switch } from "@/components/ui/switch";
 
 interface NavigationProps {
   user: UserType;
@@ -25,6 +27,7 @@ interface NavigationProps {
 export default function Navigation({ user, currentTab }: NavigationProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+  const { theme, toggleTheme } = useTheme();
 
   // Fetch notifications
   const { data: notifications = [] } = useQuery({
@@ -108,6 +111,17 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                   </Badge>
                 )}
               </Button>
+
+              {/* Theme Toggle */}
+              <div className="flex items-center space-x-2">
+                <Sun className="h-4 w-4" />
+                <Switch
+                  checked={theme === 'dark'}
+                  onCheckedChange={toggleTheme}
+                  aria-label="Toggle dark mode"
+                />
+                <Moon className="h-4 w-4" />
+              </div>
 
               {/* User Menu */}
               <DropdownMenu>

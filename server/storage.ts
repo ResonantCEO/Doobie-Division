@@ -25,9 +25,12 @@ import { db } from "./db";
 import { eq, desc, and, lt, sql, ilike, or } from "drizzle-orm";
 
 export interface IStorage {
-  // User operations (required for Replit Auth)
+  // User operations
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUserWithPassword(userData: any): Promise<User>;
+  getUserCount(): Promise<number>;
 
   // Category operations
   getCategories(): Promise<(Category & { children?: Category[] })[]>;
@@ -537,6 +540,73 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(eq(users.idVerificationStatus, 'pending'))
       .orderBy(desc(users.createdAt));
+  }
+
+  async createOrder(orderData: typeof orders.$inferInsert, orderItems: (typeof orderItems.$inferInsert)[]): Promise<Order> {
+    return await db.transaction(async (tx) => {
+      // Create the order
+      const [order] = await tx.insert(orders).values(orderData).returning();
+
+      // Create order items
+      const itemsWithOrderId = orderItems.map(item => ({
+        ...item,
+        orderId: order.id,
+      }));
+
+      await tx.insert(orderItems).values(itemsWithOrderId);
+
+      // Update product stock
+      for (const item of orderItems) {
+        if (item.productId) {
+          const [product] = await tx
+            .select()
+            .from(products)
+            .where(eq(products.id, item.productId));
+
+          if (product) {
+            const newStock = product.stock - item.quantity;
+            await tx
+              .update(products)
+              .set({ stock: newStock })
+              .where(eq(products.id, item.productId));
+
+            // Log inventory change
+            await tx.insert(inventoryLogs).values({
+              productId: item.productId,
+              type: 'sale',
+              quantity: -item.quantity,
+              previousStock: product.stock,
+              newStock: newStock,
+              reason: `Order ${order.orderNumber}`,
+              userId: orderData.customerId,
+            });
+
+            // Check for low stock and create notifications
+            if (newStock <= product.minStockThreshold) {
+              await this.createLowStockNotifications(product, newStock);
+            }
+          }
+        }
+      }
+
+      // Create new order notifications for admins and managers
+      const adminUsers = await tx
+        .select()
+        .from(users)
+        .where(or(eq(users.role, 'admin'), eq(users.role, 'manager')));
+
+      for (const admin of adminUsers) {
+        await tx.insert(notifications).values({
+          userId: admin.id,
+          type: 'new_order',
+          title: 'New Order Received',
+          message: `Order ${order.orderNumber} from ${order.customerName} - $${order.total}`,
+          data: { orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName, total: order.total },
+        });
+      }
+
+      return order;
+    });
   }
 }
 
