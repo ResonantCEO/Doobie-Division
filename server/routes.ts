@@ -386,6 +386,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/users/:id', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const id = req.params.id;
+      const userData = req.body;
+      
+      const user = await storage.updateUser(id, userData);
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
   // ID verification routes
   app.put('/api/users/:id/id-verification', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {

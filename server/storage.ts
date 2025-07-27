@@ -73,6 +73,7 @@ export interface IStorage {
   updateUserRole(id: string, role: string): Promise<User>;
   updateUserIdVerification(id: string, status: string): Promise<User>;
   getUsersPendingVerification(): Promise<User[]>;
+  updateUser(id: string, userData: any): Promise<User>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -607,6 +608,21 @@ export class DatabaseStorage implements IStorage {
 
       return order;
     });
+  }
+
+  async updateUser(userId: string, userData: any): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        firstName: userData.firstName,
+        lastName: userData.lastName,  
+        email: userData.email,
+        role: userData.role,
+        status: userData.status,
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
   }
 }
 

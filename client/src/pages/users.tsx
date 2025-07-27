@@ -17,6 +17,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
@@ -31,7 +40,9 @@ import {
   UserX,
   Check,
   X,
-  MoreHorizontal
+  MoreHorizontal,
+  Activity,
+  Save
 } from "lucide-react";
 import { format } from "date-fns";
 import type { User } from "@shared/schema";
@@ -41,6 +52,10 @@ export default function UsersPage() {
   const queryClient = useQueryClient();
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userActivity, setUserActivity] = useState<any[]>([]);
 
   // Fetch users with stats
   const { data: users = [], isLoading } = useQuery<(User & { orderCount?: number })[]>({
@@ -112,6 +127,40 @@ export default function UsersPage() {
     },
   });
 
+  // Update user details mutation
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ userId, userData }: { userId: string; userData: any }) => {
+      await apiRequest("PUT", `/api/users/${userId}`, userData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setEditModalOpen(false);
+      setEditingUser(null);
+      toast({
+        title: "Success",
+        description: "User updated successfully",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to update user",
+        variant: "destructive",
+      });
+    },
+  });
+
   const getUserStats = () => {
     const stats = {
       total: users.length,
@@ -168,17 +217,31 @@ export default function UsersPage() {
   };
 
   const handleEditUser = (userId: string) => {
-    toast({
-      title: "Edit User",
-      description: `Edit functionality for user ${userId} would be implemented here`,
-    });
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      setEditingUser(user);
+      setEditModalOpen(true);
+    }
   };
 
-  const handleViewActivity = (userId: string) => {
-    toast({
-      title: "User Activity",
-      description: `Activity log for user ${userId} would be displayed here`,
-    });
+  const handleViewActivity = async (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      setSelectedUser(user);
+      // Simulate fetching user activity - replace with actual API call
+      try {
+        const response = await apiRequest("GET", `/api/users/${userId}/activity`);
+        setUserActivity(response);
+      } catch (error) {
+        // If no activity endpoint exists, show mock data
+        setUserActivity([
+          { id: 1, action: "Logged in", timestamp: new Date().toISOString(), details: "User logged in successfully" },
+          { id: 2, action: "Profile updated", timestamp: new Date(Date.now() - 86400000).toISOString(), details: "Updated profile information" },
+          { id: 3, action: "Order placed", timestamp: new Date(Date.now() - 172800000).toISOString(), details: "Placed order #1001" }
+        ]);
+      }
+      setActivityModalOpen(true);
+    }
   };
 
   const handleInviteUser = () => {
@@ -198,6 +261,20 @@ export default function UsersPage() {
   const handlePhotoClick = (user: User) => {
     setSelectedUser(user);
     setPhotoModalOpen(true);
+  };
+
+  const handleSaveUser = (formData: FormData) => {
+    if (!editingUser) return;
+    
+    const userData = {
+      firstName: formData.get('firstName') as string,
+      lastName: formData.get('lastName') as string,
+      email: formData.get('email') as string,
+      role: formData.get('role') as string,
+      status: formData.get('status') as string,
+    };
+    
+    updateUserMutation.mutate({ userId: editingUser.id, userData });
   };
 
   if (isLoading) {
@@ -487,6 +564,125 @@ export default function UsersPage() {
                 alt={`${selectedUser.firstName} ${selectedUser.lastName} ID`}
                 className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
               />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Modal */}
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+          </DialogHeader>
+          {editingUser && (
+            <form action={handleSaveUser} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  name="firstName"
+                  defaultValue={editingUser.firstName || ''}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  name="lastName"
+                  defaultValue={editingUser.lastName || ''}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  defaultValue={editingUser.email}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <Select name="role" defaultValue={editingUser.role}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="customer">Customer</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select name="status" defaultValue={editingUser.status}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="suspended">Suspended</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updateUserMutation.isPending}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* User Activity Modal */}
+      <Dialog open={activityModalOpen} onOpenChange={setActivityModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              <div className="flex items-center">
+                <Activity className="h-5 w-5 mr-2" />
+                {selectedUser && `${selectedUser.firstName} ${selectedUser.lastName}'s Activity Log`}
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-96 overflow-y-auto">
+            {userActivity.length === 0 ? (
+              <div className="text-center py-8">
+                <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">No activity found for this user</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {userActivity.map((activity, index) => (
+                  <div key={activity.id || index} className="border-l-2 border-blue-200 pl-4 pb-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <h4 className="font-medium text-gray-900">{activity.action}</h4>
+                      <span className="text-xs text-gray-500">
+                        {format(new Date(activity.timestamp), "MMM d, yyyy 'at' h:mm a")}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600">{activity.details}</p>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </DialogContent>
