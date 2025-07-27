@@ -336,7 +336,7 @@ export default function WireframePage() {
 
             {/* Screen Details */}
             <div className="bg-white p-6 rounded-lg shadow-lg w-80">
-              <h3 className="font-bold text-lg mb-4">Selected Screen Details</h3>
+              <h3 className="font-bold text-lg mb-4">{screenDetails[currentScreen as keyof typeof screenDetails]?.name || 'Selected Screen Details'}</h3>
               <div id="screen-details">
                 <ul className="space-y-3 text-gray-600 text-sm">
                   <li className="flex items-center">
