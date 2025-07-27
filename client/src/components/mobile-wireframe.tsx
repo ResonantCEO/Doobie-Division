@@ -437,26 +437,7 @@ function LandingWireframe() {
         </CardContent>
       </Card>
 
-      {/* Features */}
-      <div className="space-y-4">
-        <h3 className="font-semibold">Features</h3>
-        {[
-          { icon: ShoppingCart, title: "E-commerce Platform", desc: "Browse and purchase products" },
-          { icon: Package, title: "Inventory Management", desc: "Track stock levels" },
-          { icon: BarChart3, title: "Analytics Dashboard", desc: "Business insights" },
-          { icon: Users, title: "User Management", desc: "Role-based access control" }
-        ].map((feature, i) => (
-          <Card key={i}>
-            <CardContent className="p-4 flex items-center space-x-3">
-              <feature.icon className="h-8 w-8 text-primary" />
-              <div>
-                <h4 className="font-medium">{feature.title}</h4>
-                <p className="text-sm text-gray-500">{feature.desc}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      
     </div>
   );
 }
