@@ -103,8 +103,7 @@ const screenDetails = {
     color: "gray",
     details: [
       "Personal information management",
-      "ID verification with document upload",
-      "Notification and privacy settings",
+      "Privacy settings and preferences",
       "Account security and export options"
     ]
   },
