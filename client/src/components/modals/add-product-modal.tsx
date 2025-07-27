@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,7 +40,7 @@ interface AddProductModalProps {
 
 const renderCategoryOptions = (categories: CategoryWithChildren[], level = 0): JSX.Element[] => {
   const result: JSX.Element[] = [];
-  
+
   for (const category of categories) {
     const prefix = "  ".repeat(level);
     result.push(
@@ -49,12 +48,12 @@ const renderCategoryOptions = (categories: CategoryWithChildren[], level = 0): J
         {prefix}{level > 0 ? "└ " : ""}{category.name}
       </SelectItem>
     );
-    
+
     if (category.children && category.children.length > 0) {
       result.push(...renderCategoryOptions(category.children, level + 1));
     }
   }
-  
+
   return result;
 };
 
@@ -101,7 +100,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       }
 
       setSelectedFile(file);
-      
+
       // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -137,7 +136,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
   const createProductMutation = useMutation({
     mutationFn: async (data: FormData) => {
       let imageUrl = "";
-      
+
       // Upload image if selected
       if (selectedFile) {
         imageUrl = await uploadImage(selectedFile);
@@ -307,7 +306,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
             {/* Image Upload Section */}
             <div className="space-y-2">
               <FormLabel>Product Image (Optional)</FormLabel>
-              
+
               {!imagePreview ? (
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                   <Upload className="mx-auto h-12 w-12 text-gray-400" />
