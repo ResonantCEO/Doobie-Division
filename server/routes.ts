@@ -418,6 +418,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin routes
+  app.get('/api/admin/inventory-logs', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const { days, type, product } = req.query;
+      const filters: any = {};
+      
+      if (days) filters.days = parseInt(days as string);
+      if (type) filters.type = type as string;
+      if (product) filters.product = product as string;
+      
+      const logs = await storage.getInventoryLogs(filters);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch inventory logs" });
+    }
+  });
+
   // ID verification routes
   app.put('/api/users/:id/id-verification', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {
