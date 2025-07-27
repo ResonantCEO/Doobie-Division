@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -148,38 +147,13 @@ export default function MobileWireframe() {
         {screens[currentScreen as keyof typeof screens].component}
       </div>
 
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-md bg-white border-t shadow-lg">
-        <div className="flex justify-around py-2">
-          {[
-            { id: "storefront", icon: Home, label: "Shop" },
-            { id: "inventory", icon: Package, label: "Inventory" },
-            { id: "orders", icon: ShoppingCart, label: "Orders" },
-            { id: "analytics", icon: BarChart3, label: "Analytics" },
-            { id: "users", icon: Users, label: "Users" }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setCurrentScreen(tab.id)}
-              className={`flex flex-col items-center py-2 px-3 ${
-                currentScreen === tab.id 
-                  ? "text-primary" 
-                  : "text-gray-500"
-              }`}
-            >
-              <tab.icon className="h-5 w-5 mb-1" />
-              <span className="text-xs">{tab.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
 
 function CartWireframe() {
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold">Shopping Cart</h2>
         <Button variant="outline" size="sm">
@@ -316,7 +290,7 @@ function CartWireframe() {
 
 function OrderConfirmationWireframe() {
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6">
       {/* Success Header */}
       <div className="text-center py-8">
         <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -450,7 +424,7 @@ function OrderConfirmationWireframe() {
 
 function LandingWireframe() {
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6">
       {/* Hero Section */}
       <Card className="bg-gradient-to-r from-green-500 to-blue-600 text-white">
         <CardContent className="p-8 text-center">
@@ -489,7 +463,7 @@ function LandingWireframe() {
 
 function DashboardWireframe() {
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold">Dashboard</h2>
         <Button variant="outline" size="sm">
@@ -571,7 +545,7 @@ function DashboardWireframe() {
 
 function ProfileWireframe() {
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4">
       {/* Profile Header */}
       <Card>
         <CardContent className="p-6 text-center">
@@ -674,7 +648,7 @@ function ProfileWireframe() {
 
 function AdminWireframe() {
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold">Admin Panel</h2>
         <Badge variant="destructive">Admin Only</Badge>
@@ -769,7 +743,7 @@ function AdminWireframe() {
 
 function StorefrontWireframe() {
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4">
       {/* Hero Banner */}
       <Card className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
         <CardContent className="p-6">
@@ -848,7 +822,7 @@ function StorefrontWireframe() {
 
 function InventoryWireframe() {
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4">
       {/* Header Actions */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold">Inventory</h2>
@@ -946,7 +920,7 @@ function InventoryWireframe() {
 
 function OrdersWireframe() {
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold">Orders</h2>
@@ -1045,7 +1019,7 @@ function OrdersWireframe() {
 
 function AnalyticsWireframe() {
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold">Analytics</h2>
         <select className="px-3 py-1 border rounded text-sm">
@@ -1141,7 +1115,7 @@ function AnalyticsWireframe() {
 
 function UsersWireframe() {
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold">Users</h2>
