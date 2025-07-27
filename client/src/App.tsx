@@ -39,7 +39,7 @@ function Router() {
           <Route path="/users" component={UsersPage} />
           <Route path="/profile" component={ProfilePage} />
           <Route path="/wireframe" component={WireframePage} />
-          <Route component={NotFoundPage} /></Route>
+          <Route component={NotFoundPage} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
     </Switch>
