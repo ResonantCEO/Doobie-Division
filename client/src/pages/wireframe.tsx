@@ -40,8 +40,8 @@ const screenDetails = {
     details: [
       "Item quantity adjustment and removal",
       "Promo code application system",
-      "Order summary with tax and shipping",
-      "Shipping address and payment method setup"
+      "Order summary with totals",
+      "Proceed to checkout functionality"
     ]
   },
   orderConfirmation: {
