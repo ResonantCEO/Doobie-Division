@@ -13,7 +13,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   const handleAddToCart = () => {
     if (product.stock === 0) return;
-    
+
     toast({
       title: "Added to Cart",
       description: `${product.name} has been added to your cart.`,
@@ -49,7 +49,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           )}
           <p className="text-sm text-gray-600 line-clamp-2 mt-1">{product.description}</p>
         </div>
-        
+
         <div className="flex items-center justify-between">
           <span className="text-2xl font-bold text-primary">
             ${Number(product.price).toFixed(2)}
@@ -58,7 +58,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             {stockStatus.label}
           </Badge>
         </div>
-        
+
         <Button
           onClick={handleAddToCart}
           disabled={product.stock === 0}

@@ -97,7 +97,7 @@ export default function StorefrontPage() {
           <Input
             type="text"
             placeholder="Search products..."
-            className="pl-10"
+            className="pl-10 glass-input"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -111,6 +111,7 @@ export default function StorefrontPage() {
             <Button
               variant={selectedCategory === null ? "default" : "outline"}
               size="sm"
+              className="glass-button"
               onClick={() => handleCategoryFilter(null)}
             >
               All Products
@@ -120,6 +121,7 @@ export default function StorefrontPage() {
                 key={category.id}
                 variant={selectedCategory === category.id ? "default" : "outline"}
                 size="sm"
+                className="glass-button"
                 onClick={() => handleCategoryFilter(category.id)}
               >
                 {category.name}
