@@ -227,21 +227,21 @@ export default function InventoryTable({ products, onStockAdjustment }: Inventor
                       variant="ghost"
                       size="sm"
                       onClick={() => onStockAdjustment(product)}
-                      className="h-6 w-6 p-0"
+                      className="h-6 w-6 p-0 text-black hover:text-black"
                       title="Adjust stock"
                     >
                       <Edit className="h-3 w-3" />
                     </Button>
                   </div>
                 </TableCell>
-                <TableCell className="font-medium text-black dark:text-white">
+                <TableCell className="font-medium text-black">
                   ${Number(product.price).toFixed(2)}
                 </TableCell>
                 <TableCell>{getStockBadge(product)}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" className="text-black hover:text-black">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
