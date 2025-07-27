@@ -22,9 +22,9 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
     lastName: "",
     address: "",
     city: "",
-    state: "",
+    state: "Virginia",
     postalCode: "",
-    country: "Canada",
+    country: "USA",
   });
   const [idFile, setIdFile] = useState<File | null>(null);
   const [verificationPhoto, setVerificationPhoto] = useState<File | null>(null);

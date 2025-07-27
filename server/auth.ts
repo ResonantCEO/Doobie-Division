@@ -100,7 +100,7 @@ export async function setupAuth(app: Express) {
         city,
         state,
         postalCode,
-        country: country || 'Canada',
+        country: country || 'USA',
         idVerificationStatus: isFirstUser ? "verified" : (idImageUrl ? "pending" : "not_provided"),
         role: isFirstUser ? "admin" : "customer",
         status: isFirstUser ? "active" : "pending"
