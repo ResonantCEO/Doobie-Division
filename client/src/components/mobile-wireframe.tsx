@@ -431,8 +431,8 @@ function LandingWireframe() {
           <h1 className="text-2xl font-bold mb-4">Welcome to Doobie Division</h1>
           <p className="text-sm opacity-90 mb-6">Your premier cannabis marketplace</p>
           <div className="space-y-3">
-            <Button className="w-full bg-white text-green-600">Sign Up with Replit</Button>
-            <Button variant="outline" className="w-full border-white text-white">Learn More</Button>
+            <Button className="w-full bg-white text-green-600">Sign Up</Button>
+            <Button className="w-full bg-white text-green-600 border-white">Sign In</Button>
           </div>
         </CardContent>
       </Card>
