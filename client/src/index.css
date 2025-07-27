@@ -261,7 +261,7 @@
 
 .category-button {
   @apply px-6 py-3 rounded-lg border-2 text-sm font-semibold transition-all duration-200;
-  @apply focus:outline-none focus:ring-4 focus:ring-primary/20;
+  @apply focus:outline-none focus:ring-4 focus:ring-primary focus:ring-opacity-20;
   min-height: 44px;
   display: flex;
   align-items: center;
