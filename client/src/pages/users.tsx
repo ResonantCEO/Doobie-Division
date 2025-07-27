@@ -181,6 +181,7 @@ export default function UsersPage() {
       case "manager":
         return <Badge className="role-manager">Manager</Badge>;
       case "customer":
+      case "user":
         return <Badge className="role-customer">Customer</Badge>;
       default:
         return <Badge variant="outline">{role}</Badge>;

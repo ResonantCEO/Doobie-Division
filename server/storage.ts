@@ -111,7 +111,7 @@ export class DatabaseStorage implements IStorage {
   }) {
     const userCount = await this.getUserCount();
     let status = 'pending';
-    let role = 'user';
+    let role = 'customer';
 
     if (userCount === 0) {
       status = 'active';
