@@ -125,12 +125,14 @@ export default function WireframePage() {
       if (detailsContainer && screenDetails[currentScreen as keyof typeof screenDetails]) {
         const screen = screenDetails[currentScreen as keyof typeof screenDetails];
         detailsContainer.innerHTML = `
-          <div class="p-4 bg-${screen.color}-50 rounded border">
-            <div class="font-medium text-${screen.color}-800 mb-2">${screen.name}</div>
-            <div class="text-${screen.color}-700 text-xs space-y-1">
-              ${screen.details.map(detail => `<div>• ${detail}</div>`).join('')}
-            </div>
-          </div>
+          <ul class="space-y-3 text-gray-600 text-sm">
+            ${screen.details.map(detail => `
+              <li class="flex items-center">
+                <span class="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                ${detail}
+              </li>
+            `).join('')}
+          </ul>
         `;
       }
     };
@@ -335,16 +337,25 @@ export default function WireframePage() {
             {/* Screen Details */}
             <div className="bg-white p-6 rounded-lg shadow-lg w-80">
               <h3 className="font-bold text-lg mb-4">Selected Screen Details</h3>
-              <div className="text-sm" id="screen-details">
-                <div className="p-4 bg-blue-50 rounded border">
-                  <div className="font-medium text-blue-800 mb-2">Landing Page</div>
-                  <div className="text-blue-700 text-xs space-y-1">
-                    <div>• Welcome hero section with gradient background</div>
-                    <div>• Sign up and sign in authentication buttons</div>
-                    <div>• Clean, minimal design for first impressions</div>
-                    <div>• Entry point to the application</div>
-                  </div>
-                </div>
+              <div id="screen-details">
+                <ul className="space-y-3 text-gray-600 text-sm">
+                  <li className="flex items-center">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                    Welcome hero section with gradient background
+                  </li>
+                  <li className="flex items-center">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                    Sign up and sign in authentication buttons
+                  </li>
+                  <li className="flex items-center">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                    Clean, minimal design for first impressions
+                  </li>
+                  <li className="flex items-center">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                    Entry point to the application
+                  </li>
+                </ul>
               </div>
             </div>
 
