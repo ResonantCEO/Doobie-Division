@@ -386,13 +386,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/users/:id', isAuthenticated, requireRole(['admin']), async (req, res) => {
+  app.put('/api/users/:id', isAuthenticated, async (req: any, res) => {
     try {
       const id = req.params.id;
       const userData = req.body;
       
-      const user = await storage.updateUser(id, userData);
-      res.json(user);
+      // Regular users can only update their own profile
+      if (req.currentUser.role === 'customer' && req.currentUser.id !== id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // If not admin, restrict what fields can be updated
+      if (req.currentUser.role === 'customer') {
+        const allowedFields = ['firstName', 'lastName', 'address', 'city', 'state', 'postalCode', 'country'];
+        const filteredData = Object.keys(userData)
+          .filter(key => allowedFields.includes(key))
+          .reduce((obj, key) => {
+            obj[key] = userData[key];
+            return obj;
+          }, {});
+        
+        const user = await storage.updateUser(id, filteredData);
+        res.json(user);
+      } else {
+        // Admins can update all fields
+        const user = await storage.updateUser(id, userData);
+        res.json(user);
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to update user" });
     }
