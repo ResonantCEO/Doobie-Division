@@ -58,10 +58,14 @@ const screenDetails = {
     name: "Inventory Management",
     color: "orange",
     details: [
-      "Product listing with stock levels",
+      "Product listing with stock levels and QR codes",
       "Low stock alerts and notifications", 
-      "Add/edit product functionality",
-      "Search, filter, and export capabilities"
+      "Add/edit product functionality with image upload",
+      "Hierarchical category organization with parent/child structure",
+      "Category management with subcategory support",
+      "QR code generation and viewing for products",
+      "Search, filter, and export capabilities",
+      "Bulk product operations and selection"
     ]
   },
   orders: {
