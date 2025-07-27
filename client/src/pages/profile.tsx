@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +31,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import type { User as UserType } from "@shared/schema";
+import Navigation from "@/components/navigation";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -180,6 +180,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <Navigation user={user} currentTab="profile" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -415,7 +416,7 @@ export default function ProfilePage() {
                     </div>
                     <span className="text-xl font-bold text-blue-600 dark:text-blue-400">{userOrders.length}</span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
                     <div className="flex items-center space-x-3">
                       <div className="p-2 bg-green-500/20 rounded-lg">
@@ -430,7 +431,7 @@ export default function ProfilePage() {
                       {user.status}
                     </Badge>
                   </div>
-                  
+
                   <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
                     <div className="flex items-center space-x-3">
                       <div className="p-2 bg-purple-500/20 rounded-lg">
@@ -460,7 +461,7 @@ export default function ProfilePage() {
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">ID Verification</span>
                     {getVerificationBadge()}
                   </div>
-                  
+
                   <div className="px-4 py-3 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
                     {user.idVerificationStatus === 'pending' && (
                       <p className="text-sm text-blue-700 dark:text-blue-300">
