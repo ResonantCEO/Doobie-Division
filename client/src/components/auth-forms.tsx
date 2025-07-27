@@ -380,6 +380,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                         accept="image/*"
                         onChange={(e) => setIdFile(e.target.files?.[0] || null)}
                         required
+                        key="id-upload"
                       />
                       <p className="text-sm text-muted-foreground">Upload a clear photo of your government-issued ID</p>
                     </div>
@@ -410,6 +411,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                         accept="image/*"
                         onChange={(e) => setVerificationPhoto(e.target.files?.[0] || null)}
                         required
+                        key="verification-upload"
                       />
                       <p className="text-sm text-muted-foreground">
                         Upload a photo of yourself holding a sign that says "Doobie Division!" 
