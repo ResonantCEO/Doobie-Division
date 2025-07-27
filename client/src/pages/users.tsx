@@ -396,12 +396,12 @@ export default function UsersPage() {
                               <span className="text-xs text-gray-500 mt-1">Verification</span>
                             </div>
                           ) : (
-                            
+                            <div className="flex flex-col items-center">
                               <div className="w-12 h-12 bg-gray-100 rounded border flex items-center justify-center">
                                 <span className="text-xs text-gray-400">No Verify</span>
                               </div>
                               <span className="text-xs text-gray-500 mt-1">Verification</span>
-                            
+                            </div>
                           )}
                         </div>
                       </TableCell>
