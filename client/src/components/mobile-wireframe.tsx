@@ -153,7 +153,7 @@ export default function MobileWireframe() {
 
 function CartWireframe() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-24">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold">Shopping Cart</h2>
         <Button variant="outline" size="sm">
@@ -166,29 +166,29 @@ function CartWireframe() {
       <div className="space-y-3">
         {[1, 2].map((i) => (
           <Card key={i}>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-3">
-                <div className="bg-gray-200 w-16 h-16 rounded flex items-center justify-center">
-                  <Package className="h-6 w-6 text-gray-400" />
+            <CardContent className="p-3">
+              <div className="flex items-start space-x-3">
+                <div className="bg-gray-200 w-12 h-12 rounded flex items-center justify-center flex-shrink-0">
+                  <Package className="h-5 w-5 text-gray-400" />
                 </div>
-                <div className="flex-1">
-                  <h4 className="font-medium text-sm">Premium Product {i}</h4>
-                  <p className="text-xs text-gray-500">Category Name</p>
-                  <div className="flex items-center space-x-2 mt-1">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-sm leading-tight">Premium Product {i}</h4>
+                  <p className="text-xs text-gray-500 mt-0.5">Category Name</p>
+                  <div className="flex items-center justify-between mt-2">
                     <span className="text-sm font-bold text-primary">${(99.99 + i * 10).toFixed(2)}</span>
                     <Badge variant="outline" className="text-xs">In Stock</Badge>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <div className="flex items-center border rounded">
-                    <Button variant="ghost" size="sm" className="px-2">-</Button>
-                    <span className="px-3 text-sm">{i}</span>
-                    <Button variant="ghost" size="sm" className="px-2">+</Button>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
+              </div>
+              <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                <div className="flex items-center border rounded overflow-hidden">
+                  <Button variant="ghost" size="sm" className="px-3 py-1 h-8 text-xs">-</Button>
+                  <span className="px-3 py-1 text-sm border-x bg-gray-50 min-w-[2rem] text-center">{i}</span>
+                  <Button variant="ghost" size="sm" className="px-3 py-1 h-8 text-xs">+</Button>
                 </div>
+                <Button variant="ghost" size="sm" className="p-2">
+                  <Trash2 className="h-4 w-4 text-red-500" />
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -202,9 +202,9 @@ function CartWireframe() {
             <input 
               type="text" 
               placeholder="Promo code" 
-              className="flex-1 px-3 py-2 border rounded text-sm"
+              className="flex-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
-            <Button variant="outline" size="sm">Apply</Button>
+            <Button variant="outline" size="sm" className="px-4">Apply</Button>
           </div>
         </CardContent>
       </Card>
@@ -214,7 +214,7 @@ function CartWireframe() {
         <CardHeader>
           <CardTitle className="text-base">Order Summary</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2">
           <div className="flex justify-between text-sm">
             <span>Subtotal (3 items)</span>
             <span>$219.98</span>
@@ -227,7 +227,7 @@ function CartWireframe() {
             <span>Tax</span>
             <span>$18.40</span>
           </div>
-          <div className="border-t pt-2 flex justify-between font-bold">
+          <div className="border-t pt-2 mt-3 flex justify-between font-bold">
             <span>Total</span>
             <span>$248.37</span>
           </div>
@@ -236,14 +236,14 @@ function CartWireframe() {
 
       {/* Shipping Address */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center justify-between">
             Shipping Address
-            <Edit className="h-4 w-4" />
+            <Edit className="h-4 w-4 text-gray-500" />
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-sm">
+        <CardContent className="pt-0">
+          <div className="text-sm space-y-0.5">
             <p className="font-medium">John Doe</p>
             <p className="text-gray-600">123 Main Street</p>
             <p className="text-gray-600">City, ST 12345</p>
@@ -254,29 +254,29 @@ function CartWireframe() {
 
       {/* Payment Method */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center justify-between">
             Payment Method
-            <Edit className="h-4 w-4" />
+            <Edit className="h-4 w-4 text-gray-500" />
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <div className="flex items-center space-x-3">
-            <div className="bg-gray-200 w-8 h-6 rounded flex items-center justify-center">
-              <span className="text-xs font-bold">••••</span>
+            <div className="bg-gray-200 w-10 h-6 rounded flex items-center justify-center">
+              <span className="text-xs font-bold text-gray-600">••••</span>
             </div>
             <div className="text-sm">
               <p className="font-medium">•••• •••• •••• 1234</p>
-              <p className="text-gray-500">Expires 12/25</p>
+              <p className="text-gray-500 text-xs">Expires 12/25</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Checkout Button */}
-      <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 w-full max-w-md px-4">
+      <div className="sticky bottom-4 left-0 right-0 px-4">
         <Button 
-          className="w-full" 
+          className="w-full shadow-lg" 
           size="lg"
           onClick={() => setCurrentScreen('orderConfirmation')}
         >
