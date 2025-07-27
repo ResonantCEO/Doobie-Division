@@ -367,7 +367,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                       </Button>
                     </div>
                   </>
-                ) : (
+                ) : signupStep === 3 ? (
                   <>
                     <div className="text-center mb-4">
                       <p className="text-sm text-muted-foreground">Step 3 of 4 - Photo ID Verification</p>
