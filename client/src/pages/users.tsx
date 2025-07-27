@@ -608,7 +608,7 @@ export default function UsersPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
-                <Select name="role" defaultValue={editingUser.role}>
+                <Select name="role" defaultValue={editingUser.role === 'user' ? 'customer' : editingUser.role}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
