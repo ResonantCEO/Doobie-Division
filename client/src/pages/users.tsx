@@ -364,17 +364,46 @@ export default function UsersPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {user.idImageUrl ? (
-                          <img
-                            src={user.idImageUrl}
-                            alt={`${user.firstName} ${user.lastName} ID`}
-                            className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => handlePhotoClick(user)}
-                            title="Click to view full size"
-                          />
-                        ) : (
-                          <span className="text-gray-400 text-sm">No photo</span>
-                        )}
+                        <div className="flex">
+                          {user.idImageUrl ? (
+                            <div className="flex flex-col items-center mr-2">
+                              <img
+                                src={user.idImageUrl}
+                                alt={`${user.firstName} ${user.lastName} ID`}
+                                className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => handlePhotoClick(user)}
+                                title="Click to view full size"
+                              />
+                              <span className="text-xs text-gray-500 mt-1">ID</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center mr-2">
+                              <div className="w-12 h-12 bg-gray-100 rounded border flex items-center justify-center">
+                                <span className="text-xs text-gray-400">No ID</span>
+                              </div>
+                              <span className="text-xs text-gray-500 mt-1">ID</span>
+                            </div>
+                          )}
+                          {user.verificationPhotoUrl ? (
+                            <div className="flex flex-col items-center">
+                              <img
+                                src={user.verificationPhotoUrl}
+                                alt={`${user.firstName} ${user.lastName} Verification`}
+                                className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => handlePhotoClick(user)}
+                                title="Click to view full size"
+                              />
+                              <span className="text-xs text-gray-500 mt-1">Verification</span>
+                            </div>
+                          ) : (
+                            
+                              <div className="w-12 h-12 bg-gray-100 rounded border flex items-center justify-center">
+                                <span className="text-xs text-gray-400">No Verify</span>
+                              </div>
+                              <span className="text-xs text-gray-500 mt-1">Verification</span>
+                            
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
                       <TableCell>{getStatusBadge(user.status)}</TableCell>
