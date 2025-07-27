@@ -77,10 +77,10 @@ export default function StorefrontPage() {
     <div className="space-y-8">
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-primary/90 to-primary dark:from-primary/80 dark:to-primary/60 rounded-2xl mb-12 overflow-hidden">
-        <div className="text-white py-16 px-8">
+        <div className="py-16 px-8">
           <div className="max-w-2xl">
-            <h2 className="text-4xl font-bold mb-4">Discover Amazing Products</h2>
-            <p className="text-xl mb-6 text-white/90">
+            <h2 className="text-4xl font-bold mb-4 text-black dark:text-white">Discover Amazing Products</h2>
+            <p className="text-xl mb-6 text-black/80 dark:text-white/90">
               Shop from our curated collection of high-quality items with fast delivery
             </p>
             <Button className="bg-white text-primary hover:bg-white/90 dark:bg-background dark:text-foreground dark:hover:bg-background/90">
