@@ -113,7 +113,6 @@ const screenDetails = {
     details: [
       "System health monitoring and metrics",
       "Customer support ticket management",
-      "Live chat and messaging controls",
       "Database backup and maintenance tools"
     ]
   }
