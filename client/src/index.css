@@ -270,7 +270,7 @@
 
 .category-button-active {
   @apply bg-primary text-white border-primary shadow-lg;
-  @apply hover:bg-primary/90 hover:shadow-xl;
+  @apply hover:bg-primary hover:bg-opacity-90 hover:shadow-xl;
   transform: translateY(-1px);
 }
 
