@@ -100,6 +100,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       // Prepare order data
       const orderData = {
         orderNumber,
+        customerId: user?.id,
         customerName,
         customerEmail: user?.email || "",
         customerPhone,
