@@ -198,8 +198,8 @@ export default function InventoryTable({ products, onStockAdjustment }: Inventor
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="font-mono text-sm">{product.sku}</TableCell>
-                <TableCell>{product.category?.name || "—"}</TableCell>
+                <TableCell className="font-mono text-sm text-black">{product.sku}</TableCell>
+                <TableCell className="text-black">{product.category?.name || "—"}</TableCell>
                 <TableCell>
                   <div className="flex items-center space-x-2">
                     <div className="flex flex-col">
@@ -234,7 +234,7 @@ export default function InventoryTable({ products, onStockAdjustment }: Inventor
                     </Button>
                   </div>
                 </TableCell>
-                <TableCell className="font-medium">
+                <TableCell className="font-medium text-black dark:text-white">
                   ${Number(product.price).toFixed(2)}
                 </TableCell>
                 <TableCell>{getStockBadge(product)}</TableCell>
