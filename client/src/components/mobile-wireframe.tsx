@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 
 export default function MobileWireframe() {
-  const [currentScreen, setCurrentScreen] = useState<string>("storefront");
+  const [currentScreen, setCurrentScreen] = useState<string>("landing");
 
   useEffect(() => {
     const handleScreenChange = (event: CustomEvent) => {
@@ -53,9 +53,25 @@ export default function MobileWireframe() {
   }, []);
 
   const screens = {
+    landing: {
+      title: "Landing",
+      component: <LandingWireframe />
+    },
+    dashboard: {
+      title: "Dashboard",
+      component: <DashboardWireframe />
+    },
     storefront: {
       title: "Storefront",
       component: <StorefrontWireframe />
+    },
+    cart: {
+      title: "Cart",
+      component: <CartWireframe />
+    },
+    orderConfirmation: {
+      title: "Order Confirm",
+      component: <OrderConfirmationWireframe />
     },
     inventory: {
       title: "Inventory",
@@ -80,14 +96,6 @@ export default function MobileWireframe() {
     admin: {
       title: "Admin",
       component: <AdminWireframe />
-    },
-    landing: {
-      title: "Landing",
-      component: <LandingWireframe />
-    },
-    dashboard: {
-      title: "Dashboard",
-      component: <DashboardWireframe />
     }
   };
 
@@ -164,6 +172,277 @@ export default function MobileWireframe() {
             </button>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CartWireframe() {
+  return (
+    <div className="space-y-4 pb-20">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold">Shopping Cart</h2>
+        <Button variant="outline" size="sm">
+          <Trash2 className="h-4 w-4 mr-1" />
+          Clear
+        </Button>
+      </div>
+
+      {/* Cart Items */}
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <Card key={i}>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="bg-gray-200 w-16 h-16 rounded flex items-center justify-center">
+                  <Package className="h-6 w-6 text-gray-400" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-medium text-sm">Premium Product {i}</h4>
+                  <p className="text-xs text-gray-500">Category Name</p>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <span className="text-sm font-bold text-primary">${(99.99 + i * 10).toFixed(2)}</span>
+                    <Badge variant="outline" className="text-xs">In Stock</Badge>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center border rounded">
+                    <Button variant="ghost" size="sm" className="px-2">-</Button>
+                    <span className="px-3 text-sm">{i}</span>
+                    <Button variant="ghost" size="sm" className="px-2">+</Button>
+                  </div>
+                  <Button variant="ghost" size="sm">
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Promo Code */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex space-x-2">
+            <input 
+              type="text" 
+              placeholder="Promo code" 
+              className="flex-1 px-3 py-2 border rounded text-sm"
+            />
+            <Button variant="outline" size="sm">Apply</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Order Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Order Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex justify-between text-sm">
+            <span>Subtotal (3 items)</span>
+            <span>$219.98</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Shipping</span>
+            <span>$9.99</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Tax</span>
+            <span>$18.40</span>
+          </div>
+          <div className="border-t pt-2 flex justify-between font-bold">
+            <span>Total</span>
+            <span>$248.37</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Shipping Address */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center justify-between">
+            Shipping Address
+            <Edit className="h-4 w-4" />
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm">
+            <p className="font-medium">John Doe</p>
+            <p className="text-gray-600">123 Main Street</p>
+            <p className="text-gray-600">City, ST 12345</p>
+            <p className="text-gray-600">United States</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Payment Method */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center justify-between">
+            Payment Method
+            <Edit className="h-4 w-4" />
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-3">
+            <div className="bg-gray-200 w-8 h-6 rounded flex items-center justify-center">
+              <span className="text-xs font-bold">••••</span>
+            </div>
+            <div className="text-sm">
+              <p className="font-medium">•••• •••• •••• 1234</p>
+              <p className="text-gray-500">Expires 12/25</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Checkout Button */}
+      <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 w-full max-w-md px-4">
+        <Button 
+          className="w-full" 
+          size="lg"
+          onClick={() => setCurrentScreen('orderConfirmation')}
+        >
+          <ShoppingCart className="h-4 w-4 mr-2" />
+          Checkout - $248.37
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function OrderConfirmationWireframe() {
+  return (
+    <div className="space-y-6 pb-20">
+      {/* Success Header */}
+      <div className="text-center py-8">
+        <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle className="h-8 w-8 text-green-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-green-800 mb-2">Order Confirmed!</h2>
+        <p className="text-gray-600 text-sm">Thank you for your purchase</p>
+      </div>
+
+      {/* Order Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Order Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Order Number</span>
+            <span className="font-mono">#ORD-12345</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Order Date</span>
+            <span>{new Date().toLocaleDateString()}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Total Amount</span>
+            <span className="font-bold">$248.37</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Payment Method</span>
+            <span>•••• 1234</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Estimated Delivery */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Estimated Delivery</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-3">
+            <Calendar className="h-5 w-5 text-primary" />
+            <div>
+              <p className="font-medium">3-5 Business Days</p>
+              <p className="text-sm text-gray-600">Expected by {new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString()}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Shipping Address */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Shipping To</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start space-x-3">
+            <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium">John Doe</p>
+              <p className="text-gray-600">123 Main Street</p>
+              <p className="text-gray-600">City, ST 12345</p>
+              <p className="text-gray-600">United States</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Order Items */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Items Ordered</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {[1, 2].map((i) => (
+            <div key={i} className="flex items-center space-x-3">
+              <div className="bg-gray-200 w-12 h-12 rounded flex items-center justify-center">
+                <Package className="h-5 w-5 text-gray-400" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-medium text-sm">Premium Product {i}</h4>
+                <p className="text-xs text-gray-500">Qty: {i} • ${(99.99 + i * 10).toFixed(2)} each</p>
+              </div>
+              <span className="text-sm font-bold">${((99.99 + i * 10) * i).toFixed(2)}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Next Steps */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">What's Next?</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center space-x-3">
+            <Bell className="h-4 w-4 text-primary" />
+            <p className="text-sm">You'll receive email updates about your order</p>
+          </div>
+          <div className="flex items-center space-x-3">
+            <Package className="h-4 w-4 text-primary" />
+            <p className="text-sm">Track your package in the Orders section</p>
+          </div>
+          <div className="flex items-center space-x-3">
+            <MessageSquare className="h-4 w-4 text-primary" />
+            <p className="text-sm">Contact support if you have questions</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Action Buttons */}
+      <div className="space-y-3">
+        <Button 
+          className="w-full" 
+          onClick={() => setCurrentScreen('orders')}
+        >
+          <Package className="h-4 w-4 mr-2" />
+          Track Order
+        </Button>
+        <Button 
+          variant="outline" 
+          className="w-full"
+          onClick={() => setCurrentScreen('storefront')}
+        >
+          Continue Shopping
+        </Button>
       </div>
     </div>
   );

@@ -40,6 +40,14 @@ export default function WireframePage() {
                     <div className="font-medium text-purple-800">Storefront</div>
                     <div className="text-xs text-purple-600">Product Browse</div>
                   </div>
+                  <div className="p-2 bg-cyan-50 rounded border">
+                    <div className="font-medium text-cyan-800">Cart</div>
+                    <div className="text-xs text-cyan-600">Shopping Cart</div>
+                  </div>
+                  <div className="p-2 bg-emerald-50 rounded border">
+                    <div className="font-medium text-emerald-800">Order Confirm</div>
+                    <div className="text-xs text-emerald-600">Order Success</div>
+                  </div>
                   <div className="p-2 bg-orange-50 rounded border">
                     <div className="font-medium text-orange-800">Inventory</div>
                     <div className="text-xs text-orange-600">Stock Management</div>
@@ -121,7 +129,7 @@ export default function WireframePage() {
               <div className="space-y-4 text-sm">
                 <div className="border-l-4 border-blue-500 pl-3">
                   <div className="font-medium">Customer Journey</div>
-                  <div className="text-gray-600">Landing → Storefront → Cart → Checkout</div>
+                  <div className="text-gray-600">Landing → Storefront → Cart → Order Confirmation</div>
                 </div>
                 <div className="border-l-4 border-green-500 pl-3">
                   <div className="font-medium">Inventory Management</div>
