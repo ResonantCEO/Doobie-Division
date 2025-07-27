@@ -624,6 +624,45 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return user;
   }
+
+  async getInventoryLogs(filters?: { days?: number; type?: string; product?: string }): Promise<any[]> {
+    let query = db
+      .select({
+        ...inventoryLogs,
+        product: products,
+        user: users,
+      })
+      .from(inventoryLogs)
+      .leftJoin(products, eq(inventoryLogs.productId, products.id))
+      .leftJoin(users, eq(inventoryLogs.userId, users.id));
+
+    const conditions = [];
+
+    if (filters?.days) {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - filters.days);
+      conditions.push(sql`${inventoryLogs.createdAt} >= ${startDate}`);
+    }
+
+    if (filters?.type) {
+      conditions.push(eq(inventoryLogs.type, filters.type));
+    }
+
+    if (filters?.product) {
+      conditions.push(
+        or(
+          ilike(products.name, `%${filters.product}%`),
+          ilike(products.sku, `%${filters.product}%`)
+        )
+      );
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+
+    return await query.orderBy(desc(inventoryLogs.createdAt));
+  }
 }
 
 export const storage = new DatabaseStorage();

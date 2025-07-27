@@ -19,7 +19,7 @@ interface InventoryLogWithDetails extends InventoryLog {
 export default function AdminPage() {
   const { user } = useAuth();
   const [dateFilter, setDateFilter] = useState("7"); // days
-  const [typeFilter, setTypeFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [productFilter, setProductFilter] = useState("");
 
   // Redirect if not admin
@@ -39,7 +39,7 @@ export default function AdminPage() {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (dateFilter) params.append('days', dateFilter);
-      if (typeFilter) params.append('type', typeFilter);
+      if (typeFilter && typeFilter !== 'all') params.append('type', typeFilter);
       if (productFilter) params.append('product', productFilter);
       
       const response = await fetch(`/api/admin/inventory-logs?${params}`);
@@ -108,7 +108,7 @@ export default function AdminPage() {
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="all">All types</SelectItem>
                   <SelectItem value="stock_in">Stock In</SelectItem>
                   <SelectItem value="stock_out">Stock Out</SelectItem>
                   <SelectItem value="adjustment">Adjustment</SelectItem>
