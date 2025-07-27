@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { useCart } from "@/contexts/cart-context";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { ShoppingCart, Minus, Plus, Trash2, CreditCard } from "lucide-react";
 
 interface CartDrawerProps {
@@ -33,15 +34,31 @@ interface CartDrawerProps {
 export default function CartDrawer({ children }: CartDrawerProps) {
   const { state, removeItem, updateQuantity, clearCart } = useCart();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [shippingForm, setShippingForm] = useState({
     customerName: "",
-    customerEmail: "",
     customerPhone: "",
     shippingAddress: "",
     notes: "",
   });
+
+  // Auto-fill form with user data when confirmation modal opens
+  useEffect(() => {
+    if (showConfirmation && user) {
+      const fullName = `${user.firstName} ${user.lastName}`;
+      const address = [user.address, user.city, user.state, user.postalCode, user.country]
+        .filter(Boolean)
+        .join(", ");
+      
+      setShippingForm(prev => ({
+        ...prev,
+        customerName: fullName,
+        shippingAddress: address,
+      }));
+    }
+  }, [showConfirmation, user]);
 
   const handleQuantityChange = (productId: number, newQuantity: number) => {
     if (newQuantity < 1) {
@@ -65,9 +82,9 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   };
 
   const handleConfirmOrder = async () => {
-    const { customerName, customerEmail, customerPhone, shippingAddress } = shippingForm;
+    const { customerName, customerPhone, shippingAddress } = shippingForm;
     
-    if (!customerName || !customerEmail || !shippingAddress) {
+    if (!customerName || !shippingAddress) {
       toast({
         title: "Missing information",
         description: "Please fill in all required fields.",
@@ -84,7 +101,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       const orderData = {
         orderNumber,
         customerName,
-        customerEmail,
+        customerEmail: user?.email || "",
         customerPhone,
         shippingAddress,
         total: state.total,
@@ -117,7 +134,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         setShowConfirmation(false);
         setShippingForm({
           customerName: "",
-          customerEmail: "",
           customerPhone: "",
           shippingAddress: "",
           notes: "",
@@ -325,18 +341,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   value={shippingForm.customerName}
                   onChange={(e) => setShippingForm(prev => ({ ...prev, customerName: e.target.value }))}
                   placeholder="Enter your full name"
-                  required
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="customerEmail">Email Address *</Label>
-                <Input
-                  id="customerEmail"
-                  type="email"
-                  value={shippingForm.customerEmail}
-                  onChange={(e) => setShippingForm(prev => ({ ...prev, customerEmail: e.target.value }))}
-                  placeholder="Enter your email address"
                   required
                 />
               </div>
