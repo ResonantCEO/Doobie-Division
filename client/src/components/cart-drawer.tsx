@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -12,6 +14,14 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useCart } from "@/contexts/cart-context";
 import { useToast } from "@/hooks/use-toast";
 import { ShoppingCart, Minus, Plus, Trash2, CreditCard } from "lucide-react";
@@ -24,6 +34,14 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const { state, removeItem, updateQuantity, clearCart } = useCart();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [shippingForm, setShippingForm] = useState({
+    customerName: "",
+    customerEmail: "",
+    customerPhone: "",
+    shippingAddress: "",
+    notes: "",
+  });
 
   const handleQuantityChange = (productId: number, newQuantity: number) => {
     if (newQuantity < 1) {
@@ -43,22 +61,86 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       return;
     }
 
-    // Simulate checkout process
-    toast({
-      title: "Checkout initiated",
-      description: `Processing ${state.itemCount} items worth $${state.total.toFixed(2)}`,
-    });
+    setShowConfirmation(true);
+  };
+
+  const handleConfirmOrder = async () => {
+    const { customerName, customerEmail, customerPhone, shippingAddress } = shippingForm;
     
-    // In a real app, you'd redirect to a payment processor
-    // For demo purposes, we'll just clear the cart after a delay
-    setTimeout(() => {
-      clearCart();
-      setIsOpen(false);
+    if (!customerName || !customerEmail || !shippingAddress) {
       toast({
-        title: "Order placed successfully!",
-        description: "Thank you for your purchase. You'll receive a confirmation email shortly.",
+        title: "Missing information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
       });
-    }, 2000);
+      return;
+    }
+
+    try {
+      // Generate order number
+      const orderNumber = `ORD-${Date.now()}`;
+      
+      // Prepare order data
+      const orderData = {
+        orderNumber,
+        customerName,
+        customerEmail,
+        customerPhone,
+        shippingAddress,
+        total: state.total,
+        paymentMethod: "cod",
+        notes: shippingForm.notes,
+      };
+
+      const orderItems = state.items.map(item => ({
+        productId: item.product.id,
+        productName: item.product.name,
+        productPrice: item.product.price,
+        quantity: item.quantity,
+        subtotal: Number(item.product.price) * item.quantity,
+      }));
+
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          order: orderData,
+          items: orderItems,
+        }),
+      });
+
+      if (response.ok) {
+        clearCart();
+        setIsOpen(false);
+        setShowConfirmation(false);
+        setShippingForm({
+          customerName: "",
+          customerEmail: "",
+          customerPhone: "",
+          shippingAddress: "",
+          notes: "",
+        });
+        
+        toast({
+          title: "Order placed successfully!",
+          description: `Order ${orderNumber} has been confirmed. You'll receive a confirmation email shortly.`,
+        });
+      } else {
+        toast({
+          title: "Order failed",
+          description: "There was an error processing your order. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Order failed",
+        description: "There was an error processing your order. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -204,6 +286,108 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           )}
         </div>
       </SheetContent>
+      
+      {/* Order Confirmation Dialog */}
+      <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Confirm Your Order</DialogTitle>
+            <DialogDescription>
+              Please review your order details and provide shipping information.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Order Summary */}
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <h4 className="font-medium mb-2">Order Summary</h4>
+              <div className="space-y-1 text-sm">
+                {state.items.map((item) => (
+                  <div key={item.product.id} className="flex justify-between">
+                    <span>{item.product.name} x {item.quantity}</span>
+                    <span>${(Number(item.product.price) * item.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+                <Separator className="my-2" />
+                <div className="flex justify-between font-medium">
+                  <span>Total</span>
+                  <span>${state.total.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Shipping Information Form */}
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="customerName">Full Name *</Label>
+                <Input
+                  id="customerName"
+                  value={shippingForm.customerName}
+                  onChange={(e) => setShippingForm(prev => ({ ...prev, customerName: e.target.value }))}
+                  placeholder="Enter your full name"
+                  required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="customerEmail">Email Address *</Label>
+                <Input
+                  id="customerEmail"
+                  type="email"
+                  value={shippingForm.customerEmail}
+                  onChange={(e) => setShippingForm(prev => ({ ...prev, customerEmail: e.target.value }))}
+                  placeholder="Enter your email address"
+                  required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="customerPhone">Phone Number</Label>
+                <Input
+                  id="customerPhone"
+                  type="tel"
+                  value={shippingForm.customerPhone}
+                  onChange={(e) => setShippingForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                  placeholder="Enter your phone number"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="shippingAddress">Shipping Address *</Label>
+                <Textarea
+                  id="shippingAddress"
+                  value={shippingForm.shippingAddress}
+                  onChange={(e) => setShippingForm(prev => ({ ...prev, shippingAddress: e.target.value }))}
+                  placeholder="Enter your complete shipping address including street, city, province, and postal code"
+                  rows={3}
+                  required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="notes">Special Instructions (Optional)</Label>
+                <Textarea
+                  id="notes"
+                  value={shippingForm.notes}
+                  onChange={(e) => setShippingForm(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Any special delivery instructions or notes"
+                  rows={2}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfirmation(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmOrder}>
+              <CreditCard className="h-4 w-4 mr-2" />
+              Confirm Order
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }
