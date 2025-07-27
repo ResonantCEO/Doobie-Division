@@ -30,7 +30,7 @@ const screenDetails = {
     details: [
       "Product browsing with search and filtering",
       "Category navigation and featured products",
-      "Product cards with ratings and pricing",
+      "Product cards with pricing",
       "Shopping cart integration and quick add"
     ]
   },
