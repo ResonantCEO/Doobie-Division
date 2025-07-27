@@ -112,8 +112,8 @@ const screenDetails = {
     color: "red",
     details: [
       "System health monitoring and metrics",
-      "User role and permission management",
-      "Category and system configuration",
+      "Customer support ticket management",
+      "Live chat and messaging controls",
       "Database backup and maintenance tools"
     ]
   }
