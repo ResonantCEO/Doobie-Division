@@ -1,4 +1,5 @@
 
+
 import MobileWireframe from "@/components/mobile-wireframe";
 
 export default function WireframePage() {
@@ -7,7 +8,7 @@ export default function WireframePage() {
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Doobie Division Mobile Wireframe</h1>
-          <p className="text-gray-600">Interactive mobile view of the e-commerce and inventory management system</p>
+          <p className="text-gray-600">Interactive mobile view of the complete e-commerce and inventory management system</p>
         </div>
         
         <div className="flex justify-center gap-12 items-start">
@@ -22,33 +23,82 @@ export default function WireframePage() {
           
           {/* Controls and Info Panel */}
           <div className="space-y-6">
+            {/* Available Screens */}
+            <div className="bg-white p-6 rounded-lg shadow-lg w-80">
+              <h3 className="font-bold text-lg mb-4">Available Screens</h3>
+              <div className="space-y-2 text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2 bg-blue-50 rounded border">
+                    <div className="font-medium text-blue-800">Landing</div>
+                    <div className="text-xs text-blue-600">Welcome & Auth</div>
+                  </div>
+                  <div className="p-2 bg-green-50 rounded border">
+                    <div className="font-medium text-green-800">Dashboard</div>
+                    <div className="text-xs text-green-600">Main Overview</div>
+                  </div>
+                  <div className="p-2 bg-purple-50 rounded border">
+                    <div className="font-medium text-purple-800">Storefront</div>
+                    <div className="text-xs text-purple-600">Product Browse</div>
+                  </div>
+                  <div className="p-2 bg-orange-50 rounded border">
+                    <div className="font-medium text-orange-800">Inventory</div>
+                    <div className="text-xs text-orange-600">Stock Management</div>
+                  </div>
+                  <div className="p-2 bg-red-50 rounded border">
+                    <div className="font-medium text-red-800">Orders</div>
+                    <div className="text-xs text-red-600">Order Tracking</div>
+                  </div>
+                  <div className="p-2 bg-indigo-50 rounded border">
+                    <div className="font-medium text-indigo-800">Analytics</div>
+                    <div className="text-xs text-indigo-600">Business Insights</div>
+                  </div>
+                  <div className="p-2 bg-yellow-50 rounded border">
+                    <div className="font-medium text-yellow-800">Users</div>
+                    <div className="text-xs text-yellow-600">User Management</div>
+                  </div>
+                  <div className="p-2 bg-gray-50 rounded border">
+                    <div className="font-medium text-gray-800">Profile</div>
+                    <div className="text-xs text-gray-600">User Settings</div>
+                  </div>
+                  <div className="p-2 bg-red-100 rounded border border-red-200">
+                    <div className="font-medium text-red-800">Admin</div>
+                    <div className="text-xs text-red-600">System Admin</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* App Features */}
             <div className="bg-white p-6 rounded-lg shadow-lg w-80">
-              <h3 className="font-bold text-lg mb-4">App Features</h3>
+              <h3 className="font-bold text-lg mb-4">Core Features</h3>
               <ul className="space-y-3 text-gray-600 text-sm">
                 <li className="flex items-center">
                   <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                  E-commerce storefront
+                  E-commerce storefront with search & categories
                 </li>
                 <li className="flex items-center">
                   <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                  Inventory management
+                  Real-time inventory management
                 </li>
                 <li className="flex items-center">
                   <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                  Order tracking
+                  Order processing & tracking
                 </li>
                 <li className="flex items-center">
                   <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                  Analytics dashboard
+                  Analytics dashboard with metrics
                 </li>
                 <li className="flex items-center">
                   <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                  User management
+                  User management & roles
                 </li>
                 <li className="flex items-center">
                   <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                  Role-based access
+                  Profile management with ID verification
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                  Admin panel for system management
                 </li>
                 <li className="flex items-center">
                   <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
@@ -56,19 +106,51 @@ export default function WireframePage() {
                 </li>
                 <li className="flex items-center">
                   <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                  Mobile-first design
+                  Mobile-first responsive design
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                  Role-based access control
                 </li>
               </ul>
+            </div>
+
+            {/* User Flows */}
+            <div className="bg-white p-6 rounded-lg shadow-lg w-80">
+              <h3 className="font-bold text-lg mb-4">Key User Flows</h3>
+              <div className="space-y-4 text-sm">
+                <div className="border-l-4 border-blue-500 pl-3">
+                  <div className="font-medium">Customer Journey</div>
+                  <div className="text-gray-600">Landing → Storefront → Cart → Checkout</div>
+                </div>
+                <div className="border-l-4 border-green-500 pl-3">
+                  <div className="font-medium">Inventory Management</div>
+                  <div className="text-gray-600">Dashboard → Inventory → Add/Edit Products</div>
+                </div>
+                <div className="border-l-4 border-purple-500 pl-3">
+                  <div className="font-medium">Order Processing</div>
+                  <div className="text-gray-600">Orders → View Details → Update Status</div>
+                </div>
+                <div className="border-l-4 border-orange-500 pl-3">
+                  <div className="font-medium">User Administration</div>
+                  <div className="text-gray-600">Users → Manage Roles → Verify Accounts</div>
+                </div>
+                <div className="border-l-4 border-red-500 pl-3">
+                  <div className="font-medium">System Administration</div>
+                  <div className="text-gray-600">Admin → System Settings → User Management</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
         
         <div className="mt-16 text-center">
           <p className="text-gray-500 text-sm">
-            Use the screen selector or bottom navigation to explore different views
+            Use the screen selector at the top or bottom navigation to explore different views and workflows
           </p>
         </div>
       </div>
     </div>
   );
 }
+
