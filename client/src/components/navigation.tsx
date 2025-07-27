@@ -15,6 +15,8 @@ import {
 import { Bell, Settings, LogOut, ShoppingBag, Package, BarChart3, Users, Home, Search, ShoppingCart, User, ChevronDown, Sun, Moon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/contexts/theme-context";
+import { useCart } from "@/contexts/cart-context";
+import CartDrawer from "@/components/cart-drawer";
 import type { User as UserType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +29,7 @@ interface NavigationProps {
 export default function Navigation({ user, currentTab }: NavigationProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const { theme, toggleTheme } = useTheme();
+  const { state: cartState } = useCart();
   const { toast } = useToast();
 
   // Fetch notifications
@@ -95,12 +98,16 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
               </div>
 
               {/* Cart */}
-              <Button variant="ghost" size="sm" className="relative">
-                <ShoppingCart className="h-5 w-5" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive">
-                  0
-                </Badge>
-              </Button>
+              <CartDrawer>
+                <Button variant="ghost" size="sm" className="relative">
+                  <ShoppingCart className="h-5 w-5" />
+                  {cartState.itemCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary">
+                      {cartState.itemCount}
+                    </Badge>
+                  )}
+                </Button>
+              </CartDrawer>
 
               {/* Notifications */}
               <Button variant="ghost" size="sm" className="relative">

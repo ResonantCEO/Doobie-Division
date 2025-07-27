@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useCart } from "@/contexts/cart-context";
 import type { Product, Category } from "@shared/schema";
 
 interface ProductCardProps {
@@ -10,10 +11,12 @@ interface ProductCardProps {
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { toast } = useToast();
+  const { addItem } = useCart();
 
   const handleAddToCart = () => {
     if (product.stock === 0) return;
 
+    addItem(product);
     toast({
       title: "Added to Cart",
       description: `${product.name} has been added to your cart.`,
