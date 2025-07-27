@@ -76,7 +76,7 @@ export default function StorefrontPage() {
   return (
     <div className="space-y-8">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-primary/90 to-primary dark:from-primary/80 dark:to-primary/60 rounded-2xl mb-12 overflow-hidden">
+      <div className="hero-gradient rounded-2xl mb-12 overflow-hidden">
         <div className="py-16 px-8">
           <div className="max-w-2xl">
             <h2 className="text-4xl font-bold mb-4 text-black dark:text-white">Discover Amazing Products</h2>
