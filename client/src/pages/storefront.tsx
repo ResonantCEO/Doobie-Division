@@ -106,7 +106,7 @@ export default function StorefrontPage() {
 
         {/* Category Filter */}
         <div className="flex flex-wrap gap-4 items-center">
-          <h3 className="text-lg font-semibold text-foreground">Categories:</h3>
+          <h3 className="text-lg font-semibold text-black dark:text-white">Categories:</h3>
           <div className="flex flex-wrap gap-2">
             <Button
               variant={selectedCategory === null ? "default" : "outline"}
