@@ -111,7 +111,7 @@ export default function StorefrontPage() {
             <Button
               variant={selectedCategory === null ? "default" : "outline"}
               size="sm"
-              className="glass-button"
+              className="glass-button text-black dark:text-white"
               onClick={() => handleCategoryFilter(null)}
             >
               All Products
@@ -121,7 +121,7 @@ export default function StorefrontPage() {
                 key={category.id}
                 variant={selectedCategory === category.id ? "default" : "outline"}
                 size="sm"
-                className="glass-button"
+                className="glass-button text-black dark:text-white"
                 onClick={() => handleCategoryFilter(category.id)}
               >
                 {category.name}
