@@ -180,6 +180,38 @@ export async function setupAuth(app: Express) {
     });
   });
 
+  // Password reset endpoint
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { email, newPassword } = req.body;
+
+      if (!email || !newPassword) {
+        return res.status(400).json({ message: "Email and new password are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      // Get user by email
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+      // Update password in database
+      await storage.updateUserPassword(user.id, hashedPassword);
+
+      res.json({ message: "Password reset successful. You can now login with your new password." });
+    } catch (error) {
+      console.error("Password reset error:", error);
+      res.status(500).json({ message: "Password reset failed" });
+    }
+  });
+
   // Get current user endpoint
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {

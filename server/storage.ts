@@ -30,6 +30,7 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUserWithPassword(userData: any): Promise<User>;
+  updateUserPassword(id: string, hashedPassword: string): Promise<void>;
   getUserCount(): Promise<number>;
 
   // Category operations
@@ -138,6 +139,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.email, email));
 
     return result[0];
+  }
+
+  async updateUserPassword(id: string, hashedPassword: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ password: hashedPassword, updatedAt: new Date() })
+      .where(eq(users.id, id));
   }
 
   async getUserCount(): Promise<number> {
