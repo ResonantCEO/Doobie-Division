@@ -13,23 +13,23 @@
   
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
-    --card: 0 0% 95%;
-    --card-foreground: 0 0% 0%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 96%;
+    --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
+    --popover-foreground: 222.2 84% 4.9%;
     --primary: 142 76% 36%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 85%;
-    --secondary-foreground: 0 0% 0%;
-    --muted: 210 40% 85%;
-    --muted-foreground: 0 0% 25%;
-    --accent: 210 40% 85%;
-    --accent-foreground: 0 0% 0%;
+    --secondary: 210 40% 90%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 90%;
+    --muted-foreground: 215.4 16.3% 35%;
+    --accent: 210 40% 90%;
+    --accent-foreground: 222.2 84% 4.9%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 60%;
-    --input: 214.3 31.8% 80%;
+    --border: 214.3 31.8% 75%;
+    --input: 214.3 31.8% 85%;
     --ring: 142 76% 36%;
     --radius: 0.5rem;
     --chart-1: 12 76% 61%;
@@ -67,33 +67,265 @@
   }
 }
 
-@layer components {
-  .card {
-    @apply border-2 border-border shadow-md;
+:root {
+  --background: hsl(0, 0%, 97%);
+  --foreground: hsl(0, 0%, 0%);
+  --muted: hsl(210, 40%, 88%);
+  --muted-foreground: hsl(215, 16%, 30%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(0, 0%, 0%);
+  --card: hsl(0, 0%, 92%);
+  --card-foreground: hsl(0, 0%, 0%);
+  --border: hsl(214, 32%, 70%);
+  --input: hsl(214, 32%, 85%);
+  --primary: hsl(142, 76%, 36%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(210, 40%, 85%);
+  --secondary-foreground: hsl(0, 0%, 0%);
+  --accent: hsl(0, 84%, 60%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --ring: hsl(142, 76%, 36%);
+  --radius: 0.5rem;
+  --chart-1: hsl(142, 76%, 36%);
+  --chart-2: hsl(142, 69%, 40%);
+  --chart-3: hsl(0, 84%, 60%);
+  --chart-4: hsl(45, 93%, 47%);
+  --chart-5: hsl(271, 81%, 56%);
+}
+
+.dark {
+  --background: hsl(220, 13%, 9%);
+  --foreground: hsl(210, 40%, 98%);
+  --muted: hsl(217, 19%, 15%);
+  --muted-foreground: hsl(215, 20%, 65%);
+  --popover: hsl(220, 13%, 9%);
+  --popover-foreground: hsl(210, 40%, 98%);
+  --card: hsl(217, 19%, 12%);
+  --card-foreground: hsl(210, 40%, 98%);
+  --border: hsl(217, 19%, 20%);
+  --input: hsl(217, 19%, 15%);
+  --primary: hsl(142, 70%, 45%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(217, 19%, 15%);
+  --secondary-foreground: hsl(210, 40%, 98%);
+  --accent: hsl(217, 19%, 20%);
+  --accent-foreground: hsl(210, 40%, 98%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --ring: hsl(142, 70%, 45%);
+  --chart-1: hsl(142, 70%, 45%);
+  --chart-2: hsl(142, 69%, 40%);
+  --chart-3: hsl(0, 84%, 60%);
+  --chart-4: hsl(45, 93%, 47%);
+  --chart-5: hsl(271, 81%, 56%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
   }
-  
-  .input {
-    @apply border border-border;
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    min-height: 100vh;
   }
-  
-  .button {
-    @apply border border-border;
+
+  @keyframes gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
   }
 }
 
+/* Custom styles for better visibility */
 .hero-gradient {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)) 100%);
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .product-card {
-  transition: all 0.2s ease-in-out;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .product-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
-html.dark .product-card:hover {
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+.glass-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.glass-nav {
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.glass-button {
+  background: hsl(var(--secondary));
+  border: 1px solid hsl(var(--border));
+  transition: all 0.3s ease;
+}
+
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.glass-input:focus {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glass-card {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .glass-nav {
+  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark .glass-button {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .glass-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .glass-input:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.tab-active {
+  border-bottom-color: hsl(142, 76%, 36%);
+  color: hsl(142, 76%, 36%);
+}
+
+/* Category section styling improvements */
+.category-section {
+  @apply border-2 border-gray-200 rounded-lg p-6 bg-white shadow-lg;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+}
+
+.category-label {
+  @apply text-lg font-bold text-gray-800 mb-4;
+}
+
+.category-buttons {
+  @apply flex flex-wrap gap-3;
+}
+
+.category-button {
+  @apply px-6 py-3 rounded-lg border-2 text-sm font-semibold transition-all duration-200;
+  @apply focus:outline-none focus:ring-4 focus:ring-primary focus:ring-opacity-20;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.category-button-active {
+  @apply bg-primary text-white border-primary shadow-lg;
+  @apply hover:bg-primary hover:bg-opacity-90 hover:shadow-xl;
+  transform: translateY(-1px);
+}
+
+.category-button-inactive {
+  @apply bg-gray-100 text-gray-700 border-gray-300;
+  @apply hover:bg-gray-200 hover:text-gray-900 hover:border-gray-400 hover:shadow-md;
+}
+
+/* Dark mode category styles */
+.dark .category-section {
+  @apply border-gray-600 bg-gray-800;
+  background: rgba(31, 41, 55, 0.95);
+}
+
+.dark .category-label {
+  @apply text-gray-100;
+}
+
+.dark .category-button-inactive {
+  @apply bg-gray-700 text-gray-200 border-gray-600;
+  @apply hover:bg-gray-600 hover:text-white hover:border-gray-500;
+}
+
+.dark .category-button-active {
+  @apply bg-primary text-white border-primary;
+}
+
+.status-badge {
+  @apply inline-flex px-2 py-1 text-xs font-semibold rounded-full;
+}
+
+.status-active {
+  @apply bg-green-100 text-green-800;
+}
+
+.status-pending {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.status-out-for-delivery {
+  @apply bg-blue-100 text-blue-800;
+}
+
+.status-completed {
+  @apply bg-green-100 text-green-800;
+}
+
+.status-cancelled {
+  @apply bg-red-100 text-red-800;
+}
+
+.status-low-stock {
+  @apply bg-orange-100 text-orange-800;
+}
+
+.status-out-of-stock {
+  @apply bg-red-100 text-red-800;
+}
+
+.status-in-stock {
+  @apply bg-green-100 text-green-800;
+}
+
+.role-admin {
+  @apply bg-red-100 text-red-800;
+}
+
+.role-manager {
+  @apply bg-blue-100 text-blue-800;
+}
+
+.role-customer {
+  @apply bg-gray-100 text-gray-800;
 }
