@@ -46,11 +46,11 @@ export default function ProductCard({ product }: ProductCardProps) {
       </div>
       <CardContent className="p-4 space-y-3">
         <div>
-          <h4 className="font-semibold text-gray-900 line-clamp-1">{product.name}</h4>
+          <h4 className="font-semibold text-foreground line-clamp-1">{product.name}</h4>
           {product.category && (
-            <p className="text-sm text-gray-500">{product.category.name}</p>
+            <p className="text-sm text-muted-foreground">{product.category.name}</p>
           )}
-          <p className="text-sm text-gray-600 line-clamp-2 mt-1">{product.description}</p>
+          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{product.description}</p>
         </div>
 
         <div className="flex items-center justify-between">
