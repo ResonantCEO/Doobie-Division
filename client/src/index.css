@@ -287,7 +287,7 @@
 }
 
 .category-button {
-  @apply px-8 py-4 rounded-xl border-3 text-base font-bold transition-all duration-300;
+  @apply px-8 py-4 rounded-xl border-2 text-base font-bold transition-all duration-300;
   @apply focus:outline-none focus:ring-4 focus:ring-primary focus:ring-opacity-30;
   min-height: 50px;
   display: flex;
@@ -302,7 +302,7 @@
   @apply hover:bg-primary hover:bg-opacity-90 hover:shadow-2xl;
   color: #ffffff !important;
   transform: translateY(-2px);
-  border-width: 3px !important;
+  border-width: 2px !important;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25) !important;
 }
 
@@ -310,7 +310,7 @@
   @apply bg-white border-gray-600;
   @apply hover:bg-gray-50 hover:border-gray-800 hover:shadow-lg;
   color: #000000 !important;
-  border-width: 3px !important;
+  border-width: 2px !important;
   background-color: rgba(255, 255, 255, 0.9) !important;
 }
 
