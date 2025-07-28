@@ -20,7 +20,7 @@ export default function StorefrontPage() {
 
   // Fetch products
   const { data: products = [], isLoading: productsLoading } = useQuery<(Product & { category: Category | null })[]>({
-    queryKey: ["/api/products"],
+    queryKey: ["/api/products", searchQuery, selectedCategory],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
