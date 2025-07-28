@@ -27,9 +27,12 @@ export default function StorefrontPage() {
       if (selectedCategory) params.append('categoryId', selectedCategory.toString());
       
       const url = `/api/products${params.toString() ? `?${params.toString()}` : ''}`;
+      console.log('Fetching products from:', url);
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch products');
-      return response.json();
+      const data = await response.json();
+      console.log('Products received:', data);
+      return data;
     },
   });
 
@@ -132,6 +135,14 @@ export default function StorefrontPage() {
       </div>
 
       {/* Products Grid */}
+      <div className="mb-4 p-4 bg-gray-100 rounded">
+        <p>Debug Info:</p>
+        <p>Products loading: {productsLoading ? 'true' : 'false'}</p>
+        <p>Products count: {products.length}</p>
+        <p>Selected category: {selectedCategory || 'null'}</p>
+        <p>Search query: "{searchQuery}"</p>
+      </div>
+      
       {products.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground text-lg">No products found</p>
