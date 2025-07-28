@@ -6,11 +6,11 @@
   * {
     @apply border-border;
   }
-  
+
   body {
     @apply bg-background text-foreground;
   }
-  
+
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
@@ -186,10 +186,8 @@
 }
 
 .glass-button {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.3s ease;
+  @apply backdrop-blur-sm bg-white/20 border-2 border-black/60 text-black shadow-lg;
+  @apply hover:bg-white/30 hover:border-black/80 transition-all duration-200;
 }
 
 .glass-button:hover {
@@ -220,8 +218,8 @@
 }
 
 .dark .glass-button {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  @apply bg-gray-800/30 border-gray-600/50 text-gray-100;
+  @apply hover:bg-gray-700/40 hover:border-gray-500/60;
 }
 
 .dark .glass-button:hover {
