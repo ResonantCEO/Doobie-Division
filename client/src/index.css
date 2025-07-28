@@ -246,13 +246,14 @@
 
 /* Category section styling improvements */
 .category-section {
-  @apply border-2 border-gray-200 rounded-lg p-6 bg-white shadow-lg;
-  background: rgba(255, 255, 255, 0.95);
+  @apply border-2 border-gray-400 rounded-lg p-6 bg-white shadow-lg;
+  background: rgba(255, 255, 255, 1);
   backdrop-filter: blur(10px);
 }
 
 .category-label {
-  @apply text-lg font-bold text-gray-800 mb-4;
+  @apply text-lg font-bold mb-4;
+  color: #000000 !important;
 }
 
 .category-buttons {
@@ -266,17 +267,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #000000 !important;
 }
 
 .category-button-active {
-  @apply bg-primary text-white border-primary shadow-lg;
+  @apply bg-primary border-primary shadow-lg;
   @apply hover:bg-primary hover:bg-opacity-90 hover:shadow-xl;
+  color: #ffffff !important;
   transform: translateY(-1px);
 }
 
 .category-button-inactive {
-  @apply bg-gray-100 text-gray-700 border-gray-300;
-  @apply hover:bg-gray-200 hover:text-gray-900 hover:border-gray-400 hover:shadow-md;
+  @apply bg-gray-100 border-gray-400;
+  @apply hover:bg-gray-200 hover:border-gray-500 hover:shadow-md;
+  color: #000000 !important;
 }
 
 /* Dark mode category styles */
@@ -286,16 +290,18 @@
 }
 
 .dark .category-label {
-  @apply text-gray-100;
+  color: #000000 !important;
 }
 
 .dark .category-button-inactive {
-  @apply bg-gray-700 text-gray-200 border-gray-600;
-  @apply hover:bg-gray-600 hover:text-white hover:border-gray-500;
+  @apply bg-gray-700 border-gray-600;
+  @apply hover:bg-gray-600 hover:border-gray-500;
+  color: #000000 !important;
 }
 
 .dark .category-button-active {
-  @apply bg-primary text-white border-primary;
+  @apply bg-primary border-primary;
+  color: #ffffff !important;
 }
 
 .status-badge {
