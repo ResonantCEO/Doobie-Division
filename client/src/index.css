@@ -14,22 +14,22 @@
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 96%;
+    --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
     --primary: 142 76% 36%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 90%;
+    --secondary: 210 40% 96%;
     --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 90%;
-    --muted-foreground: 215.4 16.3% 35%;
-    --accent: 210 40% 90%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
     --accent-foreground: 222.2 84% 4.9%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 75%;
-    --input: 214.3 31.8% 85%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
     --ring: 142 76% 36%;
     --radius: 0.5rem;
     --chart-1: 12 76% 61%;
@@ -41,19 +41,19 @@
 
   .dark {
     --background: 220 13% 8%;
-    --foreground: 210 40% 98%;
+    --foreground: 0 0% 0%;
     --card: 224 13% 12%;
-    --card-foreground: 210 40% 98%;
+    --card-foreground: 0 0% 0%;
     --popover: 224 13% 12%;
-    --popover-foreground: 210 40% 98%;
+    --popover-foreground: 0 0% 0%;
     --primary: 142 70% 45%;
     --primary-foreground: 222.2 84% 4.9%;
     --secondary: 220 13% 15%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary-foreground: 0 0% 0%;
     --muted: 220 13% 15%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted-foreground: 0 0% 0%;
     --accent: 220 13% 15%;
-    --accent-foreground: 210 40% 98%;
+    --accent-foreground: 0 0% 0%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
     --border: 220 13% 20%;
@@ -246,40 +246,17 @@
 
 /* Category section styling improvements */
 .category-section {
-  @apply border-2 border-gray-400 rounded-lg p-6 bg-white shadow-lg;
-  background: rgba(255, 255, 255, 1);
+  @apply border-2 border-gray-200 rounded-lg p-6 bg-white shadow-lg;
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
 }
 
 .category-label {
-  @apply text-lg font-bold mb-4;
-  color: #000000 !important;
+  @apply text-lg font-bold text-gray-800 mb-4;
 }
 
 .category-buttons {
   @apply flex flex-wrap gap-3;
-}
-
-/* Force all text to be black */
-* {
-  color: #000000 !important;
-}
-
-/* Make category containers clearly visible */
-.categories-container {
-  border: 2px solid #000000 !important;
-  background-color: #ffffff !important;
-  padding: 16px !important;
-  margin: 16px 0 !important;
-  border-radius: 8px !important;
-}
-
-/* Ensure search containers are visible */
-.search-container {
-  border: 1px solid #000000 !important;
-  background-color: #ffffff !important;
-  padding: 8px !important;
-  border-radius: 4px !important;
 }
 
 .category-button {
@@ -289,20 +266,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #000000 !important;
 }
 
 .category-button-active {
-  @apply bg-primary border-primary shadow-lg;
+  @apply bg-primary text-white border-primary shadow-lg;
   @apply hover:bg-primary hover:bg-opacity-90 hover:shadow-xl;
-  color: #ffffff !important;
   transform: translateY(-1px);
 }
 
 .category-button-inactive {
-  @apply bg-gray-100 border-gray-400;
-  @apply hover:bg-gray-200 hover:border-gray-500 hover:shadow-md;
-  color: #000000 !important;
+  @apply bg-gray-100 text-gray-700 border-gray-300;
+  @apply hover:bg-gray-200 hover:text-gray-900 hover:border-gray-400 hover:shadow-md;
 }
 
 /* Dark mode category styles */
@@ -312,18 +286,16 @@
 }
 
 .dark .category-label {
-  color: #000000 !important;
+  @apply text-gray-100;
 }
 
 .dark .category-button-inactive {
-  @apply bg-gray-700 border-gray-600;
-  @apply hover:bg-gray-600 hover:border-gray-500;
-  color: #000000 !important;
+  @apply bg-gray-700 text-gray-200 border-gray-600;
+  @apply hover:bg-gray-600 hover:text-white hover:border-gray-500;
 }
 
 .dark .category-button-active {
-  @apply bg-primary border-primary;
-  color: #ffffff !important;
+  @apply bg-primary text-white border-primary;
 }
 
 .status-badge {
