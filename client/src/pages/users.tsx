@@ -342,8 +342,8 @@ export default function UsersPage() {
                 <UsersIcon className="h-6 w-6" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Users</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.total}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Users</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{stats.total}</p>
               </div>
             </div>
           </CardContent>
@@ -356,8 +356,8 @@ export default function UsersPage() {
                 <UserCheck className="h-6 w-6" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Active Users</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.active}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Active Users</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{stats.active}</p>
               </div>
             </div>
           </CardContent>
@@ -370,8 +370,8 @@ export default function UsersPage() {
                 <ShieldQuestion className="h-6 w-6" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Admins</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.admins}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Admins</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{stats.admins}</p>
               </div>
             </div>
           </CardContent>
@@ -384,8 +384,8 @@ export default function UsersPage() {
                 <Clock className="h-6 w-6" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.pending}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Pending</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{stats.pending}</p>
               </div>
             </div>
           </CardContent>
@@ -394,8 +394,8 @@ export default function UsersPage() {
 
       {/* Users Table */}
       <Card>
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">All Users</h3>
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">All Users</h3>
         </div>
         <CardContent className="p-0">
           {users.length === 0 ? (
@@ -430,14 +430,14 @@ export default function UsersPage() {
                           </Avatar>
                           <div>
                             <div className="flex items-center space-x-2">
-                              <span className="text-sm font-medium text-gray-900">{user.firstName} {user.lastName}</span>
+                              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.firstName} {user.lastName}</span>
                               {user.role === 'admin' && user.createdAt && new Date(user.createdAt).getTime() === Math.min(...users.map(u => new Date(u.createdAt || 0).getTime())) && (
                                 <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
                                   Founder
                                 </Badge>
                               )}
                             </div>
-                            <div className="text-sm text-gray-500">{user.email}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{user.email}</div>
                           </div>
                         </div>
                       </TableCell>
@@ -485,10 +485,10 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
                       <TableCell>{getStatusBadge(user.status)}</TableCell>
-                      <TableCell className="text-sm text-gray-500">
+                      <TableCell className="text-sm text-gray-500 dark:text-gray-400">
                         {user.createdAt ? format(new Date(user.createdAt), "MMM d, yyyy") : "—"}
                       </TableCell>
-                      <TableCell className="text-sm text-gray-500">
+                      <TableCell className="text-sm text-gray-500 dark:text-gray-400">
                         {user.orderCount || 0} orders
                       </TableCell>
                       <TableCell className="text-right">
