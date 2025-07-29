@@ -118,8 +118,8 @@ export default function OrdersPage() {
                 <ShoppingBag className="h-6 w-6" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.total}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Orders</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.total}</p>
               </div>
             </div>
           </CardContent>
@@ -132,8 +132,8 @@ export default function OrdersPage() {
                 <Clock className="h-6 w-6" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.pending}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Pending</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.pending}</p>
               </div>
             </div>
           </CardContent>
@@ -146,8 +146,8 @@ export default function OrdersPage() {
                 <Truck className="h-6 w-6" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Shipped</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.shipped}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Shipped</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.shipped}</p>
               </div>
             </div>
           </CardContent>
@@ -160,8 +160,8 @@ export default function OrdersPage() {
                 <CheckCircle className="h-6 w-6" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Delivered</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.delivered}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Delivered</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.delivered}</p>
               </div>
             </div>
           </CardContent>
