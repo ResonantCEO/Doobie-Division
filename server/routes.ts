@@ -283,16 +283,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { order, items } = req.body;
       
+      console.log('Order data received:', JSON.stringify(order, null, 2));
+      console.log('Items data received:', JSON.stringify(items, null, 2));
+      
       const orderData = insertOrderSchema.parse(order);
       const itemsData = items.map((item: any) => insertOrderItemSchema.parse(item));
       
       const newOrder = await storage.createOrder(orderData, itemsData);
       res.status(201).json(newOrder);
     } catch (error) {
+      console.error('Order creation error:', error);
       if (error instanceof z.ZodError) {
+        console.error('Validation errors:', error.errors);
         return res.status(400).json({ message: "Invalid order data", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create order" });
+      res.status(500).json({ message: "Failed to create order", error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 

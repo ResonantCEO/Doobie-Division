@@ -105,7 +105,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         customerEmail: user?.email || "",
         customerPhone,
         shippingAddress,
-        total: state.total,
+        total: state.total.toString(),
         paymentMethod: "cod",
         notes: shippingForm.notes,
       };
@@ -120,7 +120,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           productName: item.product.name,
           productPrice: itemPrice.toString(),
           quantity: item.quantity,
-          subtotal: itemPrice * item.quantity,
+          subtotal: (itemPrice * item.quantity).toString(),
         };
       });
 
@@ -151,9 +151,11 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           description: `Order ${orderNumber} has been confirmed. You'll receive a confirmation email shortly.`,
         });
       } else {
+        const errorData = await response.json();
+        console.error("Order creation failed:", errorData);
         toast({
           title: "Order failed",
-          description: "There was an error processing your order. Please try again.",
+          description: errorData.message || "There was an error processing your order. Please try again.",
           variant: "destructive",
         });
       }

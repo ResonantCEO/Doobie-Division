@@ -228,10 +228,19 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   orderNumber: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  total: z.string().or(z.number()).transform(val => String(val)),
+  customerId: z.string().nullable().optional(),
+  customerPhone: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
 });
 
 export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
   id: true,
+}).extend({
+  productPrice: z.string().or(z.number()).transform(val => String(val)),
+  subtotal: z.string().or(z.number()).transform(val => String(val)),
+  orderId: z.number().optional(),
 });
 
 export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).omit({
