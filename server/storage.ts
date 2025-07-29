@@ -22,7 +22,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, lt, sql, ilike, or } from "drizzle-orm";
+import { eq, desc, and, lt, sql, ilike, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -241,7 +241,22 @@ export class DatabaseStorage implements IStorage {
   async getProducts(filters?: { categoryId?: number; search?: string; status?: string }): Promise<(Product & { category: Category | null })[]> {
     let query = db
       .select({
-        ...products,
+        id: products.id,
+        name: products.name,
+        description: products.description,
+        price: products.price,
+        sku: products.sku,
+        categoryId: products.categoryId,
+        imageUrl: products.imageUrl,
+        stock: products.stock,
+        minStockThreshold: products.minStockThreshold,
+        sellingMethod: products.sellingMethod,
+        weightUnit: products.weightUnit,
+        pricePerGram: products.pricePerGram,
+        pricePerOunce: products.pricePerOunce,
+        isActive: products.isActive,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
         category: categories,
       })
       .from(products)
@@ -255,7 +270,7 @@ export class DatabaseStorage implements IStorage {
       if (categoryIds.length === 1) {
         conditions.push(eq(products.categoryId, filters.categoryId));
       } else {
-        conditions.push(sql`${products.categoryId} IN (${categoryIds.join(',')})`);
+        conditions.push(inArray(products.categoryId, categoryIds));
       }
     }
 
