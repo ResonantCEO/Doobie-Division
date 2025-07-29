@@ -145,8 +145,8 @@ export default function AnalyticsPage() {
                 <DollarSign className="h-6 w-6" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Sales</p>
-                <p className="text-2xl font-semibold text-gray-900">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Sales</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                   ${metrics?.totalSales ? Number(metrics.totalSales).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}
                 </p>
                 <p className="text-sm text-secondary">+12.5% from last period</p>
@@ -162,8 +162,8 @@ export default function AnalyticsPage() {
                 <ShoppingCart className="h-6 w-6" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Orders</p>
-                <p className="text-2xl font-semibold text-gray-900">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Orders</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {metrics?.totalOrders || 0}
                 </p>
                 <p className="text-sm text-secondary">+8.3% from last period</p>
@@ -179,8 +179,8 @@ export default function AnalyticsPage() {
                 <Users className="h-6 w-6" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Customers</p>
-                <p className="text-2xl font-semibold text-gray-900">{totalCustomers}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Customers</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{totalCustomers}</p>
                 <p className="text-sm text-secondary">+15.2% from last period</p>
               </div>
             </div>
@@ -194,8 +194,8 @@ export default function AnalyticsPage() {
                 <TrendingUp className="h-6 w-6" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Avg. Order Value</p>
-                <p className="text-2xl font-semibold text-gray-900">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Avg. Order Value</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                   ${metrics?.averageOrderValue ? Number(metrics.averageOrderValue).toFixed(2) : '0.00'}
                 </p>
                 <p className="text-sm text-secondary">+3.8% from last period</p>
@@ -258,7 +258,7 @@ export default function AnalyticsPage() {
             ) : topProducts.length === 0 ? (
               <div className="text-center py-8">
                 <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500">No sales data available</p>
+                <p className="text-gray-500 dark:text-gray-400">No sales data available</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -270,13 +270,13 @@ export default function AnalyticsPage() {
                         <AvatarFallback>{item.product.name.charAt(0)}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="text-sm font-medium text-gray-900 line-clamp-1">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1">
                           {item.product.name}
                         </p>
-                        <p className="text-sm text-gray-500">{item.sales} sold</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{item.sales} sold</p>
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
                       ${Number(item.revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -356,7 +356,7 @@ export default function AnalyticsPage() {
           ) : lowStockProducts.length === 0 ? (
             <div className="text-center py-8">
               <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">All products are well stocked</p>
+              <p className="text-gray-500 dark:text-gray-400">All products are well stocked</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -378,7 +378,7 @@ export default function AnalyticsPage() {
                             <AvatarImage src={product.imageUrl || undefined} />
                             <AvatarFallback>{product.name.charAt(0)}</AvatarFallback>
                           </Avatar>
-                          <span className="text-sm font-medium text-gray-900">
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">
                             {product.name}
                           </span>
                         </div>
@@ -390,7 +390,7 @@ export default function AnalyticsPage() {
                           {product.stock}
                         </span>
                       </TableCell>
-                      <TableCell className="text-sm text-gray-900">
+                      <TableCell className="text-sm text-gray-900 dark:text-white">
                         {product.minStockThreshold}
                       </TableCell>
                       <TableCell>
