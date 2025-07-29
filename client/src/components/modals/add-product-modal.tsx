@@ -152,14 +152,14 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
 
       const payload = {
         ...data,
-        price: data.price,
-        stock: parseInt(data.stock),
+        price: parseFloat(data.price),
+        stock: parseFloat(data.stock),
         minStockThreshold: parseInt(data.minStockThreshold),
         categoryId: data.categoryId || undefined,
         sellingMethod: data.sellingMethod,
         weightUnit: data.weightUnit,
-        pricePerGram: data.pricePerGram || null,
-        pricePerOunce: data.pricePerOunce || null,
+        pricePerGram: data.pricePerGram ? parseFloat(data.pricePerGram) : null,
+        pricePerOunce: data.pricePerOunce ? parseFloat(data.pricePerOunce) : null,
         imageUrl,
       };
       await apiRequest("POST", "/api/products", payload);
