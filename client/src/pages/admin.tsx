@@ -70,7 +70,7 @@ export default function AdminPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h2>
         <p className="text-gray-600">Administrative tools and reports</p>
       </div>
 
