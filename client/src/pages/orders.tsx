@@ -83,7 +83,7 @@ export default function OrdersPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Order Management</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Order Management</h2>
         <div className="flex space-x-3">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-48">
