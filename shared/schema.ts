@@ -215,8 +215,10 @@ export const insertProductSchema = createInsertSchema(products).omit({
 }).extend({
   sellingMethod: z.enum(["units", "weight"]).optional(),
   weightUnit: z.enum(["grams", "ounces"]).optional(),
-  pricePerGram: z.string().optional(),
-  pricePerOunce: z.string().optional(),
+  pricePerGram: z.string().nullable().optional(),
+  pricePerOunce: z.string().nullable().optional(),
+  price: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
 });
 
 export const insertOrderSchema = createInsertSchema(orders).omit({

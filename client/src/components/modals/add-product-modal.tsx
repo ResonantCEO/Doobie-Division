@@ -164,15 +164,18 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       }
 
       const payload = {
-        ...data,
-        price: data.sellingMethod === "units" && data.price ? parseFloat(data.price) : null,
-        stock: parseFloat(data.stock),
-        minStockThreshold: parseInt(data.minStockThreshold),
+        name: data.name,
+        description: data.description || null,
+        sku: data.sku,
         categoryId: data.categoryId,
+        price: data.sellingMethod === "units" && data.price ? data.price : null,
+        stock: parseInt(data.stock),
+        minStockThreshold: parseInt(data.minStockThreshold),
         sellingMethod: data.sellingMethod,
         weightUnit: data.weightUnit,
-        pricePerGram: data.pricePerGram ? parseFloat(data.pricePerGram) : null,
-        pricePerOunce: data.pricePerOunce ? parseFloat(data.pricePerOunce) : null,
+        pricePerGram: data.pricePerGram || null,
+        pricePerOunce: data.pricePerOunce || null,
+        isActive: data.isActive,
         imageUrl,
       };
       await apiRequest("POST", "/api/products", payload);
@@ -188,7 +191,8 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       setSelectedFile(null);
       setImagePreview(null);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error("Product creation error:", error);
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -200,9 +204,18 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         }, 500);
         return;
       }
+      
+      let errorMessage = "Failed to create product. Please check all fields.";
+      if (error?.response?.data?.errors) {
+        const validationErrors = error.response.data.errors;
+        errorMessage = `Validation errors: ${validationErrors.map((e: any) => e.message).join(", ")}`;
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to create product. Please check all fields.",
+        description: errorMessage,
         variant: "destructive",
       });
     },
