@@ -24,13 +24,21 @@ import type { Category } from "@shared/schema";
 
 const formSchema = insertProductSchema.extend({
   categoryId: z.number().min(1, "Category is required"),
-  price: z.string().min(1, "Price is required"),
+  price: z.string().min(1, "Price is required").optional(),
   stock: z.string().min(1, "Stock is required"),
   minStockThreshold: z.string().min(1, "Minimum threshold is required"),
   sellingMethod: z.enum(["units", "weight"]).default("units"),
   weightUnit: z.enum(["grams", "ounces"]).default("grams"),
-  pricePerGram: z.string().optional(),
-  pricePerOunce: z.string().optional(),
+  pricePerGram: z.string().min(1, "Price per gram is required when selling by weight").optional(),
+  pricePerOunce: z.string().min(1, "Price per ounce is required when selling by weight").optional(),
+}).refine((data) => {
+  if (data.sellingMethod === "weight") {
+    return data.pricePerGram || data.pricePerOunce;
+  }
+  return data.price;
+}, {
+  message: "Price is required",
+  path: ["price"],
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -74,7 +82,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       description: "",
       price: "",
       sku: "",
-      categoryId: 0,
+      categoryId: undefined,
       imageUrl: "",
       stock: "",
       minStockThreshold: "5",
@@ -152,10 +160,10 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
 
       const payload = {
         ...data,
-        price: parseFloat(data.price),
+        price: data.sellingMethod === "units" && data.price ? parseFloat(data.price) : null,
         stock: parseFloat(data.stock),
         minStockThreshold: parseInt(data.minStockThreshold),
-        categoryId: data.categoryId || undefined,
+        categoryId: data.categoryId,
         sellingMethod: data.sellingMethod,
         weightUnit: data.weightUnit,
         pricePerGram: data.pricePerGram ? parseFloat(data.pricePerGram) : null,
@@ -196,6 +204,36 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
   });
 
   const onSubmit = (data: FormData) => {
+    console.log("Form submitted with data:", data);
+    
+    // Validate required fields based on selling method
+    if (data.sellingMethod === "weight" && !data.pricePerGram && !data.pricePerOunce) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter either price per gram or price per ounce for weight-based products",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (data.sellingMethod === "units" && !data.price) {
+      toast({
+        title: "Validation Error", 
+        description: "Please enter a price per unit",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!data.categoryId) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a category",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     createProductMutation.mutate(data);
   };
 
@@ -243,7 +281,10 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                 <FormItem>
                   <FormLabel>Category</FormLabel>
                   <FormControl>
-                    <Select onValueChange={(value) => field.onChange(parseInt(value))}>
+                    <Select 
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      value={field.value ? field.value.toString() : ""}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
