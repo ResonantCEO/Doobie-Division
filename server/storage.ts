@@ -219,6 +219,24 @@ export class DatabaseStorage implements IStorage {
     await db.delete(categories).where(eq(categories.id, id));
   }
 
+  // Helper function to get all descendant category IDs
+  private async getDescendantCategoryIds(categoryId: number): Promise<number[]> {
+    const allCategories = await db.select().from(categories).where(eq(categories.isActive, true));
+    const categoryIds = [categoryId];
+    
+    const findChildren = (parentId: number) => {
+      for (const category of allCategories) {
+        if (category.parentId === parentId) {
+          categoryIds.push(category.id);
+          findChildren(category.id); // Recursively find children
+        }
+      }
+    };
+    
+    findChildren(categoryId);
+    return categoryIds;
+  }
+
   // Product operations
   async getProducts(filters?: { categoryId?: number; search?: string; status?: string }): Promise<(Product & { category: Category | null })[]> {
     let query = db
@@ -232,7 +250,13 @@ export class DatabaseStorage implements IStorage {
     const conditions = [];
 
     if (filters?.categoryId) {
-      conditions.push(eq(products.categoryId, filters.categoryId));
+      // Get all descendant category IDs to support hierarchical filtering
+      const categoryIds = await this.getDescendantCategoryIds(filters.categoryId);
+      if (categoryIds.length === 1) {
+        conditions.push(eq(products.categoryId, filters.categoryId));
+      } else {
+        conditions.push(sql`${products.categoryId} IN (${categoryIds.join(',')})`);
+      }
     }
 
     if (filters?.search) {
