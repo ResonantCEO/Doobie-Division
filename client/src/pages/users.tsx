@@ -299,7 +299,7 @@ export default function UsersPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h2>
         <div className="flex space-x-3">
           <Button onClick={handleInviteUser}>
             <UserPlus className="h-4 w-4 mr-2" />
