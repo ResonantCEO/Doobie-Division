@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -321,31 +322,12 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
 
           {/* Category List */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Category Hierarchy</h3>
-              <div className="flex items-center space-x-4 text-xs text-gray-500">
-                <div className="flex items-center space-x-1">
-                  <div className="w-3 h-3 rounded bg-purple-100"></div>
-                  <span>Parent</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <div className="w-3 h-3 rounded bg-blue-100"></div>
-                  <span>Sub</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <div className="w-3 h-3 rounded bg-green-100"></div>
-                  <span>Sub-sub</span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <h3 className="text-lg font-semibold">Existing Categories</h3>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
               {categories.length > 0 ? (
                 renderCategoryTree(categories)
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No categories created yet.</p>
-                  <p className="text-sm">Create your first category to get started.</p>
-                </div>
+                <p className="text-gray-500 text-center py-8">No categories created yet</p>
               )}
             </div>
           </div>
