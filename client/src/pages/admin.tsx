@@ -38,7 +38,7 @@ export default function AdminPage() {
     queryKey: ["/api/admin/inventory-logs", { days: dateFilter, type: typeFilter, product: productFilter }],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (dateFilter) params.append('days', dateFilter);
+      if (dateFilter && dateFilter !== 'all') params.append('days', dateFilter);
       if (typeFilter && typeFilter !== 'all') params.append('type', typeFilter);
       if (productFilter) params.append('product', productFilter);
       
@@ -96,7 +96,7 @@ export default function AdminPage() {
                   <SelectItem value="7">Last 7 days</SelectItem>
                   <SelectItem value="30">Last 30 days</SelectItem>
                   <SelectItem value="90">Last 90 days</SelectItem>
-                  <SelectItem value="">All time</SelectItem>
+                  <SelectItem value="all">All time</SelectItem>
                 </SelectContent>
               </Select>
             </div>
