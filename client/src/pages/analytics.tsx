@@ -116,7 +116,7 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Analytics & Reports</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Analytics & Reports</h2>
         <div className="flex space-x-3">
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-48">
