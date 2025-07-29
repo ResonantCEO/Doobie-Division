@@ -26,6 +26,17 @@ const initialState: CartState = {
   itemCount: 0,
 };
 
+// Helper function to calculate item price based on selling method
+function getItemPrice(product: Product & { category: Category | null }): number {
+  if (product.sellingMethod === "weight") {
+    // For weight-based products, use pricePerGram as the base unit price
+    return Number(product.pricePerGram) || 0;
+  } else {
+    // For unit-based products, use the regular price
+    return Number(product.price) || 0;
+  }
+}
+
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case 'ADD_ITEM': {
@@ -42,7 +53,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         newItems = [...state.items, { product: action.payload, quantity: 1 }];
       }
       
-      const total = newItems.reduce((sum, item) => sum + (Number(item.product.price) * item.quantity), 0);
+      const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product) * item.quantity), 0);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
       
       return { items: newItems, total, itemCount };
@@ -50,7 +61,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     
     case 'REMOVE_ITEM': {
       const newItems = state.items.filter(item => item.product.id !== action.payload);
-      const total = newItems.reduce((sum, item) => sum + (Number(item.product.price) * item.quantity), 0);
+      const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product) * item.quantity), 0);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
       
       return { items: newItems, total, itemCount };
@@ -63,7 +74,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
           : item
       ).filter(item => item.quantity > 0);
       
-      const total = newItems.reduce((sum, item) => sum + (Number(item.product.price) * item.quantity), 0);
+      const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product) * item.quantity), 0);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
       
       return { items: newItems, total, itemCount };
@@ -73,7 +84,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       return initialState;
     
     case 'LOAD_CART': {
-      const total = action.payload.reduce((sum, item) => sum + (Number(item.product.price) * item.quantity), 0);
+      const total = action.payload.reduce((sum, item) => sum + (getItemPrice(item.product) * item.quantity), 0);
       const itemCount = action.payload.reduce((sum, item) => sum + item.quantity, 0);
       
       return { items: action.payload, total, itemCount };

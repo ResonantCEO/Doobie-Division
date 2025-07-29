@@ -110,13 +110,19 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         notes: shippingForm.notes,
       };
 
-      const orderItems = state.items.map(item => ({
-        productId: item.product.id,
-        productName: item.product.name,
-        productPrice: item.product.price,
-        quantity: item.quantity,
-        subtotal: Number(item.product.price) * item.quantity,
-      }));
+      const orderItems = state.items.map(item => {
+        const itemPrice = item.product.sellingMethod === "weight" 
+          ? Number(item.product.pricePerGram) || 0
+          : Number(item.product.price) || 0;
+        
+        return {
+          productId: item.product.id,
+          productName: item.product.name,
+          productPrice: itemPrice.toString(),
+          quantity: item.quantity,
+          subtotal: itemPrice * item.quantity,
+        };
+      });
 
       const response = await fetch('/api/orders', {
         method: 'POST',
@@ -267,7 +273,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                       
                       {/* Subtotal */}
                       <p className="text-sm font-medium mt-2">
-                        Subtotal: ${(Number(item.product.price) * item.quantity).toFixed(2)}
+                        Subtotal: ${(item.product.sellingMethod === "weight" 
+                          ? (Number(item.product.pricePerGram) || 0) * item.quantity
+                          : (Number(item.product.price) || 0) * item.quantity
+                        ).toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -335,7 +344,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 {state.items.map((item) => (
                   <div key={item.product.id} className="flex justify-between">
                     <span>{item.product.name} x {item.quantity}</span>
-                    <span>${(Number(item.product.price) * item.quantity).toFixed(2)}</span>
+                    <span>${(item.product.sellingMethod === "weight" 
+                      ? (Number(item.product.pricePerGram) || 0) * item.quantity
+                      : (Number(item.product.price) || 0) * item.quantity
+                    ).toFixed(2)}</span>
                   </div>
                 ))}
                 <Separator className="my-2" />
