@@ -96,7 +96,7 @@ export default function InventoryPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Inventory Management</h2>
+        <h2 className="text-2xl font-bold text-foreground">Inventory Management</h2>
         <div className="flex space-x-3">
           <Button onClick={() => setShowCategoryModal(true)} variant="outline">
             <Settings className="h-4 w-4 mr-2" />
