@@ -187,10 +187,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/products/:id', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      
+      // Check if product exists first
+      const product = await storage.getProduct(id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
       await storage.deleteProduct(id);
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete product" });
+      console.error('Delete product error:', error);
+      
+      // Check for foreign key constraint errors
+      if (error instanceof Error && error.message.includes('foreign key')) {
+        return res.status(409).json({ 
+          message: "Cannot delete product. It may be referenced in orders or other records." 
+        });
+      }
+      
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to delete product" 
+      });
     }
   });
 
