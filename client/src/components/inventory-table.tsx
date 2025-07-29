@@ -65,7 +65,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
     if (product.stock <= product.minStockThreshold) {
       return <Badge variant="secondary" className="status-low-stock">Low Stock</Badge>;
     }
-    return <Badge variant="outline" className="status-in-stock">In Stock</Badge>;
+    return null; // Don't show badge for in-stock items
   };
 
   const handleDeleteProduct = async (productId: number) => {
