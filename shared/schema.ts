@@ -74,6 +74,7 @@ export const products = pgTable("products", {
   weightUnit: varchar("weight_unit").default("grams"), // grams, ounces
   pricePerGram: decimal("price_per_gram", { precision: 10, scale: 4 }),
   pricePerOunce: decimal("price_per_ounce", { precision: 10, scale: 2 }),
+  discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default("0"), // discount percentage (0-100)
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -219,6 +220,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
   pricePerOunce: z.string().nullable().optional(),
   price: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
+  discountPercentage: z.string().nullable().optional(),
 });
 
 export const insertOrderSchema = createInsertSchema(orders).omit({

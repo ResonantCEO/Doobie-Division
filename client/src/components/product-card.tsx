@@ -58,16 +58,51 @@ export default function ProductCard({ product }: ProductCardProps) {
             {product.sellingMethod === "weight" ? (
               <div className="space-y-1">
                 {product.pricePerGram && (
-                  <div className="text-lg font-bold text-primary">${product.pricePerGram}/g</div>
+                  <div>
+                    {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                      <div className="space-y-1">
+                        <div className="text-sm line-through text-gray-500">${product.pricePerGram}/g</div>
+                        <div className="text-lg font-bold text-green-600">
+                          ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
+                        </div>
+                        <div className="text-xs text-green-600">({product.discountPercentage}% off)</div>
+                      </div>
+                    ) : (
+                      <div className="text-lg font-bold text-primary">${product.pricePerGram}/g</div>
+                    )}
+                  </div>
                 )}
                 {product.pricePerOunce && (
-                  <div className="text-sm text-gray-600">${product.pricePerOunce}/oz</div>
+                  <div>
+                    {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                      <div className="text-sm text-gray-600">
+                        <span className="line-through">${product.pricePerOunce}/oz</span>
+                        <span className="ml-2 text-green-600">
+                          ${(parseFloat(product.pricePerOunce) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/oz
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-600">${product.pricePerOunce}/oz</div>
+                    )}
+                  </div>
                 )}
               </div>
             ) : (
-              <span className="text-2xl font-bold text-primary">
-                ${Number(product.price || 0).toFixed(2)}
-              </span>
+              <div>
+                {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                  <div className="space-y-1">
+                    <div className="text-lg line-through text-gray-500">${Number(product.price || 0).toFixed(2)}</div>
+                    <div className="text-2xl font-bold text-green-600">
+                      ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
+                    </div>
+                    <div className="text-xs text-green-600">({product.discountPercentage}% off)</div>
+                  </div>
+                ) : (
+                  <span className="text-2xl font-bold text-primary">
+                    ${Number(product.price || 0).toFixed(2)}
+                  </span>
+                )}
+              </div>
             )}
           </div>
           <Badge variant={stockStatus.variant === "destructive" ? "destructive" : stockStatus.variant === "secondary" ? "secondary" : "outline"}>

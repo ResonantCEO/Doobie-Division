@@ -254,6 +254,7 @@ export class DatabaseStorage implements IStorage {
         weightUnit: products.weightUnit,
         pricePerGram: products.pricePerGram,
         pricePerOunce: products.pricePerOunce,
+        discountPercentage: products.discountPercentage,
         isActive: products.isActive,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,

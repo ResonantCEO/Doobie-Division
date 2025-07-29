@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import InventoryTable from "@/components/inventory-table";
 import AddProductModal from "@/components/modals/add-product-modal";
+import EditProductModal from "@/components/modals/edit-product-modal";
 import StockAdjustmentModal from "@/components/modals/stock-adjustment-modal";
 import CategoryManagementModal from "@/components/modals/category-management-modal";
 import { Plus, QrCode, AlertTriangle, Settings } from "lucide-react";
@@ -19,9 +20,11 @@ export default function InventoryPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [stockFilter, setStockFilter] = useState<string>("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProductWithCategory, setSelectedProductWithCategory] = useState<(Product & { category: Category | null }) | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -71,6 +74,11 @@ export default function InventoryPage() {
   const handleStockAdjustment = (product: Product) => {
     setSelectedProduct(product);
     setShowStockModal(true);
+  };
+
+  const handleEditProduct = (product: Product & { category: Category | null }) => {
+    setSelectedProductWithCategory(product);
+    setShowEditModal(true);
   };
 
   const handleGenerateQR = () => {
@@ -194,6 +202,7 @@ export default function InventoryPage() {
       <InventoryTable 
         products={products} 
         onStockAdjustment={handleStockAdjustment}
+        onEditProduct={handleEditProduct}
       />
 
       {/* Modals */}
@@ -202,6 +211,15 @@ export default function InventoryPage() {
         onOpenChange={setShowAddModal}
         categories={categories}
       />
+
+      {selectedProductWithCategory && (
+        <EditProductModal
+          open={showEditModal}
+          onOpenChange={setShowEditModal}
+          product={selectedProductWithCategory}
+          categories={categories}
+        />
+      )}
 
       <StockAdjustmentModal
         open={showStockModal}

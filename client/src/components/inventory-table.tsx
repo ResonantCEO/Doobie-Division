@@ -19,9 +19,10 @@ import type { Product, Category } from "@shared/schema";
 interface InventoryTableProps {
   products: (Product & { category: Category | null })[];
   onStockAdjustment: (product: Product) => void;
+  onEditProduct?: (product: Product & { category: Category | null }) => void;
 }
 
-export default function InventoryTable({ products, onStockAdjustment }: InventoryTableProps) {
+export default function InventoryTable({ products, onStockAdjustment, onEditProduct }: InventoryTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
@@ -204,14 +205,49 @@ export default function InventoryTable({ products, onStockAdjustment }: Inventor
                   {product.sellingMethod === "weight" ? (
                     <div className="text-sm">
                       {product.pricePerGram && (
-                        <div>${product.pricePerGram}/g</div>
+                        <div className="space-y-1">
+                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                            <div>
+                              <span className="line-through text-gray-500">${product.pricePerGram}/g</span>
+                              <span className="ml-2 text-green-600">
+                                ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
+                              </span>
+                              <span className="ml-1 text-xs text-green-600">({product.discountPercentage}% off)</span>
+                            </div>
+                          ) : (
+                            <div>${product.pricePerGram}/g</div>
+                          )}
+                        </div>
                       )}
                       {product.pricePerOunce && (
-                        <div>${product.pricePerOunce}/oz</div>
+                        <div className="space-y-1">
+                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                            <div>
+                              <span className="line-through text-gray-500">${product.pricePerOunce}/oz</span>
+                              <span className="ml-2 text-green-600">
+                                ${(parseFloat(product.pricePerOunce) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/oz
+                              </span>
+                            </div>
+                          ) : (
+                            <div>${product.pricePerOunce}/oz</div>
+                          )}
+                        </div>
                       )}
                     </div>
                   ) : (
-                    `$${Number(product.price || 0).toFixed(2)}`
+                    <div>
+                      {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                        <div className="space-y-1">
+                          <span className="line-through text-gray-500">${Number(product.price || 0).toFixed(2)}</span>
+                          <span className="ml-2 text-green-600">
+                            ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
+                          </span>
+                          <span className="ml-1 text-xs text-green-600">({product.discountPercentage}% off)</span>
+                        </div>
+                      ) : (
+                        `$${Number(product.price || 0).toFixed(2)}`
+                      )}
+                    </div>
                   )}
                 </TableCell>
                 <TableCell>
@@ -257,7 +293,7 @@ export default function InventoryTable({ products, onStockAdjustment }: Inventor
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onStockAdjustment(product)}>
+                      <DropdownMenuItem onClick={() => onEditProduct && onEditProduct(product)}>
                         <Edit className="h-4 w-4 mr-2" />
                         Edit Product
                       </DropdownMenuItem>
