@@ -22,22 +22,27 @@ import { z } from "zod";
 import { Upload, X } from "lucide-react";
 import type { Category } from "@shared/schema";
 
-const formSchema = insertProductSchema.extend({
+const formSchema = z.object({
+  name: z.string().min(1, "Product name is required"),
+  description: z.string().optional(),
+  sku: z.string().min(1, "SKU is required"),
   categoryId: z.number().min(1, "Category is required"),
-  price: z.string().min(1, "Price is required").optional(),
+  imageUrl: z.string().optional(),
+  price: z.string().optional(),
   stock: z.string().min(1, "Stock is required"),
   minStockThreshold: z.string().min(1, "Minimum threshold is required"),
   sellingMethod: z.enum(["units", "weight"]).default("units"),
   weightUnit: z.enum(["grams", "ounces"]).default("grams"),
-  pricePerGram: z.string().min(1, "Price per gram is required when selling by weight").optional(),
-  pricePerOunce: z.string().min(1, "Price per ounce is required when selling by weight").optional(),
+  pricePerGram: z.string().optional(),
+  pricePerOunce: z.string().optional(),
+  isActive: z.boolean().default(true),
 }).refine((data) => {
   if (data.sellingMethod === "weight") {
     return data.pricePerGram || data.pricePerOunce;
   }
   return data.price;
 }, {
-  message: "Price is required",
+  message: "Price is required based on selling method",
   path: ["price"],
 });
 
@@ -205,6 +210,26 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
 
   const onSubmit = (data: FormData) => {
     console.log("Form submitted with data:", data);
+    console.log("Form errors:", form.formState.errors);
+    
+    // Validate required fields
+    if (!data.name) {
+      toast({
+        title: "Validation Error",
+        description: "Product name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!data.sku) {
+      toast({
+        title: "Validation Error",
+        description: "SKU is required",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Validate required fields based on selling method
     if (data.sellingMethod === "weight" && !data.pricePerGram && !data.pricePerOunce) {
@@ -234,6 +259,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       return;
     }
     
+    console.log("All validations passed, calling mutation...");
     createProductMutation.mutate(data);
   };
 
@@ -495,7 +521,11 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={createProductMutation.isPending}>
+              <Button 
+                type="submit" 
+                disabled={createProductMutation.isPending}
+                onClick={() => console.log("Create Product button clicked")}
+              >
                 {createProductMutation.isPending ? "Creating..." : "Create Product"}
               </Button>
             </div>
