@@ -211,9 +211,22 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                       {item.product.category && (
                         <p className="text-xs text-muted-foreground">{item.product.category.name}</p>
                       )}
-                      <p className="font-semibold text-primary mt-1">
-                        ${Number(item.product.price).toFixed(2)}
-                      </p>
+                      <div className="mt-1">
+                        {item.product.sellingMethod === "weight" ? (
+                          <div className="space-y-1">
+                            {item.product.pricePerGram && (
+                              <div className="font-semibold text-primary">${item.product.pricePerGram}/g</div>
+                            )}
+                            {item.product.pricePerOunce && (
+                              <div className="text-sm text-gray-600">${item.product.pricePerOunce}/oz</div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="font-semibold text-primary">
+                            ${Number(item.product.price || 0).toFixed(2)}
+                          </p>
+                        )}
+                      </div>
                       
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-2 mt-2">

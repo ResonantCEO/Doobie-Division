@@ -201,7 +201,18 @@ export default function InventoryTable({ products, onStockAdjustment }: Inventor
                 <TableCell className="font-mono text-sm text-black">{product.sku}</TableCell>
                 <TableCell className="text-black">{product.category?.name || "—"}</TableCell>
                 <TableCell className="font-medium text-black">
-                  ${Number(product.price).toFixed(2)}
+                  {product.sellingMethod === "weight" ? (
+                    <div className="text-sm">
+                      {product.pricePerGram && (
+                        <div>${product.pricePerGram}/g</div>
+                      )}
+                      {product.pricePerOunce && (
+                        <div>${product.pricePerOunce}/oz</div>
+                      )}
+                    </div>
+                  ) : (
+                    `$${Number(product.price || 0).toFixed(2)}`
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center space-x-2">

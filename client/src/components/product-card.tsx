@@ -54,9 +54,22 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-2xl font-bold text-primary">
-            ${Number(product.price).toFixed(2)}
-          </span>
+          <div className="text-right">
+            {product.sellingMethod === "weight" ? (
+              <div className="space-y-1">
+                {product.pricePerGram && (
+                  <div className="text-lg font-bold text-primary">${product.pricePerGram}/g</div>
+                )}
+                {product.pricePerOunce && (
+                  <div className="text-sm text-gray-600">${product.pricePerOunce}/oz</div>
+                )}
+              </div>
+            ) : (
+              <span className="text-2xl font-bold text-primary">
+                ${Number(product.price || 0).toFixed(2)}
+              </span>
+            )}
+          </div>
           <Badge variant={stockStatus.variant === "destructive" ? "destructive" : stockStatus.variant === "secondary" ? "secondary" : "outline"}>
             {stockStatus.label}
           </Badge>
