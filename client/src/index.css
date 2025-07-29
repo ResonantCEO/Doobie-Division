@@ -377,3 +377,12 @@
 .dark .role-customer {
   @apply bg-gray-700/50 text-gray-300 border-gray-600;
 }
+
+/* Secondary text visibility */
+.text-secondary {
+  @apply text-green-600;
+}
+
+.dark .text-secondary {
+  @apply text-green-400;
+}
