@@ -153,17 +153,31 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
 
   const renderCategoryTree = (cats: CategoryWithChildren[], level = 0) => {
     return cats.map((category) => (
-      <div key={category.id} className="space-y-2">
-        <div className={`flex items-center justify-between p-3 border rounded-lg ${level > 0 ? 'ml-6 border-dashed' : ''}`}>
+      <div key={category.id} className="space-y-1">
+        <div 
+          className={`flex items-center justify-between p-3 border rounded-lg transition-colors hover:bg-gray-50 ${
+            level > 0 ? `ml-${level * 6} border-dashed border-gray-300` : 'border-gray-200'
+          }`}
+          style={{ marginLeft: level > 0 ? `${level * 1.5}rem` : '0' }}
+        >
           <div className="flex items-center space-x-2">
-            {level > 0 && <ChevronRight className="h-4 w-4 text-gray-400" />}
-            <div>
-              <span className="font-medium">{category.name}</span>
-              {category.description && (
-                <p className="text-sm text-gray-500">{category.description}</p>
-              )}
+            {level > 0 && (
+              <>
+                <div className="flex items-center text-gray-400">
+                  {"└".repeat(1)} 
+                </div>
+                <ChevronRight className="h-3 w-3 text-gray-400" />
+              </>
+            )}
+            <div className="flex items-center space-x-2">
+              <span className={`font-medium ${level > 0 ? 'text-sm' : ''}`}>
+                {category.name}
+              </span>
+              {level > 0 && <Badge variant="outline" size="sm">Subcategory</Badge>}
             </div>
-            {level > 0 && <Badge variant="outline" size="sm">Subcategory</Badge>}
+            {category.description && (
+              <p className="text-sm text-gray-500 ml-2">{category.description}</p>
+            )}
           </div>
           <div className="flex space-x-1">
             <Button
@@ -183,7 +197,7 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
           </div>
         </div>
         {category.children && category.children.length > 0 && (
-          <div>
+          <div className="space-y-1">
             {renderCategoryTree(category.children, level + 1)}
           </div>
         )}
