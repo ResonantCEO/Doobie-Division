@@ -419,7 +419,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const allowedFields = ['firstName', 'lastName', 'address', 'city', 'state', 'postalCode', 'country'];
         const filteredData = Object.keys(userData)
           .filter(key => allowedFields.includes(key))
-          .reduce((obj, key) => {
+          .reduce((obj: any, key) => {
             obj[key] = userData[key];
             return obj;
           }, {});

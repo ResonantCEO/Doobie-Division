@@ -52,17 +52,19 @@ export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
   description: text("description"),
-  parentId: integer("parent_id").references(() => categories.id),
+  parentId: integer("parent_id"),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+
+
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
   description: text("description"),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }), // nullable for weight-based products
   sku: varchar("sku").notNull().unique(),
   categoryId: integer("category_id").references(() => categories.id),
   imageUrl: text("image_url"),

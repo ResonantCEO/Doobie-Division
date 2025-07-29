@@ -305,7 +305,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                 <FormItem>
                   <FormLabel>Description</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Enter product description" {...field} />
+                    <Textarea placeholder="Enter product description" {...field} value={field.value || ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
