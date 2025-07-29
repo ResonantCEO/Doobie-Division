@@ -27,6 +27,10 @@ const formSchema = insertProductSchema.extend({
   price: z.string().min(1, "Price is required"),
   stock: z.string().min(1, "Stock is required"),
   minStockThreshold: z.string().min(1, "Minimum threshold is required"),
+  sellingMethod: z.enum(["units", "weight"]).default("units"),
+  weightUnit: z.enum(["grams", "ounces"]).default("grams"),
+  pricePerGram: z.string().optional(),
+  pricePerOunce: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -74,6 +78,10 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       imageUrl: "",
       stock: "",
       minStockThreshold: "5",
+      sellingMethod: "units",
+      weightUnit: "grams",
+      pricePerGram: "",
+      pricePerOunce: "",
       isActive: true,
     },
   });
@@ -148,6 +156,10 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         stock: parseInt(data.stock),
         minStockThreshold: parseInt(data.minStockThreshold),
         categoryId: data.categoryId || undefined,
+        sellingMethod: data.sellingMethod,
+        weightUnit: data.weightUnit,
+        pricePerGram: data.pricePerGram || null,
+        pricePerOunce: data.pricePerOunce || null,
         imageUrl,
       };
       await apiRequest("POST", "/api/products", payload);
@@ -259,35 +271,127 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Price ($)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" placeholder="0.00" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <FormField
+              control={form.control}
+              name="sellingMethod"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Selling Method</FormLabel>
+                  <FormControl>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select selling method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="units">By Units (individual items)</SelectItem>
+                        <SelectItem value="weight">By Weight (grams/ounces)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="stock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Stock Quantity</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            {form.watch("sellingMethod") === "units" ? (
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Price per Unit ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="stock"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stock Quantity (units)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="0" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            ) : (
+              <>
+                <FormField
+                  control={form.control}
+                  name="weightUnit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Weight Unit</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select weight unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="grams">Grams</SelectItem>
+                            <SelectItem value="ounces">Ounces</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="pricePerGram"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Price per Gram ($)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.0001" placeholder="0.0000" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="pricePerOunce"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Price per Ounce ($)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="stock"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stock Quantity ({form.watch("weightUnit")})</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.1" placeholder="0" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
 
             <FormField
               control={form.control}

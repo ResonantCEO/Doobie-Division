@@ -165,8 +165,8 @@ export default function InventoryTable({ products, onStockAdjustment }: Inventor
               <TableHead>Product</TableHead>
               <TableHead>SKU</TableHead>
               <TableHead>Category</TableHead>
-              <TableHead>Stock</TableHead>
               <TableHead>Price</TableHead>
+              <TableHead>Stock</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -200,6 +200,9 @@ export default function InventoryTable({ products, onStockAdjustment }: Inventor
                 </TableCell>
                 <TableCell className="font-mono text-sm text-black">{product.sku}</TableCell>
                 <TableCell className="text-black">{product.category?.name || "—"}</TableCell>
+                <TableCell className="font-medium text-black">
+                  ${Number(product.price).toFixed(2)}
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center space-x-2">
                     <div className="flex flex-col">
@@ -233,9 +236,6 @@ export default function InventoryTable({ products, onStockAdjustment }: Inventor
                       <Edit className="h-3 w-3" />
                     </Button>
                   </div>
-                </TableCell>
-                <TableCell className="font-medium text-black">
-                  ${Number(product.price).toFixed(2)}
                 </TableCell>
                 <TableCell>{getStockBadge(product)}</TableCell>
                 <TableCell className="text-right">

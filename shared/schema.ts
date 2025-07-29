@@ -68,6 +68,10 @@ export const products = pgTable("products", {
   imageUrl: text("image_url"),
   stock: integer("stock").notNull().default(0),
   minStockThreshold: integer("min_stock_threshold").notNull().default(5),
+  sellingMethod: varchar("selling_method").notNull().default("units"), // units, weight
+  weightUnit: varchar("weight_unit").default("grams"), // grams, ounces
+  pricePerGram: decimal("price_per_gram", { precision: 10, scale: 4 }),
+  pricePerOunce: decimal("price_per_ounce", { precision: 10, scale: 2 }),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -206,6 +210,11 @@ export const insertProductSchema = createInsertSchema(products).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  sellingMethod: z.enum(["units", "weight"]).optional(),
+  weightUnit: z.enum(["grams", "ounces"]).optional(),
+  pricePerGram: z.string().optional(),
+  pricePerOunce: z.string().optional(),
 });
 
 export const insertOrderSchema = createInsertSchema(orders).omit({
