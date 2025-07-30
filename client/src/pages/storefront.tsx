@@ -33,9 +33,6 @@ export default function StorefrontPage() {
     },
   });
 
-  // Filter out products that are out of stock (stock = 0)
-  const products = allProducts.filter(product => product.stock > 0);
-
   const handleCategoryFilter = (categoryId: number | null) => {
     setSelectedCategory(categoryId);
   };
@@ -76,15 +73,17 @@ export default function StorefrontPage() {
     );
   }
 
-  // Filter products by search and category
+  // Filter products by search, category, and stock
   const products = allProducts.filter(product => {
     const matchesSearch = !searchQuery || 
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCategory = !selectedCategory || product.categoryId === selectedCategory;
+    
+    const hasStock = product.stock > 0;
 
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && hasStock;
   });
 
   // Get discounted products for the hero section
