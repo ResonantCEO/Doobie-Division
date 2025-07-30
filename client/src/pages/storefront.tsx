@@ -41,12 +41,16 @@ export default function StorefrontPage() {
       const category = categories.find(cat => cat.id === categoryId);
       const hasSubcategories = categories.some(cat => cat.parentId === categoryId);
       
+      console.log('Category selected:', categoryId, 'Has subcategories:', hasSubcategories);
+      
       if (hasSubcategories) {
         // Show subcategories for this parent
+        console.log('Setting parent category:', categoryId);
         setCurrentParentCategory(categoryId);
         setSelectedCategory(categoryId); // Set the parent as selected to show its products too
       } else {
         // If no subcategories, select this category directly
+        console.log('Setting selected category directly:', categoryId);
         setSelectedCategory(categoryId);
         setCurrentParentCategory(null);
       }
@@ -182,7 +186,11 @@ export default function StorefrontPage() {
         {/* Category Filter */}
         <div className="flex flex-wrap gap-4 items-center">
           <h3 className="text-lg font-semibold text-black dark:text-white">
-            {currentParentCategory ? 'Subcategories:' : 'Categories:'}
+            {currentParentCategory ? 'Subcategories:' : 'Categories:'} 
+            {/* Debug info */}
+            <span className="text-xs text-gray-500 ml-2">
+              (Parent: {currentParentCategory}, Selected: {selectedCategory})
+            </span>
           </h3>
           <div className="flex flex-wrap gap-2">
             {currentParentCategory ? (
