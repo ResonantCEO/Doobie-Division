@@ -45,6 +45,10 @@ All notable changes to this project will be documented in this file.
 - **Dynamic Header Promo System** - Implemented rotating promotional hero section on storefront that automatically cycles through discounted products every 3 seconds with smooth fade transitions
 - **Promotional Content Management** - Hero section dynamically pulls from all products with active discount percentages, displaying product images as backgrounds with promotional overlay text
 - **Interactive Promo Actions** - "Shop Now" button in hero section automatically filters to show only discounted products, creating seamless promotional flow
+- **3D Flip Product Cards** - Implemented interactive product cards with CSS 3D transforms featuring front/back flip animation on click, showcasing product details and descriptions
+- **Dynamic Product Card States** - Product cards dynamically display pricing based on selling method (weight vs fixed price), discount percentages with visual indicators, and real-time stock status badges
+- **Smart Stock Status System** - Cards automatically show contextual stock badges (Out of Stock in red, Low Stock in yellow) with intelligent threshold-based visibility and cart interaction blocking for unavailable items
+- **Responsive Card Interactions** - Cards feature hover effects, scale transforms, smooth transitions, and click-to-flip functionality with detailed product descriptions on the back face
 - **Low Stock Product Endpoint** - New API endpoint for retrieving products with stock levels below minimum threshold for better inventory monitoring
 - **Enhanced Product Query Filtering** - Improved product filtering system with support for multiple category selection and parent-child category relationships
 - **Real-time Database Query Logging** - Added comprehensive database query logging for better performance monitoring and debugging
@@ -60,6 +64,11 @@ All notable changes to this project will be documented in this file.
 - **Product Loading States** - Improved product loading performance with better 304 Not Modified response handling
 
 ### Technical Improvements
+- **3D Card Animation Engine** - Developed CSS-based 3D transformation system with perspective rendering, backface-visibility controls, and 700ms transition duration for smooth flip animations
+- **Adaptive Pricing Display** - Built intelligent pricing component that switches between weight-based ($/gram, $/ounce) and fixed pricing with automatic discount calculation and visual formatting
+- **State-Driven Badge System** - Implemented dynamic badge rendering with conditional styling based on stock levels, using destructive/secondary variants with custom color schemes for dark/light themes
+- **Interactive Cart Integration** - Enhanced cart functionality with click event propagation control, toast notifications, and conditional button states based on inventory availability
+- **Responsive Layout Architecture** - Designed flexible card grid system with consistent 450px minimum height, proper image aspect ratios, and gradient overlays for enhanced visual hierarchy
 - **Promo System Architecture** - Built responsive promotional system using React Query for data fetching with separate endpoints for discounted products and main product catalog
 - **Image Carousel Implementation** - Developed smooth transition system with automatic rotation timer, opacity-based transitions, and fallback gradient backgrounds
 - **Performance Optimization** - Implemented intelligent caching for promotional content with 1-minute stale time and 5-minute cache retention for optimal user experience
