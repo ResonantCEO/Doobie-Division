@@ -228,16 +228,32 @@ export default function StorefrontPage() {
           </h3>
           <div className="flex flex-wrap gap-2">
             {(() => {
-              // Check if we should show subcategories
-              // Either currentParentCategory is set, or selectedCategory has subcategories
-              const showSubcategories = currentParentCategory || (selectedCategory && categories.some(cat => cat.parentId === selectedCategory));
+              console.log('=== RENDER CYCLE ===');
+              console.log('currentParentCategory:', currentParentCategory);
+              console.log('selectedCategory:', selectedCategory);
+              console.log('categories.length:', categories.length);
               
-              console.log('Display logic - currentParentCategory:', currentParentCategory, 'selectedCategory:', selectedCategory);
-              console.log('showSubcategories:', showSubcategories);
+              // More explicit logic
+              let showSubcategories = false;
+              let parentId = null;
               
-              if (showSubcategories) {
+              if (currentParentCategory) {
+                console.log('Case 1: currentParentCategory is set');
+                showSubcategories = true;
+                parentId = currentParentCategory;
+              } else if (selectedCategory && categories.length > 0) {
+                const hasSubcategories = categories.some(cat => cat.parentId === selectedCategory);
+                console.log('Case 2: selectedCategory has subcategories?', hasSubcategories);
+                if (hasSubcategories) {
+                  showSubcategories = true;
+                  parentId = selectedCategory;
+                }
+              }
+              
+              console.log('Final decision - showSubcategories:', showSubcategories, 'parentId:', parentId);
+              
+              if (showSubcategories && parentId) {
                 // Show subcategories view
-                const parentId = currentParentCategory || selectedCategory;
                 const subcategories = categories.filter(cat => cat.parentId === parentId);
                 const parentCategory = categories.find(cat => cat.id === parentId);
                 
