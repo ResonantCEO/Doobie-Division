@@ -15,6 +15,7 @@ export default function StorefrontPage() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showDealsOnly, setShowDealsOnly] = useState(false);
   const [currentParentCategory, setCurrentParentCategory] = useState<number | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Debounce search query
   useEffect(() => {
@@ -24,6 +25,19 @@ export default function StorefrontPage() {
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Image rotation timer for hero section
+  useEffect(() => {
+    if (discountedProducts.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => 
+        prevIndex >= discountedProducts.length - 1 ? 0 : prevIndex + 1
+      );
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [discountedProducts.length]);
 
   // Fetch categories and flatten the hierarchical structure
   const { data: categoriesResponse = [], isLoading: categoriesLoading } = useQuery<(Category & { children?: Category[] })[]>({
@@ -178,13 +192,11 @@ export default function StorefrontPage() {
         <div className="absolute inset-0">
           {discountedProducts.length > 0 ? (
             <div className="relative w-full h-full">
-              {discountedProducts.slice(0, 5).map((product, index) => (
+              {discountedProducts.map((product, index) => (
                 <div
                   key={product.id}
-                  className={`absolute inset-0 transition-opacity duration-2000 ${
-                    Math.floor(Date.now() / 3000) % discountedProducts.slice(0, 5).length === index
-                      ? 'opacity-100'
-                      : 'opacity-0'
+                  className={`absolute inset-0 transition-opacity duration-1000 ${
+                    currentImageIndex === index ? 'opacity-100' : 'opacity-0'
                   }`}
                 >
                   <img
