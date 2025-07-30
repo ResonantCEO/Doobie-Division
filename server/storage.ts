@@ -22,7 +22,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, lt, sql, ilike, or, inArray } from "drizzle-orm";
+import { eq, desc, and, lt, sql, ilike, or, inArray, exists } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -226,19 +226,24 @@ export class DatabaseStorage implements IStorage {
       .select({ id: categories.id })
       .from(categories)
       .where(and(eq(categories.parentId, categoryId), eq(categories.isActive, true)));
-    
+
     const categoryIds = [categoryId];
     for (const child of directChildren) {
       categoryIds.push(child.id);
       // For now, only go one level deep to avoid expensive recursive queries
       // This covers our current use case (parent -> direct children)
     }
-    
+
     return categoryIds;
   }
 
   // Product operations
-  async getProducts(filters?: { categoryId?: number; categoryIds?: number[]; search?: string; status?: string }): Promise<(Product & { category: Category | null })[]> {
+  async getProducts(filters?: {
+    categoryId?: number;
+    categoryIds?: number[];
+    search?: string;
+    status?: string;
+  }): Promise<(Product & { category: Category | null })[]> {
     let query = db
       .select({
         id: products.id,
@@ -266,16 +271,50 @@ export class DatabaseStorage implements IStorage {
     const conditions = [];
 
     if (filters?.categoryIds) {
-      // Filter by multiple specific category IDs
-      conditions.push(inArray(products.categoryId, filters.categoryIds));
-    } else if (filters?.categoryId) {
-      // Get all descendant category IDs to support hierarchical filtering
-      const categoryIds = await this.getDescendantCategoryIds(filters.categoryId);
-      if (categoryIds.length === 1) {
-        conditions.push(eq(products.categoryId, filters.categoryId));
-      } else {
+      // Use a single query with CTE to get all relevant category IDs
+      const categoryQuery = db
+        .with('relevant_categories', (db) =>
+          db.select({
+            id: categories.id
+          })
+          .from(categories)
+          .where(
+            or(
+              // Direct categories
+              inArray(categories.id, filters.categoryIds),
+              // Subcategories of requested parent categories
+              inArray(categories.parentId, filters.categoryIds)
+            )
+          )
+        )
+        .select({ id: sql`relevant_categories.id` })
+        .from(sql`relevant_categories`);
+
+      const relevantCategoryIds = await categoryQuery;
+      const categoryIds = relevantCategoryIds.map(cat => cat.id);
+
+      if (categoryIds.length > 0) {
         conditions.push(inArray(products.categoryId, categoryIds));
       }
+    } else if (filters?.categoryId) {
+      // Single category with subcategories optimization
+      conditions.push(
+        or(
+          eq(products.categoryId, filters.categoryId),
+          exists(
+            db
+              .select({ id: categories.id })
+              .from(categories)
+              .where(
+                and(
+                  eq(categories.parentId, filters.categoryId),
+                  eq(categories.id, products.categoryId),
+                  eq(categories.isActive, true)
+                )
+              )
+          )
+        )
+      );
     }
 
     if (filters?.search) {
@@ -434,7 +473,7 @@ export class DatabaseStorage implements IStorage {
     return await db.transaction(async (tx) => {
       // Generate order number
       const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-      
+
       // Create the order
       const [order] = await tx.insert(orders).values({
         ...orderData,

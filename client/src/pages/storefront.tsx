@@ -68,6 +68,8 @@ export default function StorefrontPage() {
       if (!response.ok) throw new Error('Failed to fetch products');
       return response.json();
     },
+    staleTime: 30000, // Cache for 30 seconds
+    cacheTime: 300000, // Keep in cache for 5 minutes
   });
 
   const handleCategoryFilter = (categoryId: number | null) => {
