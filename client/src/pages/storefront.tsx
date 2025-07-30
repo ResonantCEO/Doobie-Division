@@ -171,17 +171,7 @@ export default function StorefrontPage() {
             >
               All Products
             </Button>
-            <Button
-              variant={showDealsOnly ? "default" : "outline"}
-              size="sm"
-              className="glass-button text-black dark:text-white bg-green-100 dark:bg-green-900/30 border-green-500"
-              onClick={() => {
-                setShowDealsOnly(true);
-                setSelectedCategory(null);
-              }}
-            >
-              🔥 Deals Only
-            </Button>
+            
             {categories.map((category) => (
               <Button
                 key={category.id}
