@@ -3,7 +3,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.0] - 2025-01-25
+## [1.1.0] - 2025-01-27
 
 ### Added
 - **Recent Activity Dashboard Component** - New dashboard widget displaying real-time system activity including new orders, product restocks, and user registrations ([mobile-wireframe.tsx](client/src/components/mobile-wireframe.tsx))
