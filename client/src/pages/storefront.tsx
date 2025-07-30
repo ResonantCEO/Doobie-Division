@@ -232,11 +232,17 @@ export default function StorefrontPage() {
               // Either currentParentCategory is set, or selectedCategory has subcategories
               const showSubcategories = currentParentCategory || (selectedCategory && categories.some(cat => cat.parentId === selectedCategory));
               
+              console.log('Display logic - currentParentCategory:', currentParentCategory, 'selectedCategory:', selectedCategory);
+              console.log('showSubcategories:', showSubcategories);
+              
               if (showSubcategories) {
                 // Show subcategories view
                 const parentId = currentParentCategory || selectedCategory;
                 const subcategories = categories.filter(cat => cat.parentId === parentId);
                 const parentCategory = categories.find(cat => cat.id === parentId);
+                
+                console.log('Showing subcategories for parentId:', parentId);
+                console.log('Found subcategories:', subcategories.map(c => c.name));
                 
                 return (
                   <>
