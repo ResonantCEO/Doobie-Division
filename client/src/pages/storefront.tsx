@@ -17,14 +17,20 @@ export default function StorefrontPage() {
   const [currentParentCategory, setCurrentParentCategory] = useState<number | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  // Debounce search query
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 1200);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+    // Fetch all discounted products for hero section (independent of filters)
+  const { data: allDiscountedProducts = [] } = useQuery<(Product & { category: Category | null })[]>({
+    queryKey: ["/api/products/discounted"],
+    queryFn: async () => {
+      const response = await fetch('/api/products');
+      if (!response.ok) throw new Error('Failed to fetch products');
+      const products = await response.json();
+      return products.filter((product: Product) => 
+        product.discountPercentage && parseFloat(product.discountPercentage) > 0
+      );
+    },
+    staleTime: 60000, // Cache for 1 minute
+    cacheTime: 300000, // Keep in cache for 5 minutes
+  });
 
   // Image rotation timer for hero section
   useEffect(() => {
@@ -38,6 +44,15 @@ export default function StorefrontPage() {
 
     return () => clearInterval(interval);
   }, [discountedProducts.length]);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Fetch categories and flatten the hierarchical structure
   const { data: categoriesResponse = [], isLoading: categoriesLoading } = useQuery<(Category & { children?: Category[] })[]>({
@@ -65,21 +80,6 @@ export default function StorefrontPage() {
   }, [categoriesResponse]);
 
 
-
-  // Fetch all discounted products for hero section (independent of filters)
-  const { data: allDiscountedProducts = [] } = useQuery<(Product & { category: Category | null })[]>({
-    queryKey: ["/api/products/discounted"],
-    queryFn: async () => {
-      const response = await fetch('/api/products');
-      if (!response.ok) throw new Error('Failed to fetch products');
-      const products = await response.json();
-      return products.filter((product: Product) => 
-        product.discountPercentage && parseFloat(product.discountPercentage) > 0
-      );
-    },
-    staleTime: 60000, // Cache for 1 minute
-    cacheTime: 300000, // Keep in cache for 5 minutes
-  });
 
   // Fetch products
   const { data: allProducts = [], isLoading: productsLoading } = useQuery<(Product & { category: Category | null })[]>({
