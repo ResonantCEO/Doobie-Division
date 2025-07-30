@@ -45,7 +45,15 @@ export default function StorefrontPage() {
       
       if (hasSubcategories) {
         setCurrentParentCategory(categoryId);
+        // Don't set selectedCategory to the parent when showing subcategories
+        setSelectedCategory(null);
+      } else {
+        // If no subcategories, clear parent category state
+        setCurrentParentCategory(null);
       }
+    } else {
+      // Clear both when selecting "All Products"
+      setCurrentParentCategory(null);
     }
   };
 
@@ -98,16 +106,14 @@ export default function StorefrontPage() {
       product.description?.toLowerCase().includes(searchQuery.toLowerCase());
 
     let matchesCategory = true;
-    if (selectedCategory) {
-      if (currentParentCategory && selectedCategory === currentParentCategory) {
-        // Show all products from parent category and its subcategories
-        const subcategoryIds = categories
-          .filter(cat => cat.parentId === currentParentCategory)
-          .map(cat => cat.id);
-        matchesCategory = product.categoryId === selectedCategory || subcategoryIds.includes(product.categoryId || 0);
-      } else {
-        matchesCategory = product.categoryId === selectedCategory;
-      }
+    if (currentParentCategory && !selectedCategory) {
+      // When showing subcategories, show all products from parent and its subcategories
+      const subcategoryIds = categories
+        .filter(cat => cat.parentId === currentParentCategory)
+        .map(cat => cat.id);
+      matchesCategory = product.categoryId === currentParentCategory || subcategoryIds.includes(product.categoryId || 0);
+    } else if (selectedCategory) {
+      matchesCategory = product.categoryId === selectedCategory;
     }
     
     const hasStock = product.stock > 0;
