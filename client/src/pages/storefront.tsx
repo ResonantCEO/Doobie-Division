@@ -209,80 +209,89 @@ export default function StorefrontPage() {
             </span>
           </h3>
           <div className="flex flex-wrap gap-2">
-            {currentParentCategory || (selectedCategory && categories.some(cat => cat.parentId === selectedCategory)) ? (
-              // Show subcategories when a parent category is selected
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="glass-button text-black dark:text-white bg-gray-100 dark:bg-gray-800"
-                  onClick={handleBackToMainCategories}
-                >
-                  ← Back to Categories
-                </Button>
-                <Button
-                  variant={selectedCategory === currentParentCategory && !showDealsOnly ? "default" : "outline"}
-                  size="sm"
-                  className="glass-button text-black dark:text-white"
-                  onClick={() => {
-                    const parentId = currentParentCategory || selectedCategory;
-                    setSelectedCategory(parentId);
-                    setShowDealsOnly(false);
-                  }}
-                >
-                  All {categories.find(cat => cat.id === (currentParentCategory || selectedCategory))?.name}
-                </Button>
-                {categories
-                  .filter(category => category.parentId === (currentParentCategory || selectedCategory))
-                  .map((category) => (
-                    <Button
-                      key={category.id}
-                      variant={selectedCategory === category.id && !showDealsOnly ? "default" : "outline"}
-                      size="sm"
-                      className="glass-button text-black dark:text-white"
-                      onClick={() => {
-                        setSelectedCategory(category.id);
-                        setShowDealsOnly(false);
-                      }}
-                    >
-                      {category.name}
-                    </Button>
-                  ))}
-              </>
-            ) : (
-              // Show main categories
-              <>
-                <Button
-                  variant={selectedCategory === null && !showDealsOnly ? "default" : "outline"}
-                  size="sm"
-                  className="glass-button text-black dark:text-white"
-                  onClick={() => {
-                    handleCategoryFilter(null);
-                    setShowDealsOnly(false);
-                  }}
-                >
-                  All Products
-                </Button>
+            {(() => {
+              // Check if current selected category has subcategories
+              const showSubcategories = selectedCategory && categories.some(cat => cat.parentId === selectedCategory);
+              
+              if (showSubcategories) {
+                // Show subcategories view
+                const subcategories = categories.filter(cat => cat.parentId === selectedCategory);
+                const parentCategory = categories.find(cat => cat.id === selectedCategory);
                 
-                {categories
-                  .filter(category => !category.parentId) // Only show root categories
-                  .map((category) => (
+                return (
+                  <>
                     <Button
-                      key={category.id}
-                      variant={selectedCategory === category.id && !showDealsOnly ? "default" : "outline"}
+                      variant="outline"
+                      size="sm"
+                      className="glass-button text-black dark:text-white bg-gray-100 dark:bg-gray-800"
+                      onClick={handleBackToMainCategories}
+                    >
+                      ← Back to Categories
+                    </Button>
+                    <Button
+                      variant={!showDealsOnly ? "default" : "outline"}
                       size="sm"
                       className="glass-button text-black dark:text-white"
                       onClick={() => {
-                        handleCategoryFilter(category.id);
                         setShowDealsOnly(false);
                       }}
                     >
-                      {category.name}
-                      {categories.some(cat => cat.parentId === category.id) && " →"}
+                      All {parentCategory?.name}
                     </Button>
-                  ))}
-              </>
-            )}
+                    {subcategories.map((category) => (
+                      <Button
+                        key={category.id}
+                        variant="outline"
+                        size="sm"
+                        className="glass-button text-black dark:text-white"
+                        onClick={() => {
+                          setSelectedCategory(category.id);
+                          setCurrentParentCategory(null);
+                          setShowDealsOnly(false);
+                        }}
+                      >
+                        {category.name}
+                      </Button>
+                    ))}
+                  </>
+                );
+              } else {
+                // Show main categories view
+                return (
+                  <>
+                    <Button
+                      variant={selectedCategory === null && !showDealsOnly ? "default" : "outline"}
+                      size="sm"
+                      className="glass-button text-black dark:text-white"
+                      onClick={() => {
+                        handleCategoryFilter(null);
+                        setShowDealsOnly(false);
+                      }}
+                    >
+                      All Products
+                    </Button>
+                    
+                    {categories
+                      .filter(category => !category.parentId) // Only show root categories
+                      .map((category) => (
+                        <Button
+                          key={category.id}
+                          variant={selectedCategory === category.id && !showDealsOnly ? "default" : "outline"}
+                          size="sm"
+                          className="glass-button text-black dark:text-white"
+                          onClick={() => {
+                            handleCategoryFilter(category.id);
+                            setShowDealsOnly(false);
+                          }}
+                        >
+                          {category.name}
+                          {categories.some(cat => cat.parentId === category.id) && " →"}
+                        </Button>
+                      ))}
+                  </>
+                );
+              }
+            })()}
           </div>
         </div>
       </div>
