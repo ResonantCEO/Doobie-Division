@@ -94,14 +94,42 @@ export default function StorefrontPage() {
   return (
     <div className="space-y-8">
       {/* Hero Section */}
-      <div className="hero-gradient rounded-2xl mb-12 overflow-hidden">
-        <div className="py-16 px-8">
+      <div className="relative rounded-2xl mb-12 overflow-hidden">
+        {/* Background Image Carousel */}
+        <div className="absolute inset-0">
+          {discountedProducts.length > 0 ? (
+            <div className="relative w-full h-full">
+              {discountedProducts.slice(0, 5).map((product, index) => (
+                <div
+                  key={product.id}
+                  className={`absolute inset-0 transition-opacity duration-2000 ${
+                    Math.floor(Date.now() / 3000) % discountedProducts.slice(0, 5).length === index
+                      ? 'opacity-100'
+                      : 'opacity-0'
+                  }`}
+                >
+                  <img
+                    src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=1200&h=400&fit=crop"}
+                    alt={product.name}
+                    className="w-full h-full object-cover object-center"
+                  />
+                  <div className="absolute inset-0 bg-black/50"></div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="hero-gradient w-full h-full"></div>
+          )}
+        </div>
+        
+        {/* Content Overlay */}
+        <div className="relative py-16 px-8">
           <div className="max-w-2xl">
-            <h2 className="text-4xl font-bold mb-4 text-black dark:text-white">Today's Amazing Deals!</h2>
-            <p className="text-xl mb-6 text-black/80 dark:text-white/90">
+            <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-lg">Today's Amazing Deals!</h2>
+            <p className="text-xl mb-6 text-white/90 drop-shadow-md">
               Check out our special discounts on selected products every day!
             </p>
-            <Button className="bg-white text-primary hover:bg-white/90 dark:bg-background dark:text-foreground dark:hover:bg-background/90">
+            <Button className="bg-white text-primary hover:bg-white/90 drop-shadow-md">
               Shop Now
             </Button>
           </div>
