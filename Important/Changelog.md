@@ -39,6 +39,30 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.1.1] - 2025-01-21
+
+### Added
+- **Low Stock Product Endpoint** - New API endpoint for retrieving products with stock levels below minimum threshold for better inventory monitoring
+- **Enhanced Product Query Filtering** - Improved product filtering system with support for multiple category selection and parent-child category relationships
+- **Real-time Database Query Logging** - Added comprehensive database query logging for better performance monitoring and debugging
+
+### Changed
+- **Optimized Category Queries** - Enhanced category hierarchy queries with improved parent-child relationship handling and active status filtering
+- **Product API Performance** - Streamlined product retrieval with better caching and reduced redundant database calls
+- **Database Connection Management** - Improved PostgreSQL connection handling with better error management and connection pooling
+
+### Fixed
+- **Low Stock Query Issues** - Resolved 500 error in low-stock product endpoint with proper null handling and threshold validation
+- **Category Filter Performance** - Fixed slow category filtering by optimizing subcategory inclusion queries
+- **Product Loading States** - Improved product loading performance with better 304 Not Modified response handling
+
+### Technical Improvements
+- **Query Optimization** - Enhanced database query efficiency for product and category operations
+- **Error Handling** - Improved error responses and logging for better debugging capabilities
+- **API Response Caching** - Better HTTP caching strategies for frequently accessed product data
+
+---
+
 ## [Unreleased]
 
 ### Added
