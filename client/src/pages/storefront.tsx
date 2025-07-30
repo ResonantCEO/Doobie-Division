@@ -52,6 +52,21 @@ export default function StorefrontPage() {
 
 
 
+  // Fetch all discounted products for hero section (independent of filters)
+  const { data: allDiscountedProducts = [] } = useQuery<(Product & { category: Category | null })[]>({
+    queryKey: ["/api/products/discounted"],
+    queryFn: async () => {
+      const response = await fetch('/api/products');
+      if (!response.ok) throw new Error('Failed to fetch products');
+      const products = await response.json();
+      return products.filter((product: Product) => 
+        product.discountPercentage && parseFloat(product.discountPercentage) > 0
+      );
+    },
+    staleTime: 60000, // Cache for 1 minute
+    cacheTime: 300000, // Keep in cache for 5 minutes
+  });
+
   // Fetch products
   const { data: allProducts = [], isLoading: productsLoading } = useQuery<(Product & { category: Category | null })[]>({
     queryKey: ["/api/products", debouncedSearchQuery, selectedCategory, currentParentCategory],
@@ -152,10 +167,8 @@ export default function StorefrontPage() {
     return hasStock && matchesDeals;
   });
 
-  // Get discounted products for the hero section
-  const discountedProducts = allProducts.filter(product => 
-    product.discountPercentage && parseFloat(product.discountPercentage) > 0
-  );
+  // Use the separate discounted products query for consistent hero section
+  const discountedProducts = allDiscountedProducts;
 
   return (
     <div className="space-y-8">
