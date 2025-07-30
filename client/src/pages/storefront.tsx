@@ -291,7 +291,6 @@ export default function StorefrontPage() {
                       }}
                     >
                       {category.name}
-                      {categories.some(cat => cat.parentId === category.id) && " →"}
                     </Button>
                   ))}
               </>
