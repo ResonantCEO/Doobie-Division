@@ -15,15 +15,20 @@ export default function StorefrontPage() {
   const [showDealsOnly, setShowDealsOnly] = useState(false);
   const [currentParentCategory, setCurrentParentCategory] = useState<number | null>(null);
 
-  // Debug state changes
-  useEffect(() => {
-    console.log('State changed - currentParentCategory:', currentParentCategory, 'selectedCategory:', selectedCategory);
-  }, [currentParentCategory, selectedCategory]);
-
   // Fetch categories
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
   });
+
+  // Debug state changes
+  useEffect(() => {
+    console.log('State changed - currentParentCategory:', currentParentCategory, 'selectedCategory:', selectedCategory);
+    console.log('Categories loaded:', categories.length);
+    if (selectedCategory) {
+      const subcats = categories.filter(cat => cat.parentId === selectedCategory);
+      console.log(`Subcategories for ${selectedCategory}:`, subcats.map(c => c.name));
+    }
+  }, [currentParentCategory, selectedCategory, categories]);
 
   // Fetch products
   const { data: allProducts = [], isLoading: productsLoading } = useQuery<(Product & { category: Category | null })[]>({
