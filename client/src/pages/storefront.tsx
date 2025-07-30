@@ -20,7 +20,7 @@ export default function StorefrontPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
-    }, 600);
+    }, 1200);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
