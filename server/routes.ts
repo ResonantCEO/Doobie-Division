@@ -128,10 +128,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Product routes
   app.get('/api/products', async (req, res) => {
     try {
-      const { categoryId, search, status } = req.query;
+      const { categoryId, categoryIds, search, status } = req.query;
       const filters: any = {};
       
-      if (categoryId) filters.categoryId = parseInt(categoryId as string);
+      if (categoryIds) {
+        // Handle multiple category IDs
+        const ids = (categoryIds as string).split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+        if (ids.length > 0) {
+          filters.categoryIds = ids;
+        }
+      } else if (categoryId) {
+        filters.categoryId = parseInt(categoryId as string);
+      }
+      
       if (search) filters.search = search as string;
       if (status) filters.status = status as string;
       

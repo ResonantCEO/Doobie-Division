@@ -27,11 +27,22 @@ export default function StorefrontPage() {
 
   // Fetch products
   const { data: allProducts = [], isLoading: productsLoading } = useQuery<(Product & { category: Category | null })[]>({
-    queryKey: ["/api/products", searchQuery, selectedCategory],
+    queryKey: ["/api/products", searchQuery, selectedCategory, currentParentCategory],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
-      if (selectedCategory) params.append('categoryId', selectedCategory.toString());
+      
+      // If we have a currentParentCategory, get all products from its subcategories
+      if (currentParentCategory) {
+        const subcategoryIds = categories
+          .filter(cat => cat.parentId === currentParentCategory)
+          .map(cat => cat.id);
+        if (subcategoryIds.length > 0) {
+          params.append('categoryIds', subcategoryIds.join(','));
+        }
+      } else if (selectedCategory) {
+        params.append('categoryId', selectedCategory.toString());
+      }
 
       const url = `/api/products${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await fetch(url);
@@ -62,8 +73,8 @@ export default function StorefrontPage() {
         console.log('Setting parent category to show subcategories');
         console.log('Before state change - currentParentCategory:', currentParentCategory, 'selectedCategory:', selectedCategory);
         setCurrentParentCategory(categoryId);
-        setSelectedCategory(categoryId);
-        console.log('After state calls - should be Parent:', categoryId, 'Selected:', categoryId);
+        setSelectedCategory(null); // Clear selected category to show all products in subcategories
+        console.log('After state calls - should be Parent:', categoryId, 'Selected: null');
       } else {
         // If no subcategories, select this category directly
         console.log('No subcategories, selecting category directly');
@@ -210,13 +221,15 @@ export default function StorefrontPage() {
           </h3>
           <div className="flex flex-wrap gap-2">
             {(() => {
-              // Check if current selected category has subcategories
-              const showSubcategories = selectedCategory && categories.some(cat => cat.parentId === selectedCategory);
+              // Check if we should show subcategories
+              // Either currentParentCategory is set, or selectedCategory has subcategories
+              const showSubcategories = currentParentCategory || (selectedCategory && categories.some(cat => cat.parentId === selectedCategory));
               
               if (showSubcategories) {
                 // Show subcategories view
-                const subcategories = categories.filter(cat => cat.parentId === selectedCategory);
-                const parentCategory = categories.find(cat => cat.id === selectedCategory);
+                const parentId = currentParentCategory || selectedCategory;
+                const subcategories = categories.filter(cat => cat.parentId === parentId);
+                const parentCategory = categories.find(cat => cat.id === parentId);
                 
                 return (
                   <>

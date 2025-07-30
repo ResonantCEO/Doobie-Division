@@ -238,7 +238,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Product operations
-  async getProducts(filters?: { categoryId?: number; search?: string; status?: string }): Promise<(Product & { category: Category | null })[]> {
+  async getProducts(filters?: { categoryId?: number; categoryIds?: number[]; search?: string; status?: string }): Promise<(Product & { category: Category | null })[]> {
     let query = db
       .select({
         id: products.id,
@@ -265,7 +265,10 @@ export class DatabaseStorage implements IStorage {
 
     const conditions = [];
 
-    if (filters?.categoryId) {
+    if (filters?.categoryIds) {
+      // Filter by multiple specific category IDs
+      conditions.push(inArray(products.categoryId, filters.categoryIds));
+    } else if (filters?.categoryId) {
       // Get all descendant category IDs to support hierarchical filtering
       const categoryIds = await this.getDescendantCategoryIds(filters.categoryId);
       if (categoryIds.length === 1) {
