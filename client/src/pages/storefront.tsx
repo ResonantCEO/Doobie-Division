@@ -13,6 +13,7 @@ export default function StorefrontPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showDealsOnly, setShowDealsOnly] = useState(false);
+  const [currentParentCategory, setCurrentParentCategory] = useState<number | null>(null);
 
   // Fetch categories
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
@@ -36,6 +37,22 @@ export default function StorefrontPage() {
 
   const handleCategoryFilter = (categoryId: number | null) => {
     setSelectedCategory(categoryId);
+    
+    // If selecting a category, check if it has subcategories
+    if (categoryId) {
+      const category = categories.find(cat => cat.id === categoryId);
+      const hasSubcategories = categories.some(cat => cat.parentId === categoryId);
+      
+      if (hasSubcategories) {
+        setCurrentParentCategory(categoryId);
+      }
+    }
+  };
+
+  const handleBackToMainCategories = () => {
+    setCurrentParentCategory(null);
+    setSelectedCategory(null);
+    setShowDealsOnly(false);
   };
 
   if (productsLoading || categoriesLoading) {
@@ -80,7 +97,18 @@ export default function StorefrontPage() {
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesCategory = !selectedCategory || product.categoryId === selectedCategory;
+    let matchesCategory = true;
+    if (selectedCategory) {
+      if (currentParentCategory && selectedCategory === currentParentCategory) {
+        // Show all products from parent category and its subcategories
+        const subcategoryIds = categories
+          .filter(cat => cat.parentId === currentParentCategory)
+          .map(cat => cat.id);
+        matchesCategory = product.categoryId === selectedCategory || subcategoryIds.includes(product.categoryId || 0);
+      } else {
+        matchesCategory = product.categoryId === selectedCategory;
+      }
+    }
     
     const hasStock = product.stock > 0;
 
@@ -158,34 +186,83 @@ export default function StorefrontPage() {
 
         {/* Category Filter */}
         <div className="flex flex-wrap gap-4 items-center">
-          <h3 className="text-lg font-semibold text-black dark:text-white">Categories:</h3>
+          <h3 className="text-lg font-semibold text-black dark:text-white">
+            {currentParentCategory ? 'Subcategories:' : 'Categories:'}
+          </h3>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant={selectedCategory === null && !showDealsOnly ? "default" : "outline"}
-              size="sm"
-              className="glass-button text-black dark:text-white"
-              onClick={() => {
-                handleCategoryFilter(null);
-                setShowDealsOnly(false);
-              }}
-            >
-              All Products
-            </Button>
-            
-            {categories.map((category) => (
-              <Button
-                key={category.id}
-                variant={selectedCategory === category.id && !showDealsOnly ? "default" : "outline"}
-                size="sm"
-                className="glass-button text-black dark:text-white"
-                onClick={() => {
-                  handleCategoryFilter(category.id);
-                  setShowDealsOnly(false);
-                }}
-              >
-                {category.name}
-              </Button>
-            ))}
+            {currentParentCategory ? (
+              // Show subcategories when a parent category is selected
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="glass-button text-black dark:text-white bg-gray-100 dark:bg-gray-800"
+                  onClick={handleBackToMainCategories}
+                >
+                  ← Back to Categories
+                </Button>
+                <Button
+                  variant={selectedCategory === currentParentCategory && !showDealsOnly ? "default" : "outline"}
+                  size="sm"
+                  className="glass-button text-black dark:text-white"
+                  onClick={() => {
+                    setSelectedCategory(currentParentCategory);
+                    setShowDealsOnly(false);
+                  }}
+                >
+                  All {categories.find(cat => cat.id === currentParentCategory)?.name}
+                </Button>
+                {categories
+                  .filter(category => category.parentId === currentParentCategory)
+                  .map((category) => (
+                    <Button
+                      key={category.id}
+                      variant={selectedCategory === category.id && !showDealsOnly ? "default" : "outline"}
+                      size="sm"
+                      className="glass-button text-black dark:text-white"
+                      onClick={() => {
+                        setSelectedCategory(category.id);
+                        setShowDealsOnly(false);
+                      }}
+                    >
+                      {category.name}
+                    </Button>
+                  ))}
+              </>
+            ) : (
+              // Show main categories
+              <>
+                <Button
+                  variant={selectedCategory === null && !showDealsOnly ? "default" : "outline"}
+                  size="sm"
+                  className="glass-button text-black dark:text-white"
+                  onClick={() => {
+                    handleCategoryFilter(null);
+                    setShowDealsOnly(false);
+                  }}
+                >
+                  All Products
+                </Button>
+                
+                {categories
+                  .filter(category => !category.parentId) // Only show root categories
+                  .map((category) => (
+                    <Button
+                      key={category.id}
+                      variant={selectedCategory === category.id && !showDealsOnly ? "default" : "outline"}
+                      size="sm"
+                      className="glass-button text-black dark:text-white"
+                      onClick={() => {
+                        handleCategoryFilter(category.id);
+                        setShowDealsOnly(false);
+                      }}
+                    >
+                      {category.name}
+                      {categories.some(cat => cat.parentId === category.id) && " →"}
+                    </Button>
+                  ))}
+              </>
+            )}
           </div>
         </div>
       </div>
