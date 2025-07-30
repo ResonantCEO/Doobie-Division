@@ -20,13 +20,27 @@ export default function StorefrontPage() {
     queryKey: ["/api/categories"],
   });
 
-  // Debug state changes
+  // Debug state changes and category data
   useEffect(() => {
-    console.log('State changed - currentParentCategory:', currentParentCategory, 'selectedCategory:', selectedCategory);
+    console.log('=== STATE CHANGE ===');
+    console.log('currentParentCategory:', currentParentCategory);
+    console.log('selectedCategory:', selectedCategory);
     console.log('Categories loaded:', categories.length);
+    
+    // Log all categories with their parent relationships
+    const rootCategories = categories.filter(cat => !cat.parentId);
+    console.log('Root categories:', rootCategories.map(c => `${c.id}: ${c.name}`));
+    
+    rootCategories.forEach(root => {
+      const subcats = categories.filter(cat => cat.parentId === root.id);
+      if (subcats.length > 0) {
+        console.log(`  Subcategories of ${root.name} (${root.id}):`, subcats.map(c => `${c.id}: ${c.name}`));
+      }
+    });
+    
     if (selectedCategory) {
       const subcats = categories.filter(cat => cat.parentId === selectedCategory);
-      console.log(`Subcategories for ${selectedCategory}:`, subcats.map(c => c.name));
+      console.log(`Subcategories for selected ${selectedCategory}:`, subcats.map(c => c.name));
     }
   }, [currentParentCategory, selectedCategory, categories]);
 
@@ -227,38 +241,11 @@ export default function StorefrontPage() {
             </span>
           </h3>
           <div className="flex flex-wrap gap-2">
-            {(() => {
-              console.log('=== RENDER CYCLE ===');
-              console.log('currentParentCategory:', currentParentCategory);
-              console.log('selectedCategory:', selectedCategory);
-              console.log('categories.length:', categories.length);
-              
-              // More explicit logic
-              let showSubcategories = false;
-              let parentId = null;
-              
-              if (currentParentCategory) {
-                console.log('Case 1: currentParentCategory is set');
-                showSubcategories = true;
-                parentId = currentParentCategory;
-              } else if (selectedCategory && categories.length > 0) {
-                const hasSubcategories = categories.some(cat => cat.parentId === selectedCategory);
-                console.log('Case 2: selectedCategory has subcategories?', hasSubcategories);
-                if (hasSubcategories) {
-                  showSubcategories = true;
-                  parentId = selectedCategory;
-                }
-              }
-              
-              console.log('Final decision - showSubcategories:', showSubcategories, 'parentId:', parentId);
-              
-              if (showSubcategories && parentId) {
-                // Show subcategories view
-                const subcategories = categories.filter(cat => cat.parentId === parentId);
-                const parentCategory = categories.find(cat => cat.id === parentId);
-                
-                console.log('Showing subcategories for parentId:', parentId);
-                console.log('Found subcategories:', subcategories.map(c => c.name));
+            {currentParentCategory ? (
+              // Show subcategories when currentParentCategory is set
+              (() => {
+                const subcategories = categories.filter(cat => cat.parentId === currentParentCategory);
+                const parentCategory = categories.find(cat => cat.id === currentParentCategory);
                 
                 return (
                   <>
@@ -297,43 +284,41 @@ export default function StorefrontPage() {
                     ))}
                   </>
                 );
-              } else {
-                // Show main categories view
-                return (
-                  <>
+              })()
+            ) : (
+              // Show main categories when currentParentCategory is not set
+              <>
+                <Button
+                  variant={selectedCategory === null && !showDealsOnly ? "default" : "outline"}
+                  size="sm"
+                  className="glass-button text-black dark:text-white"
+                  onClick={() => {
+                    handleCategoryFilter(null);
+                    setShowDealsOnly(false);
+                  }}
+                >
+                  All Products
+                </Button>
+                
+                {categories
+                  .filter(category => !category.parentId) // Only show root categories
+                  .map((category) => (
                     <Button
-                      variant={selectedCategory === null && !showDealsOnly ? "default" : "outline"}
+                      key={category.id}
+                      variant={selectedCategory === category.id && !showDealsOnly ? "default" : "outline"}
                       size="sm"
                       className="glass-button text-black dark:text-white"
                       onClick={() => {
-                        handleCategoryFilter(null);
+                        handleCategoryFilter(category.id);
                         setShowDealsOnly(false);
                       }}
                     >
-                      All Products
+                      {category.name}
+                      {categories.some(cat => cat.parentId === category.id) && " →"}
                     </Button>
-                    
-                    {categories
-                      .filter(category => !category.parentId) // Only show root categories
-                      .map((category) => (
-                        <Button
-                          key={category.id}
-                          variant={selectedCategory === category.id && !showDealsOnly ? "default" : "outline"}
-                          size="sm"
-                          className="glass-button text-black dark:text-white"
-                          onClick={() => {
-                            handleCategoryFilter(category.id);
-                            setShowDealsOnly(false);
-                          }}
-                        >
-                          {category.name}
-                          {categories.some(cat => cat.parentId === category.id) && " →"}
-                        </Button>
-                      ))}
-                  </>
-                );
-              }
-            })()}
+                  ))}
+              </>
+            )}
           </div>
         </div>
       </div>
