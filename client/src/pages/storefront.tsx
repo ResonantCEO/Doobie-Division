@@ -209,7 +209,7 @@ export default function StorefrontPage() {
             </span>
           </h3>
           <div className="flex flex-wrap gap-2">
-            {currentParentCategory ? (
+            {currentParentCategory || (selectedCategory && categories.some(cat => cat.parentId === selectedCategory)) ? (
               // Show subcategories when a parent category is selected
               <>
                 <Button
@@ -225,14 +225,15 @@ export default function StorefrontPage() {
                   size="sm"
                   className="glass-button text-black dark:text-white"
                   onClick={() => {
-                    setSelectedCategory(currentParentCategory);
+                    const parentId = currentParentCategory || selectedCategory;
+                    setSelectedCategory(parentId);
                     setShowDealsOnly(false);
                   }}
                 >
-                  All {categories.find(cat => cat.id === currentParentCategory)?.name}
+                  All {categories.find(cat => cat.id === (currentParentCategory || selectedCategory))?.name}
                 </Button>
                 {categories
-                  .filter(category => category.parentId === currentParentCategory)
+                  .filter(category => category.parentId === (currentParentCategory || selectedCategory))
                   .map((category) => (
                     <Button
                       key={category.id}
