@@ -73,6 +73,10 @@ export default function StorefrontPage() {
   });
 
   const handleCategoryFilter = (categoryId: number | null) => {
+    console.log('=== handleCategoryFilter called ===');
+    console.log('categoryId:', categoryId, 'type:', typeof categoryId);
+    console.log('categories array:', categories.map(c => ({ id: c.id, name: c.name, parentId: c.parentId, parentIdType: typeof c.parentId })));
+    
     // If selecting a category, check if it has subcategories
     if (categoryId) {
       // Wait for categories to be loaded
@@ -82,7 +86,10 @@ export default function StorefrontPage() {
       }
       
       const category = categories.find(cat => cat.id === categoryId);
-      const subcategoriesForThisParent = categories.filter(cat => cat.parentId === categoryId);
+      const subcategoriesForThisParent = categories.filter(cat => {
+        console.log(`Checking cat ${cat.id} (${cat.name}): parentId=${cat.parentId} (type: ${typeof cat.parentId}) === categoryId=${categoryId} (type: ${typeof categoryId}) = ${cat.parentId === categoryId}`);
+        return cat.parentId === categoryId;
+      });
       const hasSubcategories = subcategoriesForThisParent.length > 0;
       
       console.log('Category selected:', categoryId, 'Category found:', category?.name);
@@ -90,20 +97,16 @@ export default function StorefrontPage() {
       console.log('Has subcategories:', hasSubcategories);
       
       if (hasSubcategories) {
-        // Show subcategories for this parent
-        console.log('Setting parent category to show subcategories');
-        console.log('Before state change - currentParentCategory:', currentParentCategory, 'selectedCategory:', selectedCategory);
+        console.log('✅ SETTING PARENT CATEGORY - categoryId:', categoryId);
         setCurrentParentCategory(categoryId);
-        setSelectedCategory(null); // Clear selected category to show all products in subcategories
-        console.log('After state calls - should be Parent:', categoryId, 'Selected: null');
+        setSelectedCategory(null);
       } else {
-        // If no subcategories, select this category directly
         console.log('No subcategories, selecting category directly');
         setSelectedCategory(categoryId);
         setCurrentParentCategory(null);
       }
     } else {
-      // Clear both when selecting "All Products"
+      console.log('Clearing all categories');
       setCurrentParentCategory(null);
       setSelectedCategory(null);
     }
