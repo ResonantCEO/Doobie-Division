@@ -58,7 +58,7 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Static file serving for uploaded images
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-  
+
   // Auth middleware
   await setupAuth(app);
 
@@ -130,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { categoryId, categoryIds, search, status } = req.query;
       const filters: any = {};
-      
+
       if (categoryIds) {
         // Handle multiple category IDs
         const ids = (categoryIds as string).split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
@@ -140,10 +140,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (categoryId) {
         filters.categoryId = parseInt(categoryId as string);
       }
-      
+
       if (search) filters.search = search as string;
       if (status) filters.status = status as string;
-      
+
       console.log('Product query filters:', filters);
       const products = await storage.getProducts(filters);
       console.log(`Found ${products.length} products`);
@@ -158,11 +158,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const product = await storage.getProduct(id);
-      
+
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
-      
+
       res.json(product);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch product" });
@@ -199,25 +199,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/products/:id', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      
+
       // Check if product exists first
       const product = await storage.getProduct(id);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
-      
+
       await storage.deleteProduct(id);
       res.status(204).send();
     } catch (error) {
       console.error('Delete product error:', error);
-      
+
       // Check for foreign key constraint errors
       if (error instanceof Error && error.message.includes('foreign key')) {
         return res.status(409).json({ 
           message: "Cannot delete product. It may be referenced in orders or other records." 
         });
       }
-      
+
       res.status(500).json({ 
         message: error instanceof Error ? error.message : "Failed to delete product" 
       });
@@ -229,11 +229,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const productId = parseInt(req.params.id);
       const { quantity, reason } = req.body;
-      
+
       if (typeof quantity !== 'number' || !reason) {
         return res.status(400).json({ message: "Quantity and reason are required" });
       }
-      
+
       await storage.adjustStock(productId, quantity, req.currentUser.id, reason);
       res.status(200).json({ message: "Stock adjusted successfully" });
     } catch (error) {
@@ -256,14 +256,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { status } = req.query;
       const filters: any = {};
-      
+
       if (status) filters.status = status as string;
-      
+
       // Regular customers can only see their own orders
       if (req.currentUser.role === 'customer') {
         filters.customerId = req.currentUser.id;
       }
-      
+
       const orders = await storage.getOrders(filters);
       res.json(orders);
     } catch (error) {
@@ -275,16 +275,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const order = await storage.getOrder(id);
-      
+
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
-      
+
       // Regular customers can only see their own orders
       if (req.currentUser.role === 'customer' && order.customerId !== req.currentUser.id) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
       res.json(order);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch order" });
@@ -294,13 +294,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders', async (req, res) => {
     try {
       const { order, items } = req.body;
-      
+
       console.log('Order data received:', JSON.stringify(order, null, 2));
       console.log('Items data received:', JSON.stringify(items, null, 2));
-      
+
       const orderData = insertOrderSchema.parse(order);
       const itemsData = items.map((item: any) => insertOrderItemSchema.parse(item));
-      
+
       const newOrder = await storage.createOrder(orderData, itemsData);
       res.status(201).json(newOrder);
     } catch (error) {
@@ -317,11 +317,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const { status } = req.body;
-      
+
       if (!status) {
         return res.status(400).json({ message: "Status is required" });
       }
-      
+
       const order = await storage.updateOrderStatus(id, status);
       res.json(order);
     } catch (error) {
@@ -393,11 +393,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = req.params.id;
       const { status } = req.body;
-      
+
       if (!status) {
         return res.status(400).json({ message: "Status is required" });
       }
-      
+
       const user = await storage.updateUserStatus(id, status);
       res.json(user);
     } catch (error) {
@@ -409,11 +409,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = req.params.id;
       const { role } = req.body;
-      
+
       if (!role) {
         return res.status(400).json({ message: "Role is required" });
       }
-      
+
       const user = await storage.updateUserRole(id, role);
       res.json(user);
     } catch (error) {
@@ -425,12 +425,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = req.params.id;
       const userData = req.body;
-      
+
       // Regular users can only update their own profile
       if (req.currentUser.role === 'customer' && req.currentUser.id !== id) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
       // If not admin, restrict what fields can be updated
       if (req.currentUser.role === 'customer') {
         const allowedFields = ['firstName', 'lastName', 'address', 'city', 'state', 'postalCode', 'country'];
@@ -440,7 +440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             obj[key] = userData[key];
             return obj;
           }, {});
-        
+
         const user = await storage.updateUser(id, filteredData);
         res.json(user);
       } else {
@@ -458,11 +458,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { days, type, product } = req.query;
       const filters: any = {};
-      
+
       if (days) filters.days = parseInt(days as string);
       if (type) filters.type = type as string;
       if (product) filters.product = product as string;
-      
+
       const logs = await storage.getInventoryLogs(filters);
       res.json(logs);
     } catch (error) {
@@ -475,18 +475,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = req.params.id;
       const { status } = req.body;
-      
+
       if (!['verified', 'rejected'].includes(status)) {
         return res.status(400).json({ message: "Status must be 'verified' or 'rejected'" });
       }
-      
+
       const user = await storage.updateUserIdVerification(id, status);
-      
+
       // If verified, also activate the user account
       if (status === 'verified') {
         await storage.updateUserStatus(id, 'active');
       }
-      
+
       res.json(user);
     } catch (error) {
       res.status(500).json({ message: "Failed to update ID verification status" });
@@ -505,3 +505,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   return httpServer;
 }
+```
