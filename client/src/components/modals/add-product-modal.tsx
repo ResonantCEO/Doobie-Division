@@ -35,6 +35,7 @@ const formSchema = z.object({
   weightUnit: z.enum(["grams", "ounces"]).default("grams"),
   pricePerGram: z.string().optional(),
   pricePerOunce: z.string().optional(),
+  discountPercentage: z.string().nullable().optional(),
   isActive: z.boolean().default(true),
 }).refine((data) => {
   if (data.sellingMethod === "weight") {

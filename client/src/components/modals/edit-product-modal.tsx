@@ -57,7 +57,7 @@ const formSchema = z.object({
   weightUnit: z.enum(["grams", "ounces"]).optional(),
   pricePerGram: z.string().optional(),
   pricePerOunce: z.string().optional(),
-  discountPercentage: z.string().optional(),
+  discountPercentage: z.string().nullable().optional(),
   isActive: z.boolean(),
 });
 
