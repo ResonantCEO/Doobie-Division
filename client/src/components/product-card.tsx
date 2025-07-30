@@ -30,7 +30,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     if (product.stock <= product.minStockThreshold) {
       return { label: `Low Stock (${product.stock})`, variant: "secondary" as const };
     }
-    return { label: `In Stock (${product.stock})`, variant: "default" as const };
+    return { label: "In Stock", variant: "default" as const };
   };
 
   const stockStatus = getStockStatus();
