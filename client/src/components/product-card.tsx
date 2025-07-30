@@ -51,118 +51,116 @@ export default function ProductCard({ product }: ProductCardProps) {
         onClick={handleCardClick}
       >
         {/* Front of card */}
-        <Card className="product-card-face product-card-front absolute inset-0 w-full h-full overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col backface-hidden min-h-[520px]">
-          <div className="h-48 overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0">
+        <Card className="product-card-face product-card-front absolute inset-0 w-full h-full overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col backface-hidden">
+          <div className="aspect-square overflow-hidden bg-gray-100 dark:bg-gray-800">
             <img
               src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"}
               alt={product.name}
               className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-300"
             />
           </div>
-          <CardContent className="p-4 bg-white dark:bg-gray-900 flex flex-col flex-1 min-h-[320px]">
-            <div className="flex-1 space-y-3">
-              <div>
-                <h4 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-1 mb-1">{product.name}</h4>
-                {product.category && (
-                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">{product.category.name}</p>
-                )}
-              </div>
+          <CardContent className="p-4 bg-white dark:bg-gray-900 flex flex-col flex-1">
+            <div className="flex-1">
+              <h4 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-1 mb-1">{product.name}</h4>
+              {product.category && (
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">{product.category.name}</p>
+              )}
+            </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-left flex-1">
-                    {product.sellingMethod === "weight" ? (
-                      <div className="space-y-1">
-                        {product.pricePerGram && (
-                          <div>
-                            {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                              <div className="space-y-1">
-                                <div className="text-sm line-through text-gray-500 dark:text-gray-400">${product.pricePerGram}/g</div>
-                                <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                                  ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
-                                </div>
-                                <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full inline-block">
-                                  {product.discountPercentage}% OFF
-                                </div>
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-left flex-1">
+                  {product.sellingMethod === "weight" ? (
+                    <div className="space-y-1">
+                      {product.pricePerGram && (
+                        <div>
+                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                            <div className="space-y-1">
+                              <div className="text-sm line-through text-gray-500 dark:text-gray-400">${product.pricePerGram}/g</div>
+                              <div className="text-xl font-bold text-green-600 dark:text-green-400">
+                                ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
                               </div>
-                            ) : (
-                              <div className="text-xl font-bold text-gray-900 dark:text-white">${product.pricePerGram}/g</div>
-                            )}
-                          </div>
-                        )}
-                        {product.pricePerOunce && (
-                          <div>
-                            {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                              <div className="text-sm text-gray-600 dark:text-gray-400">
-                                <span className="line-through">${product.pricePerOunce}/oz</span>
-                                <span className="ml-2 text-green-600 dark:text-green-400 font-semibold">
-                                  ${(parseFloat(product.pricePerOunce) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/oz
-                                </span>
+                              <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full inline-block">
+                                {product.discountPercentage}% OFF
                               </div>
-                            ) : (
-                              <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">${product.pricePerOunce}/oz</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div>
-                        {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                          <div className="space-y-1">
-                            <div className="text-lg line-through text-gray-500 dark:text-gray-400">${Number(product.price || 0).toFixed(2)}</div>
-                            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                              ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
                             </div>
-                            <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full inline-block">
-                              {product.discountPercentage}% OFF
+                          ) : (
+                            <div className="text-xl font-bold text-gray-900 dark:text-white">${product.pricePerGram}/g</div>
+                          )}
+                        </div>
+                      )}
+                      {product.pricePerOunce && (
+                        <div>
+                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              <span className="line-through">${product.pricePerOunce}/oz</span>
+                              <span className="ml-2 text-green-600 dark:text-green-400 font-semibold">
+                                ${(parseFloat(product.pricePerOunce) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/oz
+                              </span>
                             </div>
+                          ) : (
+                            <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">${product.pricePerOunce}/oz</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                        <div className="space-y-1">
+                          <div className="text-lg line-through text-gray-500 dark:text-gray-400">${Number(product.price || 0).toFixed(2)}</div>
+                          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                            ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
                           </div>
-                        ) : (
-                          <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                            ${Number(product.price || 0).toFixed(2)}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="ml-3">
-                    <Badge 
-                      variant={stockStatus.variant === "destructive" ? "destructive" : stockStatus.variant === "secondary" ? "secondary" : "default"}
-                      className={`
-                        font-semibold text-xs px-3 py-1
-                        ${stockStatus.variant === "destructive" 
-                          ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800" 
-                          : stockStatus.variant === "secondary"
-                          ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
-                          : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800"
-                        }
-                      `}
-                    >
-                      {stockStatus.label}
-                    </Badge>
-                  </div>
+                          <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full inline-block">
+                            {product.discountPercentage}% OFF
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                          ${Number(product.price || 0).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-
-                <Button
-                  onClick={handleAddToCart}
-                  disabled={product.stock === 0}
-                  className={`w-full font-semibold py-3 text-sm transition-all duration-300 ${
-                    product.stock === 0 
-                      ? "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed border-gray-200 dark:border-gray-700" 
-                      : "bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                  }`}
-                  variant={product.stock === 0 ? "secondary" : "default"}
-                >
-                  {product.stock === 0 ? "Out of Stock" : "Add to Cart"}
-                </Button>
+                <div className="ml-3">
+                  <Badge 
+                    variant={stockStatus.variant === "destructive" ? "destructive" : stockStatus.variant === "secondary" ? "secondary" : "default"}
+                    className={`
+                      font-semibold text-xs px-3 py-1
+                      ${stockStatus.variant === "destructive" 
+                        ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800" 
+                        : stockStatus.variant === "secondary"
+                        ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
+                        : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800"
+                      }
+                    `}
+                  >
+                    {stockStatus.label}
+                  </Badge>
+                </div>
               </div>
+
+              <Button
+                onClick={handleAddToCart}
+                disabled={product.stock === 0}
+                className={`w-full font-semibold py-3 text-sm transition-all duration-300 ${
+                  product.stock === 0 
+                    ? "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed border-gray-200 dark:border-gray-700" 
+                    : "bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                }`}
+                variant={product.stock === 0 ? "secondary" : "default"}
+              >
+                {product.stock === 0 ? "Out of Stock" : "Add to Cart"}
+              </Button>
             </div>
           </CardContent>
         </Card>
 
         {/* Back of card */}
-        <Card className="product-card-face product-card-back absolute inset-0 w-full h-full overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col backface-hidden rotate-y-180 min-h-[520px]">
-          <div className="h-48 overflow-hidden relative bg-gray-100 dark:bg-gray-800 flex-shrink-0">
+        <Card className="product-card-face product-card-back absolute inset-0 w-full h-full overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col backface-hidden rotate-y-180">
+          <div className="aspect-square overflow-hidden relative bg-gray-100 dark:bg-gray-800">
             <img
               src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"}
               alt={product.name}
@@ -170,7 +168,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/50"></div>
           </div>
-          <CardContent className="p-4 bg-white dark:bg-gray-900 flex flex-col flex-1 min-h-[320px]">
+          <CardContent className="p-4 bg-white dark:bg-gray-900 flex flex-col flex-1">
             <div className="flex-1">
               <h4 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-1 mb-1">{product.name}</h4>
               {product.category && (
