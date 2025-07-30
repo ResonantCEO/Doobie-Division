@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
 import { fileURLToPath } from "url";
+import { checkDatabaseConnection } from "./db";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,6 +11,20 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Database connection middleware
+app.use(async (req, res, next) => {
+  if (req.path.startsWith("/api") && req.path !== "/api/health") {
+    const isConnected = await checkDatabaseConnection();
+    if (!isConnected) {
+      return res.status(503).json({ 
+        error: "Database connection unavailable",
+        message: "Please try again in a moment" 
+      });
+    }
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -42,6 +57,16 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Add health check endpoint
+  app.get("/api/health", async (req, res) => {
+    const dbConnected = await checkDatabaseConnection();
+    res.json({ 
+      status: "ok", 
+      database: dbConnected ? "connected" : "disconnected",
+      timestamp: new Date().toISOString()
+    });
+  });
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -69,6 +94,16 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
+
+  // Check database connection on startup
+  console.log("Checking database connection...");
+  const dbConnected = await checkDatabaseConnection();
+  if (!dbConnected) {
+    console.warn("Warning: Database connection failed at startup. Server will continue but may have limited functionality.");
+  } else {
+    console.log("Database connection successful");
+  }
+
   server.listen({
     port,
     host: "0.0.0.0",
