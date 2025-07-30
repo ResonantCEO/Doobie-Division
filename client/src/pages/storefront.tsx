@@ -12,6 +12,7 @@ import type { Product, Category } from "@shared/schema";
 export default function StorefrontPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [showDealsOnly, setShowDealsOnly] = useState(false);
 
   // Fetch categories
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
@@ -73,7 +74,7 @@ export default function StorefrontPage() {
     );
   }
 
-  // Filter products by search, category, and stock
+  // Filter products by search, category, stock, and deals
   const products = allProducts.filter(product => {
     const matchesSearch = !searchQuery || 
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -83,7 +84,9 @@ export default function StorefrontPage() {
     
     const hasStock = product.stock > 0;
 
-    return matchesSearch && matchesCategory && hasStock;
+    const matchesDeals = !showDealsOnly || (product.discountPercentage && parseFloat(product.discountPercentage) > 0);
+
+    return matchesSearch && matchesCategory && hasStock && matchesDeals;
   });
 
   // Get discounted products for the hero section
@@ -129,7 +132,10 @@ export default function StorefrontPage() {
             <p className="text-xl mb-6 text-white/90 drop-shadow-md">
               Check out our special discounts on selected products every day!
             </p>
-            <Button className="bg-white text-primary hover:bg-white/90 drop-shadow-md">
+            <Button 
+              className="bg-white text-primary hover:bg-white/90 drop-shadow-md"
+              onClick={() => setShowDealsOnly(true)}
+            >
               Shop Now
             </Button>
           </div>
@@ -155,20 +161,37 @@ export default function StorefrontPage() {
           <h3 className="text-lg font-semibold text-black dark:text-white">Categories:</h3>
           <div className="flex flex-wrap gap-2">
             <Button
-              variant={selectedCategory === null ? "default" : "outline"}
+              variant={selectedCategory === null && !showDealsOnly ? "default" : "outline"}
               size="sm"
               className="glass-button text-black dark:text-white"
-              onClick={() => handleCategoryFilter(null)}
+              onClick={() => {
+                handleCategoryFilter(null);
+                setShowDealsOnly(false);
+              }}
             >
               All Products
+            </Button>
+            <Button
+              variant={showDealsOnly ? "default" : "outline"}
+              size="sm"
+              className="glass-button text-black dark:text-white bg-green-100 dark:bg-green-900/30 border-green-500"
+              onClick={() => {
+                setShowDealsOnly(true);
+                setSelectedCategory(null);
+              }}
+            >
+              🔥 Deals Only
             </Button>
             {categories.map((category) => (
               <Button
                 key={category.id}
-                variant={selectedCategory === category.id ? "default" : "outline"}
+                variant={selectedCategory === category.id && !showDealsOnly ? "default" : "outline"}
                 size="sm"
                 className="glass-button text-black dark:text-white"
-                onClick={() => handleCategoryFilter(category.id)}
+                onClick={() => {
+                  handleCategoryFilter(category.id);
+                  setShowDealsOnly(false);
+                }}
               >
                 {category.name}
               </Button>
