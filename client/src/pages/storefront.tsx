@@ -38,23 +38,28 @@ export default function StorefrontPage() {
   const handleCategoryFilter = (categoryId: number | null) => {
     // If selecting a category, check if it has subcategories
     if (categoryId) {
-      const category = categories.find(cat => cat.id === categoryId);
-      const hasSubcategories = categories.some(cat => cat.parentId === categoryId);
+      // Wait for categories to be loaded
+      if (categories.length === 0) {
+        console.log('Categories not loaded yet, waiting...');
+        return;
+      }
       
-      console.log('Categories loaded:', categories.length);
-      console.log('Category selected:', categoryId, 'Category found:', category);
-      console.log('All categories:', categories);
+      const category = categories.find(cat => cat.id === categoryId);
+      const subcategoriesForThisParent = categories.filter(cat => cat.parentId === categoryId);
+      const hasSubcategories = subcategoriesForThisParent.length > 0;
+      
+      console.log('Category selected:', categoryId, 'Category found:', category?.name);
+      console.log('Subcategories found:', subcategoriesForThisParent.map(c => c.name));
       console.log('Has subcategories:', hasSubcategories);
-      console.log('Subcategories:', categories.filter(cat => cat.parentId === categoryId));
       
       if (hasSubcategories) {
         // Show subcategories for this parent
-        console.log('Setting parent category:', categoryId);
+        console.log('Setting parent category to show subcategories');
         setCurrentParentCategory(categoryId);
-        setSelectedCategory(categoryId); // Set the parent as selected to show its products too
+        setSelectedCategory(categoryId);
       } else {
         // If no subcategories, select this category directly
-        console.log('Setting selected category directly:', categoryId);
+        console.log('No subcategories, selecting category directly');
         setSelectedCategory(categoryId);
         setCurrentParentCategory(null);
       }
