@@ -96,7 +96,7 @@ export default function StorefrontPage() {
       {/* Hero Section */}
       <div className="hero-gradient rounded-2xl mb-12 overflow-hidden">
         <div className="py-16 px-8">
-          <div className="max-w-2xl">
+          <div className="max-w-2xl mb-8">
             <h2 className="text-4xl font-bold mb-4 text-black dark:text-white">Today's Amazing Deals!</h2>
             <p className="text-xl mb-6 text-black/80 dark:text-white/90">
               Check out our special discounts on selected products every day!
@@ -105,6 +105,44 @@ export default function StorefrontPage() {
               Shop Now
             </Button>
           </div>
+          
+          {/* Featured Discounted Products */}
+          {discountedProducts.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-2xl font-semibold mb-4 text-black dark:text-white">Featured Deals</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {discountedProducts.slice(0, 3).map((product) => (
+                  <Card key={product.id} className="bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/20 transition-all">
+                    <CardContent className="p-4">
+                      {product.imageUrl && (
+                        <img 
+                          src={product.imageUrl} 
+                          alt={product.name}
+                          className="w-full h-32 object-cover rounded-md mb-3"
+                        />
+                      )}
+                      <h4 className="font-semibold text-black dark:text-white mb-2">{product.name}</h4>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-bold text-black dark:text-white">
+                            ${product.price}
+                          </span>
+                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 && (
+                            <Badge className="bg-red-500 text-white">
+                              -{product.discountPercentage}%
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge variant="outline" className="text-black dark:text-white border-white/30">
+                          {product.stock} left
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
