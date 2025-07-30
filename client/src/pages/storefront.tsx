@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,19 @@ import type { Product, Category } from "@shared/schema";
 
 export default function StorefrontPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showDealsOnly, setShowDealsOnly] = useState(false);
   const [currentParentCategory, setCurrentParentCategory] = useState<number | null>(null);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Fetch categories and flatten the hierarchical structure
   const { data: categoriesResponse = [], isLoading: categoriesLoading } = useQuery<(Category & { children?: Category[] })[]>({
@@ -44,10 +54,10 @@ export default function StorefrontPage() {
 
   // Fetch products
   const { data: allProducts = [], isLoading: productsLoading } = useQuery<(Product & { category: Category | null })[]>({
-    queryKey: ["/api/products", searchQuery, selectedCategory, currentParentCategory],
+    queryKey: ["/api/products", debouncedSearchQuery, selectedCategory, currentParentCategory],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (searchQuery) params.append('search', searchQuery);
+      if (debouncedSearchQuery) params.append('search', debouncedSearchQuery);
 
       // If we have a currentParentCategory, get all products from parent and its subcategories  
       if (currentParentCategory) {
@@ -136,9 +146,9 @@ export default function StorefrontPage() {
 
   // Filter products by search, stock, and deals (category filtering is handled by backend)
   const products = allProducts.filter(product => {
-    const matchesSearch = !searchQuery || 
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = !debouncedSearchQuery || 
+      product.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      product.description?.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
 
     const hasStock = product.stock > 0;
 
