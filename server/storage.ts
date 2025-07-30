@@ -271,30 +271,25 @@ export class DatabaseStorage implements IStorage {
     const conditions = [];
 
     if (filters?.categoryIds) {
-      // Use a single query with CTE to get all relevant category IDs
-      const categoryQuery = db
-        .with('relevant_categories', (db) =>
-          db.select({
-            id: categories.id
-          })
+      // Get all relevant category IDs including parent and child categories
+      const allCategoryIds = [...filters.categoryIds];
+      
+      // Get subcategories for each requested category
+      for (const categoryId of filters.categoryIds) {
+        const subcategories = await db
+          .select({ id: categories.id })
           .from(categories)
-          .where(
-            or(
-              // Direct categories
-              inArray(categories.id, filters.categoryIds),
-              // Subcategories of requested parent categories
-              inArray(categories.parentId, filters.categoryIds)
-            )
-          )
-        )
-        .select({ id: sql`relevant_categories.id` })
-        .from(sql`relevant_categories`);
+          .where(and(eq(categories.parentId, categoryId), eq(categories.isActive, true)));
+        
+        for (const sub of subcategories) {
+          if (!allCategoryIds.includes(sub.id)) {
+            allCategoryIds.push(sub.id);
+          }
+        }
+      }
 
-      const relevantCategoryIds = await categoryQuery;
-      const categoryIds = relevantCategoryIds.map(cat => cat.id);
-
-      if (categoryIds.length > 0) {
-        conditions.push(inArray(products.categoryId, categoryIds));
+      if (allCategoryIds.length > 0) {
+        conditions.push(inArray(products.categoryId, allCategoryIds));
       }
     } else if (filters?.categoryId) {
       // Single category with subcategories optimization

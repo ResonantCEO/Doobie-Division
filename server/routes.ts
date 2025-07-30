@@ -144,9 +144,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (search) filters.search = search as string;
       if (status) filters.status = status as string;
       
+      console.log('Product query filters:', filters);
       const products = await storage.getProducts(filters);
+      console.log(`Found ${products.length} products`);
       res.json(products);
     } catch (error) {
+      console.error('Error fetching products:', error);
       res.status(500).json({ message: "Failed to fetch products" });
     }
   });
