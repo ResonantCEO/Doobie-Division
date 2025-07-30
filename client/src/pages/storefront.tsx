@@ -28,7 +28,7 @@ export default function StorefrontPage() {
         // Add the parent category (without children property)
         const { children, ...parentCat } = cat;
         result.push(parentCat);
-        
+
         // Recursively add all children
         if (children && children.length > 0) {
           result.push(...flattenCategories(children));
@@ -36,7 +36,7 @@ export default function StorefrontPage() {
       }
       return result;
     };
-    
+
     return flattenCategories(categoriesResponse);
   }, [categoriesResponse]);
 
@@ -48,7 +48,7 @@ export default function StorefrontPage() {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
-      
+
       // If we have a currentParentCategory, get all products from parent and its subcategories  
       if (currentParentCategory) {
         const subcategoryIds = categories
@@ -75,10 +75,10 @@ export default function StorefrontPage() {
   const handleCategoryFilter = (categoryId: number | null) => {
     if (categoryId) {
       if (categories.length === 0) return;
-      
+
       const subcategoriesForThisParent = categories.filter(cat => cat.parentId === categoryId);
       const hasSubcategories = subcategoriesForThisParent.length > 0;
-      
+
       if (hasSubcategories) {
         setCurrentParentCategory(categoryId);
         setSelectedCategory(null);
@@ -139,7 +139,7 @@ export default function StorefrontPage() {
     const matchesSearch = !searchQuery || 
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const hasStock = product.stock > 0;
 
     const matchesDeals = !showDealsOnly || (product.discountPercentage && parseFloat(product.discountPercentage) > 0);
@@ -182,7 +182,7 @@ export default function StorefrontPage() {
             <div className="hero-gradient w-full h-full"></div>
           )}
         </div>
-        
+
         {/* Content Overlay */}
         <div className="relative py-16 px-8">
           <div className="max-w-2xl">
@@ -221,42 +221,26 @@ export default function StorefrontPage() {
           </h3>
           <div className="flex flex-wrap gap-2">
             {currentParentCategory ? (
-              // Show subcategories when currentParentCategory is set
+              // Show subcategories when a parent category is selected
               (() => {
-                const subcategories = categories.filter(cat => cat.parentId === currentParentCategory);
-                const parentCategory = categories.find(cat => cat.id === currentParentCategory);
-                
+                const subcategoriesForParent = categories.filter(cat => cat.parentId === currentParentCategory);
                 return (
                   <>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="glass-button text-black dark:text-white bg-gray-100 dark:bg-gray-800"
+                      className="glass-button text-black dark:text-white"
                       onClick={handleBackToMainCategories}
                     >
-                      ← Back to Categories
+                      ← Back
                     </Button>
-                    <Button
-                      variant={!showDealsOnly ? "default" : "outline"}
-                      size="sm"
-                      className="glass-button text-black dark:text-white"
-                      onClick={() => {
-                        setShowDealsOnly(false);
-                      }}
-                    >
-                      All {parentCategory?.name}
-                    </Button>
-                    {subcategories.map((category) => (
+                    {subcategoriesForParent.map((category) => (
                       <Button
                         key={category.id}
-                        variant="outline"
+                        variant={selectedCategory === category.id ? "default" : "outline"}
                         size="sm"
                         className="glass-button text-black dark:text-white"
-                        onClick={() => {
-                          setSelectedCategory(category.id);
-                          setCurrentParentCategory(null);
-                          setShowDealsOnly(false);
-                        }}
+                        onClick={() => handleCategoryFilter(category.id)}
                       >
                         {category.name}
                       </Button>
@@ -278,7 +262,7 @@ export default function StorefrontPage() {
                 >
                   All Products
                 </Button>
-                
+
                 {categories
                   .filter(category => !category.parentId) // Only show root categories
                   .map((category) => (
