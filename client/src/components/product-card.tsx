@@ -37,7 +37,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     if (product.stock <= product.minStockThreshold) {
       return { label: `Low Stock (${product.stock})`, variant: "secondary" as const };
     }
-    return { label: "In Stock", variant: "default" as const };
+    return null; // Don't show badge for in-stock items
   };
 
   const stockStatus = getStockStatus();
@@ -124,22 +124,22 @@ export default function ProductCard({ product }: ProductCardProps) {
                     </div>
                   )}
                 </div>
-                <div className="ml-3">
-                  <Badge 
-                    variant={stockStatus.variant === "destructive" ? "destructive" : stockStatus.variant === "secondary" ? "secondary" : "default"}
-                    className={`
-                      font-semibold text-xs px-3 py-1
-                      ${stockStatus.variant === "destructive" 
-                        ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800" 
-                        : stockStatus.variant === "secondary"
-                        ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
-                        : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800"
-                      }
-                    `}
-                  >
-                    {stockStatus.label}
-                  </Badge>
-                </div>
+                {stockStatus && (
+                  <div className="ml-3">
+                    <Badge 
+                      variant={stockStatus.variant === "destructive" ? "destructive" : "secondary"}
+                      className={`
+                        font-semibold text-xs px-3 py-1
+                        ${stockStatus.variant === "destructive" 
+                          ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800" 
+                          : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
+                        }
+                      `}
+                    >
+                      {stockStatus.label}
+                    </Badge>
+                  </div>
+                )}
               </div>
 
               <Button
@@ -179,24 +179,24 @@ export default function ProductCard({ product }: ProductCardProps) {
               </div>
             </div>
 
-            <div className="mt-4">
-              <div className="flex justify-end">
-                <Badge 
-                  variant={stockStatus.variant === "destructive" ? "destructive" : stockStatus.variant === "secondary" ? "secondary" : "default"}
-                  className={`
-                    font-semibold text-xs px-3 py-1
-                    ${stockStatus.variant === "destructive" 
-                      ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800" 
-                      : stockStatus.variant === "secondary"
-                      ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
-                      : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800"
-                    }
-                  `}
-                >
-                  {stockStatus.label}
-                </Badge>
+            {stockStatus && (
+              <div className="mt-4">
+                <div className="flex justify-end">
+                  <Badge 
+                    variant={stockStatus.variant === "destructive" ? "destructive" : "secondary"}
+                    className={`
+                      font-semibold text-xs px-3 py-1
+                      ${stockStatus.variant === "destructive" 
+                        ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800" 
+                        : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
+                      }
+                    `}
+                  >
+                    {stockStatus.label}
+                  </Badge>
+                </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
