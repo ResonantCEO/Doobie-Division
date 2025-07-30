@@ -19,7 +19,7 @@ export default function StorefrontPage() {
   });
 
   // Fetch products
-  const { data: products = [], isLoading: productsLoading } = useQuery<(Product & { category: Category | null })[]>({
+  const { data: allProducts = [], isLoading: productsLoading } = useQuery<(Product & { category: Category | null })[]>({
     queryKey: ["/api/products", searchQuery, selectedCategory],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -32,6 +32,9 @@ export default function StorefrontPage() {
       return response.json();
     },
   });
+
+  // Filter out products that are out of stock (stock = 0)
+  const products = allProducts.filter(product => product.stock > 0);
 
   const handleCategoryFilter = (categoryId: number | null) => {
     setSelectedCategory(categoryId);
