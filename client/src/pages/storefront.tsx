@@ -44,7 +44,7 @@ export default function StorefrontPage() {
       if (hasSubcategories) {
         // Show subcategories for this parent
         setCurrentParentCategory(categoryId);
-        setSelectedCategory(null); // Clear selected to show all products from parent and subcategories
+        setSelectedCategory(categoryId); // Set the parent as selected to show its products too
       } else {
         // If no subcategories, select this category directly
         setSelectedCategory(categoryId);
@@ -106,8 +106,8 @@ export default function StorefrontPage() {
       product.description?.toLowerCase().includes(searchQuery.toLowerCase());
 
     let matchesCategory = true;
-    if (currentParentCategory && !selectedCategory) {
-      // When showing subcategories, show all products from parent and its subcategories
+    if (currentParentCategory && selectedCategory === currentParentCategory) {
+      // When a parent category is selected (showing subcategories), show all products from parent and its subcategories
       const subcategoryIds = categories
         .filter(cat => cat.parentId === currentParentCategory)
         .map(cat => cat.id);
