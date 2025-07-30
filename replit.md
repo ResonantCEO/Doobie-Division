@@ -127,3 +127,12 @@ The application follows a monorepo structure with clear separation:
 - **Schema Versioning**: Version-controlled database schema in shared/schema.ts
 
 The application is designed to be deployed on Replit with integrated authentication, but can be adapted for other platforms with minimal configuration changes.
+
+## Recent Changes
+
+### July 30, 2025
+- **Fixed Subcategory Display Issue**: Resolved critical bug where clicking on parent categories (Flower, Concentrates) wasn't showing their subcategories
+- **Root Cause**: Backend returned hierarchical category structure with nested `children` arrays, but frontend expected flat array structure for filtering
+- **Solution**: Added category flattening logic using `useMemo` to convert nested API response to flat array structure compatible with existing filtering logic
+- **Impact**: Subcategory navigation now works correctly - users can click parent categories to see subcategories (Indica/Sativa for Flower, etc.)
+- **Code Quality**: Removed all debugging console logs and cleaned up code after successful fix

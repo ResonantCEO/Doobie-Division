@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,29 +40,7 @@ export default function StorefrontPage() {
     return flattenCategories(categoriesResponse);
   }, [categoriesResponse]);
 
-  // Debug state changes and category data
-  useEffect(() => {
-    console.log('=== STATE CHANGE ===');
-    console.log('currentParentCategory:', currentParentCategory);
-    console.log('selectedCategory:', selectedCategory);
-    console.log('Categories loaded:', categories.length);
-    
-    // Log all categories with their parent relationships
-    const rootCategories = categories.filter(cat => !cat.parentId);
-    console.log('Root categories:', rootCategories.map(c => `${c.id}: ${c.name}`));
-    
-    rootCategories.forEach(root => {
-      const subcats = categories.filter(cat => cat.parentId === root.id);
-      if (subcats.length > 0) {
-        console.log(`  Subcategories of ${root.name} (${root.id}):`, subcats.map(c => `${c.id}: ${c.name}`));
-      }
-    });
-    
-    if (selectedCategory) {
-      const subcats = categories.filter(cat => cat.parentId === selectedCategory);
-      console.log(`Subcategories for selected ${selectedCategory}:`, subcats.map(c => c.name));
-    }
-  }, [currentParentCategory, selectedCategory, categories]);
+
 
   // Fetch products
   const { data: allProducts = [], isLoading: productsLoading } = useQuery<(Product & { category: Category | null })[]>({
@@ -93,40 +71,20 @@ export default function StorefrontPage() {
   });
 
   const handleCategoryFilter = (categoryId: number | null) => {
-    console.log('=== handleCategoryFilter called ===');
-    console.log('categoryId:', categoryId, 'type:', typeof categoryId);
-    console.log('categories array:', categories.map(c => ({ id: c.id, name: c.name, parentId: c.parentId, parentIdType: typeof c.parentId })));
-    
-    // If selecting a category, check if it has subcategories
     if (categoryId) {
-      // Wait for categories to be loaded
-      if (categories.length === 0) {
-        console.log('Categories not loaded yet, waiting...');
-        return;
-      }
+      if (categories.length === 0) return;
       
-      const category = categories.find(cat => cat.id === categoryId);
-      const subcategoriesForThisParent = categories.filter(cat => {
-        console.log(`Checking cat ${cat.id} (${cat.name}): parentId=${cat.parentId} (type: ${typeof cat.parentId}) === categoryId=${categoryId} (type: ${typeof categoryId}) = ${cat.parentId === categoryId}`);
-        return cat.parentId === categoryId;
-      });
+      const subcategoriesForThisParent = categories.filter(cat => cat.parentId === categoryId);
       const hasSubcategories = subcategoriesForThisParent.length > 0;
       
-      console.log('Category selected:', categoryId, 'Category found:', category?.name);
-      console.log('Subcategories found:', subcategoriesForThisParent.map(c => c.name));
-      console.log('Has subcategories:', hasSubcategories);
-      
       if (hasSubcategories) {
-        console.log('✅ SETTING PARENT CATEGORY - categoryId:', categoryId);
         setCurrentParentCategory(categoryId);
         setSelectedCategory(null);
       } else {
-        console.log('No subcategories, selecting category directly');
         setSelectedCategory(categoryId);
         setCurrentParentCategory(null);
       }
     } else {
-      console.log('Clearing all categories');
       setCurrentParentCategory(null);
       setSelectedCategory(null);
     }
@@ -257,11 +215,7 @@ export default function StorefrontPage() {
         {/* Category Filter */}
         <div className="flex flex-wrap gap-4 items-center">
           <h3 className="text-lg font-semibold text-black dark:text-white">
-            {currentParentCategory ? 'Subcategories:' : 'Categories:'} 
-            {/* Debug info */}
-            <span className="text-xs text-gray-500 ml-2">
-              (Parent: {currentParentCategory}, Selected: {selectedCategory})
-            </span>
+            {currentParentCategory ? 'Subcategories:' : 'Categories:'}
           </h3>
           <div className="flex flex-wrap gap-2">
             {currentParentCategory ? (
