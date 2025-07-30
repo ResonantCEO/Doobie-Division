@@ -25,7 +25,7 @@ export default function StorefrontPage() {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
       if (selectedCategory) params.append('categoryId', selectedCategory.toString());
-      
+
       const url = `/api/products${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch products');
@@ -75,6 +75,22 @@ export default function StorefrontPage() {
       </div>
     );
   }
+
+  // Filter products by search and category
+  const products = allProducts.filter(product => {
+    const matchesSearch = !searchQuery || 
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesCategory = !selectedCategory || product.categoryId === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
+  // Get discounted products for the hero section
+  const discountedProducts = allProducts.filter(product => 
+    product.discountPercentage && parseFloat(product.discountPercentage) > 0
+  );
 
   return (
     <div className="space-y-8">

@@ -429,3 +429,49 @@
 .dark .text-secondary {
   @apply text-green-400;
 }
+
+@layer utilities {
+  .hero-gradient {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .glass-input {
+    @apply bg-white/10 backdrop-blur-sm border-white/20 text-black placeholder:text-black/60;
+  }
+
+  .glass-button {
+    @apply bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/20;
+  }
+
+  /* 3D Card Styles */
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+
+  .transform-style-preserve-3d {
+    transform-style: preserve-3d;
+  }
+
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+
+  .product-card-face {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  /* Scrollbar hide utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
