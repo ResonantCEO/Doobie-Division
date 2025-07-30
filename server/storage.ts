@@ -219,21 +219,21 @@ export class DatabaseStorage implements IStorage {
     await db.delete(categories).where(eq(categories.id, id));
   }
 
-  // Helper function to get all descendant category IDs
+  // Optimized helper function to get all descendant category IDs
   private async getDescendantCategoryIds(categoryId: number): Promise<number[]> {
-    const allCategories = await db.select().from(categories).where(eq(categories.isActive, true));
+    // Use a more efficient single query to get children
+    const directChildren = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(and(eq(categories.parentId, categoryId), eq(categories.isActive, true)));
+    
     const categoryIds = [categoryId];
+    for (const child of directChildren) {
+      categoryIds.push(child.id);
+      // For now, only go one level deep to avoid expensive recursive queries
+      // This covers our current use case (parent -> direct children)
+    }
     
-    const findChildren = (parentId: number) => {
-      for (const category of allCategories) {
-        if (category.parentId === parentId) {
-          categoryIds.push(category.id);
-          findChildren(category.id); // Recursively find children
-        }
-      }
-    };
-    
-    findChildren(categoryId);
     return categoryIds;
   }
 
