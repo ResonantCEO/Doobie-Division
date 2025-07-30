@@ -1,4 +1,3 @@
-
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -180,93 +179,23 @@ export default function ProductCard({ product }: ProductCardProps) {
               </div>
             </div>
 
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="text-left flex-1">
-                  {product.sellingMethod === "weight" ? (
-                    <div className="space-y-1">
-                      {product.pricePerGram && (
-                        <div>
-                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                            <div className="space-y-1">
-                              <div className="text-sm line-through text-gray-500 dark:text-gray-400">${product.pricePerGram}/g</div>
-                              <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                                ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
-                              </div>
-                              <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full inline-block">
-                                {product.discountPercentage}% OFF
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="text-xl font-bold text-gray-900 dark:text-white">${product.pricePerGram}/g</div>
-                          )}
-                        </div>
-                      )}
-                      {product.pricePerOunce && (
-                        <div>
-                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                            <div className="text-sm text-gray-600 dark:text-gray-400">
-                              <span className="line-through">${product.pricePerOunce}/oz</span>
-                              <span className="ml-2 text-green-600 dark:text-green-400 font-semibold">
-                                ${(parseFloat(product.pricePerOunce) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/oz
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">${product.pricePerOunce}/oz</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                        <div className="space-y-1">
-                          <div className="text-lg line-through text-gray-500 dark:text-gray-400">${Number(product.price || 0).toFixed(2)}</div>
-                          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                            ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
-                          </div>
-                          <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full inline-block">
-                            {product.discountPercentage}% OFF
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                          ${Number(product.price || 0).toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="ml-3">
-                  <Badge 
-                    variant={stockStatus.variant === "destructive" ? "destructive" : stockStatus.variant === "secondary" ? "secondary" : "default"}
-                    className={`
-                      font-semibold text-xs px-3 py-1
-                      ${stockStatus.variant === "destructive" 
-                        ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800" 
-                        : stockStatus.variant === "secondary"
-                        ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
-                        : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800"
-                      }
-                    `}
-                  >
-                    {stockStatus.label}
-                  </Badge>
-                </div>
+            <div className="mt-4">
+              <div className="flex justify-end">
+                <Badge 
+                  variant={stockStatus.variant === "destructive" ? "destructive" : stockStatus.variant === "secondary" ? "secondary" : "default"}
+                  className={`
+                    font-semibold text-xs px-3 py-1
+                    ${stockStatus.variant === "destructive" 
+                      ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800" 
+                      : stockStatus.variant === "secondary"
+                      ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
+                      : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800"
+                    }
+                  `}
+                >
+                  {stockStatus.label}
+                </Badge>
               </div>
-
-              <Button
-                onClick={handleAddToCart}
-                disabled={product.stock === 0}
-                className={`w-full font-semibold py-3 text-sm transition-all duration-300 ${
-                  product.stock === 0 
-                    ? "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed border-gray-200 dark:border-gray-700" 
-                    : "bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                }`}
-                variant={product.stock === 0 ? "secondary" : "default"}
-              >
-                {product.stock === 0 ? "Out of Stock" : "Add to Cart"}
-              </Button>
             </div>
           </CardContent>
         </Card>
