@@ -36,24 +36,24 @@ export default function StorefrontPage() {
   });
 
   const handleCategoryFilter = (categoryId: number | null) => {
-    setSelectedCategory(categoryId);
-    
     // If selecting a category, check if it has subcategories
     if (categoryId) {
       const category = categories.find(cat => cat.id === categoryId);
       const hasSubcategories = categories.some(cat => cat.parentId === categoryId);
       
       if (hasSubcategories) {
+        // Show subcategories for this parent
         setCurrentParentCategory(categoryId);
-        // Don't set selectedCategory to the parent when showing subcategories
-        setSelectedCategory(null);
+        setSelectedCategory(null); // Clear selected to show all products from parent and subcategories
       } else {
-        // If no subcategories, clear parent category state
+        // If no subcategories, select this category directly
+        setSelectedCategory(categoryId);
         setCurrentParentCategory(null);
       }
     } else {
       // Clear both when selecting "All Products"
       setCurrentParentCategory(null);
+      setSelectedCategory(null);
     }
   };
 
