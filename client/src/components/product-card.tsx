@@ -52,11 +52,11 @@ export default function ProductCard({ product }: ProductCardProps) {
       >
         {/* Front of card */}
         <Card className="product-card-face product-card-front absolute inset-0 w-full h-full overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col backface-hidden">
-          <div className="aspect-square overflow-hidden">
+          <div className="aspect-square overflow-hidden bg-gray-100 dark:bg-gray-800">
             <img
               src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"}
               alt={product.name}
-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+              className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-300"
             />
           </div>
           <CardContent className="p-4 bg-white dark:bg-gray-900 flex flex-col flex-1">
@@ -160,11 +160,11 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Back of card */}
         <Card className="product-card-face product-card-back absolute inset-0 w-full h-full overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col backface-hidden rotate-y-180">
-          <div className="aspect-square overflow-hidden relative">
+          <div className="aspect-square overflow-hidden relative bg-gray-100 dark:bg-gray-800">
             <img
               src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"}
               alt={product.name}
-              className="w-full h-full object-cover opacity-20"
+              className="w-full h-full object-cover object-center opacity-20"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/50"></div>
           </div>
