@@ -99,28 +99,17 @@ export default function StorefrontPage() {
     );
   }
 
-  // Filter products by search, category, stock, and deals
+  // Filter products by search, stock, and deals (category filtering is handled by backend)
   const products = allProducts.filter(product => {
     const matchesSearch = !searchQuery || 
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    let matchesCategory = true;
-    if (currentParentCategory && selectedCategory === currentParentCategory) {
-      // When a parent category is selected (showing subcategories), show all products from parent and its subcategories
-      const subcategoryIds = categories
-        .filter(cat => cat.parentId === currentParentCategory)
-        .map(cat => cat.id);
-      matchesCategory = product.categoryId === currentParentCategory || subcategoryIds.includes(product.categoryId || 0);
-    } else if (selectedCategory) {
-      matchesCategory = product.categoryId === selectedCategory;
-    }
     
     const hasStock = product.stock > 0;
 
     const matchesDeals = !showDealsOnly || (product.discountPercentage && parseFloat(product.discountPercentage) > 0);
 
-    return matchesSearch && matchesCategory && hasStock && matchesDeals;
+    return matchesSearch && hasStock && matchesDeals;
   });
 
   // Get discounted products for the hero section
