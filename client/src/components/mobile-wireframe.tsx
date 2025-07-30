@@ -766,23 +766,18 @@ function StorefrontWireframe() {
                 <Package className="h-8 w-8 text-gray-400" />
                 <Heart className="absolute top-2 right-2 h-4 w-4 text-gray-400" />
               </div>
-              <CardContent className="p-3 flex flex-col h-full">
-                <div className="flex-1">
-                  <h4 className="font-medium text-sm mb-1">Premium Product {i}</h4>
-                  <p className="text-xs text-gray-500 mb-2">Category Name</p>
-                  <div className="flex items-center mb-2">
-                    {[...Array(5)].map((_, j) => (
-                      <Star key={j} className={`h-3 w-3 ${j < 4 ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
-                    ))}
-                    <span className="text-xs text-gray-500 ml-1">(4.0)</span>
-                  </div>
+              <CardContent className="p-3">
+                <h4 className="font-medium text-sm mb-1">Premium Product {i}</h4>
+                <p className="text-xs text-gray-500 mb-2">Category Name</p>
+                <div className="flex items-center mb-2">
+                  {[...Array(5)].map((_, j) => (
+                    <Star key={j} className={`h-3 w-3 ${j < 4 ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                  ))}
+                  <span className="text-xs text-gray-500 ml-1">(4.0)</span>
                 </div>
-                <div className="space-y-2 mt-auto">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-primary">${(99.99 + i * 10).toFixed(2)}</span>
-                    <Badge variant="outline" className="text-xs">In Stock</Badge>
-                  </div>
-                  <Button size="sm" className="w-full">Add to Cart</Button>
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-primary">${(99.99 + i * 10).toFixed(2)}</span>
+                  <Button size="sm">Add</Button>
                 </div>
               </CardContent>
             </Card>
