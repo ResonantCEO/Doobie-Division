@@ -37,13 +37,15 @@ export default function StorefrontPage() {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
       
-      // If we have a currentParentCategory, get all products from its subcategories
+      // If we have a currentParentCategory, get all products from parent and its subcategories  
       if (currentParentCategory) {
         const subcategoryIds = categories
           .filter(cat => cat.parentId === currentParentCategory)
           .map(cat => cat.id);
-        if (subcategoryIds.length > 0) {
-          params.append('categoryIds', subcategoryIds.join(','));
+        // Include both parent category and its subcategories
+        const allCategoryIds = [currentParentCategory, ...subcategoryIds];
+        if (allCategoryIds.length > 0) {
+          params.append('categoryIds', allCategoryIds.join(','));
         }
       } else if (selectedCategory) {
         params.append('categoryId', selectedCategory.toString());
