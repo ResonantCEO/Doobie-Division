@@ -176,6 +176,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         weightUnit: data.weightUnit,
         pricePerGram: data.pricePerGram || null,
         pricePerOunce: data.pricePerOunce || null,
+        discountPercentage: data.discountPercentage || null,
         isActive: data.isActive,
         imageUrl,
       };
@@ -205,7 +206,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         }, 500);
         return;
       }
-      
+
       let errorMessage = "Failed to create product. Please check all fields.";
       if (error?.response?.data?.errors) {
         const validationErrors = error.response.data.errors;
@@ -213,7 +214,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       } else if (error?.response?.data?.message) {
         errorMessage = error.response.data.message;
       }
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -225,7 +226,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
   const onSubmit = (data: FormData) => {
     console.log("Form submitted with data:", data);
     console.log("Form errors:", form.formState.errors);
-    
+
     // Validate required fields
     if (!data.name) {
       toast({
@@ -235,7 +236,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       });
       return;
     }
-    
+
     if (!data.sku) {
       toast({
         title: "Validation Error",
@@ -244,7 +245,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       });
       return;
     }
-    
+
     // Validate required fields based on selling method
     if (data.sellingMethod === "weight" && !data.pricePerGram && !data.pricePerOunce) {
       toast({
@@ -254,7 +255,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       });
       return;
     }
-    
+
     if (data.sellingMethod === "units" && !data.price) {
       toast({
         title: "Validation Error", 
@@ -272,7 +273,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       });
       return;
     }
-    
+
     console.log("All validations passed, calling mutation...");
     createProductMutation.mutate(data);
   };

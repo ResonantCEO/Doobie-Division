@@ -161,7 +161,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         price: data.sellingMethod === "units" && data.price ? data.price : null,
         pricePerGram: data.sellingMethod === "weight" && data.pricePerGram ? data.pricePerGram : null,
         pricePerOunce: data.sellingMethod === "weight" && data.pricePerOunce ? data.pricePerOunce : null,
-        discountPercentage: data.discountPercentage ? parseFloat(data.discountPercentage) : 0,
+        discountPercentage: data.discountPercentage || null,
       };
 
       await apiRequest("PUT", `/api/products/${product.id}`, productData);
