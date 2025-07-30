@@ -34,16 +34,16 @@ export default function StorefrontPage() {
 
   // Image rotation timer for hero section
   useEffect(() => {
-    if (discountedProducts.length <= 1) return;
+    if (allDiscountedProducts.length <= 1) return;
 
     const interval = setInterval(() => {
       setCurrentImageIndex((prevIndex) => 
-        prevIndex >= discountedProducts.length - 1 ? 0 : prevIndex + 1
+        prevIndex >= allDiscountedProducts.length - 1 ? 0 : prevIndex + 1
       );
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [discountedProducts.length]);
+  }, [allDiscountedProducts.length]);
 
   // Debounce search query
   useEffect(() => {
@@ -181,8 +181,7 @@ export default function StorefrontPage() {
     return hasStock && matchesDeals;
   });
 
-  // Use the separate discounted products query for consistent hero section
-  const discountedProducts = allDiscountedProducts;
+  
 
   return (
     <div className="space-y-8">
@@ -190,9 +189,9 @@ export default function StorefrontPage() {
       <div className="relative rounded-2xl mb-12 overflow-hidden">
         {/* Background Image Carousel */}
         <div className="absolute inset-0">
-          {discountedProducts.length > 0 ? (
+          {allDiscountedProducts.length > 0 ? (
             <div className="relative w-full h-full">
-              {discountedProducts.map((product, index) => (
+              {allDiscountedProducts.map((product, index) => (
                 <div
                   key={product.id}
                   className={`absolute inset-0 transition-opacity duration-1000 ${
