@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,30 @@ export default function StorefrontPage() {
   const [showDealsOnly, setShowDealsOnly] = useState(false);
   const [currentParentCategory, setCurrentParentCategory] = useState<number | null>(null);
 
-  // Fetch categories
-  const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
+  // Fetch categories and flatten the hierarchical structure
+  const { data: categoriesResponse = [], isLoading: categoriesLoading } = useQuery<(Category & { children?: Category[] })[]>({
     queryKey: ["/api/categories"],
   });
+
+  // Flatten the hierarchical structure to work with existing logic
+  const categories = useMemo(() => {
+    const flattenCategories = (cats: (Category & { children?: Category[] })[]): Category[] => {
+      const result: Category[] = [];
+      for (const cat of cats) {
+        // Add the parent category (without children property)
+        const { children, ...parentCat } = cat;
+        result.push(parentCat);
+        
+        // Recursively add all children
+        if (children && children.length > 0) {
+          result.push(...flattenCategories(children));
+        }
+      }
+      return result;
+    };
+    
+    return flattenCategories(categoriesResponse);
+  }, [categoriesResponse]);
 
   // Debug state changes and category data
   useEffect(() => {
