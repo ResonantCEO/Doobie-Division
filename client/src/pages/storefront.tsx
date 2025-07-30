@@ -41,7 +41,11 @@ export default function StorefrontPage() {
       const category = categories.find(cat => cat.id === categoryId);
       const hasSubcategories = categories.some(cat => cat.parentId === categoryId);
       
-      console.log('Category selected:', categoryId, 'Has subcategories:', hasSubcategories);
+      console.log('Categories loaded:', categories.length);
+      console.log('Category selected:', categoryId, 'Category found:', category);
+      console.log('All categories:', categories);
+      console.log('Has subcategories:', hasSubcategories);
+      console.log('Subcategories:', categories.filter(cat => cat.parentId === categoryId));
       
       if (hasSubcategories) {
         // Show subcategories for this parent
