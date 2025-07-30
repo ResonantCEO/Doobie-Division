@@ -42,6 +42,9 @@ All notable changes to this project will be documented in this file.
 ## [1.1.1] - 2025-01-21
 
 ### Added
+- **Dynamic Header Promo System** - Implemented rotating promotional hero section on storefront that automatically cycles through discounted products every 3 seconds with smooth fade transitions
+- **Promotional Content Management** - Hero section dynamically pulls from all products with active discount percentages, displaying product images as backgrounds with promotional overlay text
+- **Interactive Promo Actions** - "Shop Now" button in hero section automatically filters to show only discounted products, creating seamless promotional flow
 - **Low Stock Product Endpoint** - New API endpoint for retrieving products with stock levels below minimum threshold for better inventory monitoring
 - **Enhanced Product Query Filtering** - Improved product filtering system with support for multiple category selection and parent-child category relationships
 - **Real-time Database Query Logging** - Added comprehensive database query logging for better performance monitoring and debugging
@@ -57,6 +60,9 @@ All notable changes to this project will be documented in this file.
 - **Product Loading States** - Improved product loading performance with better 304 Not Modified response handling
 
 ### Technical Improvements
+- **Promo System Architecture** - Built responsive promotional system using React Query for data fetching with separate endpoints for discounted products and main product catalog
+- **Image Carousel Implementation** - Developed smooth transition system with automatic rotation timer, opacity-based transitions, and fallback gradient backgrounds
+- **Performance Optimization** - Implemented intelligent caching for promotional content with 1-minute stale time and 5-minute cache retention for optimal user experience
 - **Query Optimization** - Enhanced database query efficiency for product and category operations
 - **Error Handling** - Improved error responses and logging for better debugging capabilities
 - **API Response Caching** - Better HTTP caching strategies for frequently accessed product data
