@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/cart-context";
 import { useState } from "react";
+import AddToCartModal from "./add-to-cart-modal";
 import type { Product, Category } from "@shared/schema";
 
 interface ProductCardProps {
@@ -14,6 +15,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { toast } = useToast();
   const { addItem } = useCart();
   const [isFlipped, setIsFlipped] = useState(false);
+  const [showAddToCartModal, setShowAddToCartModal] = useState(false);
 
   const handleCardClick = () => {
     setIsFlipped(!isFlipped);
@@ -23,11 +25,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     e.stopPropagation(); // Prevent card flip when clicking button
     if (product.stock === 0) return;
 
-    addItem(product);
-    toast({
-      title: "Added to Cart",
-      description: `${product.name} has been added to your cart.`,
-    });
+    setShowAddToCartModal(true);
   };
 
   const getStockStatus = () => {
@@ -200,6 +198,13 @@ export default function ProductCard({ product }: ProductCardProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Add to Cart Modal */}
+      <AddToCartModal
+        open={showAddToCartModal}
+        onOpenChange={setShowAddToCartModal}
+        product={product}
+      />
     </div>
   );
 }
