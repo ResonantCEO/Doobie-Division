@@ -175,9 +175,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const product = await storage.createProduct(productData);
       res.status(201).json(product);
     } catch (error) {
+      console.error('Product creation error:', error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid product data", errors: error.errors });
       }
+      
+      // Check for duplicate SKU constraint violation
+      if (error instanceof Error && (
+        error.message.includes('duplicate key value violates unique constraint') ||
+        error.message.includes('UNIQUE constraint failed') ||
+        error.message.includes('sku') && error.message.includes('unique')
+      )) {
+        return res.status(400).json({ 
+          message: "duplicate key value violates unique constraint \"products_sku_unique\"" 
+        });
+      }
+      
       res.status(500).json({ message: "Failed to create product" });
     }
   });
