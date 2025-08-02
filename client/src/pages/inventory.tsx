@@ -35,11 +35,44 @@ export default function InventoryPage() {
 
   // Fetch products with filters
   const { data: products = [], isLoading } = useQuery<(Product & { category: Category | null })[]>({
-    queryKey: ["/api/products", searchQuery, selectedCategory, stockFilter],
+    queryKey: ["/api/products", searchQuery, selectedCategory, stockFilter, categories],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
-      if (selectedCategory) params.append('categoryId', selectedCategory);
+      
+      // Handle hierarchical category filtering like storefront
+      if (selectedCategory) {
+        const categoryId = parseInt(selectedCategory);
+        if (categories.length > 0) {
+          // Get all descendants recursively (subcategories and their children)
+          const getAllDescendants = (parentId: number): number[] => {
+            const directChildren = categories
+              .filter(cat => cat.parentId === parentId)
+              .map(cat => cat.id);
+            
+            let allDescendants: number[] = [...directChildren];
+            
+            // Get grandchildren and deeper levels
+            for (const childId of directChildren) {
+              allDescendants = allDescendants.concat(getAllDescendants(childId));
+            }
+            
+            return allDescendants;
+          };
+          
+          const descendantIds = getAllDescendants(categoryId);
+          
+          // Include parent category and all its descendants
+          const allCategoryIds = [categoryId, ...descendantIds];
+          if (allCategoryIds.length > 0) {
+            params.append('categoryIds', allCategoryIds.join(','));
+          }
+        } else {
+          // Fallback to single category if categories not loaded yet
+          params.append('categoryId', selectedCategory);
+        }
+      }
+      
       if (stockFilter) params.append('status', stockFilter);
       
       const response = await fetch(`/api/products?${params.toString()}`, {
