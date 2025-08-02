@@ -13,8 +13,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { Edit, QrCode, Trash2, MoreHorizontal, Package } from "lucide-react";
+import { Edit, QrCode, Trash2, MoreHorizontal, Package, ChevronUp, ChevronDown } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
+
+type SortField = 'name' | 'sku' | 'category' | 'price' | 'stock';
+type SortDirection = 'asc' | 'desc';
 
 interface InventoryTableProps {
   products: (Product & { category: Category | null })[];
@@ -26,6 +29,8 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const deleteProductMutation = useMutation({
     mutationFn: async (productId: number) => {
@@ -107,6 +112,58 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
     setSelectedProducts(new Set());
   };
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return null;
+    return sortDirection === 'asc' ? 
+      <ChevronUp className="h-4 w-4 ml-1" /> : 
+      <ChevronDown className="h-4 w-4 ml-1" />;
+  };
+
+  const sortedProducts = [...products].sort((a, b) => {
+    if (!sortField) return 0;
+    
+    let aValue: string | number;
+    let bValue: string | number;
+    
+    switch (sortField) {
+      case 'name':
+        aValue = a.name.toLowerCase();
+        bValue = b.name.toLowerCase();
+        break;
+      case 'sku':
+        aValue = a.sku.toLowerCase();
+        bValue = b.sku.toLowerCase();
+        break;
+      case 'category':
+        aValue = (a.category?.name || '').toLowerCase();
+        bValue = (b.category?.name || '').toLowerCase();
+        break;
+      case 'price':
+        aValue = Number(a.price || 0);
+        bValue = Number(b.price || 0);
+        break;
+      case 'stock':
+        aValue = a.stock;
+        bValue = b.stock;
+        break;
+      default:
+        return 0;
+    }
+    
+    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   if (products.length === 0) {
     return (
       <div className="text-center py-12">
@@ -163,17 +220,57 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                   className="rounded border-gray-300"
                 />
               </TableHead>
-              <TableHead>Product</TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>Stock</TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-gray-50 select-none"
+                onClick={() => handleSort('name')}
+              >
+                <div className="flex items-center">
+                  Product
+                  {getSortIcon('name')}
+                </div>
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-gray-50 select-none"
+                onClick={() => handleSort('sku')}
+              >
+                <div className="flex items-center">
+                  SKU
+                  {getSortIcon('sku')}
+                </div>
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-gray-50 select-none"
+                onClick={() => handleSort('category')}
+              >
+                <div className="flex items-center">
+                  Category
+                  {getSortIcon('category')}
+                </div>
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-gray-50 select-none"
+                onClick={() => handleSort('price')}
+              >
+                <div className="flex items-center">
+                  Price
+                  {getSortIcon('price')}
+                </div>
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-gray-50 select-none"
+                onClick={() => handleSort('stock')}
+              >
+                <div className="flex items-center">
+                  Stock
+                  {getSortIcon('stock')}
+                </div>
+              </TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {products.map((product) => (
+            {sortedProducts.map((product) => (
               <TableRow key={product.id} className={selectedProducts.has(product.id) ? "bg-blue-50" : ""}>
                 <TableCell>
                   <input
