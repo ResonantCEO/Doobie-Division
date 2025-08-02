@@ -130,10 +130,10 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
 
   const sortedProducts = [...products].sort((a, b) => {
     if (!sortField) return 0;
-    
+
     let aValue: string | number;
     let bValue: string | number;
-    
+
     switch (sortField) {
       case 'name':
         aValue = a.name.toLowerCase();
@@ -158,7 +158,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
       default:
         return 0;
     }
-    
+
     if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
     if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
     return 0;
