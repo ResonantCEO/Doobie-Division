@@ -271,19 +271,33 @@ export class DatabaseStorage implements IStorage {
     const conditions = [];
 
     if (filters?.categoryIds) {
-      // Get all relevant category IDs including parent and child categories
+      // Get all relevant category IDs including parent and all descendant categories recursively
       const allCategoryIds = [...filters.categoryIds];
       
-      // Get subcategories for each requested category
-      for (const categoryId of filters.categoryIds) {
-        const subcategories = await db
+      // Recursive function to get all descendants
+      const getAllDescendants = async (parentId: number): Promise<number[]> => {
+        const directChildren = await db
           .select({ id: categories.id })
           .from(categories)
-          .where(and(eq(categories.parentId, categoryId), eq(categories.isActive, true)));
+          .where(and(eq(categories.parentId, parentId), eq(categories.isActive, true)));
         
-        for (const sub of subcategories) {
-          if (!allCategoryIds.includes(sub.id)) {
-            allCategoryIds.push(sub.id);
+        let descendants: number[] = [];
+        for (const child of directChildren) {
+          descendants.push(child.id);
+          // Recursively get children of children
+          const grandchildren = await getAllDescendants(child.id);
+          descendants = descendants.concat(grandchildren);
+        }
+        
+        return descendants;
+      };
+      
+      // Get descendants for each requested category
+      for (const categoryId of filters.categoryIds) {
+        const descendants = await getAllDescendants(categoryId);
+        for (const descendantId of descendants) {
+          if (!allCategoryIds.includes(descendantId)) {
+            allCategoryIds.push(descendantId);
           }
         }
       }
