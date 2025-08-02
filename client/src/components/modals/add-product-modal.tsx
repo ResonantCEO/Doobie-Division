@@ -80,6 +80,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
   const queryClient = useQueryClient();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isDuplicateSku, setIsDuplicateSku] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -192,6 +193,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       form.reset();
       setSelectedFile(null);
       setImagePreview(null);
+      setIsDuplicateSku(false);
     },
     onError: (error: any) => {
       console.error("Product creation error:", error);
@@ -213,6 +215,10 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         errorMessage = `Validation errors: ${validationErrors.map((e: any) => e.message).join(", ")}`;
       } else if (error?.response?.data?.message) {
         errorMessage = error.response.data.message;
+        if (errorMessage.includes("duplicate key value violates unique constraint")) {
+          setIsDuplicateSku(true);
+          errorMessage = "SKU already exists. Please enter a unique SKU.";
+        }
       }
 
       toast({
@@ -310,6 +316,9 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                   <FormControl>
                     <Input placeholder="Enter product SKU" {...field} />
                   </FormControl>
+                  {isDuplicateSku && (
+                    <p className="text-red-500 text-sm">SKU already exists</p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
