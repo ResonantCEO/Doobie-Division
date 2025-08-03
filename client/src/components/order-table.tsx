@@ -61,7 +61,7 @@ export default function OrderTable({ orders }: OrderTableProps) {
       case "pending":
         return <Badge variant="secondary" className="status-pending">Pending</Badge>;
       case "processing":
-        return <Badge variant="secondary" className="bg-gray-200 text-black">Processing</Badge>;
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Processing</Badge>;
       case "shipped":
         return <Badge variant="secondary" className="status-out-for-delivery">Shipped</Badge>;
       case "delivered":
@@ -158,7 +158,7 @@ export default function OrderTable({ orders }: OrderTableProps) {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4 text-black" />
+                          <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
