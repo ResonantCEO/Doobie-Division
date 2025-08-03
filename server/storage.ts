@@ -76,6 +76,10 @@ export interface IStorage {
   updateUserIdVerification(id: string, status: string): Promise<User>;
   getUsersPendingVerification(): Promise<User[]>;
   updateUser(id: string, userData: any): Promise<User>;
+
+  // User activity
+  logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void>;
+  getUserActivity(userId: string, options?: { limit?: number; type?: string }): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -729,21 +733,47 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserStatus(id: string, status: string): Promise<User> {
-    const [updated] = await db
+    const [user] = await db
       .update(users)
       .set({ status, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
-    return updated;
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Log the status change
+    await this.logUserActivity(
+      id, 
+      'Status Updated', 
+      `User status changed to ${status}`,
+      { previousStatus: user.status, newStatus: status }
+    );
+
+    return user;
   }
 
   async updateUserRole(id: string, role: string): Promise<User> {
-    const [updated] = await db
+    const [user] = await db
       .update(users)
       .set({ role, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
-    return updated;
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Log the role change
+    await this.logUserActivity(
+      id, 
+      'Role Updated', 
+      `User role changed to ${role}`,
+      { previousRole: user.role, newRole: role }
+    );
+
+    return user;
   }
 
   async updateUserIdVerification(id: string, status: string): Promise<User> {
@@ -763,9 +793,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(users.createdAt));
   }
 
-
-
-  async updateUser(userId: string, userData: any): Promise<User> {
+  async updateUser(id: string, userData: any): Promise<User> {
     const [user] = await db
       .update(users)
       .set({
@@ -774,9 +802,24 @@ export class DatabaseStorage implements IStorage {
         email: userData.email,
         role: userData.role,
         status: userData.status,
+        updatedAt: new Date()
       })
-      .where(eq(users.id, userId))
+      .where(eq(users.id, id))
       .returning();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Log the profile update
+    const updatedFields = Object.keys(userData).join(', ');
+    await this.logUserActivity(
+      id, 
+      'Profile Updated', 
+      `User profile updated: ${updatedFields}`,
+      { updatedFields: userData }
+    );
+
     return user;
   }
 
@@ -817,6 +860,75 @@ export class DatabaseStorage implements IStorage {
     }
 
     return await query.orderBy(desc(inventoryLogs.createdAt));
+  }
+    
+  async logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void> {
+    try {
+      // For now, we'll use the inventory_logs table to store user activity
+      // In a production system, you'd want a dedicated user_activity_logs table
+      await db.insert(inventoryLogs).values({
+        productId: null, // We'll use null for user activities
+        userId: userId,
+        type: 'user_activity',
+        quantity: 0,
+        reason: action,
+        notes: details,
+        metadata: metadata ? JSON.stringify(metadata) : null
+      });
+    } catch (error) {
+      console.error('Error logging user activity:', error);
+      // Don't throw here as this shouldn't break the main operation
+    }
+  }
+
+  async getUserActivity(userId: string, options: { limit?: number; type?: string } = {}): Promise<any[]> {
+    try {
+      const { limit = 50 } = options;
+
+      const query = db
+        .select({
+          id: inventoryLogs.id,
+          action: inventoryLogs.reason,
+          details: inventoryLogs.notes,
+          metadata: inventoryLogs.metadata,
+          timestamp: inventoryLogs.createdAt,
+          type: inventoryLogs.type
+        })
+        .from(inventoryLogs)
+        .where(and(
+          eq(inventoryLogs.userId, userId),
+          eq(inventoryLogs.type, 'user_activity')
+        ))
+        .orderBy(desc(inventoryLogs.createdAt))
+        .limit(limit);
+
+      const activityLogs = await query;
+
+      // Also get order-related activities
+      const orderActivities = await db
+        .select({
+          id: orders.id,
+          action: sql<string>`'Order placed'`,
+          details: sql<string>`CONCAT('Order #', ${orders.orderNumber}, ' - $', ${orders.total})`,
+          metadata: sql<string>`NULL`,
+          timestamp: orders.createdAt,
+          type: sql<string>`'order'`
+        })
+        .from(orders)
+        .where(eq(orders.customerId, userId))
+        .orderBy(desc(orders.createdAt))
+        .limit(10);
+
+      // Combine and sort by timestamp
+      const allActivity = [...activityLogs, ...orderActivities]
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, limit);
+
+      return allActivity;
+    } catch (error) {
+      console.error('Error fetching user activity:', error);
+      return [];
+    }
   }
 }
 

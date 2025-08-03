@@ -111,9 +111,28 @@ export async function setupAuth(app: Express) {
 
       if (isFirstUser) {
         (req.session as any).userId = userId;
-        res.status(201).json({ 
-          user, 
-          message: "Welcome! You are the first user and have been granted administrator privileges." 
+        req.session.save(async (err) => {
+          if (err) {
+            console.error('Session save error:', err);
+            return res.status(500).json({ message: "Session error" });
+          }
+
+          // Log the login activity
+          try {
+            await storage.logUserActivity(
+              user.id,
+              'Login',
+              'User logged in successfully',
+              { ipAddress: req.ip, userAgent: req.get('User-Agent') }
+            );
+          } catch (error) {
+            console.error('Error logging login activity:', error);
+          }
+
+          res.status(201).json({ 
+            user, 
+            message: "Welcome! You are the first user and have been granted administrator privileges." 
+          });
         });
       } else {
         res.status(201).json({ 
@@ -159,10 +178,28 @@ export async function setupAuth(app: Express) {
 
       // Create session
       (req.session as any).userId = user.id;
+      req.session.save(async (err) => {
+        if (err) {
+          console.error('Session save error:', err);
+          return res.status(500).json({ message: "Session error" });
+        }
 
-      // Remove password from response
-      const { password: _, ...userResponse } = user;
-      res.json({ user: userResponse, message: "Login successful" });
+        // Log the login activity
+        try {
+          await storage.logUserActivity(
+            user.id,
+            'Login',
+            'User logged in successfully',
+            { ipAddress: req.ip, userAgent: req.get('User-Agent') }
+          );
+        } catch (error) {
+          console.error('Error logging login activity:', error);
+        }
+
+        // Remove password from response
+        const { password: _, ...userResponse } = user;
+        res.json({ user: userResponse, message: "Login successful" });
+      });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Login failed" });
@@ -171,9 +208,25 @@ export async function setupAuth(app: Express) {
 
   // Logout endpoint
   app.post("/api/auth/logout", (req, res) => {
-    req.session.destroy((err) => {
+    const userId = (req.session as any).userId;
+    req.session.destroy(async (err) => {
       if (err) {
+        console.error('Session destroy error:', err);
         return res.status(500).json({ message: "Logout failed" });
+      }
+
+      // Log the logout activity
+      if (userId) {
+        try {
+          await storage.logUserActivity(
+            userId,
+            'Logout',
+            'User logged out successfully',
+            { ipAddress: req.ip }
+          );
+        } catch (error) {
+          console.error('Error logging logout activity:', error);
+        }
       }
       res.clearCookie("connect.sid");
       res.json({ message: "Logout successful" });

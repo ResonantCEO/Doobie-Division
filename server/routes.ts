@@ -643,6 +643,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User activity endpoint
+  app.get('/api/users/:id/activity', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const { limit = 50, type } = req.query;
+      
+      const filters: any = { userId };
+      if (type) filters.type = type as string;
+      
+      const activity = await storage.getUserActivity(userId, {
+        limit: parseInt(limit as string),
+        type: filters.type
+      });
+      
+      res.json(activity);
+    } catch (error) {
+      console.error('Error fetching user activity:', error);
+      res.status(500).json({ message: "Failed to fetch user activity" });
+    }
+  });
+
   // Admin routes
   app.get('/api/admin/inventory-logs', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {

@@ -229,17 +229,17 @@ export default function UsersPage() {
     const user = users.find(u => u.id === userId);
     if (user) {
       setSelectedUser(user);
-      // Simulate fetching user activity - replace with actual API call
       try {
-        const response = await apiRequest("GET", `/api/users/${userId}/activity`);
+        const response = await apiRequest("GET", `/api/users/${userId}/activity?limit=20`);
         setUserActivity(response);
       } catch (error) {
-        // If no activity endpoint exists, show mock data
-        setUserActivity([
-          { id: 1, action: "Logged in", timestamp: new Date().toISOString(), details: "User logged in successfully" },
-          { id: 2, action: "Profile updated", timestamp: new Date(Date.now() - 86400000).toISOString(), details: "Updated profile information" },
-          { id: 3, action: "Order placed", timestamp: new Date(Date.now() - 172800000).toISOString(), details: "Placed order #1001" }
-        ]);
+        console.error('Error fetching user activity:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch user activity",
+          variant: "destructive",
+        });
+        setUserActivity([]);
       }
       setActivityModalOpen(true);
     }
@@ -655,12 +655,15 @@ export default function UsersPage() {
 
       {/* User Activity Modal */}
       <Dialog open={activityModalOpen} onOpenChange={setActivityModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>
-              <div className="flex items-center">
-                <Activity className="h-5 w-5 mr-2" />
-                {selectedUser && `${selectedUser.firstName} ${selectedUser.lastName}'s Activity Log`}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Activity className="h-5 w-5 mr-2" />
+                  {selectedUser && `${selectedUser.firstName} ${selectedUser.lastName}'s Activity Log`}
+                </div>
+                <Badge variant="outline">{userActivity.length} activities</Badge>
               </div>
             </DialogTitle>
           </DialogHeader>
@@ -669,22 +672,65 @@ export default function UsersPage() {
               <div className="text-center py-8">
                 <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500">No activity found for this user</p>
+                <p className="text-xs text-gray-400 mt-2">Activities will appear here as the user interacts with the system</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {userActivity.map((activity, index) => (
-                  <div key={activity.id || index} className="border-l-2 border-blue-200 pl-4 pb-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <h4 className="font-medium text-gray-900">{activity.action}</h4>
-                      <span className="text-xs text-gray-500">
-                        {format(new Date(activity.timestamp), "MMM d, yyyy 'at' h:mm a")}
-                      </span>
+              <div className="space-y-3">
+                {userActivity.map((activity, index) => {
+                  const getActivityIcon = (action: string, type: string) => {
+                    if (type === 'order') return <ShoppingCart className="h-4 w-4 text-green-600" />;
+                    if (action.includes('Login')) return <UserCheck className="h-4 w-4 text-blue-600" />;
+                    if (action.includes('Logout')) return <UserX className="h-4 w-4 text-gray-600" />;
+                    if (action.includes('Profile') || action.includes('Updated')) return <Edit className="h-4 w-4 text-orange-600" />;
+                    if (action.includes('Created')) return <UserPlus className="h-4 w-4 text-purple-600" />;
+                    if (action.includes('Status')) return <ShieldQuestion className="h-4 w-4 text-yellow-600" />;
+                    return <Activity className="h-4 w-4 text-gray-600" />;
+                  };
+
+                  const getBorderColor = (action: string, type: string) => {
+                    if (type === 'order') return 'border-green-200';
+                    if (action.includes('Login')) return 'border-blue-200';
+                    if (action.includes('Logout')) return 'border-gray-200';
+                    if (action.includes('Profile') || action.includes('Updated')) return 'border-orange-200';
+                    if (action.includes('Created')) return 'border-purple-200';
+                    if (action.includes('Status')) return 'border-yellow-200';
+                    return 'border-gray-200';
+                  };
+
+                  return (
+                    <div key={activity.id || index} className={`border-l-3 ${getBorderColor(activity.action, activity.type)} pl-4 pb-3 hover:bg-gray-50 rounded-r-lg transition-colors`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          {getActivityIcon(activity.action, activity.type)}
+                          <h4 className="font-medium text-gray-900">{activity.action}</h4>
+                          {activity.type === 'order' && <Badge variant="secondary" className="text-xs">Order</Badge>}
+                          {activity.type === 'user_activity' && <Badge variant="outline" className="text-xs">System</Badge>}
+                        </div>
+                        <span className="text-xs text-gray-500 whitespace-nowrap ml-4">
+                          {format(new Date(activity.timestamp), "MMM d, yyyy 'at' h:mm a")}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 ml-6">{activity.details}</p>
+                      {activity.metadata && (
+                        <div className="mt-2 ml-6">
+                          <details className="text-xs">
+                            <summary className="text-gray-500 cursor-pointer hover:text-gray-700">View metadata</summary>
+                            <pre className="mt-1 p-2 bg-gray-100 rounded text-xs overflow-auto">
+                              {typeof activity.metadata === 'string' ? activity.metadata : JSON.stringify(JSON.parse(activity.metadata || '{}'), null, 2)}
+                            </pre>
+                          </details>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-sm text-gray-600">{activity.details}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
+          </div>
+          <div className="flex justify-end pt-4 border-t">
+            <Button variant="outline" onClick={() => setActivityModalOpen(false)}>
+              Close
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
