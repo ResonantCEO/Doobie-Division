@@ -410,6 +410,7 @@ export default function UsersPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>User</TableHead>
+                    <TableHead>Address</TableHead>
                     <TableHead>Photo</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
@@ -439,6 +440,21 @@ export default function UsersPage() {
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">{user.email}</div>
                           </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {user.address ? (
+                            <div>
+                              <div className="text-gray-900 dark:text-gray-100">{user.address}</div>
+                              <div className="text-gray-500 dark:text-gray-400">
+                                {user.city && user.state ? `${user.city}, ${user.state}` : user.city || user.state || ''}
+                                {user.postalCode && ` ${user.postalCode}`}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic">No address provided</span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
