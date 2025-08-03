@@ -180,7 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid product data", errors: error.errors });
       }
-      
+
       // Check for duplicate SKU constraint violation
       if (error instanceof Error && (
         error.message.includes('duplicate key value violates unique constraint') ||
@@ -191,7 +191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "duplicate key value violates unique constraint \"products_sku_unique\"" 
         });
       }
-      
+
       res.status(500).json({ message: "Failed to create product" });
     }
   });
@@ -259,7 +259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/products/bulk-adjust-stock', isAuthenticated, requireRole(['admin', 'manager']), async (req: any, res) => {
     try {
       const { adjustments } = req.body;
-      
+
       if (!adjustments || !Array.isArray(adjustments)) {
         return res.status(400).json({ message: "Adjustments array is required" });
       }
@@ -267,7 +267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const results = [];
       for (const adjustment of adjustments) {
         const { productId, quantity, reason } = adjustment;
-        
+
         if (typeof productId !== 'number' || typeof quantity !== 'number' || !reason) {
           results.push({ productId, success: false, error: "Invalid adjustment data" });
           continue;
@@ -343,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/products/generate-qr-codes', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
       const { productIds } = req.body;
-      
+
       if (!productIds || !Array.isArray(productIds)) {
         return res.status(400).json({ message: "Product IDs array is required" });
       }

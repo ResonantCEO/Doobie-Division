@@ -1,6 +1,6 @@
 
-import { useState, useRef, useEffect } from "react";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,34 +8,57 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { Camera, Package, Plus, Minus, RotateCcw, Scan } from "lucide-react";
+import { Camera, Package, Plus, Minus, RotateCcw, Scan, AlertCircle, CheckCircle } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
 
 interface ScannedProduct extends Product {
   category: Category | null;
 }
 
+interface RecentAction {
+  id: number;
+  productName: string;
+  sku: string;
+  adjustment: number;
+  reason: string;
+  timestamp: string;
+}
+
 export default function ScannerPage() {
   const [isScanning, setIsScanning] = useState(false);
+  const [scanningError, setScanningError] = useState<string>("");
   const [scannedProduct, setScannedProduct] = useState<ScannedProduct | null>(null);
   const [adjustment, setAdjustment] = useState("");
   const [reason, setReason] = useState("");
   const [manualSku, setManualSku] = useState("");
-  const [recentActions, setRecentActions] = useState<any[]>([]);
+  const [recentActions, setRecentActions] = useState<RecentAction[]>([]);
+  const [lastScanTime, setLastScanTime] = useState(0);
+  const [scanningStatus, setScanningStatus] = useState<"idle" | "scanning" | "found" | "error">("idle");
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number>();
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Start camera for QR scanning
   const startScanning = async () => {
     try {
+      setScanningError("");
+      setScanningStatus("scanning");
+      
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' } // Use back camera on mobile
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
       });
       
       if (videoRef.current) {
@@ -43,10 +66,13 @@ export default function ScannerPage() {
         streamRef.current = stream;
         setIsScanning(true);
         
-        // Start QR detection
-        detectQRCode();
+        videoRef.current.onloadedmetadata = () => {
+          detectQRCode();
+        };
       }
     } catch (error) {
+      setScanningError("Unable to access camera. Please allow camera permissions.");
+      setScanningStatus("error");
       toast({
         title: "Camera Error",
         description: "Unable to access camera. Please allow camera permissions.",
@@ -56,16 +82,21 @@ export default function ScannerPage() {
   };
 
   // Stop camera
-  const stopScanning = () => {
+  const stopScanning = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
     setIsScanning(false);
-  };
+    setScanningStatus("idle");
+    setScanningError("");
+  }, []);
 
-  // Simple QR code detection using canvas
-  const detectQRCode = () => {
+  // QR code detection using canvas and jsQR
+  const detectQRCode = useCallback(() => {
     if (!videoRef.current || !canvasRef.current || !isScanning) return;
 
     const video = videoRef.current;
@@ -77,12 +108,50 @@ export default function ScannerPage() {
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // For now, we'll rely on manual SKU input
-      // In a real implementation, you'd use a QR code library like jsQR
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      
+      // Import jsQR dynamically to avoid build issues
+      import('jsqr').then(({ default: jsQR }) => {
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        if (code) {
+          const now = Date.now();
+          // Prevent duplicate scans within 2 seconds
+          if (now - lastScanTime > 2000) {
+            setLastScanTime(now);
+            setScanningStatus("found");
+            handleQRCodeDetected(code.data);
+          }
+        }
+      }).catch((error) => {
+        console.warn('jsQR not available, falling back to manual input:', error);
+      });
     }
 
     if (isScanning) {
-      requestAnimationFrame(detectQRCode);
+      animationFrameRef.current = requestAnimationFrame(detectQRCode);
+    }
+  }, [isScanning, lastScanTime]);
+
+  // Handle QR code detection
+  const handleQRCodeDetected = (qrData: string) => {
+    console.log('QR Code detected:', qrData);
+    
+    // Try to extract SKU from QR data
+    // QR codes generated by the system should contain just the SKU
+    const sku = qrData.trim();
+    
+    if (sku) {
+      lookupProductMutation.mutate(sku);
+    } else {
+      toast({
+        title: "Invalid QR Code",
+        description: "QR code does not contain valid product information",
+        variant: "destructive",
+      });
+      setScanningStatus("error");
     }
   };
 
@@ -101,13 +170,16 @@ export default function ScannerPage() {
     onSuccess: (product) => {
       setScannedProduct(product);
       setManualSku("");
+      setScanningStatus("found");
       stopScanning();
       toast({
         title: "Product Found",
         description: `Loaded ${product.name}`,
+        icon: <CheckCircle className="h-4 w-4" />
       });
     },
     onError: (error: any) => {
+      setScanningStatus("error");
       toast({
         title: "Product Not Found",
         description: error.message || "Unable to find product with that SKU",
@@ -128,10 +200,10 @@ export default function ScannerPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       
       // Add to recent actions
-      const action = {
+      const action: RecentAction = {
         id: Date.now(),
-        productName: scannedProduct?.name,
-        sku: scannedProduct?.sku,
+        productName: scannedProduct?.name || "Unknown",
+        sku: scannedProduct?.sku || "Unknown",
         adjustment: variables.quantity,
         reason: variables.reason,
         timestamp: new Date().toLocaleTimeString()
@@ -152,6 +224,7 @@ export default function ScannerPage() {
       toast({
         title: "Stock Updated",
         description: `${variables.quantity > 0 ? 'Added' : 'Removed'} ${Math.abs(variables.quantity)} units`,
+        icon: <CheckCircle className="h-4 w-4" />
       });
     },
     onError: (error) => {
@@ -200,6 +273,7 @@ export default function ScannerPage() {
       });
       return;
     }
+    setScanningStatus("scanning");
     lookupProductMutation.mutate(manualSku.trim());
   };
 
@@ -208,6 +282,7 @@ export default function ScannerPage() {
     setAdjustment("");
     setReason("");
     setManualSku("");
+    setScanningStatus("idle");
     stopScanning();
   };
 
@@ -215,12 +290,21 @@ export default function ScannerPage() {
     return () => {
       stopScanning();
     };
-  }, []);
+  }, [stopScanning]);
 
   const getStockStatus = (stock: number, minThreshold: number = 10) => {
     if (stock === 0) return { label: "Out of Stock", variant: "destructive" as const };
     if (stock <= minThreshold) return { label: "Low Stock", variant: "secondary" as const };
     return { label: "In Stock", variant: "default" as const };
+  };
+
+  const getScanningStatusColor = () => {
+    switch (scanningStatus) {
+      case "scanning": return "border-blue-500";
+      case "found": return "border-green-500";
+      case "error": return "border-red-500";
+      default: return "border-gray-300";
+    }
   };
 
   return (
@@ -259,19 +343,57 @@ export default function ScannerPage() {
                     ref={videoRef}
                     autoPlay
                     playsInline
-                    className="w-full max-w-md mx-auto rounded-lg border"
+                    muted
+                    className={`w-full max-w-md mx-auto rounded-lg border-2 ${getScanningStatusColor()}`}
                   />
                   <canvas ref={canvasRef} className="hidden" />
+                  
+                  {/* Scanning overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="border-2 border-white border-dashed w-48 h-48 rounded-lg animate-pulse">
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Scan className="h-8 w-8 text-white animate-spin" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Status indicator */}
+                  <div className="absolute top-2 left-2 right-2">
+                    {scanningStatus === "scanning" && (
+                      <Badge variant="default" className="bg-blue-500">
+                        Scanning for QR codes...
+                      </Badge>
+                    )}
+                    {scanningStatus === "found" && (
+                      <Badge variant="default" className="bg-green-500">
+                        QR Code Found!
+                      </Badge>
+                    )}
+                    {scanningStatus === "error" && (
+                      <Badge variant="destructive">
+                        Scan Error
+                      </Badge>
+                    )}
+                  </div>
                 </div>
+                
                 <Button onClick={stopScanning} variant="outline">
                   Stop Scanner
                 </Button>
                 <p className="text-sm text-muted-foreground">
-                  Position QR code in the camera view
+                  Position QR code in the camera view within the dashed box
                 </p>
               </div>
             )}
           </div>
+
+          {/* Error Alert */}
+          {scanningError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{scanningError}</AlertDescription>
+            </Alert>
+          )}
 
           {/* Manual SKU Lookup */}
           <div className="border-t pt-4">
@@ -283,6 +405,7 @@ export default function ScannerPage() {
                 value={manualSku}
                 onChange={(e) => setManualSku(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleManualLookup()}
+                disabled={lookupProductMutation.isPending}
               />
               <Button 
                 onClick={handleManualLookup} 
@@ -291,6 +414,9 @@ export default function ScannerPage() {
                 {lookupProductMutation.isPending ? "Searching..." : "Lookup"}
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Tip: You can also scan the QR codes printed from the inventory management page
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -322,6 +448,11 @@ export default function ScannerPage() {
                   <Badge {...getStockStatus(scannedProduct.stock, scannedProduct.minStockThreshold)}>
                     Stock: {scannedProduct.stock} units
                   </Badge>
+                  {scannedProduct.minStockThreshold && (
+                    <Badge variant="outline">
+                      Min Threshold: {scannedProduct.minStockThreshold}
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -337,13 +468,14 @@ export default function ScannerPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="reason">Reason for Adjustment</Label>
+              <Label htmlFor="reason">Reason for Adjustment *</Label>
               <Textarea
                 id="reason"
-                placeholder="e.g., Order fulfillment, Damage, Restock, Inventory count correction"
+                placeholder="e.g., Order fulfillment, Damage, Restock, Inventory count correction, Customer return"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 className="mt-2"
+                required
               />
             </div>
 
@@ -404,11 +536,17 @@ export default function ScannerPage() {
                     const qty = parseInt(adjustment);
                     if (!isNaN(qty)) {
                       handleAdjustment(qty);
+                    } else {
+                      toast({
+                        title: "Invalid Amount",
+                        description: "Please enter a valid number",
+                        variant: "destructive",
+                      });
                     }
                   }}
                   disabled={!reason.trim() || !adjustment || adjustStockMutation.isPending}
                 >
-                  Apply
+                  {adjustStockMutation.isPending ? "Applying..." : "Apply"}
                 </Button>
               </div>
             </div>
@@ -429,21 +567,22 @@ export default function ScannerPage() {
       {recentActions.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Recent Actions</CardTitle>
+            <CardTitle>Recent Actions ({recentActions.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-64 overflow-y-auto">
               {recentActions.map((action) => (
-                <div key={action.id} className="flex justify-between items-center p-2 border rounded">
-                  <div>
+                <div key={action.id} className="flex justify-between items-center p-3 border rounded-lg">
+                  <div className="flex-1">
                     <p className="font-medium">{action.productName}</p>
                     <p className="text-sm text-muted-foreground">SKU: {action.sku}</p>
+                    <p className="text-xs text-muted-foreground">{action.reason}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right ml-4">
                     <Badge variant={action.adjustment > 0 ? "default" : "secondary"}>
                       {action.adjustment > 0 ? "+" : ""}{action.adjustment}
                     </Badge>
-                    <p className="text-xs text-muted-foreground">{action.timestamp}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{action.timestamp}</p>
                   </div>
                 </div>
               ))}
@@ -451,6 +590,21 @@ export default function ScannerPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Help Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>How to Use</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>• <strong>Camera Scanner:</strong> Click "Start Camera Scanner" and position QR codes within the dashed box</p>
+            <p>• <strong>Manual Lookup:</strong> Enter a product SKU directly if you don't have a QR code</p>
+            <p>• <strong>Stock Adjustments:</strong> Always provide a reason for inventory changes for audit purposes</p>
+            <p>• <strong>QR Codes:</strong> Generate QR codes from the Inventory Management page for easy scanning</p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
