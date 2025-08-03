@@ -143,7 +143,7 @@ export default function OrderTable({ orders }: OrderTableProps) {
                       value={order.status}
                       onValueChange={(status) => handleStatusUpdate(order.id, status)}
                     >
-                      <SelectTrigger className="w-32 h-8">
+                      <SelectTrigger className="w-32 h-8 bg-gray-100 text-black border-gray-300 hover:bg-gray-200">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
