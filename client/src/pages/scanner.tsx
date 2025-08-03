@@ -54,7 +54,7 @@ export default function ScannerPage() {
   const [recentActions, setRecentActions] = useState<RecentAction[]>([]);
   const [lastScanTime, setLastScanTime] = useState(0);
   const [scanningStatus, setScanningStatus] = useState<"idle" | "scanning" | "found" | "error">("idle");
-  const [activeTab, setActiveTab] = useState("inventory");
+  const [activeTab, setActiveTab] = useState("fulfillment");
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
   const [selectedOrder, setSelectedOrder] = useState<OrderForFulfillment | null>(null);
   const [fulfillmentActions, setFulfillmentActions] = useState<Array<{
