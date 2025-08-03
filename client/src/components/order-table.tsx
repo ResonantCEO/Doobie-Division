@@ -59,7 +59,7 @@ export default function OrderTable({ orders }: OrderTableProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
-        return <Badge variant="secondary" className="status-pending">Pending</Badge>;
+        return <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">Pending</Badge>;
       case "processing":
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Processing</Badge>;
       case "shipped":
