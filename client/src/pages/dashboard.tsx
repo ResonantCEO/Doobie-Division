@@ -9,6 +9,7 @@ import OrdersPage from "./orders";
 import AnalyticsPage from "./analytics";
 import UsersPage from "./users";
 import AdminPage from "./admin";
+import ScannerPage from "./scanner";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -59,6 +60,8 @@ export default function Dashboard() {
         return user.role === 'admin' ? <UsersPage /> : <StorefrontPage />;
       case "admin":
         return user.role === 'admin' ? <AdminPage /> : <StorefrontPage />;
+      case "scanner":
+        return user.role === 'admin' || user.role === 'manager' ? <ScannerPage /> : <StorefrontPage />;
       default:
         return <StorefrontPage />;
     }
