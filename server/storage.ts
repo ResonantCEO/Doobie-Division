@@ -867,10 +867,12 @@ export class DatabaseStorage implements IStorage {
       // For now, we'll use the inventory_logs table to store user activity
       // In a production system, you'd want a dedicated user_activity_logs table
       await db.insert(inventoryLogs).values({
-        productId: null, // We'll use null for user activities
+        productId: null,
         userId: userId,
         type: 'user_activity',
         quantity: 0,
+        previousStock: 0, // Set default value to avoid null constraint
+        newStock: 0, // Set default value to avoid null constraint
         reason: action,
         notes: details,
         metadata: metadata ? JSON.stringify(metadata) : null
@@ -885,7 +887,8 @@ export class DatabaseStorage implements IStorage {
     try {
       const { limit = 50 } = options;
 
-      const query = db
+      // Get user activity logs (if any exist)
+      const activityLogs = await db
         .select({
           id: inventoryLogs.id,
           action: inventoryLogs.reason,
@@ -902,14 +905,12 @@ export class DatabaseStorage implements IStorage {
         .orderBy(desc(inventoryLogs.createdAt))
         .limit(limit);
 
-      const activityLogs = await query;
-
-      // Also get order-related activities
+      // Get order-related activities
       const orderActivities = await db
         .select({
           id: orders.id,
           action: sql<string>`'Order placed'`,
-          details: sql<string>`CONCAT('Order #', ${orders.orderNumber}, ' - $', ${orders.total})`,
+          details: sql<string>`CONCAT('Order #', ${orders.orderNumber}, ' - $', CAST(${orders.total} AS VARCHAR))`,
           metadata: sql<string>`NULL`,
           timestamp: orders.createdAt,
           type: sql<string>`'order'`

@@ -231,7 +231,8 @@ export default function UsersPage() {
       setSelectedUser(user);
       try {
         const response = await apiRequest("GET", `/api/users/${userId}/activity?limit=20`);
-        setUserActivity(response);
+        // Ensure response is an array
+        setUserActivity(Array.isArray(response) ? response : []);
       } catch (error) {
         console.error('Error fetching user activity:', error);
         toast({
@@ -668,7 +669,7 @@ export default function UsersPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="max-h-96 overflow-y-auto">
-            {userActivity.length === 0 ? (
+            {!Array.isArray(userActivity) || userActivity.length === 0 ? (
               <div className="text-center py-8">
                 <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500">No activity found for this user</p>
