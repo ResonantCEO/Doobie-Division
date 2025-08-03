@@ -485,90 +485,88 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createOrder(orderData: InsertOrder, orderItems: InsertOrderItem[]): Promise<Order> {
-    return await db.transaction(async (tx) => {
-      // Generate order number
-      const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+    // Generate order number
+    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
 
-      // Create the order
-      const [order] = await tx.insert(orders).values({
-        ...orderData,
-        orderNumber
-      }).returning();
+    // Create the order
+    const [order] = await db.insert(orders).values({
+      ...orderData,
+      orderNumber
+    }).returning();
 
-      // Create order items
-      const itemsWithOrderId = orderItems.map(item => ({
-        ...item,
-        orderId: order.id,
-      }));
+    // Create order items
+    const itemsWithOrderId = orderItems.map(item => ({
+      ...item,
+      orderId: order.id,
+    }));
 
-      await tx.insert(orderItems).values(itemsWithOrderId);
+    await db.insert(orderItems).values(itemsWithOrderId);
 
-      // Update product stock
-      for (const item of orderItems) {
-        if (item.productId) {
-          const [product] = await tx
-            .select()
-            .from(products)
+    // Update product stock and create logs/notifications
+    for (const item of orderItems) {
+      if (item.productId) {
+        const [product] = await db
+          .select()
+          .from(products)
+          .where(eq(products.id, item.productId));
+
+        if (product) {
+          const newStock = product.stock - item.quantity;
+          await db
+            .update(products)
+            .set({ stock: newStock })
             .where(eq(products.id, item.productId));
 
-          if (product) {
-            const newStock = product.stock - item.quantity;
-            await tx
-              .update(products)
-              .set({ stock: newStock })
-              .where(eq(products.id, item.productId));
+          // Log inventory change
+          await db.insert(inventoryLogs).values({
+            productId: item.productId,
+            type: 'sale',
+            quantity: -item.quantity,
+            previousStock: product.stock,
+            newStock: newStock,
+            reason: `Order ${order.orderNumber}`,
+            userId: orderData.customerId,
+          });
 
-            // Log inventory change
-            await tx.insert(inventoryLogs).values({
-              productId: item.productId,
-              type: 'sale',
-              quantity: -item.quantity,
-              previousStock: product.stock,
-              newStock: newStock,
-              reason: `Order ${order.orderNumber}`,
-              userId: orderData.customerId,
-            });
+          // Check for low stock and create notifications
+          if (newStock <= product.minStockThreshold) {
+            // Create notifications for admin users about low stock
+            const adminUsers = await db
+              .select()
+              .from(users)
+              .where(or(eq(users.role, 'admin'), eq(users.role, 'manager')));
 
-            // Check for low stock and create notifications
-            if (newStock <= product.minStockThreshold) {
-              // Create notifications for admin users about low stock
-              const adminUsers = await tx
-                .select()
-                .from(users)
-                .where(or(eq(users.role, 'admin'), eq(users.role, 'manager')));
-
-              for (const admin of adminUsers) {
-                await tx.insert(notifications).values({
-                  userId: admin.id,
-                  type: 'low_stock',
-                  title: 'Low Stock Alert',
-                  message: `${product.name} is running low (${newStock} remaining)`,
-                  data: { productId: product.id, productName: product.name, stock: newStock, threshold: product.minStockThreshold },
-                });
-              }
+            for (const admin of adminUsers) {
+              await db.insert(notifications).values({
+                userId: admin.id,
+                type: 'low_stock',
+                title: 'Low Stock Alert',
+                message: `${product.name} is running low (${newStock} remaining)`,
+                data: { productId: product.id, productName: product.name, stock: newStock, threshold: product.minStockThreshold },
+              });
             }
           }
         }
       }
+    }
 
-      // Create new order notifications for admins and managers
-      const adminUsers = await tx
-        .select()
-        .from(users)
-        .where(or(eq(users.role, 'admin'), eq(users.role, 'manager')));
+    // Create new order notifications for admins and managers
+    const adminUsers = await db
+      .select()
+      .from(users)
+      .where(or(eq(users.role, 'admin'), eq(users.role, 'manager')));
 
-      for (const admin of adminUsers) {
-        await tx.insert(notifications).values({
-          userId: admin.id,
-          type: 'new_order',
-          title: 'New Order Received',
-          message: `Order ${order.orderNumber} from ${order.customerName} - $${order.total}`,
-          data: { orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName, total: order.total },
-        });
-      }
+    for (const admin of adminUsers) {
+      await db.insert(notifications).values({
+        userId: admin.id,
+        type: 'new_order',
+        title: 'New Order Received',
+        message: `Order ${order.orderNumber} from ${order.customerName} - $${order.total}`,
+        data: { orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName, total: order.total },
+      });
+    }
 
-      return order;
-    });
+    return order;
   }
 
   async updateOrderStatus(id: number, status: string): Promise<Order> {
@@ -581,56 +579,54 @@ export class DatabaseStorage implements IStorage {
   }
 
   async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string) {
-    return await db.transaction(async (tx) => {
-      // Reduce product stock
-      await tx
-        .update(products)
+    // Reduce product stock
+    await db
+      .update(products)
+      .set({ 
+        stock: sql`${products.stock} - ${quantity}`,
+        updatedAt: new Date()
+      })
+      .where(eq(products.id, productId));
+
+    // Mark order item as fulfilled
+    await db
+      .update(orderItems)
+      .set({ fulfilled: true })
+      .where(and(
+        eq(orderItems.orderId, orderId),
+        eq(orderItems.productId, productId)
+      ));
+
+    // Log the inventory adjustment
+    await db.insert(inventoryLogs).values({
+      productId,
+      userId,
+      type: 'adjustment',
+      quantity: -quantity,
+      reason: `Order fulfillment - Order #${orderId}`,
+      createdAt: new Date()
+    });
+
+    // Check if all items in the order are fulfilled
+    const orderItemsResult = await db
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.orderId, orderId));
+
+    const allFulfilled = orderItemsResult.every(item => item.fulfilled);
+
+    // If all items are fulfilled, update order status to shipped
+    if (allFulfilled) {
+      await db
+        .update(orders)
         .set({ 
-          stock: sql`${products.stock} - ${quantity}`,
+          status: 'shipped',
           updatedAt: new Date()
         })
-        .where(eq(products.id, productId));
+        .where(eq(orders.id, orderId));
+    }
 
-      // Mark order item as fulfilled
-      await tx
-        .update(orderItems)
-        .set({ fulfilled: true })
-        .where(and(
-          eq(orderItems.orderId, orderId),
-          eq(orderItems.productId, productId)
-        ));
-
-      // Log the inventory adjustment
-      await tx.insert(inventoryLogs).values({
-        productId,
-        userId,
-        type: 'adjustment',
-        quantity: -quantity,
-        reason: `Order fulfillment - Order #${orderId}`,
-        createdAt: new Date()
-      });
-
-      // Check if all items in the order are fulfilled
-      const orderItemsResult = await tx
-        .select()
-        .from(orderItems)
-        .where(eq(orderItems.orderId, orderId));
-
-      const allFulfilled = orderItemsResult.every(item => item.fulfilled);
-
-      // If all items are fulfilled, update order status to shipped
-      if (allFulfilled) {
-        await tx
-          .update(orders)
-          .set({ 
-            status: 'shipped',
-            updatedAt: new Date()
-          })
-          .where(eq(orders.id, orderId));
-      }
-
-      return { success: true, allFulfilled };
-    });
+    return { success: true, allFulfilled };
   }
 
   // Analytics operations
