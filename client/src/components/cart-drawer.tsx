@@ -312,7 +312,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   className="w-full"
                   size="lg"
                 >
-                  <CreditCard className="h-4 w-4 mr-2" />
+                  <ShoppingCart className="h-4 w-4 mr-2" />
                   Proceed to Checkout
                 </Button>
                 <Button 
@@ -414,7 +414,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
               Cancel
             </Button>
             <Button onClick={handleConfirmOrder}>
-              <CreditCard className="h-4 w-4 mr-2" />
+              <ShoppingCart className="h-4 w-4 mr-2" />
               Confirm Order
             </Button>
           </DialogFooter>
