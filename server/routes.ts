@@ -255,6 +255,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk stock adjustment route for scanner operations
+  app.post('/api/products/bulk-adjust-stock', isAuthenticated, requireRole(['admin', 'manager']), async (req: any, res) => {
+    try {
+      const { adjustments } = req.body;
+      
+      if (!adjustments || !Array.isArray(adjustments)) {
+        return res.status(400).json({ message: "Adjustments array is required" });
+      }
+
+      const results = [];
+      for (const adjustment of adjustments) {
+        const { productId, quantity, reason } = adjustment;
+        
+        if (typeof productId !== 'number' || typeof quantity !== 'number' || !reason) {
+          results.push({ productId, success: false, error: "Invalid adjustment data" });
+          continue;
+        }
+
+        try {
+          await storage.adjustStock(productId, quantity, req.currentUser.id, reason);
+          results.push({ productId, success: true });
+        } catch (error) {
+          results.push({ productId, success: false, error: "Failed to adjust stock" });
+        }
+      }
+
+      res.status(200).json({ results });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to process bulk adjustments" });
+    }
+  });
+
   // Low stock products
   app.get('/api/products/low-stock', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {

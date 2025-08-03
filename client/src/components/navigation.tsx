@@ -21,6 +21,7 @@ import type { User as UserType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield } from "lucide-react";
+import { Camera } from "lucide-react";
 
 interface NavigationProps {
   user: UserType;
@@ -68,6 +69,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
     { id: "analytics", label: "Analytics", path: "/dashboard/analytics", roles: ["admin", "manager"] },
     { id: "users", label: "User Management", path: "/dashboard/users", roles: ["admin"] },
     { id: "admin", label: "Admin", path: "/dashboard/admin", roles: ["admin"] },
+    { id: "scanner", label: "Scanner", path: "/dashboard/scanner", roles: ["admin", "manager"] },
   ];
 
   const visibleTabs = tabs.filter(tab => !tab.roles || tab.roles.includes(user.role));
