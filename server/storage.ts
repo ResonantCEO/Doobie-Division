@@ -484,7 +484,7 @@ export class DatabaseStorage implements IStorage {
     return { ...order, items };
   }
 
-  async createOrder(orderData: InsertOrder, orderItems: InsertOrderItem[]): Promise<Order> {
+  async createOrder(orderData: InsertOrder, itemsData: InsertOrderItem[]): Promise<Order> {
     // Generate order number
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
 
@@ -495,7 +495,7 @@ export class DatabaseStorage implements IStorage {
     }).returning();
 
     // Create order items
-    const itemsWithOrderId = orderItems.map(item => ({
+    const itemsWithOrderId = itemsData.map(item => ({
       ...item,
       orderId: order.id,
     }));
@@ -503,7 +503,7 @@ export class DatabaseStorage implements IStorage {
     await db.insert(orderItems).values(itemsWithOrderId);
 
     // Update product stock and create logs/notifications
-    for (const item of orderItems) {
+    for (const item of itemsData) {
       if (item.productId) {
         const [product] = await db
           .select()
