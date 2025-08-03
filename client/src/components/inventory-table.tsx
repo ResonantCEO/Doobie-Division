@@ -13,6 +13,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
+import QRCodeModal from "@/components/modals/qr-code-modal";
 import { Edit, QrCode, Trash2, MoreHorizontal, Package, ChevronUp, ChevronDown } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
 
@@ -31,6 +32,9 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
   const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedProductForQR, setSelectedProductForQR] = useState<Product | null>(null);
+  const [qrCodeData, setQrCodeData] = useState<string>("");
 
   const deleteProductMutation = useMutation({
     mutationFn: async (productId: number) => {
@@ -79,11 +83,30 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
     }
   };
 
+  // QR code generation mutation
+  const qrCodeMutation = useMutation({
+    mutationFn: async (productId: number) => {
+      const response = await apiRequest(`/api/products/${productId}/qr-code`, {
+        method: 'GET',
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setQrCodeData(data.qrCode);
+      setShowQRModal(true);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate QR code",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleViewQRCode = (product: Product) => {
-    toast({
-      title: "QR Code",
-      description: `QR Code for ${product.name} (SKU: ${product.sku})`,
-    });
+    setSelectedProductForQR(product);
+    qrCodeMutation.mutate(product.id);
   };
 
   const handleSelectProduct = (productId: number) => {
@@ -413,6 +436,17 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
           </TableBody>
         </Table>
       </div>
+
+      {/* QR Code Modal */}
+      {selectedProductForQR && (
+        <QRCodeModal
+          open={showQRModal}
+          onOpenChange={setShowQRModal}
+          product={selectedProductForQR}
+          qrCode={qrCodeData}
+          isLoading={qrCodeMutation.isPending}
+        />
+      )}
     </div>
   );
 }

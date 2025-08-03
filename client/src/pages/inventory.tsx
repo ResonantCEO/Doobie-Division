@@ -7,11 +7,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { apiRequest } from "@/lib/queryClient";
 import InventoryTable from "@/components/inventory-table";
 import AddProductModal from "@/components/modals/add-product-modal";
 import EditProductModal from "@/components/modals/edit-product-modal";
 import StockAdjustmentModal from "@/components/modals/stock-adjustment-modal";
 import CategoryManagementModal from "@/components/modals/category-management-modal";
+import BulkQRModal from "@/components/modals/bulk-qr-modal";
 import { Plus, QrCode, AlertTriangle, Settings } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
 
@@ -23,10 +25,39 @@ export default function InventoryPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showBulkQRModal, setShowBulkQRModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedProductWithCategory, setSelectedProductWithCategory] = useState<(Product & { category: Category | null }) | null>(null);
+  const [bulkQRCodes, setBulkQRCodes] = useState<any[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Bulk QR code generation mutation
+  const bulkQRMutation = useMutation({
+    mutationFn: async (productIds: number[]) => {
+      const response = await apiRequest('/api/products/generate-qr-codes', {
+        method: 'POST',
+        body: JSON.stringify({ productIds }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setBulkQRCodes(data.qrCodes);
+      setShowBulkQRModal(true);
+      toast({
+        title: "QR Codes Generated",
+        description: `Generated ${data.qrCodes.length} QR codes successfully.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate QR codes",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Fetch categories
   const { data: categories = [] } = useQuery<Category[]>({
@@ -115,10 +146,17 @@ export default function InventoryPage() {
   };
 
   const handleGenerateQR = () => {
-    toast({
-      title: "QR Codes Generated",
-      description: "QR codes have been generated for all products.",
-    });
+    if (products.length === 0) {
+      toast({
+        title: "No Products",
+        description: "No products found to generate QR codes for.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const productIds = products.map(p => p.id);
+    bulkQRMutation.mutate(productIds);
   };
 
   if (isLoading) {
@@ -264,6 +302,13 @@ export default function InventoryPage() {
         open={showCategoryModal}
         onOpenChange={setShowCategoryModal}
         categories={categories}
+      />
+
+      <BulkQRModal
+        open={showBulkQRModal}
+        onOpenChange={setShowBulkQRModal}
+        qrCodes={bulkQRCodes}
+        isLoading={bulkQRMutation.isPending}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import path from "path";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
+import QRCode from "qrcode";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema } from "@shared/schema";
@@ -261,6 +262,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(products);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch low stock products" });
+    }
+  });
+
+  // QR Code generation routes
+  app.get('/api/products/:id/qr-code', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const product = await storage.getProduct(id);
+
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // Create QR code data with product information
+      const qrData = JSON.stringify({
+        id: product.id,
+        sku: product.sku,
+        name: product.name,
+        price: product.price,
+        category: product.category?.name || 'Uncategorized'
+      });
+
+      // Generate QR code as base64 data URL
+      const qrCodeUrl = await QRCode.toDataURL(qrData, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+
+      res.json({ 
+        qrCode: qrCodeUrl,
+        product: {
+          id: product.id,
+          sku: product.sku,
+          name: product.name
+        }
+      });
+    } catch (error) {
+      console.error('QR Code generation error:', error);
+      res.status(500).json({ message: "Failed to generate QR code" });
+    }
+  });
+
+  app.post('/api/products/generate-qr-codes', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const { productIds } = req.body;
+      
+      if (!productIds || !Array.isArray(productIds)) {
+        return res.status(400).json({ message: "Product IDs array is required" });
+      }
+
+      const qrCodes = [];
+
+      for (const id of productIds) {
+        const product = await storage.getProduct(id);
+        if (product) {
+          const qrData = JSON.stringify({
+            id: product.id,
+            sku: product.sku,
+            name: product.name,
+            price: product.price,
+            category: product.category?.name || 'Uncategorized'
+          });
+
+          const qrCodeUrl = await QRCode.toDataURL(qrData, {
+            width: 300,
+            margin: 2,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF'
+            }
+          });
+
+          qrCodes.push({
+            productId: product.id,
+            sku: product.sku,
+            name: product.name,
+            qrCode: qrCodeUrl
+          });
+        }
+      }
+
+      res.json({ qrCodes });
+    } catch (error) {
+      console.error('Bulk QR Code generation error:', error);
+      res.status(500).json({ message: "Failed to generate QR codes" });
     }
   });
 
