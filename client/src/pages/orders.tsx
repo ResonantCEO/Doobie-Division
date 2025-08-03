@@ -17,7 +17,22 @@ export default function OrdersPage() {
 
   // Fetch orders
   const { data: orders = [], isLoading } = useQuery<Order[]>({
-    queryKey: ["/api/orders", { status: statusFilter === "all" ? undefined : statusFilter || undefined }],
+    queryKey: ["/api/orders", statusFilter || "all"],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (statusFilter && statusFilter !== "all") {
+        params.set("status", statusFilter);
+      }
+      
+      const url = `/api/orders${params.toString() ? `?${params.toString()}` : ""}`;
+      const response = await fetch(url, { credentials: "include" });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch orders: ${response.statusText}`);
+      }
+      
+      return response.json();
+    },
     staleTime: Infinity, // Never consider data stale
     gcTime: Infinity, // Keep in cache indefinitely
   });
