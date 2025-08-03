@@ -115,7 +115,6 @@ export default function OrderTable({ orders }: OrderTableProps) {
               <TableHead className="text-black">Total</TableHead>
               <TableHead className="text-black">Status</TableHead>
               <TableHead className="text-black">Date</TableHead>
-              <TableHead className="text-black">Payment</TableHead>
               <TableHead className="text-right text-black">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -137,11 +136,6 @@ export default function OrderTable({ orders }: OrderTableProps) {
                 <TableCell>{getStatusBadge(order.status)}</TableCell>
                 <TableCell className="text-black">
                   {format(new Date(order.createdAt!), "MMM d, yyyy")}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="capitalize">
-                    {order.paymentMethod}
-                  </Badge>
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end space-x-2">
