@@ -414,7 +414,6 @@ export default function UsersPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
-                    <TableHead>Orders</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -488,9 +487,6 @@ export default function UsersPage() {
                       <TableCell>{getStatusBadge(user.status)}</TableCell>
                       <TableCell className="text-sm text-gray-500 dark:text-gray-400">
                         {user.createdAt ? format(new Date(user.createdAt), "MMM d, yyyy") : "—"}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500 dark:text-gray-400">
-                        {user.orderCount || 0} orders
                       </TableCell>
                       <TableCell className="text-right">
                         {user.status === 'pending' ? (
@@ -656,79 +652,220 @@ export default function UsersPage() {
 
       {/* User Activity Modal */}
       <Dialog open={activityModalOpen} onOpenChange={setActivityModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <Activity className="h-5 w-5 mr-2" />
-                  {selectedUser && `${selectedUser.firstName} ${selectedUser.lastName}'s Activity Log`}
+                  {selectedUser && `${selectedUser.firstName} ${selectedUser.lastName}'s Profile & Activity`}
                 </div>
                 <Badge variant="outline">{userActivity.length} activities</Badge>
               </div>
             </DialogTitle>
           </DialogHeader>
-          <div className="max-h-96 overflow-y-auto">
-            {!Array.isArray(userActivity) || userActivity.length === 0 ? (
-              <div className="text-center py-8">
-                <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No activity found for this user</p>
-                <p className="text-xs text-gray-400 mt-2">Activities will appear here as the user interacts with the system</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {userActivity.map((activity, index) => {
-                  const getActivityIcon = (action: string, type: string) => {
-                    if (type === 'order') return <ShoppingCart className="h-4 w-4 text-green-600" />;
-                    if (action.includes('Login')) return <UserCheck className="h-4 w-4 text-blue-600" />;
-                    if (action.includes('Logout')) return <UserX className="h-4 w-4 text-gray-600" />;
-                    if (action.includes('Profile') || action.includes('Updated')) return <Edit className="h-4 w-4 text-orange-600" />;
-                    if (action.includes('Created')) return <UserPlus className="h-4 w-4 text-purple-600" />;
-                    if (action.includes('Status')) return <ShieldQuestion className="h-4 w-4 text-yellow-600" />;
-                    return <Activity className="h-4 w-4 text-gray-600" />;
-                  };
-
-                  const getBorderColor = (action: string, type: string) => {
-                    if (type === 'order') return 'border-green-200';
-                    if (action.includes('Login')) return 'border-blue-200';
-                    if (action.includes('Logout')) return 'border-gray-200';
-                    if (action.includes('Profile') || action.includes('Updated')) return 'border-orange-200';
-                    if (action.includes('Created')) return 'border-purple-200';
-                    if (action.includes('Status')) return 'border-yellow-200';
-                    return 'border-gray-200';
-                  };
-
-                  return (
-                    <div key={activity.id || index} className={`border-l-3 ${getBorderColor(activity.action, activity.type)} pl-4 pb-3 hover:bg-gray-50 rounded-r-lg transition-colors`}>
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          {getActivityIcon(activity.action, activity.type)}
-                          <h4 className="font-medium text-gray-900">{activity.action}</h4>
-                          {activity.type === 'order' && <Badge variant="secondary" className="text-xs">Order</Badge>}
-                          {activity.type === 'user_activity' && <Badge variant="outline" className="text-xs">System</Badge>}
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+            {/* User Information Panel */}
+            <div className="lg:col-span-1 space-y-4">
+              {selectedUser && (
+                <>
+                  {/* Profile Overview */}
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex flex-col items-center text-center space-y-3">
+                        <Avatar className="h-20 w-20">
+                          <AvatarImage src={selectedUser.profileImageUrl || undefined} />
+                          <AvatarFallback className="text-lg">
+                            {selectedUser.firstName?.[0]}{selectedUser.lastName?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-semibold text-lg">{selectedUser.firstName} {selectedUser.lastName}</h3>
+                          <p className="text-sm text-gray-500">{selectedUser.email}</p>
                         </div>
-                        <span className="text-xs text-gray-500 whitespace-nowrap ml-4">
-                          {format(new Date(activity.timestamp), "MMM d, yyyy 'at' h:mm a")}
-                        </span>
+                        <div className="flex space-x-2">
+                          {getRoleBadge(selectedUser.role)}
+                          {getStatusBadge(selectedUser.status)}
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600 ml-6">{activity.details}</p>
-                      {activity.metadata && (
-                        <div className="mt-2 ml-6">
-                          <details className="text-xs">
-                            <summary className="text-gray-500 cursor-pointer hover:text-gray-700">View metadata</summary>
-                            <pre className="mt-1 p-2 bg-gray-100 rounded text-xs overflow-auto">
-                              {typeof activity.metadata === 'string' ? activity.metadata : JSON.stringify(JSON.parse(activity.metadata || '{}'), null, 2)}
-                            </pre>
-                          </details>
+                    </CardContent>
+                  </Card>
+
+                  {/* User Details */}
+                  <Card>
+                    <CardContent className="p-4 space-y-3">
+                      <h4 className="font-medium text-sm text-gray-700 uppercase tracking-wide">User Details</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">User ID:</span>
+                          <span className="font-mono text-xs">{selectedUser.id.slice(0, 8)}...</span>
                         </div>
-                      )}
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Joined:</span>
+                          <span>{selectedUser.createdAt ? format(new Date(selectedUser.createdAt), "MMM d, yyyy") : "—"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Last Updated:</span>
+                          <span>{selectedUser.updatedAt ? format(new Date(selectedUser.updatedAt), "MMM d, yyyy") : "—"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Total Orders:</span>
+                          <span className="font-medium">{selectedUser.orderCount || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">ID Verification:</span>
+                          <Badge variant={selectedUser.idVerificationStatus === 'verified' ? 'default' : 'secondary'} className="text-xs">
+                            {selectedUser.idVerificationStatus || 'pending'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Address Information */}
+                  {(selectedUser.address || selectedUser.city || selectedUser.state) && (
+                    <Card>
+                      <CardContent className="p-4 space-y-3">
+                        <h4 className="font-medium text-sm text-gray-700 uppercase tracking-wide">Address</h4>
+                        <div className="text-sm space-y-1">
+                          {selectedUser.address && <p>{selectedUser.address}</p>}
+                          <p>
+                            {selectedUser.city && selectedUser.city}
+                            {selectedUser.city && selectedUser.state && ', '}
+                            {selectedUser.state && selectedUser.state}
+                            {selectedUser.postalCode && ` ${selectedUser.postalCode}`}
+                          </p>
+                          {selectedUser.country && <p>{selectedUser.country}</p>}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Quick Stats */}
+                  <Card>
+                    <CardContent className="p-4 space-y-3">
+                      <h4 className="font-medium text-sm text-gray-700 uppercase tracking-wide">Quick Stats</h4>
+                      <div className="grid grid-cols-2 gap-3 text-center">
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                          <div className="text-lg font-bold text-blue-600">{userActivity.filter(a => a.type === 'order').length}</div>
+                          <div className="text-xs text-blue-500">Orders Placed</div>
+                        </div>
+                        <div className="bg-green-50 p-3 rounded-lg">
+                          <div className="text-lg font-bold text-green-600">{userActivity.filter(a => a.action.includes('Login')).length}</div>
+                          <div className="text-xs text-green-500">Login Sessions</div>
+                        </div>
+                        <div className="bg-purple-50 p-3 rounded-lg">
+                          <div className="text-lg font-bold text-purple-600">{userActivity.filter(a => a.action.includes('Profile') || a.action.includes('Updated')).length}</div>
+                          <div className="text-xs text-purple-500">Profile Updates</div>
+                        </div>
+                        <div className="bg-orange-50 p-3 rounded-lg">
+                          <div className="text-lg font-bold text-orange-600">{userActivity.length}</div>
+                          <div className="text-xs text-orange-500">Total Activities</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </div>
+
+            {/* Activity Timeline */}
+            <div className="lg:col-span-2">
+              <Card className="h-full">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium text-sm text-gray-700 uppercase tracking-wide">Activity Timeline</h4>
+                    <div className="flex space-x-2">
+                      <Badge variant="outline" className="text-xs">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Last 30 days
+                      </Badge>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  </div>
+                  
+                  <div className="max-h-[500px] overflow-y-auto pr-2">
+                    {!Array.isArray(userActivity) || userActivity.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500 text-lg">No activity found</p>
+                        <p className="text-xs text-gray-400 mt-2">Activities will appear here as the user interacts with the system</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {userActivity.map((activity, index) => {
+                          const getActivityIcon = (action: string, type: string) => {
+                            if (type === 'order') return <ShoppingCart className="h-4 w-4 text-green-600" />;
+                            if (action.includes('Login')) return <UserCheck className="h-4 w-4 text-blue-600" />;
+                            if (action.includes('Logout')) return <UserX className="h-4 w-4 text-gray-600" />;
+                            if (action.includes('Profile') || action.includes('Updated')) return <Edit className="h-4 w-4 text-orange-600" />;
+                            if (action.includes('Created')) return <UserPlus className="h-4 w-4 text-purple-600" />;
+                            if (action.includes('Status')) return <ShieldQuestion className="h-4 w-4 text-yellow-600" />;
+                            return <Activity className="h-4 w-4 text-gray-600" />;
+                          };
+
+                          const getBorderColor = (action: string, type: string) => {
+                            if (type === 'order') return 'border-green-200 bg-green-50';
+                            if (action.includes('Login')) return 'border-blue-200 bg-blue-50';
+                            if (action.includes('Logout')) return 'border-gray-200 bg-gray-50';
+                            if (action.includes('Profile') || action.includes('Updated')) return 'border-orange-200 bg-orange-50';
+                            if (action.includes('Created')) return 'border-purple-200 bg-purple-50';
+                            if (action.includes('Status')) return 'border-yellow-200 bg-yellow-50';
+                            return 'border-gray-200 bg-gray-50';
+                          };
+
+                          return (
+                            <div key={activity.id || index} className={`border-l-4 ${getBorderColor(activity.action, activity.type)} pl-4 pr-3 py-3 rounded-r-lg transition-all hover:shadow-sm`}>
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-center space-x-3">
+                                  <div className="p-1 bg-white rounded-full border">
+                                    {getActivityIcon(activity.action, activity.type)}
+                                  </div>
+                                  <div>
+                                    <h4 className="font-medium text-gray-900">{activity.action}</h4>
+                                    <p className="text-sm text-gray-600">{activity.details}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-xs text-gray-500 whitespace-nowrap">
+                                    {format(new Date(activity.timestamp), "MMM d, yyyy")}
+                                  </span>
+                                  <br />
+                                  <span className="text-xs text-gray-400">
+                                    {format(new Date(activity.timestamp), "h:mm a")}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              <div className="ml-8 flex space-x-2">
+                                {activity.type === 'order' && <Badge variant="secondary" className="text-xs">Order</Badge>}
+                                {activity.type === 'user_activity' && <Badge variant="outline" className="text-xs">System</Badge>}
+                              </div>
+                              
+                              {activity.metadata && (
+                                <div className="mt-3 ml-8">
+                                  <details className="text-xs">
+                                    <summary className="text-gray-500 cursor-pointer hover:text-gray-700 font-medium">Additional Details</summary>
+                                    <div className="mt-2 p-3 bg-white border rounded text-xs overflow-auto">
+                                      <pre className="whitespace-pre-wrap">
+                                        {typeof activity.metadata === 'string' ? activity.metadata : JSON.stringify(JSON.parse(activity.metadata || '{}'), null, 2)}
+                                      </pre>
+                                    </div>
+                                  </details>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-          <div className="flex justify-end pt-4 border-t">
+          
+          <div className="flex justify-end pt-4 border-t mt-6">
             <Button variant="outline" onClick={() => setActivityModalOpen(false)}>
               Close
             </Button>
