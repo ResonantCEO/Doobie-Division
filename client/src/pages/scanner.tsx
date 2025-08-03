@@ -74,7 +74,7 @@ export default function ScannerPage() {
   const queryClient = useQueryClient();
 
   // Fetch orders for fulfillment (pending and processing orders)
-  const { data: pendingOrders = [] } = useQuery<Order[]>({
+  const { data: allOrders = [] } = useQuery<Order[]>({
     queryKey: ["/api/orders", "fulfillment"],
     queryFn: async () => {
       const response = await fetch("/api/orders", { credentials: "include" });
@@ -83,7 +83,7 @@ export default function ScannerPage() {
     },
   });
 
-  const pendingOrders = pendingOrders.filter(order => 
+  const pendingOrders = allOrders.filter(order => 
     (order.status === "pending" || order.status === "processing") && 
     order.items?.some(item => !item.fulfilled)
   );
