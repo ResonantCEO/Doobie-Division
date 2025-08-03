@@ -108,6 +108,7 @@ export const orderItems = pgTable("order_items", {
   orderId: integer("order_id").references(() => orders.id),
   productId: integer("product_id").references(() => products.id),
   productName: varchar("product_name").notNull(),
+  productSku: varchar("product_sku"),
   productPrice: decimal("product_price", { precision: 10, scale: 2 }).notNull(),
   quantity: integer("quantity").notNull(),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
@@ -249,6 +250,7 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
   productPrice: z.string().or(z.number()).transform(val => String(val)),
   subtotal: z.string().or(z.number()).transform(val => String(val)),
   orderId: z.number().optional(),
+  productSku: z.string().optional(),
 });
 
 export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).omit({

@@ -441,7 +441,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Items data received:', JSON.stringify(items, null, 2));
 
       const orderData = insertOrderSchema.parse(order);
-      const itemsData = items.map((item: any) => insertOrderItemSchema.parse(item));
+      
+      // Enrich items with product SKU data
+      const enrichedItems = [];
+      for (const item of items) {
+        const product = await storage.getProduct(item.productId);
+        if (product) {
+          enrichedItems.push({
+            ...item,
+            productSku: product.sku
+          });
+        } else {
+          enrichedItems.push(item);
+        }
+      }
+      
+      const itemsData = enrichedItems.map((item: any) => insertOrderItemSchema.parse(item));
 
       const newOrder = await storage.createOrder(orderData, itemsData);
       res.status(201).json(newOrder);

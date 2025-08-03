@@ -860,7 +860,9 @@ export default function ScannerPage() {
                         <div key={item.id} className="flex justify-between items-center p-2 border rounded">
                           <div>
                             <p className="font-medium">{item.productName}</p>
-                            <p className="text-sm text-muted-foreground">SKU: {item.productSku}</p>
+                            <p className="text-sm text-muted-foreground">
+                              SKU: {item.productSku || item.product?.sku || 'N/A'}
+                            </p>
                           </div>
                           <div className="text-right">
                             <p className="font-medium">Qty: {item.quantity}</p>
