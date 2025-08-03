@@ -110,32 +110,32 @@ export default function OrderTable({ orders }: OrderTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Order Number</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Payment</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="text-black">Order Number</TableHead>
+              <TableHead className="text-black">Customer</TableHead>
+              <TableHead className="text-black">Total</TableHead>
+              <TableHead className="text-black">Status</TableHead>
+              <TableHead className="text-black">Date</TableHead>
+              <TableHead className="text-black">Payment</TableHead>
+              <TableHead className="text-right text-black">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.map((order) => (
               <TableRow key={order.id}>
-                <TableCell className="font-medium">
+                <TableCell className="font-medium text-black">
                   {order.orderNumber}
                 </TableCell>
                 <TableCell>
                   <div>
-                    <div className="font-medium text-gray-900">{order.customerName}</div>
-                    <div className="text-sm text-gray-500">{order.customerEmail}</div>
+                    <div className="font-medium text-black">{order.customerName}</div>
+                    <div className="text-sm text-black">{order.customerEmail}</div>
                   </div>
                 </TableCell>
-                <TableCell className="font-medium">
+                <TableCell className="font-medium text-black">
                   ${Number(order.total).toFixed(2)}
                 </TableCell>
                 <TableCell>{getStatusBadge(order.status)}</TableCell>
-                <TableCell>
+                <TableCell className="text-black">
                   {format(new Date(order.createdAt!), "MMM d, yyyy")}
                 </TableCell>
                 <TableCell>
