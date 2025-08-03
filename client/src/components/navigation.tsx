@@ -114,14 +114,49 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
               </CartDrawer>
 
               {/* Notifications */}
-              <Button variant="ghost" size="sm" className="relative">
-                <Bell className="h-5 w-5" />
-                {unreadCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="relative">
+                    <Bell className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive">
+                        {unreadCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80">
+                  <div className="p-2">
+                    <h3 className="font-semibold text-sm mb-2">Notifications</h3>
+                    {notifications.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4 text-center">
+                        No notifications
+                      </p>
+                    ) : (
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {notifications.map((notification: any) => (
+                          <div
+                            key={notification.id}
+                            className={`p-2 rounded-md text-sm ${
+                              notification.isRead
+                                ? "bg-background"
+                                : "bg-muted"
+                            }`}
+                          >
+                            <div className="font-medium">{notification.title}</div>
+                            <div className="text-muted-foreground text-xs">
+                              {notification.message}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {new Date(notification.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               {/* Theme Toggle */}
               <div className="flex items-center space-x-2">
