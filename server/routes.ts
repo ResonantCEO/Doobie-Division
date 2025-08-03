@@ -392,7 +392,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status } = req.query;
       const filters: any = {};
 
-      if (status) filters.status = status as string;
+      if (status) {
+        // Handle multiple statuses separated by comma
+        if (status.includes(',')) {
+          filters.statuses = status.split(',').map((s: string) => s.trim());
+        } else {
+          filters.status = status as string;
+        }
+      }
 
       // Regular customers can only see their own orders
       if (req.currentUser.role === 'customer') {
