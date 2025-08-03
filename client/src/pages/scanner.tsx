@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,11 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { Camera, Package, Plus, Minus, RotateCcw, Scan, AlertCircle, CheckCircle } from "lucide-react";
-import type { Product, Category } from "@shared/schema";
+import { Camera, Package, Plus, Minus, RotateCcw, Scan, AlertCircle, CheckCircle, ShoppingCart, Truck, Clock } from "lucide-react";
+import type { Product, Category, Order } from "@shared/schema";
 
 interface ScannedProduct extends Product {
   category: Category | null;
@@ -28,6 +30,20 @@ interface RecentAction {
   timestamp: string;
 }
 
+interface OrderItem {
+  id: number;
+  productId: number;
+  productName: string;
+  productSku: string;
+  quantity: number;
+  price: number;
+  fulfilled: boolean;
+}
+
+interface OrderForFulfillment extends Order {
+  items: OrderItem[];
+}
+
 export default function ScannerPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanningError, setScanningError] = useState<string>("");
@@ -38,6 +54,17 @@ export default function ScannerPage() {
   const [recentActions, setRecentActions] = useState<RecentAction[]>([]);
   const [lastScanTime, setLastScanTime] = useState(0);
   const [scanningStatus, setScanningStatus] = useState<"idle" | "scanning" | "found" | "error">("idle");
+  const [activeTab, setActiveTab] = useState("inventory");
+  const [selectedOrderId, setSelectedOrderId] = useState<string>("");
+  const [selectedOrder, setSelectedOrder] = useState<OrderForFulfillment | null>(null);
+  const [fulfillmentActions, setFulfillmentActions] = useState<Array<{
+    id: number;
+    orderNumber: string;
+    productName: string;
+    sku: string;
+    quantityFulfilled: number;
+    timestamp: string;
+  }>>([]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -46,6 +73,19 @@ export default function ScannerPage() {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch pending orders for fulfillment
+  const { data: pendingOrders = [] } = useQuery<Order[]>({
+    queryKey: ["/api/orders", { status: "processing" }],
+    staleTime: 30000, // Refresh every 30 seconds
+  });
+
+  // Fetch selected order details
+  const { data: orderDetails } = useQuery<OrderForFulfillment>({
+    queryKey: ["/api/orders", selectedOrderId],
+    enabled: !!selectedOrderId && selectedOrderId !== "",
+    staleTime: 30000,
+  });
 
   // Start camera for QR scanning
   const startScanning = async () => {
@@ -247,6 +287,63 @@ export default function ScannerPage() {
     },
   });
 
+  // Order fulfillment mutation
+  const fulfillOrderItemMutation = useMutation({
+    mutationFn: async (data: { orderId: number; productId: number; quantity: number }) => {
+      await apiRequest("POST", `/api/orders/${data.orderId}/fulfill-item`, {
+        productId: data.productId,
+        quantity: data.quantity
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      
+      // Add to fulfillment actions
+      const action = {
+        id: Date.now(),
+        orderNumber: selectedOrder?.orderNumber || "Unknown",
+        productName: scannedProduct?.name || "Unknown",
+        sku: scannedProduct?.sku || "Unknown",
+        quantityFulfilled: variables.quantity,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      setFulfillmentActions(prev => [action, ...prev.slice(0, 9)]);
+      
+      // Update current product stock
+      if (scannedProduct) {
+        setScannedProduct({
+          ...scannedProduct,
+          stock: scannedProduct.stock - variables.quantity
+        });
+      }
+      
+      toast({
+        title: "Item Fulfilled",
+        description: `Fulfilled ${variables.quantity} units for order ${selectedOrder?.orderNumber}`,
+        icon: <CheckCircle className="h-4 w-4" />
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to fulfill order item",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleAdjustment = (adjustmentValue: number) => {
     if (!scannedProduct || !reason.trim()) {
       toast({
@@ -275,6 +372,68 @@ export default function ScannerPage() {
     }
     setScanningStatus("scanning");
     lookupProductMutation.mutate(manualSku.trim());
+  };
+
+  const handleOrderSelection = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    if (orderId && orderDetails) {
+      setSelectedOrder(orderDetails);
+    }
+  };
+
+  const handleFulfillOrderItem = (quantity: number) => {
+    if (!selectedOrder || !scannedProduct) {
+      toast({
+        title: "Missing Information",
+        description: "Please select an order and scan a product",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if this product is in the order
+    const orderItem = selectedOrder.items?.find(item => item.productId === scannedProduct.id);
+    if (!orderItem) {
+      toast({
+        title: "Product Not in Order",
+        description: "This product is not part of the selected order",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (orderItem.fulfilled) {
+      toast({
+        title: "Already Fulfilled",
+        description: "This item has already been fulfilled",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (quantity > orderItem.quantity) {
+      toast({
+        title: "Invalid Quantity",
+        description: `Order only requires ${orderItem.quantity} units`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (quantity > scannedProduct.stock) {
+      toast({
+        title: "Insufficient Stock",
+        description: `Only ${scannedProduct.stock} units available`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    fulfillOrderItemMutation.mutate({
+      orderId: selectedOrder.id,
+      productId: scannedProduct.id,
+      quantity
+    });
   };
 
   const resetSession = () => {
@@ -307,16 +466,38 @@ export default function ScannerPage() {
     }
   };
 
+  // Update selected order when orderDetails changes
+  useEffect(() => {
+    if (orderDetails) {
+      setSelectedOrder(orderDetails);
+    }
+  }, [orderDetails]);
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto p-4">
       {/* Header */}
       <div className="text-center">
         <h1 className="text-3xl font-bold text-foreground mb-2">Warehouse Scanner</h1>
-        <p className="text-muted-foreground">Scan QR codes or enter SKUs to manage inventory</p>
+        <p className="text-muted-foreground">Scan QR codes or enter SKUs to manage inventory and fulfill orders</p>
       </div>
 
+      {/* Mode Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="inventory" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Inventory Management
+          </TabsTrigger>
+          <TabsTrigger value="fulfillment" className="flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4" />
+            Order Fulfillment
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="inventory" className="space-y-6">
+
       {/* Scanner Section */}
-      <Card>
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Scan className="h-5 w-5" />
@@ -591,20 +772,388 @@ export default function ScannerPage() {
         </Card>
       )}
 
-      {/* Help Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>How to Use</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p>• <strong>Camera Scanner:</strong> Click "Start Camera Scanner" and position QR codes within the dashed box</p>
-            <p>• <strong>Manual Lookup:</strong> Enter a product SKU directly if you don't have a QR code</p>
-            <p>• <strong>Stock Adjustments:</strong> Always provide a reason for inventory changes for audit purposes</p>
-            <p>• <strong>QR Codes:</strong> Generate QR codes from the Inventory Management page for easy scanning</p>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Help Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Inventory Management Help</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>• <strong>Camera Scanner:</strong> Click "Start Camera Scanner" and position QR codes within the dashed box</p>
+              <p>• <strong>Manual Lookup:</strong> Enter a product SKU directly if you don't have a QR code</p>
+              <p>• <strong>Stock Adjustments:</strong> Always provide a reason for inventory changes for audit purposes</p>
+              <p>• <strong>QR Codes:</strong> Generate QR codes from the Inventory Management page for easy scanning</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        </TabsContent>
+
+        <TabsContent value="fulfillment" className="space-y-6">
+          {/* Order Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="h-5 w-5" />
+                Order Selection
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="order-select">Select Order to Fulfill</Label>
+                <Select value={selectedOrderId} onValueChange={handleOrderSelection}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Choose an order..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pendingOrders.map((order) => (
+                      <SelectItem key={order.id} value={order.id.toString()}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>#{order.orderNumber}</span>
+                          <div className="flex items-center gap-2 ml-4">
+                            <Badge variant="outline">${order.total}</Badge>
+                            <Badge variant="secondary">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {new Date(order.createdAt).toLocaleDateString()}
+                            </Badge>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {pendingOrders.length === 0 && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    No orders pending fulfillment
+                  </p>
+                )}
+              </div>
+
+              {/* Selected Order Details */}
+              {selectedOrder && (
+                <div className="border rounded-lg p-4 bg-muted/50">
+                  <h4 className="font-semibold mb-2">Order #{selectedOrder.orderNumber}</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p><strong>Customer:</strong> {selectedOrder.customerName}</p>
+                      <p><strong>Total:</strong> ${selectedOrder.total}</p>
+                    </div>
+                    <div>
+                      <p><strong>Status:</strong> <Badge variant="secondary">{selectedOrder.status}</Badge></p>
+                      <p><strong>Items:</strong> {selectedOrder.items?.length || 0}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Order Items */}
+                  <div className="mt-4">
+                    <h5 className="font-medium mb-2">Items to Fulfill:</h5>
+                    <div className="space-y-2">
+                      {selectedOrder.items?.map((item) => (
+                        <div key={item.id} className="flex justify-between items-center p-2 border rounded">
+                          <div>
+                            <p className="font-medium">{item.productName}</p>
+                            <p className="text-sm text-muted-foreground">SKU: {item.productSku}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">Qty: {item.quantity}</p>
+                            <Badge variant={item.fulfilled ? "default" : "secondary"}>
+                              {item.fulfilled ? "Fulfilled" : "Pending"}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Scanner Section for Fulfillment */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scan className="h-5 w-5" />
+                Product Scanner - Order Fulfillment
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Camera Section */}
+              <div className="text-center">
+                {!isScanning ? (
+                  <div className="space-y-4">
+                    <Button onClick={startScanning} size="lg" className="w-full sm:w-auto">
+                      <Camera className="h-5 w-5 mr-2" />
+                      Start Camera Scanner
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      Or use manual SKU lookup below
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className={`w-full max-w-md mx-auto rounded-lg border-2 ${getScanningStatusColor()}`}
+                      />
+                      <canvas ref={canvasRef} className="hidden" />
+                      
+                      {/* Scanning overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="border-2 border-white border-dashed w-48 h-48 rounded-lg animate-pulse">
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Scan className="h-8 w-8 text-white animate-spin" />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Status indicator */}
+                      <div className="absolute top-2 left-2 right-2">
+                        {scanningStatus === "scanning" && (
+                          <Badge variant="default" className="bg-blue-500">
+                            Scanning for QR codes...
+                          </Badge>
+                        )}
+                        {scanningStatus === "found" && (
+                          <Badge variant="default" className="bg-green-500">
+                            QR Code Found!
+                          </Badge>
+                        )}
+                        {scanningStatus === "error" && (
+                          <Badge variant="destructive">
+                            Scan Error
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <Button onClick={stopScanning} variant="outline">
+                      Stop Scanner
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      Scan products to fulfill the selected order
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Error Alert */}
+              {scanningError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{scanningError}</AlertDescription>
+                </Alert>
+              )}
+
+              {/* Manual SKU Lookup */}
+              <div className="border-t pt-4">
+                <Label htmlFor="manual-sku-fulfillment">Manual SKU Lookup</Label>
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    id="manual-sku-fulfillment"
+                    placeholder="Enter SKU (e.g., 0001, 0002)"
+                    value={manualSku}
+                    onChange={(e) => setManualSku(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleManualLookup()}
+                    disabled={lookupProductMutation.isPending}
+                  />
+                  <Button 
+                    onClick={handleManualLookup} 
+                    disabled={lookupProductMutation.isPending}
+                  >
+                    {lookupProductMutation.isPending ? "Searching..." : "Lookup"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Product Information for Fulfillment */}
+          {scannedProduct && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Scanned Product
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-start gap-4">
+                  <Avatar className="h-16 w-16">
+                    <AvatarImage src={scannedProduct.imageUrl || ""} alt={scannedProduct.name} />
+                    <AvatarFallback>{scannedProduct.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold">{scannedProduct.name}</h3>
+                    <p className="text-muted-foreground mb-2">{scannedProduct.description}</p>
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      <Badge variant="outline">SKU: {scannedProduct.sku}</Badge>
+                      <Badge variant="outline">Price: ${scannedProduct.price}</Badge>
+                      <Badge {...getStockStatus(scannedProduct.stock, scannedProduct.minStockThreshold)}>
+                        Stock: {scannedProduct.stock} units
+                      </Badge>
+                    </div>
+                    
+                    {/* Order Item Match Info */}
+                    {selectedOrder && (() => {
+                      const orderItem = selectedOrder.items?.find(item => item.productId === scannedProduct.id);
+                      if (orderItem) {
+                        return (
+                          <div className="mt-3 p-3 border rounded-lg bg-green-50 border-green-200">
+                            <p className="text-sm font-medium text-green-800">
+                              ✓ This product is in the selected order
+                            </p>
+                            <p className="text-sm text-green-600">
+                              Required: {orderItem.quantity} units | 
+                              Status: {orderItem.fulfilled ? "Fulfilled" : "Pending"}
+                            </p>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="mt-3 p-3 border rounded-lg bg-yellow-50 border-yellow-200">
+                            <p className="text-sm font-medium text-yellow-800">
+                              ⚠ This product is not in the selected order
+                            </p>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Order Fulfillment Actions */}
+          {scannedProduct && selectedOrder && (() => {
+            const orderItem = selectedOrder.items?.find(item => item.productId === scannedProduct.id);
+            return orderItem && !orderItem.fulfilled ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Fulfill Order Item</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <Button
+                      onClick={() => handleFulfillOrderItem(1)}
+                      disabled={fulfillOrderItemMutation.isPending || orderItem.quantity < 1}
+                      className="flex items-center gap-2"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Fulfill 1
+                    </Button>
+                    <Button
+                      onClick={() => handleFulfillOrderItem(Math.min(5, orderItem.quantity))}
+                      disabled={fulfillOrderItemMutation.isPending || orderItem.quantity < 5}
+                      className="flex items-center gap-2"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Fulfill 5
+                    </Button>
+                    <Button
+                      onClick={() => handleFulfillOrderItem(orderItem.quantity)}
+                      disabled={fulfillOrderItemMutation.isPending}
+                      className="flex items-center gap-2"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Fulfill All ({orderItem.quantity})
+                    </Button>
+                    <Button
+                      onClick={resetSession}
+                      variant="outline"
+                      className="flex items-center gap-2"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Reset
+                    </Button>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="custom-fulfill-quantity">Custom Quantity</Label>
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        id="custom-fulfill-quantity"
+                        type="number"
+                        placeholder={`Enter quantity (max: ${orderItem.quantity})`}
+                        value={adjustment}
+                        onChange={(e) => setAdjustment(e.target.value)}
+                        max={orderItem.quantity}
+                        min={1}
+                      />
+                      <Button
+                        onClick={() => {
+                          const qty = parseInt(adjustment);
+                          if (!isNaN(qty) && qty > 0 && qty <= orderItem.quantity) {
+                            handleFulfillOrderItem(qty);
+                          } else {
+                            toast({
+                              title: "Invalid Quantity",
+                              description: `Please enter a number between 1 and ${orderItem.quantity}`,
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        disabled={!adjustment || fulfillOrderItemMutation.isPending}
+                      >
+                        {fulfillOrderItemMutation.isPending ? "Fulfilling..." : "Fulfill"}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null;
+          })()}
+
+          {/* Recent Fulfillment Actions */}
+          {fulfillmentActions.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Fulfillment Actions ({fulfillmentActions.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {fulfillmentActions.map((action) => (
+                    <div key={action.id} className="flex justify-between items-center p-3 border rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-medium">{action.productName}</p>
+                        <p className="text-sm text-muted-foreground">Order #{action.orderNumber} | SKU: {action.sku}</p>
+                      </div>
+                      <div className="text-right ml-4">
+                        <Badge variant="default">
+                          Fulfilled: {action.quantityFulfilled}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">{action.timestamp}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Fulfillment Help Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Order Fulfillment Help</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>• <strong>Order Selection:</strong> Choose a processing order from the dropdown to begin fulfillment</p>
+                <p>• <strong>Product Scanning:</strong> Scan QR codes or enter SKUs to match products with order items</p>
+                <p>• <strong>Fulfillment:</strong> The system will automatically reduce stock and mark items as fulfilled</p>
+                <p>• <strong>Validation:</strong> Only products in the selected order can be fulfilled</p>
+                <p>• <strong>Stock Check:</strong> Fulfillment is prevented if insufficient stock is available</p>
+              </div>
+            </CardContent>
+          </Card>
+
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -464,6 +464,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Order item fulfillment route
+  app.post('/api/orders/:id/fulfill-item', isAuthenticated, requireRole(['admin', 'manager']), async (req: any, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const { productId, quantity } = req.body;
+
+      if (!productId || !quantity || quantity <= 0) {
+        return res.status(400).json({ message: "Product ID and positive quantity are required" });
+      }
+
+      // Get the order and verify it exists
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Check if order is in a fulfillable status
+      if (!['pending', 'processing'].includes(order.status)) {
+        return res.status(400).json({ message: "Order cannot be fulfilled in its current status" });
+      }
+
+      // Get the product and verify stock
+      const product = await storage.getProduct(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      if (product.stock < quantity) {
+        return res.status(400).json({ message: "Insufficient stock available" });
+      }
+
+      // Verify the product is part of this order
+      const orderItem = order.items?.find(item => item.productId === productId);
+      if (!orderItem) {
+        return res.status(400).json({ message: "Product is not part of this order" });
+      }
+
+      if (orderItem.fulfilled) {
+        return res.status(400).json({ message: "This order item has already been fulfilled" });
+      }
+
+      if (quantity > orderItem.quantity) {
+        return res.status(400).json({ message: `Order only requires ${orderItem.quantity} units` });
+      }
+
+      // Fulfill the item (reduce stock and mark as fulfilled)
+      await storage.fulfillOrderItem(orderId, productId, quantity, req.currentUser.id);
+
+      res.status(200).json({ message: "Order item fulfilled successfully" });
+    } catch (error) {
+      console.error('Order fulfillment error:', error);
+      res.status(500).json({ message: "Failed to fulfill order item" });
+    }
+  });
+
   // Analytics routes
   app.get('/api/analytics/metrics', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {

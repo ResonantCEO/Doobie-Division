@@ -53,6 +53,7 @@ export interface IStorage {
   getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined>;
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
+  fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<any>;
 
   // Analytics operations
   getSalesMetrics(days: number): Promise<{
@@ -273,14 +274,14 @@ export class DatabaseStorage implements IStorage {
     if (filters?.categoryIds) {
       // Get all relevant category IDs including parent and all descendant categories recursively
       const allCategoryIds = [...filters.categoryIds];
-      
+
       // Recursive function to get all descendants
       const getAllDescendants = async (parentId: number): Promise<number[]> => {
         const directChildren = await db
           .select({ id: categories.id })
           .from(categories)
           .where(and(eq(categories.parentId, parentId), eq(categories.isActive, true)));
-        
+
         let descendants: number[] = [];
         for (const child of directChildren) {
           descendants.push(child.id);
@@ -288,10 +289,10 @@ export class DatabaseStorage implements IStorage {
           const grandchildren = await getAllDescendants(child.id);
           descendants = descendants.concat(grandchildren);
         }
-        
+
         return descendants;
       };
-      
+
       // Get descendants for each requested category
       for (const categoryId of filters.categoryIds) {
         const descendants = await getAllDescendants(categoryId);
@@ -573,6 +574,59 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orders.id, id))
       .returning();
     return updated;
+  }
+
+  async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string) {
+    return await db.transaction(async (tx) => {
+      // Reduce product stock
+      await tx
+        .update(products)
+        .set({ 
+          stock: sql`${products.stock} - ${quantity}`,
+          updatedAt: new Date()
+        })
+        .where(eq(products.id, productId));
+
+      // Mark order item as fulfilled
+      await tx
+        .update(orderItems)
+        .set({ fulfilled: true })
+        .where(and(
+          eq(orderItems.orderId, orderId),
+          eq(orderItems.productId, productId)
+        ));
+
+      // Log the inventory adjustment
+      await tx.insert(inventoryLogs).values({
+        productId,
+        userId,
+        type: 'adjustment',
+        quantity: -quantity,
+        reason: `Order fulfillment - Order #${orderId}`,
+        createdAt: new Date()
+      });
+
+      // Check if all items in the order are fulfilled
+      const orderItemsResult = await tx
+        .select()
+        .from(orderItems)
+        .where(eq(orderItems.orderId, orderId));
+
+      const allFulfilled = orderItemsResult.every(item => item.fulfilled);
+
+      // If all items are fulfilled, update order status to shipped
+      if (allFulfilled) {
+        await tx
+          .update(orders)
+          .set({ 
+            status: 'shipped',
+            updatedAt: new Date()
+          })
+          .where(eq(orders.id, orderId));
+      }
+
+      return { success: true, allFulfilled };
+    });
   }
 
   // Analytics operations
