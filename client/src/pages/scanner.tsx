@@ -817,7 +817,7 @@ export default function ScannerPage() {
                     {pendingOrders.map((order) => (
                       <SelectItem key={order.id} value={order.id.toString()}>
                         <div className="flex items-center justify-between w-full">
-                          <span>#{order.orderNumber}</span>
+                          <span>{order.customerName} - #{order.orderNumber}</span>
                           <div className="flex items-center gap-2 ml-4">
                             <Badge variant="outline">${order.total}</Badge>
                             <Badge variant="secondary">
@@ -931,8 +931,7 @@ export default function ScannerPage() {
                         {scanningStatus === "found" && (
                           <Badge variant="default" className="bg-green-500">
                             QR Code Found!
-                          </Badge>
-                        )}
+                          </Badge>                        )}
                         {scanningStatus === "error" && (
                           <Badge variant="destructive">
                             Scan Error
