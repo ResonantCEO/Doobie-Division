@@ -484,13 +484,13 @@ export default function ScannerPage() {
       {/* Mode Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="inventory" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Inventory Management
-          </TabsTrigger>
           <TabsTrigger value="fulfillment" className="flex items-center gap-2">
             <ShoppingCart className="h-4 w-4" />
             Order Fulfillment
+          </TabsTrigger>
+          <TabsTrigger value="inventory" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Inventory Management
           </TabsTrigger>
         </TabsList>
 
