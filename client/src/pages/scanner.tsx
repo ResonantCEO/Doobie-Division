@@ -857,21 +857,26 @@ export default function ScannerPage() {
                     <h5 className="font-medium mb-2">Items to Fulfill:</h5>
                     <div className="space-y-2">
                       {selectedOrder.items?.map((item) => (
-                        <div key={item.id} className="flex justify-between items-center p-2 border rounded">
-                          <div>
-                            <p className="font-medium">{item.productName}</p>
-                            <p className="text-sm text-muted-foreground">
-                              SKU: {item.productSku || item.product?.sku || 'N/A'}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">Qty: {item.quantity}</p>
-                            <Badge variant={item.fulfilled ? "default" : "secondary"}>
-                              {item.fulfilled ? "Fulfilled" : "Pending"}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
+                    <div key={item.id} className="flex justify-between items-center p-2 border rounded">
+                      <div>
+                        <p className="font-medium">{item.productName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          SKU: {item.productSku || item.product?.sku || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">
+                          {item.product?.sellingMethod === "weight" 
+                            ? `${item.quantity} ${item.product.weightUnit || 'grams'}`
+                            : `Qty: ${item.quantity}`
+                          }
+                        </p>
+                        <Badge variant={item.fulfilled ? "default" : "secondary"}>
+                          {item.fulfilled ? "Fulfilled" : "Pending"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
                     </div>
                   </div>
                 </div>
