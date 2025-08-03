@@ -78,6 +78,25 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.1.2] - 2025-01-21
+
+### Added
+- New feature descriptions will go here for this release.
+
+### Changed
+- Modification details for existing features will be listed here.
+
+### Fixed
+- Bug fix details for this release.
+
+### Security
+- Security improvements or updates for this version.
+
+### Technical Improvements
+- Technical enhancement details for this release.
+
+---
+
 ## [Unreleased]
 
 ### Added
