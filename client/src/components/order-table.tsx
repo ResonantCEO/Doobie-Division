@@ -158,7 +158,7 @@ export default function OrderTable({ orders }: OrderTableProps) {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
+                          <MoreHorizontal className="h-4 w-4 text-black" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
