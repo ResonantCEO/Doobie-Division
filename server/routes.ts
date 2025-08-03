@@ -266,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // QR Code generation routes
-  app.get('/api/products/:id/qr-code', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  app.get('/api/products/:id/qr-code', isAuthenticated, requireRole(['admin', 'manager', 'customer']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const product = await storage.getProduct(id);

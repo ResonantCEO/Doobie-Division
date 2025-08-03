@@ -86,9 +86,16 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
   // QR code generation mutation
   const qrCodeMutation = useMutation({
     mutationFn: async (productId: number) => {
-      const response = await apiRequest(`/api/products/${productId}/qr-code`, {
+      const response = await fetch(`/api/products/${productId}/qr-code`, {
         method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
+      if (!response.ok) {
+        throw new Error(`Failed to generate QR code: ${response.statusText}`);
+      }
       return response.json();
     },
     onSuccess: (data) => {

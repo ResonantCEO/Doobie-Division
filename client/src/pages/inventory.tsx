@@ -35,11 +35,17 @@ export default function InventoryPage() {
   // Bulk QR code generation mutation
   const bulkQRMutation = useMutation({
     mutationFn: async (productIds: number[]) => {
-      const response = await apiRequest('/api/products/generate-qr-codes', {
+      const response = await fetch('/api/products/generate-qr-codes', {
         method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ productIds }),
-        headers: { 'Content-Type': 'application/json' }
       });
+      if (!response.ok) {
+        throw new Error(`Failed to generate QR codes: ${response.statusText}`);
+      }
       return response.json();
     },
     onSuccess: (data) => {
