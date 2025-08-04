@@ -867,6 +867,7 @@ export default function AnalyticsPage() {
             </Card>
           </div>
         </TabsContent>
+        </TabsContent>
       </Tabs>
     </div>
   );
