@@ -353,55 +353,30 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          {/* Sales by Channel & Time Analysis */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Sales by Channel</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {[
-                    { channel: "Online Store", sales: "$15,420", percentage: "68%" },
-                    { channel: "Mobile App", sales: "$5,230", percentage: "23%" },
-                    { channel: "Phone Orders", sales: "$2,100", percentage: "9%" }
-                  ].map((item, i) => (
-                    <div key={i} className="flex justify-between items-center">
-                      <span className="text-sm font-medium">{item.channel}</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm">{item.sales}</span>
-                        <Badge variant="secondary">{item.percentage}</Badge>
-                      </div>
+          {/* Peak Purchase Times */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Peak Purchase Times</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[
+                  { time: "12:00 PM - 2:00 PM", orders: "145", percentage: "32%" },
+                  { time: "6:00 PM - 8:00 PM", orders: "98", percentage: "22%" },
+                  { time: "8:00 PM - 10:00 PM", orders: "87", percentage: "19%" },
+                  { time: "10:00 AM - 12:00 PM", orders: "76", percentage: "17%" }
+                ].map((item, i) => (
+                  <div key={i} className="flex justify-between items-center">
+                    <span className="text-sm font-medium">{item.time}</span>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm">{item.orders} orders</span>
+                      <Badge variant="outline">{item.percentage}</Badge>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Peak Purchase Times</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {[
-                    { time: "12:00 PM - 2:00 PM", orders: "145", percentage: "32%" },
-                    { time: "6:00 PM - 8:00 PM", orders: "98", percentage: "22%" },
-                    { time: "8:00 PM - 10:00 PM", orders: "87", percentage: "19%" },
-                    { time: "10:00 AM - 12:00 PM", orders: "76", percentage: "17%" }
-                  ].map((item, i) => (
-                    <div key={i} className="flex justify-between items-center">
-                      <span className="text-sm font-medium">{item.time}</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm">{item.orders} orders</span>
-                        <Badge variant="outline">{item.percentage}</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="customers" className="space-y-6">
