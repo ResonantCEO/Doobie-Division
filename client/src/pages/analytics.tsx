@@ -828,36 +828,8 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          {/* Market Analysis */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Market Share Analysis</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {[
-                    { company: "Your Company", share: "28%", change: "+3%" },
-                    { company: "Competitor A", share: "25%", change: "-1%" },
-                    { company: "Competitor B", share: "22%", change: "+1%" },
-                    { company: "Competitor C", share: "15%", change: "-2%" },
-                    { company: "Others", share: "10%", change: "-1%" }
-                  ].map((item, i) => (
-                    <div key={i} className="flex justify-between items-center">
-                      <span className="text-sm font-medium">{item.company}</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm">{item.share}</span>
-                        <Badge variant={item.change.startsWith('+') ? "secondary" : "outline"}>
-                          {item.change}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
+          {/* Customer Feedback */}
+          <Card>
               <CardHeader>
                 <CardTitle>Customer Feedback & Satisfaction</CardTitle>
               </CardHeader>
