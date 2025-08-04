@@ -869,8 +869,3 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
