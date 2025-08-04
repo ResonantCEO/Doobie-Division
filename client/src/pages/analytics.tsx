@@ -829,42 +829,46 @@ export default function AnalyticsPage() {
 
           {/* Customer Feedback */}
           <Card>
-              <CardHeader>
-                <CardTitle>Customer Feedback & Satisfaction</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Overall Satisfaction</span>
-                    <div className="flex items-center space-x-2">
-                      <div className="flex text-yellow-400">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="h-4 w-4 fill-current" />
-                        ))}
-                      </div>
-                      <span className="text-sm font-medium">4.8/5</span>
+            <CardHeader>
+              <CardTitle>Customer Feedback & Satisfaction</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Overall Satisfaction</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex text-yellow-400">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} className="h-4 w-4 fill-current" />
+                      ))}
                     </div>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Product Quality</span>
-                    <span className="text-sm font-medium">95%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Delivery Speed</span>
-                    <span className="text-sm font-medium">92%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Customer Service</span>
-                    <span className="text-sm font-medium">96%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Value for Money</span>
-                    <span className="text-sm font-medium">88%</span>
+                    <span className="text-sm font-medium">4.8/5</span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Product Quality</span>
+                  <span className="text-sm font-medium">95%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Delivery Speed</span>
+                  <span className="text-sm font-medium">92%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Customer Service</span>
+                  <span className="text-sm font-medium">96%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Value for Money</span>
+                  <span className="text-sm font-medium">88%</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
         </TabsContent>
       </Tabs>
     </div>
