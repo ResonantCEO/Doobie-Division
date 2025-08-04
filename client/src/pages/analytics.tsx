@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -827,48 +828,72 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          {/* Customer Feedback */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Customer Feedback & Satisfaction</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Overall Satisfaction</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex text-yellow-400">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className="h-4 w-4 fill-current" />
-                      ))}
+          {/* Market Analysis */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Market Share Analysis</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[
+                    { company: "Your Company", share: "28%", change: "+3%" },
+                    { company: "Competitor A", share: "25%", change: "-1%" },
+                    { company: "Competitor B", share: "22%", change: "+1%" },
+                    { company: "Competitor C", share: "15%", change: "-2%" },
+                    { company: "Others", share: "10%", change: "-1%" }
+                  ].map((item, i) => (
+                    <div key={i} className="flex justify-between items-center">
+                      <span className="text-sm font-medium">{item.company}</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm">{item.share}</span>
+                        <Badge variant={item.change.startsWith('+') ? "secondary" : "outline"}>
+                          {item.change}
+                        </Badge>
+                      </div>
                     </div>
-                    <span className="text-sm font-medium">4.8/5</span>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Customer Feedback & Satisfaction</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Overall Satisfaction</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex text-yellow-400">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className="h-4 w-4 fill-current" />
+                        ))}
+                      </div>
+                      <span className="text-sm font-medium">4.8/5</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Product Quality</span>
+                    <span className="text-sm font-medium">95%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Delivery Speed</span>
+                    <span className="text-sm font-medium">92%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Customer Service</span>
+                    <span className="text-sm font-medium">96%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Value for Money</span>
+                    <span className="text-sm font-medium">88%</span>
                   </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Product Quality</span>
-                  <span className="text-sm font-medium">95%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Delivery Speed</span>
-                  <span className="text-sm font-medium">92%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Customer Service</span>
-                  <span className="text-sm font-medium">96%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Value for Money</span>
-                  <span className="text-sm font-medium">88%</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
