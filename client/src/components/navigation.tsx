@@ -35,7 +35,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   const { toast } = useToast();
 
   // Fetch notifications
-  const { data: notifications = [] } = useQuery({
+  const { data: notifications = [] } = useQuery<any[]>({
     queryKey: ["/api/notifications"],
   });
 
@@ -83,30 +83,35 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <Link href="/dashboard">
-                  <h1 className="text-2xl font-bold text-primary cursor-pointer">Doobie Division!</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold text-primary cursor-pointer">Doobie Division!</h1>
                 </Link>
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               {/* Search */}
-              <div className="relative hidden md:block">
+              <div className="relative hidden lg:block">
                 <Input
                   type="text"
                   placeholder="Search products..."
-                  className="w-64 pl-10"
+                  className="w-48 xl:w-64 pl-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               </div>
 
+              {/* Mobile Search Button */}
+              <Button variant="ghost" size="sm" className="lg:hidden">
+                <Search className="h-5 w-5" />
+              </Button>
+
               {/* Cart */}
               <CartDrawer>
                 <Button variant="ghost" size="sm" className="relative">
-                  <ShoppingCart className="h-5 w-5" />
+                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
                   {cartState.itemCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary">
+                    <Badge className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center p-0 text-xs bg-primary">
                       {cartState.itemCount}
                     </Badge>
                   )}
@@ -117,9 +122,9 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="relative">
-                    <Bell className="h-5 w-5" />
+                    <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
                     {unreadCount > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive">
+                      <Badge className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center p-0 text-xs bg-destructive">
                         {unreadCount}
                       </Badge>
                     )}
@@ -159,30 +164,30 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
               </DropdownMenu>
 
               {/* Theme Toggle */}
-              <div className="flex items-center space-x-2">
-                <Sun className="h-4 w-4" />
+              <div className="flex items-center space-x-1 sm:space-x-2">
+                <Sun className="h-3 w-3 sm:h-4 sm:w-4" />
                 <Switch
                   checked={theme === "dark"}
                   onCheckedChange={toggleTheme}
-                  className="data-[state=checked]:bg-primary"
+                  className="data-[state=checked]:bg-primary scale-75 sm:scale-100"
                 />
-                <Moon className="h-4 w-4" />
+                <Moon className="h-3 w-3 sm:h-4 sm:w-4" />
               </div>
 
               {/* User Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center space-x-2">
-                    <Avatar className="h-8 w-8">
+                  <Button variant="ghost" className="flex items-center space-x-1 sm:space-x-2 p-1 sm:p-2">
+                    <Avatar className="h-6 w-6 sm:h-8 sm:w-8">
                       <AvatarImage src={user.profileImageUrl || undefined} />
                       <AvatarFallback>
-                        {user.firstName?.[0]}{user.lastName?.[0]} || <User className="h-4 w-4" />
+                        {user.firstName?.[0]}{user.lastName?.[0]} || <User className="h-3 w-3 sm:h-4 sm:w-4" />
                       </AvatarFallback>
                     </Avatar>
-                    <span className="hidden md:block">
+                    <span className="hidden lg:block text-sm">
                       {user.firstName} {user.lastName}
                     </span>
-                    <ChevronDown className="h-4 w-4" />
+                    <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -206,21 +211,23 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
 
       {/* Tab Navigation */}
       <div className="bg-background border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="-mb-px flex space-x-8">
-            {visibleTabs.map((tab) => (
-              <Link key={tab.id} href={tab.path}>
-                <button
-                  className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                    currentTab === tab.id
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              </Link>
-            ))}
+        <div className="max-w-7xl mx-auto">
+          <nav className="-mb-px flex overflow-x-auto scrollbar-hide px-4 sm:px-6 lg:px-8">
+            <div className="flex space-x-4 sm:space-x-6 lg:space-x-8 min-w-max">
+              {visibleTabs.map((tab) => (
+                <Link key={tab.id} href={tab.path}>
+                  <button
+                    className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors flex-shrink-0 ${
+                      currentTab === tab.id
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                </Link>
+              ))}
+            </div>
           </nav>
         </div>
       </div>
