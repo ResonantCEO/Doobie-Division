@@ -78,23 +78,26 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
     <>
       {/* Main Navigation */}
       <nav className="bg-background border-b border-border sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
+          <div className="flex justify-between items-center h-14 sm:h-16">
+            <div className="flex items-center min-w-0">
               <div className="flex-shrink-0">
                 <Link href="/dashboard">
-                  <h1 className="text-xl sm:text-2xl font-bold text-primary cursor-pointer">Doobie Division!</h1>
+                  <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-primary cursor-pointer truncate">
+                    <span className="hidden sm:inline">Doobie Division!</span>
+                    <span className="sm:hidden">DD!</span>
+                  </h1>
                 </Link>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2 sm:space-x-4">
+            <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-shrink-0">
               {/* Search */}
-              <div className="relative hidden lg:block">
+              <div className="relative hidden xl:block">
                 <Input
                   type="text"
                   placeholder="Search products..."
-                  className="w-48 xl:w-64 pl-10"
+                  className="w-40 pl-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -102,16 +105,16 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
               </div>
 
               {/* Mobile Search Button */}
-              <Button variant="ghost" size="sm" className="lg:hidden">
-                <Search className="h-5 w-5" />
+              <Button variant="ghost" size="sm" className="xl:hidden p-1">
+                <Search className="h-4 w-4" />
               </Button>
 
               {/* Cart */}
               <CartDrawer>
-                <Button variant="ghost" size="sm" className="relative">
-                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Button variant="ghost" size="sm" className="relative p-1">
+                  <ShoppingCart className="h-4 w-4" />
                   {cartState.itemCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center p-0 text-xs bg-primary">
+                    <Badge className="absolute -top-0.5 -right-0.5 h-4 w-4 flex items-center justify-center p-0 text-xs bg-primary">
                       {cartState.itemCount}
                     </Badge>
                   )}
@@ -121,10 +124,10 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
               {/* Notifications */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="relative">
-                    <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <Button variant="ghost" size="sm" className="relative p-1">
+                    <Bell className="h-4 w-4" />
                     {unreadCount > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center p-0 text-xs bg-destructive">
+                      <Badge className="absolute -top-0.5 -right-0.5 h-4 w-4 flex items-center justify-center p-0 text-xs bg-destructive">
                         {unreadCount}
                       </Badge>
                     )}
@@ -164,30 +167,30 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
               </DropdownMenu>
 
               {/* Theme Toggle */}
-              <div className="flex items-center space-x-1 sm:space-x-2">
-                <Sun className="h-3 w-3 sm:h-4 sm:w-4" />
+              <div className="hidden sm:flex items-center space-x-1">
+                <Sun className="h-3 w-3" />
                 <Switch
                   checked={theme === "dark"}
                   onCheckedChange={toggleTheme}
-                  className="data-[state=checked]:bg-primary scale-75 sm:scale-100"
+                  className="data-[state=checked]:bg-primary scale-75"
                 />
-                <Moon className="h-3 w-3 sm:h-4 sm:w-4" />
+                <Moon className="h-3 w-3" />
               </div>
 
               {/* User Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center space-x-1 sm:space-x-2 p-1 sm:p-2">
-                    <Avatar className="h-6 w-6 sm:h-8 sm:w-8">
+                  <Button variant="ghost" className="flex items-center space-x-1 p-1">
+                    <Avatar className="h-6 w-6">
                       <AvatarImage src={user.profileImageUrl || undefined} />
                       <AvatarFallback>
-                        {user.firstName?.[0]}{user.lastName?.[0]} || <User className="h-3 w-3 sm:h-4 sm:w-4" />
+                        {user.firstName?.[0]}{user.lastName?.[0]} || <User className="h-3 w-3" />
                       </AvatarFallback>
                     </Avatar>
-                    <span className="hidden lg:block text-sm">
+                    <span className="hidden xl:block text-sm">
                       {user.firstName} {user.lastName}
                     </span>
-                    <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <ChevronDown className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -212,12 +215,12 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
       {/* Tab Navigation */}
       <div className="bg-background border-b border-border">
         <div className="max-w-7xl mx-auto">
-          <nav className="-mb-px flex overflow-x-auto scrollbar-hide px-4 sm:px-6 lg:px-8">
-            <div className="flex space-x-4 sm:space-x-6 lg:space-x-8 min-w-max">
+          <nav className="-mb-px flex overflow-x-auto scrollbar-hide px-2 sm:px-4 lg:px-8">
+            <div className="flex space-x-2 sm:space-x-4 lg:space-x-6 min-w-max">
               {visibleTabs.map((tab) => (
                 <Link key={tab.id} href={tab.path}>
                   <button
-                    className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors flex-shrink-0 ${
+                    className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-xs transition-colors flex-shrink-0 ${
                       currentTab === tab.id
                         ? "border-primary text-primary"
                         : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
