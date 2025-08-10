@@ -205,40 +205,172 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
       {selectedProducts.size > 0 && (
-        <div className="bg-blue-50 border-b border-blue-200 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-800">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800 p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <span className="text-sm font-medium text-blue-800 dark:text-blue-300">
               {selectedProducts.size} products selected
             </span>
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               <Button 
                 size="sm" 
                 variant="outline"
                 onClick={() => handleBulkAction("Export")}
               >
-                Export Selected
+                Export
               </Button>
               <Button 
                 size="sm" 
                 variant="outline"
                 onClick={() => handleBulkAction("Update Stock")}
               >
-                Bulk Stock Update
+                <span className="hidden sm:inline">Bulk Stock Update</span>
+                <span className="sm:hidden">Update Stock</span>
               </Button>
               <Button 
                 size="sm" 
                 variant="outline"
                 onClick={() => setSelectedProducts(new Set())}
               >
-                Clear Selection
+                Clear
               </Button>
             </div>
           </div>
         </div>
       )}
-      <div className="overflow-x-auto">
+
+      {/* Mobile Card View */}
+      <div className="md:hidden">
+        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+          {sortedProducts.map((product) => (
+            <div key={product.id} className={`p-4 ${selectedProducts.has(product.id) ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}>
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  checked={selectedProducts.has(product.id)}
+                  onChange={() => handleSelectProduct(product.id)}
+                  className="mt-1 rounded border-gray-300"
+                />
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={product.imageUrl || undefined} />
+                  <AvatarFallback>{product.name.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {product.name}
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {product.description}
+                      </p>
+                      <div className="flex items-center mt-1 space-x-4 text-xs text-gray-500 dark:text-gray-400">
+                        <span>SKU: {product.sku}</span>
+                        <span>Category: {product.category?.name || "—"}</span>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {onEditProduct && (
+                          <DropdownMenuItem onClick={() => onEditProduct(product)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Product
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => onStockAdjustment(product)}>
+                          <Package className="h-4 w-4 mr-2" />
+                          Adjust Stock
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewQRCode(product)}>
+                          <QrCode className="h-4 w-4 mr-2" />
+                          View QR Code
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="text-sm">
+                      {product.sellingMethod === "weight" ? (
+                        <div className="space-y-1">
+                          {product.pricePerGram && (
+                            <div className="font-medium text-gray-900 dark:text-gray-100">
+                              {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                                <span>
+                                  <span className="line-through text-gray-500">${product.pricePerGram}/g</span>
+                                  <span className="ml-2 text-green-600">
+                                    ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
+                                  </span>
+                                </span>
+                              ) : (
+                                <span>${product.pricePerGram}/g</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="font-medium text-gray-900 dark:text-gray-100">
+                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                            <span>
+                              <span className="line-through text-gray-500">${Number(product.price || 0).toFixed(2)}</span>
+                              <span className="ml-2 text-green-600">
+                                ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
+                              </span>
+                            </span>
+                          ) : (
+                            `$${Number(product.price || 0).toFixed(2)}`
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <div className="text-right">
+                        <div className={`text-sm font-medium ${
+                          product.stock === 0 ? "text-red-600" : 
+                          product.stock <= product.minStockThreshold ? "text-orange-600" : 
+                          "text-gray-900 dark:text-gray-100"
+                        }`}>
+                          {product.stock} units
+                        </div>
+                        <div className="w-16 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mt-1">
+                          <div 
+                            className={`h-1 rounded-full transition-all ${
+                              product.stock === 0 ? "bg-red-500" :
+                              product.stock <= product.minStockThreshold ? "bg-orange-500" :
+                              "bg-green-500"
+                            }`}
+                            style={{ 
+                              width: `${Math.min((product.stock / (product.minStockThreshold * 2)) * 100, 100)}%` 
+                            }}
+                          />
+                        </div>
+                      </div>
+                      {getStockBadge(product)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>

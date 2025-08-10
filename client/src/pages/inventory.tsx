@@ -180,20 +180,24 @@ export default function InventoryPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-foreground">Inventory Management</h2>
-        <div className="flex space-x-3">
-          <Button onClick={() => setShowCategoryModal(true)} variant="outline">
-            <Settings className="h-4 w-4 mr-2" />
-            Manage Categories
-          </Button>
-          <Button onClick={handleGenerateQR} variant="outline">
-            <QrCode className="h-4 w-4 mr-2" />
-            Generate QR Codes
-          </Button>
-          <Button onClick={() => setShowAddModal(true)}>
+      <div className="space-y-4">
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground">Inventory Management</h2>
+        
+        {/* Mobile-first button layout */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-3">
+          <Button onClick={() => setShowAddModal(true)} className="flex-1 sm:flex-initial">
             <Plus className="h-4 w-4 mr-2" />
             Add Product
+          </Button>
+          <Button onClick={() => setShowCategoryModal(true)} variant="outline" className="flex-1 sm:flex-initial">
+            <Settings className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Manage Categories</span>
+            <span className="sm:hidden">Categories</span>
+          </Button>
+          <Button onClick={handleGenerateQR} variant="outline" className="flex-1 sm:flex-initial">
+            <QrCode className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Generate QR Codes</span>
+            <span className="sm:hidden">QR Codes</span>
           </Button>
         </div>
       </div>
@@ -218,9 +222,9 @@ export default function InventoryPage() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Category</label>
               <Select value={selectedCategory || "all"} onValueChange={handleCategoryChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Categories" />
@@ -237,7 +241,7 @@ export default function InventoryPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Stock Status</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stock Status</label>
               <Select value={stockFilter || "all"} onValueChange={handleStockFilterChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Stock Levels" />
@@ -251,8 +255,8 @@ export default function InventoryPage() {
               </Select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+            <div className="sm:col-span-2 lg:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search</label>
               <Input
                 type="text"
                 placeholder="Search products..."
@@ -261,8 +265,8 @@ export default function InventoryPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">&nbsp;</label>
+            <div className="sm:col-span-2 lg:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 sm:invisible">Reset</label>
               <Button 
                 variant="outline" 
                 className="w-full"
