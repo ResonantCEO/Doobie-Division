@@ -142,17 +142,23 @@ export default function AnalyticsPage() {
     );
   }
 
-  const MetricCard = ({ title, value, change, icon: Icon, color = "green" }) => (
+  const MetricCard = ({ title, value, change, icon: Icon, color = "green" }: {
+    title: string;
+    value: string | number;
+    change: string;
+    icon: any;
+    color?: string;
+  }) => (
     <Card>
-      <CardContent className="p-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="flex items-center">
-          <div className={`p-3 rounded-full bg-${color}-100 text-${color}-600`}>
-            <Icon className="h-6 w-6" />
+          <div className={`p-2 sm:p-3 rounded-full bg-${color}-100 dark:bg-${color}-900/20 text-${color}-600 dark:text-${color}-400`}>
+            <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{title}</p>
-            <p className="text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
-            <p className={`text-sm text-${color}-600`}>{change}</p>
+          <div className="ml-3 sm:ml-4">
+            <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">{title}</p>
+            <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
+            <p className={`text-xs sm:text-sm text-${color}-600 dark:text-${color}-400`}>{change}</p>
           </div>
         </div>
       </CardContent>
@@ -162,11 +168,13 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Analytics & Reports</h2>
-        <div className="flex space-x-3">
+      <div className="space-y-4">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Analytics & Reports</h2>
+        
+        {/* Mobile-first filters and actions */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-3 sm:items-center">
           <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -176,26 +184,28 @@ export default function AnalyticsPage() {
               <SelectItem value="365">Last year</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={handleExportReport}>
+          
+          <Button onClick={handleExportReport} className="sm:ml-auto">
             <Download className="h-4 w-4 mr-2" />
-            Export Report
+            <span className="hidden sm:inline">Export Report</span>
+            <span className="sm:hidden">Export</span>
           </Button>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="sales">Sales</TabsTrigger>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-          <TabsTrigger value="marketing">Marketing</TabsTrigger>
-          <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          <TabsTrigger value="operations">Operations</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-0 h-auto p-1">
+          <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+          <TabsTrigger value="sales" className="text-xs sm:text-sm">Sales</TabsTrigger>
+          <TabsTrigger value="customers" className="text-xs sm:text-sm">Customers</TabsTrigger>
+          <TabsTrigger value="marketing" className="text-xs sm:text-sm">Marketing</TabsTrigger>
+          <TabsTrigger value="inventory" className="text-xs sm:text-sm">Inventory</TabsTrigger>
+          <TabsTrigger value="operations" className="text-xs sm:text-sm">Operations</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
           {/* Key Metrics Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <MetricCard
               title="Total Revenue"
               value={`$${metrics?.totalSales ? Number(metrics.totalSales).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}`}
@@ -227,7 +237,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Quick Overview Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -273,14 +283,14 @@ export default function AnalyticsPage() {
 
         <TabsContent value="sales" className="space-y-6">
           {/* Sales Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <MetricCard title="Net Profit" value="$8,250" change="+18.2%" icon={DollarSign} color="green" />
             <MetricCard title="Sales Growth Rate" value="12.5%" change="+2.1%" icon={TrendingUp} color="blue" />
             <MetricCard title="Return Rate" value="2.3%" change="-0.5%" icon={RefreshCw} color="red" />
             <MetricCard title="Abandoned Cart Rate" value="68.2%" change="-3.1%" icon={ShoppingCart} color="orange" />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
             {/* Sales Trends */}
             <Card>
               <CardHeader>
@@ -380,7 +390,7 @@ export default function AnalyticsPage() {
 
         <TabsContent value="customers" className="space-y-6">
           {/* Customer Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <MetricCard title="Customer Acquisition Cost" value="$45.20" change="-8.3%" icon={UserPlus} color="blue" />
             <MetricCard title="Customer Retention Rate" value="78.5%" change="+5.2%" icon={Heart} color="green" />
             <MetricCard title="Churn Rate" value="21.5%" change="-5.2%" icon={TrendingUp} color="red" />
@@ -510,7 +520,7 @@ export default function AnalyticsPage() {
 
         <TabsContent value="marketing" className="space-y-6">
           {/* Marketing Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <MetricCard title="Website Traffic" value="12,456" change="+22.1%" icon={Globe} color="blue" />
             <MetricCard title="Conversion Rate" value="3.2%" change="+0.8%" icon={Target} color="green" />
             <MetricCard title="Email Open Rate" value="24.5%" change="+1.2%" icon={Mail} color="purple" />
@@ -610,7 +620,7 @@ export default function AnalyticsPage() {
 
         <TabsContent value="inventory" className="space-y-6">
           {/* Inventory Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <MetricCard title="Stock Turnover Rate" value="3.2x" change="+0.4x" icon={RefreshCw} color="blue" />
             <MetricCard title="Inventory Value" value="$45,280" change="+8.2%" icon={Package} color="green" />
             <MetricCard title="Low Stock Items" value="12" change="-3" icon={AlertTriangle} color="orange" />
