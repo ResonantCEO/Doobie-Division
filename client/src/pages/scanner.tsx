@@ -135,14 +135,31 @@ export default function ScannerPage() {
       }
 
       if (videoRef.current) {
+        console.log('Setting video source:', stream);
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         setIsScanning(true);
+        
+        // Add loaded event listeners
+        videoRef.current.addEventListener('loadeddata', () => {
+          console.log('Video data loaded');
+        });
+        
+        videoRef.current.addEventListener('canplay', () => {
+          console.log('Video can play');
+        });
 
         videoRef.current.onloadedmetadata = () => {
           console.log('Video metadata loaded, dimensions:', videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight);
+          // Force video to play
+          if (videoRef.current) {
+            videoRef.current.play().catch(e => console.warn('Play failed:', e));
+          }
           detectQRCode();
         };
+
+        // Force play immediately
+        videoRef.current.play().catch(e => console.warn('Initial play failed:', e));
 
         videoRef.current.onerror = (error) => {
           console.error('Video error:', error);
@@ -580,8 +597,13 @@ export default function ScannerPage() {
                     autoPlay
                     playsInline
                     muted
+                    controls={false}
                     className={`w-full h-64 sm:h-80 object-cover rounded-lg border-2 ${getScanningStatusColor()}`}
-                    style={{ minHeight: '256px' }}
+                    style={{ 
+                      minHeight: '256px',
+                      background: '#000',
+                      display: 'block'
+                    }}
                   />
                   <canvas ref={canvasRef} className="hidden" />
 
@@ -614,9 +636,30 @@ export default function ScannerPage() {
                   </div>
                 </div>
 
-                <Button onClick={stopScanning} variant="outline">
-                  Stop Scanner
-                </Button>
+                <div className="flex gap-2 justify-center">
+                  <Button onClick={stopScanning} variant="outline">
+                    Stop Scanner
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      if (videoRef.current) {
+                        console.log('Video element:', {
+                          srcObject: videoRef.current.srcObject,
+                          readyState: videoRef.current.readyState,
+                          videoWidth: videoRef.current.videoWidth,
+                          videoHeight: videoRef.current.videoHeight,
+                          paused: videoRef.current.paused,
+                          ended: videoRef.current.ended,
+                          currentTime: videoRef.current.currentTime
+                        });
+                      }
+                    }}
+                    variant="ghost" 
+                    size="sm"
+                  >
+                    Debug
+                  </Button>
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Position QR code in the camera view within the dashed box
                 </p>
