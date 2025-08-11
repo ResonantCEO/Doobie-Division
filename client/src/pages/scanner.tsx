@@ -158,13 +158,13 @@ export default function ScannerPage() {
         console.log('Setting video source:', stream);
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
+        setIsScanning(true); // Set this immediately so video element becomes visible
         
         // Set up event listeners
         const video = videoRef.current;
         
         const onLoadedData = () => {
           console.log('Video data loaded');
-          setIsScanning(true);
           setScanningStatus("scanning");
         };
         
