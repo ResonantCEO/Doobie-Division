@@ -154,29 +154,52 @@ export default function ScannerPage() {
         throw lastError || new Error("Unable to access camera. Please try manual SKU input instead.");
       }
 
-      // Immediately set scanning state and status when stream is obtained
-      setIsScanning(true);
-      setScanningStatus("scanning");
+      // Store the stream reference immediately
+      streamRef.current = stream;
+      
+      // Wait for video element to be ready before setting stream
+      setTimeout(() => {
+        if (videoRef.current && streamRef.current) {
+          console.log('Setting video source:', streamRef.current);
+          console.log('Video element before setting stream:', {
+            element: videoRef.current,
+            readyState: videoRef.current.readyState,
+            srcObject: videoRef.current.srcObject
+          });
+          
+          // Set the stream on the video element
+          videoRef.current.srcObject = streamRef.current;
+          
+          console.log('Video element after setting stream:', {
+            element: videoRef.current,
+            readyState: videoRef.current.readyState,
+            srcObject: videoRef.current.srcObject,
+            streamActive: streamRef.current.active,
+            streamTracks: streamRef.current.getTracks().length
+          });
+          
+          // Set scanning state after stream is assigned
+          setIsScanning(true);
+          setScanningStatus("scanning");
+          
+          // Force video to play after a short delay
+          setTimeout(() => {
+            if (videoRef.current && videoRef.current.srcObject) {
+              console.log('Force playing video...');
+              videoRef.current.play().then(() => {
+                console.log('Force play successful');
+                setTimeout(() => {
+                  detectQRCode();
+                }, 300);
+              }).catch(e => {
+                console.warn('Force play failed:', e);
+              });
+            }
+          }, 200);
+        }
+      }, 100);
 
       if (videoRef.current) {
-        console.log('Setting video source:', stream);
-        console.log('Video element before setting stream:', {
-          element: videoRef.current,
-          readyState: videoRef.current.readyState,
-          srcObject: videoRef.current.srcObject
-        });
-        
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-        
-        console.log('Video element after setting stream:', {
-          element: videoRef.current,
-          readyState: videoRef.current.readyState,
-          srcObject: videoRef.current.srcObject,
-          streamActive: stream.active,
-          streamTracks: stream.getTracks().length
-        });
-        
         // Set up event listeners
         const video = videoRef.current;
         
@@ -198,7 +221,7 @@ export default function ScannerPage() {
           });
           
           // Start playing the video
-          if (video) {
+          if (video && video.srcObject) {
             video.play().then(() => {
               console.log('Video playing successfully');
               console.log('Video after play:', {
@@ -217,6 +240,8 @@ export default function ScannerPage() {
               setScanningStatus("error");
               setIsScanning(false);
             });
+          } else {
+            console.warn('Video metadata loaded but no srcObject available');
           }
         };
 
