@@ -322,24 +322,27 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
       {/* Tab Navigation */}
       <div className="bg-background border-b border-border">
         <div className="max-w-7xl mx-auto">
-          <nav className="-mb-px flex overflow-x-auto scrollbar-hide px-2 sm:px-4 lg:px-8">
-            <div className="flex space-x-2 sm:space-x-4 lg:space-x-6 min-w-max">
+          <nav className="-mb-px overflow-x-auto scrollbar-hide">
+            <div className="flex space-x-1 sm:space-x-2 lg:space-x-4 px-2 sm:px-4 lg:px-8 min-w-max">
               {visibleTabs.map((tab) => (
                 <Link key={tab.id} href={tab.path}>
                   <button
-                    className={`whitespace-nowrap py-2 px-2 sm:px-3 border-b-2 font-medium text-xs sm:text-sm transition-colors flex-shrink-0 ${
+                    className={`whitespace-nowrap py-3 px-2 sm:px-4 lg:px-6 border-b-2 font-medium text-xs sm:text-sm transition-colors flex-shrink-0 min-w-fit touch-manipulation ${
                       currentTab === tab.id
-                        ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                        ? "border-primary text-primary bg-primary/5"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border hover:bg-muted/50"
                     }`}
                   >
-                    <span className="hidden sm:inline">{tab.label}</span>
-                    <span className="sm:hidden">
-                      {tab.label === "Inventory Management" ? "Inventory" : 
+                    {/* Mobile: Show shortened labels */}
+                    <span className="block sm:hidden text-xs">
+                      {tab.label === "Inventory Management" ? "Stock" : 
                        tab.label === "User Management" ? "Users" :
                        tab.label === "Analytics" ? "Stats" :
+                       tab.label === "Storefront" ? "Shop" :
                        tab.label}
                     </span>
+                    {/* Desktop: Show full labels */}
+                    <span className="hidden sm:block">{tab.label}</span>
                   </button>
                 </Link>
               ))}
