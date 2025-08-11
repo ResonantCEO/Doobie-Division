@@ -175,6 +175,18 @@ export default function ScannerPage() {
           });
           
           try {
+            // Ensure all tracks are enabled
+            const tracks = streamRef.current.getTracks();
+            tracks.forEach(track => {
+              track.enabled = true;
+              console.log('Enabled track:', {
+                kind: track.kind,
+                enabled: track.enabled,
+                readyState: track.readyState,
+                muted: track.muted
+              });
+            });
+            
             // Set the stream on the video element
             video.srcObject = streamRef.current;
             
@@ -732,20 +744,20 @@ export default function ScannerPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="relative bg-gray-900 rounded-lg overflow-hidden">
+                <div className="relative rounded-lg overflow-hidden">
                   <video
                     ref={videoRef}
                     autoPlay
                     playsInline
                     muted
-                    controls={false}
-                    className={`w-full h-64 sm:h-80 rounded-lg border-2 ${getScanningStatusColor()}`}
+                    controls={true}
+                    width="640"
+                    height="480"
+                    className="w-full border-2 border-green-500 rounded-lg"
                     style={{ 
-                      minHeight: '256px',
-                      background: '#1f2937',
                       display: 'block',
-                      maxWidth: '100%',
-                      objectFit: 'cover'
+                      minHeight: '300px',
+                      maxHeight: '480px'
                     }}
                     onLoadedData={(e) => {
                       console.log('Video loadeddata event fired');
