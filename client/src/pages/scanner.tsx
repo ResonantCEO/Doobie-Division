@@ -102,7 +102,20 @@ export default function ScannerPage() {
 
       // Check if camera is available first
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera not supported on this device");
+        throw new Error("Camera not supported on this device. Please use manual SKU input instead.");
+      }
+
+      // Check for permissions first
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
+        console.log('Camera permission status:', permissionStatus.state);
+        
+        if (permissionStatus.state === 'denied') {
+          throw new Error("Camera permission denied. Please enable camera access in your browser settings and reload the page.");
+        }
+      } catch (permError) {
+        console.warn('Permission check failed:', permError);
+        // Continue anyway as some browsers don't support permission query
       }
 
       // Try different camera configurations
@@ -122,44 +135,73 @@ export default function ScannerPage() {
 
       for (const constraint of constraints) {
         try {
+          console.log('Trying camera constraint:', constraint);
           stream = await navigator.mediaDevices.getUserMedia(constraint);
+          console.log('Camera stream obtained successfully');
           break;
         } catch (err: any) {
           lastError = err;
           console.warn('Camera constraint failed:', constraint, err.message);
+          
+          // Check for specific permission errors
+          if (err.name === 'NotAllowedError' || err.message.includes('Permission denied')) {
+            throw new Error("Camera permission denied. Please click 'Allow' when prompted or enable camera access in your browser settings.");
+          }
         }
       }
 
       if (!stream) {
-        throw lastError || new Error("Unable to access camera");
+        throw lastError || new Error("Unable to access camera. Please try manual SKU input instead.");
       }
 
       if (videoRef.current) {
         console.log('Setting video source:', stream);
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
-        setIsScanning(true);
         
-        // Add loaded event listeners
-        videoRef.current.addEventListener('loadeddata', () => {
+        // Set up event listeners
+        const video = videoRef.current;
+        
+        const onLoadedData = () => {
           console.log('Video data loaded');
-        });
+          setIsScanning(true);
+          setScanningStatus("scanning");
+        };
         
-        videoRef.current.addEventListener('canplay', () => {
+        const onCanPlay = () => {
           console.log('Video can play');
-        });
-
-        videoRef.current.onloadedmetadata = () => {
-          console.log('Video metadata loaded, dimensions:', videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight);
-          // Force video to play
-          if (videoRef.current) {
-            videoRef.current.play().catch(e => console.warn('Play failed:', e));
-          }
-          detectQRCode();
         };
 
-        // Force play immediately
-        videoRef.current.play().catch(e => console.warn('Initial play failed:', e));
+        const onLoadedMetadata = () => {
+          console.log('Video metadata loaded, dimensions:', video?.videoWidth, 'x', video?.videoHeight);
+          // Start playing the video
+          if (video) {
+            video.play().then(() => {
+              console.log('Video playing successfully');
+              // Small delay before starting QR detection to ensure video is stable
+              setTimeout(() => {
+                detectQRCode();
+              }, 500);
+            }).catch(e => {
+              console.error('Play failed:', e);
+              setScanningError("Failed to start video playback. Please try again.");
+              setScanningStatus("error");
+              setIsScanning(false);
+            });
+          }
+        };
+
+        video.addEventListener('loadeddata', onLoadedData);
+        video.addEventListener('canplay', onCanPlay);
+        video.addEventListener('loadedmetadata', onLoadedMetadata);
+
+        // Try to play immediately (this might fail but that's ok)
+        try {
+          await video.play();
+          console.log('Initial play successful');
+        } catch (e) {
+          console.log('Initial play failed, waiting for metadata:', e);
+        }
 
         videoRef.current.onerror = (error) => {
           console.error('Video error:', error);
@@ -580,14 +622,26 @@ export default function ScannerPage() {
           <div className="text-center">
             {!isScanning ? (
               <div className="space-y-4">
-                <Button onClick={startScanning} size="lg" className="w-full sm:w-auto">
+                <Button 
+                  onClick={startScanning} 
+                  size="lg" 
+                  className="w-full sm:w-auto"
+                  disabled={scanningStatus === "scanning"}
+                >
                   <Camera className="h-5 w-5 mr-2" />
-                  Start Camera Scanner
+                  {scanningStatus === "scanning" ? "Initializing Camera..." : "Start Camera Scanner"}
                 </Button>
                 <div className="text-xs text-muted-foreground space-y-1">
-                  <p>📸 Make sure to allow camera permission when prompted</p>
+                  <p>📸 Click "Allow" when your browser asks for camera permission</p>
+                  <p>🔒 If permission was denied, enable camera in browser settings and reload</p>
                   <p>💡 Or use manual SKU lookup below if camera doesn't work</p>
                 </div>
+                {scanningStatus === "scanning" && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+                    Requesting camera permission...
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
@@ -598,11 +652,14 @@ export default function ScannerPage() {
                     playsInline
                     muted
                     controls={false}
+                    width="640"
+                    height="480"
                     className={`w-full h-64 sm:h-80 object-cover rounded-lg border-2 ${getScanningStatusColor()}`}
                     style={{ 
                       minHeight: '256px',
                       background: '#000',
-                      display: 'block'
+                      display: 'block',
+                      maxWidth: '100%'
                     }}
                   />
                   <canvas ref={canvasRef} className="hidden" />
