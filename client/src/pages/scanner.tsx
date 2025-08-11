@@ -100,13 +100,39 @@ export default function ScannerPage() {
       setScanningError("");
       setScanningStatus("scanning");
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+      // Check if camera is available first
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera not supported on this device");
+      }
+
+      // Try different camera configurations
+      const constraints = [
+        // Primary: back camera with high quality
+        { video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+        // Fallback 1: back camera with lower quality
+        { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } },
+        // Fallback 2: any camera
+        { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
+        // Fallback 3: basic video
+        { video: true }
+      ];
+
+      let stream = null;
+      let lastError = null;
+
+      for (const constraint of constraints) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraint);
+          break;
+        } catch (err: any) {
+          lastError = err;
+          console.warn('Camera constraint failed:', constraint, err.message);
         }
-      });
+      }
+
+      if (!stream) {
+        throw lastError || new Error("Unable to access camera");
+      }
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -118,7 +144,6 @@ export default function ScannerPage() {
           detectQRCode();
         };
 
-        // Add error handler for video
         videoRef.current.onerror = (error) => {
           console.error('Video error:', error);
           setScanningError("Camera error occurred. Please try again.");
@@ -128,9 +153,17 @@ export default function ScannerPage() {
       }
     } catch (error: any) {
       console.error('Camera access error:', error);
-      const errorMessage = error.name === 'NotAllowedError' ? 
-        "Camera permission denied. Please allow camera access and try again." :
-        "Unable to access camera. Please check your camera permissions.";
+      let errorMessage = "Unable to access camera.";
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage = "Camera permission denied. Please allow camera access in your browser settings and refresh the page.";
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = "No camera found on this device.";
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = "Camera is being used by another application.";
+      } else if (error.name === 'OverconstrainedError') {
+        errorMessage = "Camera constraints not supported.";
+      }
       
       setScanningError(errorMessage);
       setScanningStatus("error");
@@ -534,9 +567,10 @@ export default function ScannerPage() {
                   <Camera className="h-5 w-5 mr-2" />
                   Start Camera Scanner
                 </Button>
-                <p className="text-sm text-muted-foreground">
-                  Or use manual SKU lookup below
-                </p>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>📸 Make sure to allow camera permission when prompted</p>
+                  <p>💡 Or use manual SKU lookup below if camera doesn't work</p>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
@@ -590,11 +624,20 @@ export default function ScannerPage() {
             )}
           </div>
 
-          {/* Error Alert */}
+          {/* Error Alert with Help */}
           {scanningError && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{scanningError}</AlertDescription>
+              <AlertDescription>
+                {scanningError}
+                <div className="mt-2 text-xs">
+                  <p><strong>To fix camera issues:</strong></p>
+                  <p>1. Click the camera icon in your browser's address bar</p>
+                  <p>2. Select "Allow" for camera permission</p>
+                  <p>3. Refresh the page and try again</p>
+                  <p>4. Or use manual SKU lookup below</p>
+                </div>
+              </AlertDescription>
             </Alert>
           )}
 
@@ -618,7 +661,7 @@ export default function ScannerPage() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Tip: You can also scan the QR codes printed from the inventory management page
+              💡 Use this if camera scanning isn't working or QR codes aren't available
             </p>
           </div>
         </CardContent>
