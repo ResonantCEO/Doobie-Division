@@ -594,23 +594,8 @@ export default function ScannerPage() {
         <p className="text-muted-foreground">Scan QR codes or enter SKUs to manage inventory and fulfill orders</p>
       </div>
 
-      {/* Mode Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="fulfillment" className="flex items-center gap-2">
-            <ShoppingCart className="h-4 w-4" />
-            Order Fulfillment
-          </TabsTrigger>
-          <TabsTrigger value="inventory" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Inventory Management
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="inventory" className="space-y-6">
-
-      {/* Scanner Section */}
-        <Card>
+      {/* Scanner Section - Available on both tabs */}
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Scan className="h-5 w-5" />
@@ -766,6 +751,21 @@ export default function ScannerPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Mode Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="fulfillment" className="flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4" />
+            Order Fulfillment
+          </TabsTrigger>
+          <TabsTrigger value="inventory" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Inventory Management
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="inventory" className="space-y-6">
 
       {/* Product Information */}
       {scannedProduct && (
