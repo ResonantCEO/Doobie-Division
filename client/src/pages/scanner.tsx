@@ -118,16 +118,11 @@ export default function ScannerPage() {
         // Continue anyway as some browsers don't support permission query
       }
 
-      // Try different camera configurations
+      // Try different camera configurations starting with basic
       const constraints = [
-        // Basic video first to ensure compatibility
-        { video: true },
-        // Fallback 1: simple settings
         { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
-        // Fallback 2: back camera with lower quality
         { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } },
-        // Primary: back camera with high quality
-        { video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } }
+        { video: true }
       ];
 
       let stream = null;
@@ -135,15 +130,10 @@ export default function ScannerPage() {
 
       for (const constraint of constraints) {
         try {
-          console.log('Trying camera constraint:', constraint);
           stream = await navigator.mediaDevices.getUserMedia(constraint);
-          console.log('Camera stream obtained successfully');
           break;
         } catch (err: any) {
           lastError = err;
-          console.warn('Camera constraint failed:', constraint, err.message);
-          
-          // Check for specific permission errors
           if (err.name === 'NotAllowedError' || err.message.includes('Permission denied')) {
             throw new Error("Camera permission denied. Please click 'Allow' when prompted or enable camera access in your browser settings.");
           }
@@ -154,176 +144,25 @@ export default function ScannerPage() {
         throw lastError || new Error("Unable to access camera. Please try manual SKU input instead.");
       }
 
-      // Store the stream reference immediately
       streamRef.current = stream;
-      
-      // Show the video element first to ensure it's mounted
       setIsScanning(true);
       setScanningStatus("scanning");
       
-      // Wait for React to render the video element, then assign stream
+      // Simple video setup
       setTimeout(() => {
         const video = videoRef.current;
         if (video && streamRef.current) {
-          console.log('Setting video source after render:', streamRef.current);
-          console.log('Video element before setting stream:', {
-            element: video,
-            readyState: video.readyState,
-            srcObject: video.srcObject,
-            videoWidth: video.videoWidth,
-            videoHeight: video.videoHeight
-          });
-          
-          try {
-            // Ensure all tracks are enabled
-            const tracks = streamRef.current.getTracks();
-            tracks.forEach(track => {
-              track.enabled = true;
-              console.log('Enabled track:', {
-                kind: track.kind,
-                enabled: track.enabled,
-                readyState: track.readyState,
-                muted: track.muted
-              });
-            });
-            
-            // Set the stream on the video element
-            video.srcObject = streamRef.current;
-            
-            console.log('Video element after setting stream:', {
-              element: video,
-              readyState: video.readyState,
-              srcObject: video.srcObject,
-              streamActive: streamRef.current.active,
-              streamTracks: streamRef.current.getTracks().length
-            });
-            
-            // Force play immediately with comprehensive debugging
-            video.play().then(() => {
-              console.log('Video play successful after srcObject assignment');
-              
-              // Log detailed video state after successful play
-              setTimeout(() => {
-                console.log('Video state after play:', {
-                  currentTime: video.currentTime,
-                  duration: video.duration,
-                  paused: video.paused,
-                  ended: video.ended,
-                  videoWidth: video.videoWidth,
-                  videoHeight: video.videoHeight,
-                  readyState: video.readyState,
-                  networkState: video.networkState,
-                  srcObject: video.srcObject,
-                  streamActive: streamRef.current?.active,
-                  streamTracks: streamRef.current?.getTracks().map(track => ({
-                    kind: track.kind,
-                    enabled: track.enabled,
-                    readyState: track.readyState
-                  }))
-                });
-                
-                detectQRCode();
-              }, 500);
-            }).catch(e => {
-              console.error('Video play failed after srcObject assignment:', e);
-            });
-            
-          } catch (error) {
-            console.error('Error setting srcObject:', error);
-            setScanningError("Failed to initialize video stream. Please try again.");
+          video.srcObject = streamRef.current;
+          video.play().then(() => {
+            setTimeout(detectQRCode, 100);
+          }).catch(e => {
+            setScanningError("Failed to start video. Please try again.");
             setScanningStatus("error");
-            setIsScanning(false);
-          }
-        } else {
-          console.error('Video element or stream not available after timeout');
-          setScanningError("Video element not ready. Please try again.");
-          setScanningStatus("error");
-          setIsScanning(false);
-        }
-      }, 200);
-
-      // Also set up the video element if it's already available
-      if (videoRef.current) {
-        const video = videoRef.current;
-        
-        const onLoadedData = () => {
-          console.log('Video data loaded');
-        };
-        
-        const onCanPlay = () => {
-          console.log('Video can play');
-        };
-
-        const onLoadedMetadata = () => {
-          console.log('Video metadata loaded, dimensions:', video?.videoWidth, 'x', video?.videoHeight);
-          console.log('Video element state:', {
-            srcObject: video?.srcObject,
-            readyState: video?.readyState,
-            paused: video?.paused,
-            currentTime: video?.currentTime
           });
-          
-          // Start playing the video
-          if (video && video.srcObject) {
-            video.play().then(() => {
-              console.log('Video playing successfully');
-              console.log('Video after play:', {
-                videoWidth: video.videoWidth,
-                videoHeight: video.videoHeight,
-                paused: video.paused,
-                currentTime: video.currentTime
-              });
-              // Small delay before starting QR detection to ensure video is stable
-              setTimeout(() => {
-                detectQRCode();
-              }, 500);
-            }).catch(e => {
-              console.error('Play failed:', e);
-              setScanningError("Failed to start video playback. Please try again.");
-              setScanningStatus("error");
-              setIsScanning(false);
-            });
-          } else {
-            console.warn('Video metadata loaded but no srcObject available');
-          }
-        };
-
-        video.addEventListener('loadeddata', onLoadedData);
-        video.addEventListener('canplay', onCanPlay);
-        video.addEventListener('loadedmetadata', onLoadedMetadata);
-
-        // Force autoplay and play the video immediately
-        video.autoplay = true;
-        video.muted = true;
-        video.playsInline = true;
-        
-        // Try to play immediately (this might fail but that's ok)
-        try {
-          const playPromise = video.play();
-          if (playPromise !== undefined) {
-            await playPromise;
-            console.log('Initial play successful');
-          }
-        } catch (e) {
-          console.log('Initial play failed, waiting for metadata:', e);
-          // Try to play again after a short delay
-          setTimeout(async () => {
-            try {
-              await video.play();
-              console.log('Delayed play successful');
-            } catch (retryError) {
-              console.error('Delayed play also failed:', retryError);
-            }
-          }, 500);
         }
+      }, 100);
 
-        videoRef.current.onerror = (error) => {
-          console.error('Video error:', error);
-          setScanningError("Camera error occurred. Please try again.");
-          setScanningStatus("error");
-          setIsScanning(false);
-        };
-      }
+
     } catch (error: any) {
       console.error('Camera access error:', error);
       let errorMessage = "Unable to access camera.";
@@ -749,33 +588,16 @@ export default function ScannerPage() {
                     autoPlay
                     playsInline
                     muted
-                    controls={false}
-                    width="640"
-                    height="480"
-                    className="w-full border-2 border-green-500 rounded-lg"
+                    className="w-full h-full object-cover rounded-lg"
                     style={{ 
-                      display: 'block',
+                      backgroundColor: '#000',
                       minHeight: '300px',
                       maxHeight: '480px'
                     }}
                   />
                   <canvas ref={canvasRef} className="hidden" />
                   
-                  {/* Camera issue overlay */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 bg-opacity-80 text-white p-4">
-                    <div className="text-center space-y-3">
-                      <div className="text-yellow-400 text-sm">
-                        ⚠️ Camera feed not displaying
-                      </div>
-                      <div className="text-xs text-gray-300 max-w-md">
-                        Camera permissions are granted and stream is active, but video display is not working. 
-                        This may be due to browser/device compatibility issues.
-                      </div>
-                      <div className="text-sm font-medium text-blue-400">
-                        Please use Manual SKU Lookup below
-                      </div>
-                    </div>
-                  </div>
+
 
                   {/* Scanning overlay */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
