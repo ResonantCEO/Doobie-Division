@@ -98,7 +98,7 @@ export default function ScannerPage() {
   const startScanning = async () => {
     try {
       setScanningError("");
-      setScanningStatus("scanning");
+      setScanningStatus("initializing");
 
       // Check if camera is available first
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -154,18 +154,20 @@ export default function ScannerPage() {
         throw lastError || new Error("Unable to access camera. Please try manual SKU input instead.");
       }
 
+      // Immediately set scanning state and status when stream is obtained
+      setIsScanning(true);
+      setScanningStatus("scanning");
+
       if (videoRef.current) {
         console.log('Setting video source:', stream);
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
-        setIsScanning(true); // Set this immediately so video element becomes visible
         
         // Set up event listeners
         const video = videoRef.current;
         
         const onLoadedData = () => {
           console.log('Video data loaded');
-          setScanningStatus("scanning");
         };
         
         const onCanPlay = () => {
@@ -611,17 +613,17 @@ export default function ScannerPage() {
                   onClick={startScanning} 
                   size="lg" 
                   className="w-full sm:w-auto"
-                  disabled={scanningStatus === "scanning"}
+                  disabled={scanningStatus === "initializing"}
                 >
                   <Camera className="h-5 w-5 mr-2" />
-                  {scanningStatus === "scanning" ? "Initializing Camera..." : "Start Camera Scanner"}
+                  {scanningStatus === "initializing" ? "Initializing Camera..." : "Start Camera Scanner"}
                 </Button>
                 <div className="text-xs text-muted-foreground space-y-1">
                   <p>📸 Click "Allow" when your browser asks for camera permission</p>
                   <p>🔒 If permission was denied, enable camera in browser settings and reload</p>
                   <p>💡 Or use manual SKU lookup below if camera doesn't work</p>
                 </div>
-                {scanningStatus === "scanning" && (
+                {scanningStatus === "initializing" && (
                   <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                     <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
                     Requesting camera permission...
