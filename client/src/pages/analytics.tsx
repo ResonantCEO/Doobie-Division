@@ -549,8 +549,28 @@ export default function AnalyticsPage() {
               <CardHeader>
                 <CardTitle>Traffic Sources & Conversions</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
+              <CardContent className="p-4 sm:p-6">
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-3">
+                  {marketingData.map((item, i) => (
+                    <div key={i} className="border rounded-lg p-3 space-y-2">
+                      <div className="font-medium text-sm">{item.channel}</div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>Visitors: {item.visitors}</div>
+                        <div>Conversions: {item.conversions}</div>
+                        <div>Cost: ${item.cost}</div>
+                        <div>
+                          <Badge variant={item.cost === 0 ? "secondary" : "default"} className="text-xs">
+                            {item.cost === 0 ? "∞" : `${((item.conversions * 89 - item.cost) / item.cost * 100).toFixed(0)}%`}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -615,20 +635,22 @@ export default function AnalyticsPage() {
             <CardHeader>
               <CardTitle>Seasonal Sales Trends</CardTitle>
             </CardHeader>
-            <CardContent>
-              <ChartContainer config={chartConfig} className="h-64">
-                <BarChart data={[
-                  { season: "Spring", sales: 18500, orders: 234 },
-                  { season: "Summer", sales: 24600, orders: 312 },
-                  { season: "Fall", sales: 21300, orders: 267 },
-                  { season: "Winter", sales: 19800, orders: 245 }
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="season" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="sales" fill="var(--color-sales)" />
-                </BarChart>
+            <CardContent className="p-4 sm:p-6">
+              <ChartContainer config={chartConfig} className="h-48 sm:h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={[
+                    { season: "Spring", sales: 18500, orders: 234 },
+                    { season: "Summer", sales: 24600, orders: 312 },
+                    { season: "Fall", sales: 21300, orders: 267 },
+                    { season: "Winter", sales: 19800, orders: 245 }
+                  ]} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="season" fontSize={12} />
+                    <YAxis fontSize={12} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="sales" fill="var(--color-sales)" />
+                  </BarChart>
+                </ResponsiveContainer>
               </ChartContainer>
             </CardContent>
           </Card>
@@ -649,8 +671,28 @@ export default function AnalyticsPage() {
               <CardHeader>
                 <CardTitle>Inventory Aging Report</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
+              <CardContent className="p-4 sm:p-6">
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-3">
+                  {inventoryData.map((item, i) => (
+                    <div key={i} className="border rounded-lg p-3 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="font-medium text-sm">{item.product}</div>
+                        <Badge variant={item.current < item.threshold ? "destructive" : "secondary"} className="text-xs">
+                          {item.current < item.threshold ? "Low Stock" : "Normal"}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>Stock: {item.current}</div>
+                        <div>Threshold: {item.threshold}</div>
+                        <div>Turnover: {item.turnover}x</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -829,25 +871,28 @@ export default function AnalyticsPage() {
               <CardHeader>
                 <CardTitle>Sales Attribution Analysis</CardTitle>
               </CardHeader>
-              <CardContent>
-                <ChartContainer config={chartConfig} className="h-64">
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: "Direct Sales", value: 35, fill: "#8884d8" },
-                        { name: "Referrals", value: 25, fill: "#82ca9d" },
-                        { name: "Social Media", value: 20, fill: "#ffc658" },
-                        { name: "Email Marketing", value: 15, fill: "#ff7c7c" },
-                        { name: "Paid Ads", value: 5, fill: "#8dd1e1" }
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                  </PieChart>
+              <CardContent className="p-4 sm:p-6">
+                <ChartContainer config={chartConfig} className="h-48 sm:h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: "Direct Sales", value: 35, fill: "#8884d8" },
+                          { name: "Referrals", value: 25, fill: "#82ca9d" },
+                          { name: "Social Media", value: 20, fill: "#ffc658" },
+                          { name: "Email Marketing", value: 15, fill: "#ff7c7c" },
+                          { name: "Paid Ads", value: 5, fill: "#8dd1e1" }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius="70%"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        fontSize={10}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </ChartContainer>
               </CardContent>
             </Card>
