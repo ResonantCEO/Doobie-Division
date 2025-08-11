@@ -744,13 +744,13 @@ export default function ScannerPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="relative rounded-lg overflow-hidden">
+                <div className="relative rounded-lg overflow-hidden bg-gray-900">
                   <video
                     ref={videoRef}
                     autoPlay
                     playsInline
                     muted
-                    controls={true}
+                    controls={false}
                     width="640"
                     height="480"
                     className="w-full border-2 border-green-500 rounded-lg"
@@ -759,39 +759,24 @@ export default function ScannerPage() {
                       minHeight: '300px',
                       maxHeight: '480px'
                     }}
-                    onLoadedData={(e) => {
-                      console.log('Video loadeddata event fired');
-                      const video = e.target as HTMLVideoElement;
-                      console.log('Video loaded data, attempting play...');
-                      video.play().catch(err => console.warn('Play on loadeddata failed:', err));
-                    }}
-                    onCanPlay={(e) => {
-                      console.log('Video canplay event fired');
-                      const video = e.target as HTMLVideoElement;
-                      console.log('Video can play, attempting play...');
-                      video.play().catch(err => console.warn('Play on canplay failed:', err));
-                    }}
-                    onPlay={() => console.log('Video play event fired')}
-                    onPlaying={() => console.log('Video playing event fired')}
-                    onTimeUpdate={() => {
-                      // Only log once to avoid spam
-                      if (!videoRef.current?.dataset.logged) {
-                        console.log('Video timeupdate - video is actually playing');
-                        if (videoRef.current) videoRef.current.dataset.logged = 'true';
-                      }
-                    }}
-                    onError={(e) => {
-                      console.error('Video error event:', e);
-                      const video = e.target as HTMLVideoElement;
-                      console.error('Video error details:', {
-                        error: video.error,
-                        networkState: video.networkState,
-                        readyState: video.readyState,
-                        srcObject: video.srcObject
-                      });
-                    }}
                   />
                   <canvas ref={canvasRef} className="hidden" />
+                  
+                  {/* Camera issue overlay */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 bg-opacity-80 text-white p-4">
+                    <div className="text-center space-y-3">
+                      <div className="text-yellow-400 text-sm">
+                        ⚠️ Camera feed not displaying
+                      </div>
+                      <div className="text-xs text-gray-300 max-w-md">
+                        Camera permissions are granted and stream is active, but video display is not working. 
+                        This may be due to browser/device compatibility issues.
+                      </div>
+                      <div className="text-sm font-medium text-blue-400">
+                        Please use Manual SKU Lookup below
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Scanning overlay */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
