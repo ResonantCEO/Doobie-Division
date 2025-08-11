@@ -154,33 +154,64 @@ export default function ScannerPage() {
         throw lastError || new Error("Unable to access camera. Please try manual SKU input instead.");
       }
 
-      // Immediately show the video element and set scanning state
+      // Store the stream reference immediately
+      streamRef.current = stream;
+      
+      // Show the video element first to ensure it's mounted
       setIsScanning(true);
       setScanningStatus("scanning");
       
-      // Store the stream reference
-      streamRef.current = stream;
+      // Wait for React to render the video element, then assign stream
+      setTimeout(() => {
+        const video = videoRef.current;
+        if (video && streamRef.current) {
+          console.log('Setting video source after render:', streamRef.current);
+          console.log('Video element before setting stream:', {
+            element: video,
+            readyState: video.readyState,
+            srcObject: video.srcObject,
+            videoWidth: video.videoWidth,
+            videoHeight: video.videoHeight
+          });
+          
+          try {
+            // Set the stream on the video element
+            video.srcObject = streamRef.current;
+            
+            console.log('Video element after setting stream:', {
+              element: video,
+              readyState: video.readyState,
+              srcObject: video.srcObject,
+              streamActive: streamRef.current.active,
+              streamTracks: streamRef.current.getTracks().length
+            });
+            
+            // Force play immediately
+            video.play().then(() => {
+              console.log('Video play successful after srcObject assignment');
+              setTimeout(() => {
+                detectQRCode();
+              }, 500);
+            }).catch(e => {
+              console.error('Video play failed after srcObject assignment:', e);
+            });
+            
+          } catch (error) {
+            console.error('Error setting srcObject:', error);
+            setScanningError("Failed to initialize video stream. Please try again.");
+            setScanningStatus("error");
+            setIsScanning(false);
+          }
+        } else {
+          console.error('Video element or stream not available after timeout');
+          setScanningError("Video element not ready. Please try again.");
+          setScanningStatus("error");
+          setIsScanning(false);
+        }
+      }, 200);
 
+      // Also set up the video element if it's already available
       if (videoRef.current) {
-        console.log('Setting video source immediately:', stream);
-        console.log('Video element before setting stream:', {
-          element: videoRef.current,
-          readyState: videoRef.current.readyState,
-          srcObject: videoRef.current.srcObject
-        });
-        
-        // Set the stream on the video element immediately
-        videoRef.current.srcObject = stream;
-        
-        console.log('Video element after setting stream:', {
-          element: videoRef.current,
-          readyState: videoRef.current.readyState,
-          srcObject: videoRef.current.srcObject,
-          streamActive: stream.active,
-          streamTracks: stream.getTracks().length
-        });
-        
-        // Set up event listeners
         const video = videoRef.current;
         
         const onLoadedData = () => {
