@@ -52,7 +52,7 @@ export default function ScannerPage() {
   const [manualSku, setManualSku] = useState("");
   const [recentActions, setRecentActions] = useState<RecentAction[]>([]);
   const [lastScanTime, setLastScanTime] = useState(0);
-  const [scanningStatus, setScanningStatus] = useState<"idle" | "scanning" | "found" | "error">("idle");
+  const [scanningStatus, setScanningStatus] = useState<"idle" | "initializing" | "scanning" | "found" | "error">("idle");
   const [activeTab, setActiveTab] = useState("fulfillment");
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
   const [selectedOrder, setSelectedOrder] = useState<OrderForFulfillment | null>(null);
@@ -186,10 +186,30 @@ export default function ScannerPage() {
               streamTracks: streamRef.current.getTracks().length
             });
             
-            // Force play immediately
+            // Force play immediately with comprehensive debugging
             video.play().then(() => {
               console.log('Video play successful after srcObject assignment');
+              
+              // Log detailed video state after successful play
               setTimeout(() => {
+                console.log('Video state after play:', {
+                  currentTime: video.currentTime,
+                  duration: video.duration,
+                  paused: video.paused,
+                  ended: video.ended,
+                  videoWidth: video.videoWidth,
+                  videoHeight: video.videoHeight,
+                  readyState: video.readyState,
+                  networkState: video.networkState,
+                  srcObject: video.srcObject,
+                  streamActive: streamRef.current?.active,
+                  streamTracks: streamRef.current?.getTracks().map(track => ({
+                    kind: track.kind,
+                    enabled: track.enabled,
+                    readyState: track.readyState
+                  }))
+                });
+                
                 detectQRCode();
               }, 500);
             }).catch(e => {
@@ -712,19 +732,20 @@ export default function ScannerPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="relative bg-black rounded-lg overflow-hidden">
+                <div className="relative bg-gray-900 rounded-lg overflow-hidden">
                   <video
                     ref={videoRef}
                     autoPlay
                     playsInline
                     muted
                     controls={false}
-                    className={`w-full h-64 sm:h-80 object-contain rounded-lg border-2 ${getScanningStatusColor()}`}
+                    className={`w-full h-64 sm:h-80 rounded-lg border-2 ${getScanningStatusColor()}`}
                     style={{ 
                       minHeight: '256px',
-                      background: '#000',
+                      background: '#1f2937',
                       display: 'block',
-                      maxWidth: '100%'
+                      maxWidth: '100%',
+                      objectFit: 'cover'
                     }}
                     onLoadedData={(e) => {
                       console.log('Video loadeddata event fired');
