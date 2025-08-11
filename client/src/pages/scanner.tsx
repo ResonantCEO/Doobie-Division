@@ -548,7 +548,6 @@ export default function ScannerPage() {
       toast({
         title: "Item Fulfilled",
         description: `Fulfilled ${variables.quantity} units for order ${selectedOrder?.orderNumber}`,
-        icon: <CheckCircle className="h-4 w-4" />
       });
     },
     onError: (error) => {
@@ -1108,7 +1107,7 @@ export default function ScannerPage() {
                             <Badge variant="outline">${order.total}</Badge>
                             <Badge variant="secondary">
                               <Clock className="h-3 w-3 mr-1" />
-                              {new Date(order.createdAt).toLocaleDateString()}
+                              {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
                             </Badge>
                           </div>
                         </div>
@@ -1147,15 +1146,12 @@ export default function ScannerPage() {
                       <div>
                         <p className="font-medium">{item.productName}</p>
                         <p className="text-sm text-muted-foreground">
-                          SKU: {item.productSku || item.product?.sku || 'N/A'}
+                          SKU: {item.productSku || 'N/A'}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="font-medium">
-                          {item.product?.sellingMethod === "weight" 
-                            ? `${item.quantity} ${item.product.weightUnit || 'grams'}`
-                            : `Qty: ${item.quantity}`
-                          }
+                          Qty: {item.quantity}
                         </p>
                         <Badge variant={item.fulfilled ? "default" : "secondary"}>
                           {item.fulfilled ? "Fulfilled" : "Pending"}
