@@ -154,52 +154,32 @@ export default function ScannerPage() {
         throw lastError || new Error("Unable to access camera. Please try manual SKU input instead.");
       }
 
-      // Store the stream reference immediately
-      streamRef.current = stream;
+      // Immediately show the video element and set scanning state
+      setIsScanning(true);
+      setScanningStatus("scanning");
       
-      // Wait for video element to be ready before setting stream
-      setTimeout(() => {
-        if (videoRef.current && streamRef.current) {
-          console.log('Setting video source:', streamRef.current);
-          console.log('Video element before setting stream:', {
-            element: videoRef.current,
-            readyState: videoRef.current.readyState,
-            srcObject: videoRef.current.srcObject
-          });
-          
-          // Set the stream on the video element
-          videoRef.current.srcObject = streamRef.current;
-          
-          console.log('Video element after setting stream:', {
-            element: videoRef.current,
-            readyState: videoRef.current.readyState,
-            srcObject: videoRef.current.srcObject,
-            streamActive: streamRef.current.active,
-            streamTracks: streamRef.current.getTracks().length
-          });
-          
-          // Set scanning state after stream is assigned
-          setIsScanning(true);
-          setScanningStatus("scanning");
-          
-          // Force video to play after a short delay
-          setTimeout(() => {
-            if (videoRef.current && videoRef.current.srcObject) {
-              console.log('Force playing video...');
-              videoRef.current.play().then(() => {
-                console.log('Force play successful');
-                setTimeout(() => {
-                  detectQRCode();
-                }, 300);
-              }).catch(e => {
-                console.warn('Force play failed:', e);
-              });
-            }
-          }, 200);
-        }
-      }, 100);
+      // Store the stream reference
+      streamRef.current = stream;
 
       if (videoRef.current) {
+        console.log('Setting video source immediately:', stream);
+        console.log('Video element before setting stream:', {
+          element: videoRef.current,
+          readyState: videoRef.current.readyState,
+          srcObject: videoRef.current.srcObject
+        });
+        
+        // Set the stream on the video element immediately
+        videoRef.current.srcObject = stream;
+        
+        console.log('Video element after setting stream:', {
+          element: videoRef.current,
+          readyState: videoRef.current.readyState,
+          srcObject: videoRef.current.srcObject,
+          streamActive: stream.active,
+          streamTracks: stream.getTracks().length
+        });
+        
         // Set up event listeners
         const video = videoRef.current;
         
