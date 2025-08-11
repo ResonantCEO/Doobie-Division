@@ -120,14 +120,14 @@ export default function ScannerPage() {
 
       // Try different camera configurations
       const constraints = [
-        // Primary: back camera with high quality
-        { video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
-        // Fallback 1: back camera with lower quality
-        { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } },
-        // Fallback 2: any camera
+        // Basic video first to ensure compatibility
+        { video: true },
+        // Fallback 1: simple settings
         { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
-        // Fallback 3: basic video
-        { video: true }
+        // Fallback 2: back camera with lower quality
+        { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } },
+        // Primary: back camera with high quality
+        { video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } }
       ];
 
       let stream = null;
@@ -229,12 +229,29 @@ export default function ScannerPage() {
         video.addEventListener('canplay', onCanPlay);
         video.addEventListener('loadedmetadata', onLoadedMetadata);
 
+        // Force autoplay and play the video immediately
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        
         // Try to play immediately (this might fail but that's ok)
         try {
-          await video.play();
-          console.log('Initial play successful');
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            await playPromise;
+            console.log('Initial play successful');
+          }
         } catch (e) {
           console.log('Initial play failed, waiting for metadata:', e);
+          // Try to play again after a short delay
+          setTimeout(async () => {
+            try {
+              await video.play();
+              console.log('Delayed play successful');
+            } catch (retryError) {
+              console.error('Delayed play also failed:', retryError);
+            }
+          }, 500);
         }
 
         videoRef.current.onerror = (error) => {
@@ -676,13 +693,39 @@ export default function ScannerPage() {
                       minHeight: '256px',
                       background: '#000',
                       display: 'block',
-                      maxWidth: '100%',
-                      transform: 'scaleX(-1)' // Mirror horizontally for better UX
+                      maxWidth: '100%'
                     }}
-                    onLoadedData={() => console.log('Video loadeddata event fired')}
-                    onCanPlay={() => console.log('Video canplay event fired')}
+                    onLoadedData={(e) => {
+                      console.log('Video loadeddata event fired');
+                      const video = e.target as HTMLVideoElement;
+                      console.log('Video loaded data, attempting play...');
+                      video.play().catch(err => console.warn('Play on loadeddata failed:', err));
+                    }}
+                    onCanPlay={(e) => {
+                      console.log('Video canplay event fired');
+                      const video = e.target as HTMLVideoElement;
+                      console.log('Video can play, attempting play...');
+                      video.play().catch(err => console.warn('Play on canplay failed:', err));
+                    }}
                     onPlay={() => console.log('Video play event fired')}
-                    onError={(e) => console.error('Video error event:', e)}
+                    onPlaying={() => console.log('Video playing event fired')}
+                    onTimeUpdate={() => {
+                      // Only log once to avoid spam
+                      if (!videoRef.current?.dataset.logged) {
+                        console.log('Video timeupdate - video is actually playing');
+                        if (videoRef.current) videoRef.current.dataset.logged = 'true';
+                      }
+                    }}
+                    onError={(e) => {
+                      console.error('Video error event:', e);
+                      const video = e.target as HTMLVideoElement;
+                      console.error('Video error details:', {
+                        error: video.error,
+                        networkState: video.networkState,
+                        readyState: video.readyState,
+                        srcObject: video.srcObject
+                      });
+                    }}
                   />
                   <canvas ref={canvasRef} className="hidden" />
 
