@@ -322,18 +322,24 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
       {/* Tab Navigation */}
       <div className="bg-background border-b border-border">
         <div className="max-w-7xl mx-auto">
-          <nav className="-mb-px flex overflow-x-auto scrollbar-hide px-4 sm:px-6 lg:px-8">
-            <div className="flex space-x-6 sm:space-x-8 min-w-max">
+          <nav className="-mb-px flex overflow-x-auto scrollbar-hide px-2 sm:px-4 lg:px-8">
+            <div className="flex space-x-2 sm:space-x-4 lg:space-x-6 min-w-max">
               {visibleTabs.map((tab) => (
                 <Link key={tab.id} href={tab.path}>
                   <button
-                    className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
+                    className={`whitespace-nowrap py-2 px-2 sm:px-3 border-b-2 font-medium text-xs sm:text-sm transition-colors flex-shrink-0 ${
                       currentTab === tab.id
                         ? "border-primary text-primary"
                         : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                     }`}
                   >
-                    {tab.label}
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className="sm:hidden">
+                      {tab.label === "Inventory Management" ? "Inventory" : 
+                       tab.label === "User Management" ? "Users" :
+                       tab.label === "Analytics" ? "Stats" :
+                       tab.label}
+                    </span>
                   </button>
                 </Link>
               ))}

@@ -50,6 +50,7 @@
   .scrollbar-hide {
     -ms-overflow-style: none;  /* Internet Explorer 10+ */
     scrollbar-width: none;  /* Firefox */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
   }
   .scrollbar-hide::-webkit-scrollbar { 
     display: none;  /* Safari and Chrome */
