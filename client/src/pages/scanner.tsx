@@ -160,8 +160,22 @@ export default function ScannerPage() {
 
       if (videoRef.current) {
         console.log('Setting video source:', stream);
+        console.log('Video element before setting stream:', {
+          element: videoRef.current,
+          readyState: videoRef.current.readyState,
+          srcObject: videoRef.current.srcObject
+        });
+        
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
+        
+        console.log('Video element after setting stream:', {
+          element: videoRef.current,
+          readyState: videoRef.current.readyState,
+          srcObject: videoRef.current.srcObject,
+          streamActive: stream.active,
+          streamTracks: stream.getTracks().length
+        });
         
         // Set up event listeners
         const video = videoRef.current;
@@ -176,10 +190,23 @@ export default function ScannerPage() {
 
         const onLoadedMetadata = () => {
           console.log('Video metadata loaded, dimensions:', video?.videoWidth, 'x', video?.videoHeight);
+          console.log('Video element state:', {
+            srcObject: video?.srcObject,
+            readyState: video?.readyState,
+            paused: video?.paused,
+            currentTime: video?.currentTime
+          });
+          
           // Start playing the video
           if (video) {
             video.play().then(() => {
               console.log('Video playing successfully');
+              console.log('Video after play:', {
+                videoWidth: video.videoWidth,
+                videoHeight: video.videoHeight,
+                paused: video.paused,
+                currentTime: video.currentTime
+              });
               // Small delay before starting QR detection to ensure video is stable
               setTimeout(() => {
                 detectQRCode();
@@ -639,15 +666,18 @@ export default function ScannerPage() {
                     playsInline
                     muted
                     controls={false}
-                    width="640"
-                    height="480"
-                    className={`w-full h-64 sm:h-80 object-cover rounded-lg border-2 ${getScanningStatusColor()}`}
+                    className={`w-full h-64 sm:h-80 object-contain rounded-lg border-2 ${getScanningStatusColor()}`}
                     style={{ 
                       minHeight: '256px',
                       background: '#000',
                       display: 'block',
-                      maxWidth: '100%'
+                      maxWidth: '100%',
+                      transform: 'scaleX(-1)' // Mirror horizontally for better UX
                     }}
+                    onLoadedData={() => console.log('Video loadeddata event fired')}
+                    onCanPlay={() => console.log('Video canplay event fired')}
+                    onPlay={() => console.log('Video play event fired')}
+                    onError={(e) => console.error('Video error event:', e)}
                   />
                   <canvas ref={canvasRef} className="hidden" />
 
