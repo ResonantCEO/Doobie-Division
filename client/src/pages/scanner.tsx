@@ -84,8 +84,7 @@ export default function ScannerPage() {
   });
 
   const pendingOrders = allOrders.filter(order => 
-    (order.status === "pending" || order.status === "processing") && 
-    (!order.items || order.items.length === 0 || order.items.some(item => !item.fulfilled))
+    (order.status === "pending" || order.status === "processing")
   );
 
   // Fetch selected order details
@@ -115,15 +114,31 @@ export default function ScannerPage() {
         setIsScanning(true);
 
         videoRef.current.onloadedmetadata = () => {
+          console.log('Video metadata loaded, dimensions:', videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight);
           detectQRCode();
         };
+
+        // Add error handler for video
+        videoRef.current.onerror = (error) => {
+          console.error('Video error:', error);
+          setScanningError("Camera error occurred. Please try again.");
+          setScanningStatus("error");
+          setIsScanning(false);
+        };
       }
-    } catch (error) {
-      setScanningError("Unable to access camera. Please allow camera permissions.");
+    } catch (error: any) {
+      console.error('Camera access error:', error);
+      const errorMessage = error.name === 'NotAllowedError' ? 
+        "Camera permission denied. Please allow camera access and try again." :
+        "Unable to access camera. Please check your camera permissions.";
+      
+      setScanningError(errorMessage);
       setScanningStatus("error");
+      setIsScanning(false);
+      
       toast({
         title: "Camera Error",
-        description: "Unable to access camera. Please allow camera permissions.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -222,8 +237,7 @@ export default function ScannerPage() {
       stopScanning();
       toast({
         title: "Product Found",
-        description: `Loaded ${product.name}`,
-        icon: <CheckCircle className="h-4 w-4" />
+        description: `Loaded ${product.name}`
       });
     },
     onError: (error: any) => {
@@ -271,8 +285,7 @@ export default function ScannerPage() {
 
       toast({
         title: "Stock Updated",
-        description: `${variables.quantity > 0 ? 'Added' : 'Removed'} ${Math.abs(variables.quantity)} units`,
-        icon: <CheckCircle className="h-4 w-4" />
+        description: `${variables.quantity > 0 ? 'Added' : 'Removed'} ${Math.abs(variables.quantity)} units`
       });
     },
     onError: (error) => {
@@ -527,13 +540,14 @@ export default function ScannerPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="relative">
+                <div className="relative bg-black rounded-lg overflow-hidden">
                   <video
                     ref={videoRef}
                     autoPlay
                     playsInline
                     muted
-                    className={`w-full max-w-md mx-auto rounded-lg border-2 ${getScanningStatusColor()}`}
+                    className={`w-full h-64 sm:h-80 object-cover rounded-lg border-2 ${getScanningStatusColor()}`}
+                    style={{ minHeight: '256px' }}
                   />
                   <canvas ref={canvasRef} className="hidden" />
 
