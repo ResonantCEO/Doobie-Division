@@ -142,7 +142,7 @@ export default function OrderTable({ orders }: OrderTableProps) {
                     value={order.status}
                     onValueChange={(status) => handleStatusUpdate(order.id, status)}
                   >
-                    <SelectTrigger className="flex-1 h-8 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
+                    <SelectTrigger className="flex-1 h-8 bg-gray-700 dark:bg-gray-700 text-white dark:text-gray-100 border-gray-600 dark:border-gray-600 hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -216,7 +216,7 @@ export default function OrderTable({ orders }: OrderTableProps) {
                       value={order.status}
                       onValueChange={(status) => handleStatusUpdate(order.id, status)}
                     >
-                      <SelectTrigger className="w-32 h-8 bg-gray-100 text-white border-gray-300 hover:bg-gray-200">
+                      <SelectTrigger className="w-32 h-8 bg-gray-700 text-white border-gray-600 hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
