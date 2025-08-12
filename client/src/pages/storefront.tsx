@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductCard from "@/components/product-card";
-import { Search, Sparkles, TrendingUp, Star } from "lucide-react";
+import { Search } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
 
 export default function StorefrontPage() {
@@ -80,6 +79,8 @@ export default function StorefrontPage() {
     return flattenCategories(categoriesResponse);
   }, [categoriesResponse]);
 
+
+
   // Fetch products
   const { data: allProducts = [], isLoading: productsLoading } = useQuery<(Product & { category: Category | null })[]>({
     queryKey: ["/api/products", debouncedSearchQuery, selectedCategory, currentParentCategory],
@@ -138,37 +139,35 @@ export default function StorefrontPage() {
 
   if (productsLoading || categoriesLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-        <div className="max-w-8xl mx-auto px-6 py-8 space-y-12">
-          {/* Hero Section Skeleton */}
-          <div className="premium-hero-card p-16 rounded-3xl overflow-hidden relative">
-            <div className="relative z-10 max-w-2xl">
-              <Skeleton className="h-16 w-96 mb-6 bg-white/30 rounded-2xl" />
-              <Skeleton className="h-6 w-full mb-8 bg-white/20 rounded-xl" />
-              <Skeleton className="h-14 w-40 bg-white/30 rounded-xl" />
-            </div>
+      <div className="space-y-8">
+        {/* Hero Section Skeleton */}
+        <div className="hero-gradient rounded-2xl p-16">
+          <div className="max-w-2xl">
+            <Skeleton className="h-12 w-96 mb-4 bg-white/20" />
+            <Skeleton className="h-6 w-full mb-6 bg-white/20" />
+            <Skeleton className="h-12 w-32 bg-white/20" />
           </div>
+        </div>
 
-          {/* Categories Skeleton */}
-          <div className="flex flex-wrap gap-3">
-            {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-12 w-28 rounded-full" />
-            ))}
-          </div>
+        {/* Categories Skeleton */}
+        <div className="flex flex-wrap gap-4">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-10 w-24" />
+          ))}
+        </div>
 
-          {/* Products Grid Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {[...Array(8)].map((_, i) => (
-              <Card key={i} className="premium-card overflow-hidden h-96">
-                <Skeleton className="h-48 w-full" />
-                <CardContent className="p-6 space-y-3">
-                  <Skeleton className="h-6 w-full rounded-lg" />
-                  <Skeleton className="h-4 w-2/3 rounded-lg" />
-                  <Skeleton className="h-8 w-20 rounded-lg" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+        {/* Products Grid Skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {[...Array(8)].map((_, i) => (
+            <Card key={i} className="overflow-hidden">
+              <Skeleton className="h-48 w-full" />
+              <CardContent className="p-4 space-y-2">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-6 w-16" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     );
@@ -182,141 +181,94 @@ export default function StorefrontPage() {
     return hasStock && matchesDeals;
   });
 
+  
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <div className="max-w-8xl mx-auto px-6 py-8 space-y-12">
-        {/* Premium Hero Section */}
-        <div className="premium-hero-card rounded-3xl overflow-hidden relative group">
-          {/* Dynamic Background with Enhanced Overlay */}
-          <div className="absolute inset-0">
-            {allDiscountedProducts.length > 0 ? (
-              <div className="relative w-full h-full">
-                {allDiscountedProducts.map((product, index) => (
-                  <div
-                    key={product.id}
-                    className={`absolute inset-0 transition-all duration-1000 ${
-                      currentImageIndex === index ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
-                    }`}
-                  >
-                    <img
-                      src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=1400&h=500&fit=crop"}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent"></div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="premium-gradient w-full h-full"></div>
-            )}
-          </div>
-
-          {/* Enhanced Content Overlay */}
-          <div className="relative z-10 px-12 py-16 lg:px-16 lg:py-20">
-            <div className="max-w-3xl">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="premium-badge">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  <span className="text-sm font-medium">Premium Deals</span>
-                </div>
-                <div className="premium-badge">
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  <span className="text-sm font-medium">Trending Now</span>
-                </div>
-              </div>
-              
-              <h1 className="text-5xl lg:text-6xl font-bold mb-6 text-white leading-tight">
-                Today's Amazing
-                <span className="block bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                  Deals!
-                </span>
-              </h1>
-              
-              <p className="text-xl lg:text-2xl mb-8 text-white/90 leading-relaxed max-w-2xl">
-                Discover exceptional products with exclusive discounts. 
-                <span className="block text-lg text-emerald-300 mt-2">Premium quality, unbeatable prices.</span>
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
-                  size="lg"
-                  className="premium-cta-button group"
-                  onClick={() => setShowDealsOnly(true)}
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <div className="relative rounded-2xl mb-12 overflow-hidden">
+        {/* Background Image Carousel */}
+        <div className="absolute inset-0">
+          {allDiscountedProducts.length > 0 ? (
+            <div className="relative w-full h-full">
+              {allDiscountedProducts.map((product, index) => (
+                <div
+                  key={product.id}
+                  className={`absolute inset-0 transition-opacity duration-1000 ${
+                    currentImageIndex === index ? 'opacity-100' : 'opacity-0'
+                  }`}
                 >
-                  <Sparkles className="h-5 w-5 mr-2 group-hover:rotate-12 transition-transform duration-200" />
-                  Shop Premium Deals
-                </Button>
-                
-                <Button 
-                  size="lg"
-                  variant="outline"
-                  className="premium-secondary-button"
-                >
-                  <Star className="h-5 w-5 mr-2" />
-                  View All Products
-                </Button>
-              </div>
+                  <img
+                    src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=1200&h=400&fit=crop"}
+                    alt={product.name}
+                    className="w-full h-full object-cover object-center"
+                  />
+                  <div className="absolute inset-0 bg-black/50"></div>
+                </div>
+              ))}
             </div>
-          </div>
-
-          {/* Floating Elements */}
-          <div className="absolute top-8 right-8 premium-floating-badge">
-            <span className="text-sm font-bold text-emerald-600">Up to 50% OFF</span>
-          </div>
+          ) : (
+            <div className="hero-gradient w-full h-full"></div>
+          )}
         </div>
 
-        {/* Enhanced Search Section */}
-        <div className="premium-search-section">
-          <div className="max-w-2xl mx-auto">
-            <div className="relative">
-              <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
-              <Input
-                type="text"
-                placeholder="Search premium products..."
-                className="premium-search-input"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Premium Category Filters */}
-        <div className="space-y-8">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-3">
-              {currentParentCategory ? 'Explore Subcategories' : 'Browse Categories'}
-            </h2>
-            <p className="text-slate-600 dark:text-slate-300 text-lg">
-              Find exactly what you're looking for
+        {/* Content Overlay */}
+        <div className="relative py-16 px-8">
+          <div className="max-w-2xl">
+            <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-lg">Today's Amazing Deals!</h2>
+            <p className="text-xl mb-6 text-white/90 drop-shadow-md">
+              Check out our special discounts on selected products every day!
             </p>
+            <Button 
+              className="bg-white text-primary hover:bg-white/90 drop-shadow-md"
+              onClick={() => setShowDealsOnly(true)}
+            >
+              Shop Now
+            </Button>
           </div>
-          
-          <div className="flex flex-wrap justify-center gap-3">
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="space-y-6">
+        {/* Search */}
+        <div className="relative max-w-md">
+          <Input
+            type="text"
+            placeholder="Search products..."
+            className="pl-10 glass-input"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        </div>
+
+        {/* Category Filter */}
+        <div className="flex flex-wrap gap-4 items-center">
+          <h3 className="text-lg font-semibold text-black dark:text-white">
+            {currentParentCategory ? 'Subcategories:' : 'Categories:'}
+          </h3>
+          <div className="flex flex-wrap gap-2">
             {currentParentCategory ? (
-              // Enhanced Subcategories View
+              // Show subcategories when a parent category is selected
               (() => {
                 const subcategoriesForParent = categories.filter(cat => cat.parentId === currentParentCategory);
                 return (
                   <>
                     <Button
                       variant="outline"
-                      size="lg"
-                      className="premium-back-button"
+                      size="sm"
+                      className="glass-button text-black dark:text-white"
                       onClick={handleBackToMainCategories}
                     >
-                      ← Back to Categories
+                      ← Back
                     </Button>
                     {subcategoriesForParent.map((category) => (
                       <Button
                         key={category.id}
                         variant={selectedCategory === category.id ? "default" : "outline"}
-                        size="lg"
-                        className={`premium-category-button ${
-                          selectedCategory === category.id ? 'active' : ''
-                        }`}
+                        size="sm"
+                        className="glass-button text-black dark:text-white"
                         onClick={() => handleCategoryFilter(category.id)}
                       >
                         {category.name}
@@ -326,126 +278,55 @@ export default function StorefrontPage() {
                 );
               })()
             ) : (
-              // Enhanced Main Categories View
+              // Show main categories when currentParentCategory is not set
               <>
                 <Button
                   variant={selectedCategory === null && !showDealsOnly ? "default" : "outline"}
-                  size="lg"
-                  className={`premium-category-button ${
-                    selectedCategory === null && !showDealsOnly ? 'active' : ''
-                  }`}
+                  size="sm"
+                  className="glass-button text-black dark:text-white"
                   onClick={() => {
                     handleCategoryFilter(null);
                     setShowDealsOnly(false);
                   }}
                 >
-                  <span className="relative">
-                    All Products
-                    {selectedCategory === null && !showDealsOnly && (
-                      <span className="premium-active-indicator"></span>
-                    )}
-                  </span>
+                  All Products
                 </Button>
 
                 {categories
-                  .filter(category => !category.parentId)
+                  .filter(category => !category.parentId) // Only show root categories
                   .map((category) => (
                     <Button
                       key={category.id}
                       variant={selectedCategory === category.id && !showDealsOnly ? "default" : "outline"}
-                      size="lg"
-                      className={`premium-category-button ${
-                        selectedCategory === category.id && !showDealsOnly ? 'active' : ''
-                      }`}
+                      size="sm"
+                      className="glass-button text-black dark:text-white"
                       onClick={() => {
                         handleCategoryFilter(category.id);
                         setShowDealsOnly(false);
                       }}
                     >
-                      <span className="relative">
-                        {category.name}
-                        {selectedCategory === category.id && !showDealsOnly && (
-                          <span className="premium-active-indicator"></span>
-                        )}
-                      </span>
+                      {category.name}
                     </Button>
                   ))}
-                  
-                <Button
-                  variant={showDealsOnly ? "default" : "outline"}
-                  size="lg"
-                  className={`premium-category-button deals-button ${showDealsOnly ? 'active' : ''}`}
-                  onClick={() => setShowDealsOnly(true)}
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  <span className="relative">
-                    Special Deals
-                    {showDealsOnly && <span className="premium-active-indicator"></span>}
-                  </span>
-                </Button>
               </>
             )}
           </div>
         </div>
-
-        {/* Enhanced Products Grid */}
-        {products.length === 0 ? (
-          <div className="premium-empty-state">
-            <div className="text-center max-w-md mx-auto">
-              <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                <Search className="h-10 w-10 text-slate-400" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-800 dark:text-white mb-3">
-                No products found
-              </h3>
-              <p className="text-slate-600 dark:text-slate-300 text-lg mb-6">
-                Try adjusting your search or browse different categories
-              </p>
-              <Button 
-                variant="outline" 
-                size="lg"
-                onClick={() => {
-                  setSearchQuery("");
-                  setSelectedCategory(null);
-                  setCurrentParentCategory(null);
-                  setShowDealsOnly(false);
-                }}
-                className="premium-reset-button"
-              >
-                Reset Filters
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-2xl font-bold text-slate-800 dark:text-white">
-                  {showDealsOnly ? 'Special Deals' : 'Premium Products'}
-                </h3>
-                <p className="text-slate-600 dark:text-slate-300 mt-1">
-                  {products.length} {products.length === 1 ? 'product' : 'products'} found
-                </p>
-              </div>
-              
-              {products.some(product => product.discountPercentage && parseFloat(product.discountPercentage) > 0) && (
-                <div className="premium-deals-indicator">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  <span className="text-sm font-medium">Deals Available</span>
-                </div>
-              )}
-            </div>
-            
-            <div className="premium-products-grid">
-              {products.map((product) => (
-                <div key={product.id} className="premium-product-container">
-                  <ProductCard product={product} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Products Grid */}
+      {products.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground text-lg">No products found</p>
+          <p className="text-muted-foreground/60 mt-2">Try adjusting your search or category filter</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {products.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
