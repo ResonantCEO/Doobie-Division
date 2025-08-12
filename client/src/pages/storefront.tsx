@@ -370,21 +370,16 @@ export default function StorefrontPage() {
               return (
                 <div key={parentCategoryId || 'uncategorized'} className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {categoryName}
-                    </h3>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="glass-button text-black dark:text-white"
+                    <h3 
+                      className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-primary transition-colors duration-200"
                       onClick={() => {
                         if (parentCategoryId) {
                           handleCategoryFilter(parentCategoryId);
                         }
                       }}
                     >
-                      View All
-                    </Button>
+                      {categoryName}
+                    </h3>
                   </div>
                   
                   {/* Horizontal Scrolling Product Container */}
