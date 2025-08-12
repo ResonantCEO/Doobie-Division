@@ -193,54 +193,48 @@ export default function Landing() {
                 icon: Zap,
                 title: "Lightning Fast",
                 description: "Optimized performance for seamless browsing and instant loading",
-                size: "large",
                 gradient: "from-yellow-400 to-orange-500"
               },
               {
                 icon: Shield,
                 title: "Bank-Level Security",
                 description: "Advanced encryption and secure processing",
-                size: "medium",
                 gradient: "from-blue-400 to-purple-500"
               },
               {
                 icon: Heart,
                 title: "Customer First",
                 description: "Dedicated support team available 24/7",
-                size: "medium",
                 gradient: "from-pink-400 to-red-500"
               },
               {
                 icon: Smartphone,
                 title: "Mobile Optimized",
                 description: "Perfect experience across all devices and screen sizes",
-                size: "large",
                 gradient: "from-green-400 to-teal-500"
               },
               {
                 icon: Clock,
                 title: "Real-Time Updates",
                 description: "Live inventory and order tracking",
-                size: "medium",
                 gradient: "from-purple-400 to-indigo-500"
               },
               {
                 icon: CheckCircle,
                 title: "Quality Guaranteed",
                 description: "Rigorous testing and authenticity verification",
-                size: "medium",
                 gradient: "from-emerald-400 to-cyan-500"
               }
             ].map((feature, index) => (
-              <div key={index} className={`${feature.size === 'large' ? 'md:col-span-2' : ''} group`}>
-                <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:border-white/20 transition-all duration-500 hover:scale-105 hover:bg-white/10 h-full">
+              <div key={index} className="group">
+                <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:border-white/20 transition-all duration-500 hover:scale-105 hover:bg-white/10 h-full min-h-[280px] flex flex-col">
                   <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
                     <feature.icon className="w-7 h-7 text-white" />
                   </div>
                   <h3 className="text-xl font-semibold mb-3 text-white group-hover:text-emerald-200 transition-colors">
                     {feature.title}
                   </h3>
-                  <p className="text-white/70 leading-relaxed">
+                  <p className="text-white/70 leading-relaxed flex-grow">
                     {feature.description}
                   </p>
                 </div>
