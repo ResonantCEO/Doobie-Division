@@ -323,7 +323,61 @@ export default function StorefrontPage() {
       ) : (
         <div className="space-y-8">
           {(() => {
-            // Group products by main parent category (root level)
+            // If we're viewing a parent category with subcategories, group by subcategories
+            if (currentParentCategory && !selectedCategory) {
+              const subcategoriesForParent = categories.filter(cat => cat.parentId === currentParentCategory);
+              
+              if (subcategoriesForParent.length > 0) {
+                // Group products by their direct subcategory
+                const productsBySubcategory = new Map<number, (Product & { category: Category | null })[]>();
+                
+                products.forEach(product => {
+                  if (product.category && subcategoriesForParent.some(sub => sub.id === product.category!.id)) {
+                    if (!productsBySubcategory.has(product.category.id)) {
+                      productsBySubcategory.set(product.category.id, []);
+                    }
+                    productsBySubcategory.get(product.category.id)!.push(product);
+                  }
+                });
+
+                return subcategoriesForParent.map(subcategory => {
+                  const subcategoryProducts = productsBySubcategory.get(subcategory.id) || [];
+                  
+                  if (subcategoryProducts.length === 0) return null;
+
+                  return (
+                    <div key={subcategory.id} className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 
+                          className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-primary transition-colors duration-200"
+                          onClick={() => handleCategoryFilter(subcategory.id)}
+                        >
+                          {subcategory.name}
+                        </h3>
+                      </div>
+                      
+                      {/* Horizontal Scrolling Product Container */}
+                      <div className="relative">
+                        <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
+                          <div className="flex space-x-4" style={{ minWidth: 'max-content' }}>
+                            {subcategoryProducts.map((product) => (
+                              <div key={product.id} className="flex-shrink-0 w-64 sm:w-72">
+                                <ProductCard product={product} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        {/* Scroll indicators */}
+                        <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-white dark:from-gray-900 to-transparent pointer-events-none"></div>
+                      </div>
+                    </div>
+                  );
+                }).filter(Boolean);
+              }
+            }
+
+            // Default behavior: Group products by main parent category (root level)
             const productsByParentCategory = new Map<number | null, (Product & { category: Category | null })[]>();
             
             products.forEach(product => {
