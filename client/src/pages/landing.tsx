@@ -34,11 +34,11 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              Your Premium Cannabis Experience Awaits
+              Your Premium Shopping Experience Awaits
             </h1>
             <p className="text-xl md:text-2xl mb-8 text-blue-100 dark:text-gray-300 max-w-4xl mx-auto">
               Discover curated products, enjoy seamless ordering, and experience personalized service 
-              with our premium cannabis marketplace designed for discerning customers.
+              with our premium marketplace designed for discerning customers.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Button 
@@ -96,7 +96,7 @@ export default function Landing() {
               <h3 className="text-lg font-semibold mb-2">Secure Checkout</h3>
               <p className="text-gray-600 text-sm">
                 Complete your purchase with confidence using our encrypted checkout process. 
-                Multiple payment options and age verification ensure a safe transaction.
+                Multiple payment options and verification ensure a safe transaction.
               </p>
             </div>
 
@@ -136,8 +136,8 @@ export default function Landing() {
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Lab-tested products from trusted suppliers. Every item meets our strict quality 
-                  standards for potency, purity, and safety.
+                  Rigorously tested products from trusted suppliers. Every item meets our strict quality 
+                  standards for authenticity, excellence, and safety.
                 </p>
               </CardContent>
             </Card>
@@ -198,7 +198,7 @@ export default function Landing() {
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-2">Product Variety</h3>
                   <p className="text-gray-600 text-sm">
-                    "Amazing selection! From flower to edibles to concentrates - they have everything 
+                    "Amazing selection! From electronics to home goods to specialty items - they have everything 
                     I need with detailed product information."
                   </p>
                   <p className="text-xs text-gray-500 mt-2">- Sarah M., verified customer</p>
@@ -234,7 +234,7 @@ export default function Landing() {
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-2">Customer Service</h3>
                   <p className="text-gray-600 text-sm">
-                    "Had a question about dosage and got helpful advice immediately. The team 
+                    "Had a question about specifications and got helpful advice immediately. The team 
                     really knows their products and cares about customers."
                   </p>
                   <p className="text-xs text-gray-500 mt-2">- Jessica L., verified customer</p>
@@ -253,7 +253,7 @@ export default function Landing() {
               Features Designed for You
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Every feature we build is focused on making your cannabis shopping experience 
+              Every feature we build is focused on making your shopping experience 
               better, safer, and more convenient.
             </p>
           </div>
@@ -268,8 +268,8 @@ export default function Landing() {
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Find exactly what you're looking for with intelligent filters by type, potency, 
-                  effects, and price range.
+                  Find exactly what you're looking for with intelligent filters by category, brand, 
+                  features, and price range.
                 </p>
               </CardContent>
             </Card>
@@ -326,11 +326,11 @@ export default function Landing() {
       <div className="bg-gradient-to-r from-green-600 to-blue-600 py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">
-            Ready to Elevate Your Cannabis Experience?
+            Ready to Elevate Your Shopping Experience?
           </h2>
           <p className="text-xl text-green-100 mb-8">
             Join thousands of satisfied customers who trust Doobie Division for their premium 
-            cannabis needs. Start your journey today.
+            shopping needs. Start your journey today.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Button 
@@ -342,7 +342,7 @@ export default function Landing() {
             </Button>
             <div className="flex items-center text-green-100 text-sm">
               <Shield className="h-4 w-4 mr-2" />
-              SSL Secured • Age Verification Required • Discreet Packaging
+              SSL Secured • Identity Verification • Discreet Packaging
             </div>
           </div>
         </div>
@@ -355,7 +355,7 @@ export default function Landing() {
             <div>
               <h3 className="font-bold text-lg mb-4 text-primary">Doobie Division</h3>
               <p className="text-gray-600 text-sm">
-                Your trusted partner for premium cannabis products, delivered with care and discretion.
+                Your trusted partner for premium products, delivered with care and discretion.
               </p>
             </div>
             <div>
@@ -370,9 +370,9 @@ export default function Landing() {
             <div>
               <h4 className="font-semibold mb-3">Products</h4>
               <ul className="text-sm text-gray-600 space-y-2">
-                <li>Flower</li>
-                <li>Edibles</li>
-                <li>Concentrates</li>
+                <li>Electronics</li>
+                <li>Home & Garden</li>
+                <li>Specialty Items</li>
                 <li>Accessories</li>
               </ul>
             </div>
@@ -387,7 +387,7 @@ export default function Landing() {
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-gray-600">
-            <p>&copy; 2024 Doobie Division. All rights reserved. | Must be 21+ to purchase.</p>
+            <p>&copy; 2024 Doobie Division. All rights reserved. | Must be 18+ to purchase.</p>
           </div>
         </div>
       </footer>
