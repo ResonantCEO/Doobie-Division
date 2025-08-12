@@ -340,10 +340,9 @@ export default function StorefrontPage() {
                   }
                 });
 
+                // Always show all subcategories, even if they have no products
                 return subcategoriesForParent.map(subcategory => {
                   const subcategoryProducts = productsBySubcategory.get(subcategory.id) || [];
-                  
-                  if (subcategoryProducts.length === 0) return null;
 
                   return (
                     <div key={subcategory.id} className="space-y-4">
@@ -354,26 +353,37 @@ export default function StorefrontPage() {
                         >
                           {subcategory.name}
                         </h3>
+                        <span className="text-sm text-muted-foreground">
+                          {subcategoryProducts.length} products
+                        </span>
                       </div>
                       
                       {/* Horizontal Scrolling Product Container */}
                       <div className="relative">
-                        <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
-                          <div className="flex space-x-4" style={{ minWidth: 'max-content' }}>
-                            {subcategoryProducts.map((product) => (
-                              <div key={product.id} className="flex-shrink-0 w-64 sm:w-72">
-                                <ProductCard product={product} />
-                              </div>
-                            ))}
+                        {subcategoryProducts.length > 0 ? (
+                          <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
+                            <div className="flex space-x-4" style={{ minWidth: 'max-content' }}>
+                              {subcategoryProducts.map((product) => (
+                                <div key={product.id} className="flex-shrink-0 w-64 sm:w-72">
+                                  <ProductCard product={product} />
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <p>No products available in this category</p>
+                          </div>
+                        )}
                         
                         {/* Scroll indicators */}
-                        <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-white dark:from-gray-900 to-transparent pointer-events-none"></div>
+                        {subcategoryProducts.length > 0 && (
+                          <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-white dark:from-gray-900 to-transparent pointer-events-none"></div>
+                        )}
                       </div>
                     </div>
                   );
-                }).filter(Boolean);
+                });
               }
             }
 
