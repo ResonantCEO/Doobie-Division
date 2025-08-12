@@ -255,17 +255,36 @@ export default function StorefrontPage() {
             {currentParentCategory ? 'Subcategories:' : 'Categories:'}
           </h3>
           <div className="flex flex-wrap gap-1 sm:gap-2">
+            {/* Always show All Products button */}
+            <Button
+              variant={selectedCategory === null && !showDealsOnly && !currentParentCategory ? "default" : "outline"}
+              size="sm"
+              className="glass-button text-black dark:text-white"
+              onClick={() => {
+                handleCategoryFilter(null);
+                setShowDealsOnly(false);
+              }}
+            >
+              All Products
+            </Button>
+
             {currentParentCategory ? (
               // Show subcategories when a parent category is selected
               (() => {
                 const subcategoriesForParent = categories.filter(cat => cat.parentId === currentParentCategory);
+                const parentCategory = categories.find(cat => cat.id === currentParentCategory);
                 return (
                   <>
                     <Button
                       variant="outline"
                       size="sm"
                       className="glass-button text-black dark:text-white"
-                      onClick={handleBackToMainCategories}
+                      onClick={() => {
+                        // Go back to the parent category view (showing all parent categories)
+                        setCurrentParentCategory(null);
+                        setSelectedCategory(null);
+                        setShowDealsOnly(false);
+                      }}
                     >
                       ← Back
                     </Button>
@@ -286,18 +305,6 @@ export default function StorefrontPage() {
             ) : (
               // Show main categories when currentParentCategory is not set
               <>
-                <Button
-                  variant={selectedCategory === null && !showDealsOnly ? "default" : "outline"}
-                  size="sm"
-                  className="glass-button text-black dark:text-white"
-                  onClick={() => {
-                    handleCategoryFilter(null);
-                    setShowDealsOnly(false);
-                  }}
-                >
-                  All Products
-                </Button>
-
                 {categories
                   .filter(category => !category.parentId) // Only show root categories
                   .map((category) => (
