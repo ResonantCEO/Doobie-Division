@@ -156,8 +156,8 @@ export default function OrderTable({ orders }: OrderTableProps) {
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="flex-shrink-0">
-                        <MoreHorizontal className="h-4 w-4" />
+                      <Button variant="outline" size="sm" className="flex-shrink-0 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <MoreHorizontal className="h-4 w-4 text-gray-600 dark:text-gray-300" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -230,8 +230,8 @@ export default function OrderTable({ orders }: OrderTableProps) {
 
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4 text-white" />
+                        <Button variant="outline" size="sm" className="border-gray-600 hover:border-gray-400 hover:bg-gray-700">
+                          <MoreHorizontal className="h-4 w-4 text-gray-300 hover:text-white" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
