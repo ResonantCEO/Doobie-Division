@@ -181,6 +181,12 @@ export default function StorefrontPage() {
     return hasStock && matchesDeals;
   });
 
+  // Debug logging to understand what's happening
+  console.log('All products from API:', allProducts.length);
+  console.log('Filtered products:', products.length);
+  console.log('Current parent category:', currentParentCategory);
+  console.log('Products:', products.map(p => ({ id: p.id, name: p.name, categoryId: p.category?.id, categoryName: p.category?.name })));
+
 
 
   return (
@@ -343,6 +349,7 @@ export default function StorefrontPage() {
 
                 // Always show all subcategories, even if they have no products
                 return subcategoriesForParent.map(subcategory => {
+                  // Get products that belong to this specific subcategory
                   const subcategoryProducts = productsBySubcategory.get(subcategory.id) || [];
 
                   return (
