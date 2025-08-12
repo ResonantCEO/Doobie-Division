@@ -90,13 +90,13 @@ export default function Landing() {
 
             <div className="text-center">
               <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 relative">
-                <CreditCard className="h-8 w-8 text-blue-600" />
+                <Shield className="h-8 w-8 text-blue-600" />
                 <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
               </div>
               <h3 className="text-lg font-semibold mb-2">Secure Checkout</h3>
               <p className="text-gray-600 text-sm">
                 Complete your purchase with confidence using our encrypted checkout process. 
-                Multiple payment options and verification ensure a safe transaction.
+                Identity verification and secure processing ensure a safe transaction.
               </p>
             </div>
 
