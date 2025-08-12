@@ -336,8 +336,16 @@ export default function StorefrontPage() {
                 return;
               }
 
-              // Find the parent category ID
-              const parentCategoryId = product.category.parentId || product.category.id;
+              // Determine the parent category ID for grouping
+              let parentCategoryId;
+              
+              if (product.category.parentId) {
+                // This is a subcategory, use its parent
+                parentCategoryId = product.category.parentId;
+              } else {
+                // This is already a parent category, use its own ID
+                parentCategoryId = product.category.id;
+              }
               
               if (!productsByParentCategory.has(parentCategoryId)) {
                 productsByParentCategory.set(parentCategoryId, []);
@@ -350,7 +358,7 @@ export default function StorefrontPage() {
 
               // Find the parent category info
               const parentCategory = parentCategoryId 
-                ? categories.find(cat => cat.id === parentCategoryId && !cat.parentId)
+                ? categories.find(cat => cat.id === parentCategoryId)
                 : null;
 
               const categoryName = parentCategory?.name || 'Uncategorized';
