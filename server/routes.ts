@@ -571,25 +571,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/analytics/category-sales', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
-    try {
-      const categorySales = await storage.getCategorySalesBreakdown();
-      res.json(categorySales);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch category sales breakdown" });
-    }
-  });
-
-  app.get('/api/analytics/sales-data', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
-    try {
-      const days = parseInt(req.query.days as string) || 30;
-      const salesData = await storage.getSalesDataOverTime(days);
-      res.json(salesData);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch sales data over time" });
-    }
-  });
-
   // Notification routes
   app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
     try {

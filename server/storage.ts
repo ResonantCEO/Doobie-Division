@@ -63,8 +63,6 @@ export interface IStorage {
   }>;
   getTopProducts(limit: number): Promise<{ product: Product; sales: number; revenue: number }[]>;
   getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]>;
-  getCategorySalesBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]>;
-  getSalesDataOverTime(days: number): Promise<{ date: string; sales: number; orders: number; customers: number }[]>;
 
   // Notification operations
   getNotifications(userId?: string): Promise<Notification[]>;
@@ -689,55 +687,6 @@ export class DatabaseStorage implements IStorage {
     return results.map(r => ({
       status: r.status,
       count: Number(r.count),
-    }));
-  }
-
-  async getCategorySalesBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]> {
-    const results = await db
-      .select({
-        categoryName: sql<string>`COALESCE(${categories.name}, 'Uncategorized')`,
-        totalQuantity: sql<number>`SUM(${orderItems.quantity})`,
-        totalRevenue: sql<number>`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`,
-      })
-      .from(orderItems)
-      .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .leftJoin(products, eq(orderItems.productId, products.id))
-      .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(eq(orders.status, 'completed'))
-      .groupBy(sql`COALESCE(${categories.name}, 'Uncategorized')`)
-      .orderBy(desc(sql`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`));
-
-    const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1'];
-    
-    return results.map((r, index) => ({
-      name: r.categoryName,
-      value: Number(r.totalQuantity),
-      revenue: Number(r.totalRevenue),
-      fill: colors[index % colors.length],
-    }));
-  }
-
-  async getSalesDataOverTime(days: number): Promise<{ date: string; sales: number; orders: number; customers: number }[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    const results = await db
-      .select({
-        date: sql<string>`DATE(${orders.createdAt})`,
-        sales: sql<number>`SUM(CAST(${orders.total} AS NUMERIC))`,
-        orders: sql<number>`COUNT(*)`,
-        customers: sql<number>`COUNT(DISTINCT ${orders.customerId})`,
-      })
-      .from(orders)
-      .where(sql`${orders.createdAt} >= ${startDate}`)
-      .groupBy(sql`DATE(${orders.createdAt})`)
-      .orderBy(sql`DATE(${orders.createdAt})`);
-
-    return results.map(r => ({
-      date: new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      sales: Number(r.sales),
-      orders: Number(r.orders),
-      customers: Number(r.customers),
     }));
   }
 
