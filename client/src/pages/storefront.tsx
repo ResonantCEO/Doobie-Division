@@ -280,9 +280,22 @@ export default function StorefrontPage() {
                       size="sm"
                       className="glass-button text-black dark:text-white"
                       onClick={() => {
-                        // Go back to the parent category view (showing all parent categories)
-                        setCurrentParentCategory(null);
-                        setSelectedCategory(null);
+                        // When we have a selectedCategory, go back to its parent category view
+                        if (selectedCategory) {
+                          const selectedCat = categories.find(cat => cat.id === selectedCategory);
+                          if (selectedCat?.parentId) {
+                            setCurrentParentCategory(selectedCat.parentId);
+                            setSelectedCategory(null);
+                          } else {
+                            // If no parent, go to main categories
+                            setCurrentParentCategory(null);
+                            setSelectedCategory(null);
+                          }
+                        } else {
+                          // If no selected category, go back to main categories
+                          setCurrentParentCategory(null);
+                          setSelectedCategory(null);
+                        }
                         setShowDealsOnly(false);
                       }}
                     >
