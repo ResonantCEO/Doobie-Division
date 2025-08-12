@@ -331,8 +331,9 @@ export default function StorefrontPage() {
                 // Group products by their direct subcategory
                 const productsBySubcategory = new Map<number, (Product & { category: Category | null })[]>();
                 
+                // First, group all products by their category ID
                 products.forEach(product => {
-                  if (product.category && subcategoriesForParent.some(sub => sub.id === product.category!.id)) {
+                  if (product.category) {
                     if (!productsBySubcategory.has(product.category.id)) {
                       productsBySubcategory.set(product.category.id, []);
                     }
