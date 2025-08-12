@@ -349,8 +349,25 @@ export default function StorefrontPage() {
 
                 // Always show all subcategories, even if they have no products
                 return subcategoriesForParent.map(subcategory => {
-                  // Get products that belong to this specific subcategory
-                  const subcategoryProducts = productsBySubcategory.get(subcategory.id) || [];
+                  // Get products that belong to this specific subcategory OR any of its children
+                  const getProductsForSubcategory = (subcategoryId: number): (Product & { category: Category | null })[] => {
+                    // Get direct products for this subcategory
+                    const directProducts = productsBySubcategory.get(subcategoryId) || [];
+                    
+                    // Get all child categories of this subcategory
+                    const childCategories = categories.filter(cat => cat.parentId === subcategoryId);
+                    
+                    // Get products from all child categories
+                    const childProducts: (Product & { category: Category | null })[] = [];
+                    childCategories.forEach(childCat => {
+                      const childCatProducts = productsBySubcategory.get(childCat.id) || [];
+                      childProducts.push(...childCatProducts);
+                    });
+                    
+                    return [...directProducts, ...childProducts];
+                  };
+
+                  const subcategoryProducts = getProductsForSubcategory(subcategory.id);
 
                   return (
                     <div key={subcategory.id} className="space-y-4">
