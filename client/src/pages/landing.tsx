@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ShoppingBag, Users, BarChart3, Package, Star, Shield, Clock, Smartphone, CreditCard, Truck } from "lucide-react";
+import { ShoppingBag, Users, BarChart3, Package, Star, Shield, Clock, Smartphone, Truck, ArrowRight, CheckCircle, Zap, Heart, Sparkles } from "lucide-react";
 import { AuthForms } from "@/components/auth-forms";
 
 export default function Landing() {
@@ -14,15 +14,20 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
       {/* Navigation */}
-      <nav className="bg-background shadow-sm border-b border-border">
+      <nav className="bg-black/10 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex-shrink-0">
-              <h1 className="text-2xl font-bold text-primary">Doobie Division</h1>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Doobie Division
+              </h1>
             </div>
-            <Button onClick={handleLogin} className="bg-primary hover:bg-primary/90">
+            <Button 
+              onClick={handleLogin} 
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 border-0 px-6 py-2 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25"
+            >
               Sign In
             </Button>
           </div>
@@ -30,317 +35,299 @@ export default function Landing() {
       </nav>
 
       {/* Hero Section */}
-      <div className="hero-gradient text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="relative py-32 overflow-hidden">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-10 left-10 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
+          <div className="absolute top-20 right-10 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
+          <div className="absolute bottom-20 left-20 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000"></div>
+        </div>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              Your Premium Shopping Experience Awaits
+            <div className="mb-6">
+              <span className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 text-sm font-medium mb-8">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Premium Experience
+              </span>
+            </div>
+            
+            <h1 className="text-5xl md:text-7xl font-bold mb-8 leading-tight">
+              <span className="bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
+                Your Premium
+              </span>
+              <br />
+              <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-purple-300 bg-clip-text text-transparent">
+                Shopping Experience
+              </span>
+              <br />
+              <span className="text-white/90 text-4xl md:text-5xl">
+                Awaits
+              </span>
             </h1>
-            <p className="text-xl md:text-2xl mb-8 text-blue-100 dark:text-gray-300 max-w-4xl mx-auto">
+            
+            <p className="text-xl md:text-2xl mb-12 text-white/70 max-w-4xl mx-auto leading-relaxed">
               Discover curated products, enjoy seamless ordering, and experience personalized service 
               with our premium marketplace designed for discerning customers.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            
+            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-12">
               <Button 
                 onClick={handleLogin}
                 size="lg"
-                className="bg-white dark:bg-gray-800 text-primary dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 text-lg px-8 py-3"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-lg px-12 py-4 rounded-full shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105 group"
               >
                 Start Shopping
+                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
-              <div className="flex items-center text-blue-100">
-                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-1" />
-                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-1" />
-                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-1" />
-                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-1" />
-                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-3" />
-                <span className="text-sm">Trusted by 10,000+ customers</span>
+              
+              <div className="flex items-center space-x-2 text-white/80">
+                <div className="flex">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                  ))}
+                </div>
+                <span className="text-sm font-medium ml-2">Trusted by 10,000+ customers</span>
+              </div>
+            </div>
+            
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-8 max-w-md mx-auto">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-300">10K+</div>
+                <div className="text-sm text-white/60">Happy Customers</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-pink-300">24/7</div>
+                <div className="text-sm text-white/60">Support</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-300">Fast</div>
+                <div className="text-sm text-white/60">Delivery</div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Customer Experience Journey */}
-      <div className="py-20 bg-white">
+      {/* Customer Journey - Modern Cards */}
+      <div className="py-24 bg-gradient-to-b from-transparent to-black/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Your Journey with Doobie Division
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
+              Your Journey with Us
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              From browsing to delivery, we've crafted every step of your experience to be smooth, 
-              secure, and satisfying. Here's what makes shopping with us special.
-            </p>
-          </div>
-
-          {/* Customer Journey Steps */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
-            <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 relative">
-                <ShoppingBag className="h-8 w-8 text-green-600" />
-                <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Browse & Discover</h3>
-              <p className="text-gray-600 text-sm">
-                Explore our curated selection of premium products with detailed descriptions, 
-                reviews, and high-quality images to help you make informed choices.
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 relative">
-                <Shield className="h-8 w-8 text-blue-600" />
-                <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Secure Checkout</h3>
-              <p className="text-gray-600 text-sm">
-                Complete your purchase with confidence using our encrypted checkout process. 
-                Secure processing and data protection ensure a safe transaction experience.
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4 relative">
-                <Package className="h-8 w-8 text-purple-600" />
-                <div className="absolute -top-2 -right-2 w-6 h-6 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Order Processing</h3>
-              <p className="text-gray-600 text-sm">
-                Our team carefully prepares your order with attention to quality and discretion. 
-                Real-time updates keep you informed every step of the way.
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 relative">
-                <Truck className="h-8 w-8 text-orange-600" />
-                <div className="absolute -top-2 -right-2 w-6 h-6 bg-orange-600 text-white rounded-full flex items-center justify-center text-sm font-bold">4</div>
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Fast Delivery</h3>
-              <p className="text-gray-600 text-sm">
-                Enjoy quick, discreet delivery to your door. Track your package in real-time 
-                and receive notifications when your order is on its way.
-              </p>
-            </div>
-          </div>
-
-          {/* Customer Benefits */}
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card className="text-center p-6 hover:shadow-lg transition-shadow border-2 border-green-200">
-              <CardHeader>
-                <div className="mx-auto w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                  <Shield className="h-6 w-6 text-green-600" />
-                </div>
-                <CardTitle className="text-xl text-green-700">Premium Quality</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  Rigorously tested products from trusted suppliers. Every item meets our strict quality 
-                  standards for authenticity, excellence, and safety.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center p-6 hover:shadow-lg transition-shadow border-2 border-blue-200">
-              <CardHeader>
-                <div className="mx-auto w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                  <Smartphone className="h-6 w-6 text-blue-600" />
-                </div>
-                <CardTitle className="text-xl text-blue-700">Easy Mobile Experience</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  Shop anywhere, anytime with our mobile-optimized platform. Intuitive design 
-                  makes browsing and ordering effortless on any device.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center p-6 hover:shadow-lg transition-shadow border-2 border-purple-200">
-              <CardHeader>
-                <div className="mx-auto w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                  <Clock className="h-6 w-6 text-purple-600" />
-                </div>
-                <CardTitle className="text-xl text-purple-700">Fast & Reliable</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  Quick processing times and reliable delivery. Most orders ship within 24 hours 
-                  with tracking information provided immediately.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-
-      {/* What Customers Love */}
-      <div className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              What Our Customers Love Most
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Here's what sets us apart and keeps customers coming back for more.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                    <Star className="h-5 w-5 text-green-600" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Product Variety</h3>
-                  <p className="text-gray-600 text-sm">
-                    "Amazing selection! From electronics to home goods to specialty items - they have everything 
-                    I need with detailed product information."
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">- Sarah M., verified customer</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Clock className="h-5 w-5 text-blue-600" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Quick Delivery</h3>
-                  <p className="text-gray-600 text-sm">
-                    "Ordered Monday, received Wednesday. Package was discreet and products were 
-                    exactly as described. Will definitely order again!"
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">- Mike R., verified customer</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                    <Users className="h-5 w-5 text-purple-600" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Customer Service</h3>
-                  <p className="text-gray-600 text-sm">
-                    "Had a question about specifications and got helpful advice immediately. The team 
-                    really knows their products and cares about customers."
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">- Jessica L., verified customer</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Features for Customers */}
-      <div className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Features Designed for You
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Every feature we build is focused on making your shopping experience 
-              better, safer, and more convenient.
+            <p className="text-xl text-white/70 max-w-3xl mx-auto leading-relaxed">
+              Every step designed for excellence, security, and satisfaction
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <Card className="text-center p-6 hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="mx-auto w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                  <ShoppingBag className="h-6 w-6 text-primary" />
+            {[
+              {
+                icon: ShoppingBag,
+                step: "01",
+                title: "Browse & Discover",
+                description: "Explore curated products with detailed info, reviews, and stunning visuals",
+                color: "from-green-400 to-emerald-500"
+              },
+              {
+                icon: Shield,
+                step: "02",
+                title: "Secure Checkout",
+                description: "Complete purchases with confidence using encrypted processing",
+                color: "from-blue-400 to-cyan-500"
+              },
+              {
+                icon: Package,
+                step: "03",
+                title: "Order Processing",
+                description: "Professional preparation with real-time updates and quality assurance",
+                color: "from-purple-400 to-violet-500"
+              },
+              {
+                icon: Truck,
+                step: "04",
+                title: "Fast Delivery",
+                description: "Quick, discreet delivery with real-time tracking and notifications",
+                color: "from-pink-400 to-rose-500"
+              }
+            ].map((item, index) => (
+              <div key={index} className="group">
+                <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:border-white/20 transition-all duration-500 hover:scale-105 hover:bg-white/10">
+                  <div className="relative mb-6">
+                    <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
+                      <item.icon className="w-8 h-8 text-white" />
+                    </div>
+                    <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white">
+                      {item.step}
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-semibold mb-3 text-white group-hover:text-purple-200 transition-colors">
+                    {item.title}
+                  </h3>
+                  <p className="text-white/70 text-sm leading-relaxed">
+                    {item.description}
+                  </p>
                 </div>
-                <CardTitle className="text-xl">Smart Search</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  Find exactly what you're looking for with intelligent filters by category, brand, 
-                  features, and price range.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center p-6 hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="mx-auto w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                  <Package className="h-6 w-6 text-secondary" />
-                </div>
-                <CardTitle className="text-xl">Real-time Stock</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  Never worry about out-of-stock surprises. See live inventory levels and get 
-                  notifications when favorites are back.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center p-6 hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="mx-auto w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                  <Truck className="h-6 w-6 text-purple-600" />
-                </div>
-                <CardTitle className="text-xl">Order Tracking</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  Follow your order from confirmation to delivery with detailed tracking and 
-                  proactive notifications.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center p-6 hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="mx-auto w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
-                  <BarChart3 className="h-6 w-6 text-orange-600" />
-                </div>
-                <CardTitle className="text-xl">Personal Dashboard</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  View your order history, track spending, save favorites, and manage your 
-                  preferences in one place.
-                </p>
-              </CardContent>
-            </Card>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Call to Action */}
-      <div className="bg-gradient-to-r from-green-600 to-blue-600 py-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Ready to Elevate Your Shopping Experience?
+      {/* Features Section - Modern Bento Grid */}
+      <div className="py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
+              Why Choose Us
+            </h2>
+            <p className="text-xl text-white/70 max-w-2xl mx-auto">
+              Experience the difference with features built for modern shopping
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                icon: Zap,
+                title: "Lightning Fast",
+                description: "Optimized performance for seamless browsing and instant loading",
+                size: "large",
+                gradient: "from-yellow-400 to-orange-500"
+              },
+              {
+                icon: Shield,
+                title: "Bank-Level Security",
+                description: "Advanced encryption and secure processing",
+                size: "medium",
+                gradient: "from-blue-400 to-purple-500"
+              },
+              {
+                icon: Heart,
+                title: "Customer First",
+                description: "Dedicated support team available 24/7",
+                size: "medium",
+                gradient: "from-pink-400 to-red-500"
+              },
+              {
+                icon: Smartphone,
+                title: "Mobile Optimized",
+                description: "Perfect experience across all devices and screen sizes",
+                size: "large",
+                gradient: "from-green-400 to-teal-500"
+              },
+              {
+                icon: Clock,
+                title: "Real-Time Updates",
+                description: "Live inventory and order tracking",
+                size: "medium",
+                gradient: "from-purple-400 to-indigo-500"
+              },
+              {
+                icon: CheckCircle,
+                title: "Quality Guaranteed",
+                description: "Rigorous testing and authenticity verification",
+                size: "medium",
+                gradient: "from-emerald-400 to-cyan-500"
+              }
+            ].map((feature, index) => (
+              <div key={index} className={`${feature.size === 'large' ? 'md:col-span-2' : ''} group`}>
+                <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:border-white/20 transition-all duration-500 hover:scale-105 hover:bg-white/10 h-full">
+                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                    <feature.icon className="w-7 h-7 text-white" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-3 text-white group-hover:text-purple-200 transition-colors">
+                    {feature.title}
+                  </h3>
+                  <p className="text-white/70 leading-relaxed">
+                    {feature.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Social Proof Section */}
+      <div className="py-24 bg-gradient-to-b from-black/20 to-transparent">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
+              Loved by Thousands
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                name: "Sarah M.",
+                text: "Amazing selection and lightning-fast delivery. The quality exceeded my expectations!",
+                rating: 5,
+                verified: true
+              },
+              {
+                name: "Mike R.",
+                text: "Seamless experience from start to finish. The customer service is exceptional.",
+                rating: 5,
+                verified: true
+              },
+              {
+                name: "Jessica L.",
+                text: "Love the mobile app and real-time tracking. Makes shopping so convenient!",
+                rating: 5,
+                verified: true
+              }
+            ].map((review, index) => (
+              <div key={index} className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:border-white/20 transition-all duration-300">
+                <div className="flex mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                  ))}
+                </div>
+                <p className="text-white/80 mb-6 leading-relaxed">"{review.text}"</p>
+                <div className="flex items-center">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-semibold mr-3">
+                    {review.name.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="text-white font-medium">{review.name}</div>
+                    <div className="text-white/50 text-sm flex items-center">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Verified Customer
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* CTA Section */}
+      <div className="py-24 relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-purple-600/20"></div>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+          <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
+            Ready to Experience the Future?
           </h2>
-          <p className="text-xl text-green-100 mb-8">
-            Join thousands of satisfied customers who trust Doobie Division for their premium 
-            shopping needs. Start your journey today.
+          <p className="text-xl text-white/70 mb-12 max-w-2xl mx-auto leading-relaxed">
+            Join thousands of satisfied customers who trust Doobie Division for their premium shopping needs.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
             <Button 
               onClick={handleLogin}
               size="lg"
-              className="bg-white text-green-600 hover:bg-gray-100 text-lg px-8 py-3"
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xl px-12 py-4 rounded-full shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105 group"
             >
-              Create Your Account
+              Get Started Now
+              <ArrowRight className="ml-2 w-6 h-6 group-hover:translate-x-1 transition-transform" />
             </Button>
-            <div className="flex items-center text-green-100 text-sm">
+            
+            <div className="flex items-center text-white/60 text-sm">
               <Shield className="h-4 w-4 mr-2" />
               SSL Secured • Secure Processing • Discreet Packaging
             </div>
@@ -349,57 +336,69 @@ export default function Landing() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-white border-t">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <footer className="bg-black/40 backdrop-blur-sm border-t border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <h3 className="font-bold text-lg mb-4 text-primary">Doobie Division</h3>
-              <p className="text-gray-600 text-sm">
-                Your trusted partner for premium products, delivered with care and discretion.
+            <div className="md:col-span-2">
+              <h3 className="font-bold text-2xl mb-4 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Doobie Division
+              </h3>
+              <p className="text-white/70 text-sm leading-relaxed max-w-md">
+                Your trusted partner for premium products, delivered with care and discretion. 
+                Experience the future of online shopping.
               </p>
             </div>
             <div>
-              <h4 className="font-semibold mb-3">Customer Care</h4>
-              <ul className="text-sm text-gray-600 space-y-2">
-                <li>Order Support</li>
-                <li>Product Questions</li>
-                <li>Return Policy</li>
-                <li>FAQ</li>
+              <h4 className="font-semibold mb-4 text-white">Support</h4>
+              <ul className="text-sm text-white/60 space-y-3">
+                <li className="hover:text-white transition-colors cursor-pointer">Order Support</li>
+                <li className="hover:text-white transition-colors cursor-pointer">Product Questions</li>
+                <li className="hover:text-white transition-colors cursor-pointer">Return Policy</li>
+                <li className="hover:text-white transition-colors cursor-pointer">FAQ</li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-3">Products</h4>
-              <ul className="text-sm text-gray-600 space-y-2">
-                <li>Electronics</li>
-                <li>Home & Garden</li>
-                <li>Specialty Items</li>
-                <li>Accessories</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-3">Company</h4>
-              <ul className="text-sm text-gray-600 space-y-2">
-                <li>About Us</li>
-                <li>Quality Promise</li>
-                <li>Privacy Policy</li>
-                <li>Terms of Service</li>
+              <h4 className="font-semibold mb-4 text-white">Company</h4>
+              <ul className="text-sm text-white/60 space-y-3">
+                <li className="hover:text-white transition-colors cursor-pointer">About Us</li>
+                <li className="hover:text-white transition-colors cursor-pointer">Quality Promise</li>
+                <li className="hover:text-white transition-colors cursor-pointer">Privacy Policy</li>
+                <li className="hover:text-white transition-colors cursor-pointer">Terms of Service</li>
               </ul>
             </div>
           </div>
-          <div className="border-t mt-8 pt-8 text-center text-gray-600">
+          <div className="border-t border-white/10 mt-12 pt-8 text-center text-white/50 text-sm">
             <p>&copy; 2024 Doobie Division. All rights reserved. | Must be 18+ to purchase.</p>
           </div>
         </div>
       </footer>
 
       <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
-        <DialogContent>
+        <DialogContent className="bg-slate-900 border-white/20">
           <DialogHeader>
-            <DialogTitle>Join Doobie Division</DialogTitle>
+            <DialogTitle className="text-white">Join Doobie Division</DialogTitle>
           </DialogHeader>
           <AuthForms onSuccess={() => setShowAuthDialog(false)} />
         </DialogContent>
       </Dialog>
+
+      <style jsx>{`
+        @keyframes blob {
+          0% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+      `}</style>
     </div>
   );
 }
