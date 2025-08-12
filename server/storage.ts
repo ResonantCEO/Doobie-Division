@@ -534,12 +534,12 @@ export class DatabaseStorage implements IStorage {
       }).returning();
 
       // Create order items
-      const orderItems = items.map(item => ({
+      const orderItemsData = items.map(item => ({
         ...item,
         orderId: order.id,
       }));
 
-      await tx.insert(orderItems).values(orderItems);
+      await tx.insert(orderItems).values(orderItemsData);
 
       // Reduce stock for each item
       for (const item of items) {
@@ -552,7 +552,8 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Get the complete order with items
-      return await this.getOrder(order.id);
+      const fullOrder = await this.getOrder(order.id);
+      return fullOrder!;
     });
   }
 
