@@ -314,17 +314,86 @@ export default function StorefrontPage() {
         </div>
       </div>
 
-      {/* Products Grid */}
+      {/* Products by Category */}
       {products.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground text-lg">No products found</p>
           <p className="text-muted-foreground/60 mt-2">Try adjusting your search or category filter</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+        <div className="space-y-8">
+          {(() => {
+            // Group products by parent category
+            const productsByParentCategory = new Map<number | null, (Product & { category: Category | null })[]>();
+            
+            products.forEach(product => {
+              if (!product.category) {
+                // Products without category
+                if (!productsByParentCategory.has(null)) {
+                  productsByParentCategory.set(null, []);
+                }
+                productsByParentCategory.get(null)!.push(product);
+                return;
+              }
+
+              // Find the parent category ID
+              const parentCategoryId = product.category.parentId || product.category.id;
+              
+              if (!productsByParentCategory.has(parentCategoryId)) {
+                productsByParentCategory.set(parentCategoryId, []);
+              }
+              productsByParentCategory.get(parentCategoryId)!.push(product);
+            });
+
+            return Array.from(productsByParentCategory.entries()).map(([parentCategoryId, categoryProducts]) => {
+              if (categoryProducts.length === 0) return null;
+
+              // Find the parent category info
+              const parentCategory = parentCategoryId 
+                ? categories.find(cat => cat.id === parentCategoryId && !cat.parentId)
+                : null;
+
+              const categoryName = parentCategory?.name || 'Uncategorized';
+
+              return (
+                <div key={parentCategoryId || 'uncategorized'} className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {categoryName}
+                    </h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="glass-button text-black dark:text-white"
+                      onClick={() => {
+                        if (parentCategoryId) {
+                          handleCategoryFilter(parentCategoryId);
+                        }
+                      }}
+                    >
+                      View All
+                    </Button>
+                  </div>
+                  
+                  {/* Horizontal Scrolling Product Container */}
+                  <div className="relative">
+                    <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
+                      <div className="flex space-x-4" style={{ minWidth: 'max-content' }}>
+                        {categoryProducts.map((product) => (
+                          <div key={product.id} className="flex-shrink-0 w-64 sm:w-72">
+                            <ProductCard product={product} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Scroll indicators */}
+                    <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-white dark:from-gray-900 to-transparent pointer-events-none"></div>
+                  </div>
+                </div>
+              );
+            }).filter(Boolean);
+          })()}
         </div>
       )}
     </div>
