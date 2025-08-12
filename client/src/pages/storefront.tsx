@@ -323,7 +323,7 @@ export default function StorefrontPage() {
       ) : (
         <div className="space-y-8">
           {(() => {
-            // Group products by parent category
+            // Group products by main parent category (root level)
             const productsByParentCategory = new Map<number | null, (Product & { category: Category | null })[]>();
             
             products.forEach(product => {
@@ -336,32 +336,36 @@ export default function StorefrontPage() {
                 return;
               }
 
-              // Determine the parent category ID for grouping
-              let parentCategoryId;
+              // Find the root parent category
+              let rootCategoryId = product.category.id;
+              let currentCategory = product.category;
               
-              if (product.category.parentId) {
-                // This is a subcategory, use its parent
-                parentCategoryId = product.category.parentId;
-              } else {
-                // This is already a parent category, use its own ID
-                parentCategoryId = product.category.id;
+              // Traverse up the category tree to find the root parent
+              while (currentCategory.parentId) {
+                const parentCategory = categories.find(cat => cat.id === currentCategory.parentId);
+                if (parentCategory) {
+                  rootCategoryId = parentCategory.id;
+                  currentCategory = parentCategory;
+                } else {
+                  break;
+                }
               }
               
-              if (!productsByParentCategory.has(parentCategoryId)) {
-                productsByParentCategory.set(parentCategoryId, []);
+              if (!productsByParentCategory.has(rootCategoryId)) {
+                productsByParentCategory.set(rootCategoryId, []);
               }
-              productsByParentCategory.get(parentCategoryId)!.push(product);
+              productsByParentCategory.get(rootCategoryId)!.push(product);
             });
 
             return Array.from(productsByParentCategory.entries()).map(([parentCategoryId, categoryProducts]) => {
               if (categoryProducts.length === 0) return null;
 
-              // Find the parent category info
-              const parentCategory = parentCategoryId 
+              // Find the root category info
+              const rootCategory = parentCategoryId 
                 ? categories.find(cat => cat.id === parentCategoryId)
                 : null;
 
-              const categoryName = parentCategory?.name || 'Uncategorized';
+              const categoryName = rootCategory?.name || 'Uncategorized';
 
               return (
                 <div key={parentCategoryId || 'uncategorized'} className="space-y-4">
