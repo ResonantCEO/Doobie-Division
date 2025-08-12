@@ -96,7 +96,7 @@ export default function Landing() {
               <h3 className="text-lg font-semibold mb-2">Secure Checkout</h3>
               <p className="text-gray-600 text-sm">
                 Complete your purchase with confidence using our encrypted checkout process. 
-                Identity verification and secure processing ensure a safe transaction.
+                Secure processing and data protection ensure a safe transaction experience.
               </p>
             </div>
 
@@ -342,7 +342,7 @@ export default function Landing() {
             </Button>
             <div className="flex items-center text-green-100 text-sm">
               <Shield className="h-4 w-4 mr-2" />
-              SSL Secured • Identity Verification • Discreet Packaging
+              SSL Secured • Secure Processing • Discreet Packaging
             </div>
           </div>
         </div>
