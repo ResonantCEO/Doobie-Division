@@ -1,8 +1,9 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ShoppingBag, Users, BarChart3, Package } from "lucide-react";
+import { ShoppingBag, Users, BarChart3, Package, Star, Shield, Clock, Smartphone, CreditCard, Truck } from "lucide-react";
 import { AuthForms } from "@/components/auth-forms";
 
 export default function Landing() {
@@ -33,33 +34,227 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              Rolling with the Division!
+              Your Premium Cannabis Experience Awaits
             </h1>
-            <p className="text-xl md:text-2xl mb-8 text-blue-100 dark:text-gray-300 max-w-3xl mx-auto">
-              Streamline your business with our comprehensive platform for product catalog, 
-              inventory tracking, order management, and analytics.
+            <p className="text-xl md:text-2xl mb-8 text-blue-100 dark:text-gray-300 max-w-4xl mx-auto">
+              Discover curated products, enjoy seamless ordering, and experience personalized service 
+              with our premium cannabis marketplace designed for discerning customers.
             </p>
-            <Button 
-              onClick={handleLogin}
-              size="lg"
-              className="bg-white dark:bg-gray-800 text-primary dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 text-lg px-8 py-3"
-            >
-              Get Started Today
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Button 
+                onClick={handleLogin}
+                size="lg"
+                className="bg-white dark:bg-gray-800 text-primary dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 text-lg px-8 py-3"
+              >
+                Start Shopping
+              </Button>
+              <div className="flex items-center text-blue-100">
+                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-1" />
+                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-1" />
+                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-1" />
+                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-1" />
+                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-3" />
+                <span className="text-sm">Trusted by 10,000+ customers</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Features Section */}
+      {/* Customer Experience Journey */}
       <div className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Everything you need to run your business
+              Your Journey with Doobie Division
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              From browsing to delivery, we've crafted every step of your experience to be smooth, 
+              secure, and satisfying. Here's what makes shopping with us special.
+            </p>
+          </div>
+
+          {/* Customer Journey Steps */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 relative">
+                <ShoppingBag className="h-8 w-8 text-green-600" />
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Browse & Discover</h3>
+              <p className="text-gray-600 text-sm">
+                Explore our curated selection of premium products with detailed descriptions, 
+                reviews, and high-quality images to help you make informed choices.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 relative">
+                <CreditCard className="h-8 w-8 text-blue-600" />
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Secure Checkout</h3>
+              <p className="text-gray-600 text-sm">
+                Complete your purchase with confidence using our encrypted checkout process. 
+                Multiple payment options and age verification ensure a safe transaction.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4 relative">
+                <Package className="h-8 w-8 text-purple-600" />
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Order Processing</h3>
+              <p className="text-gray-600 text-sm">
+                Our team carefully prepares your order with attention to quality and discretion. 
+                Real-time updates keep you informed every step of the way.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 relative">
+                <Truck className="h-8 w-8 text-orange-600" />
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-orange-600 text-white rounded-full flex items-center justify-center text-sm font-bold">4</div>
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Fast Delivery</h3>
+              <p className="text-gray-600 text-sm">
+                Enjoy quick, discreet delivery to your door. Track your package in real-time 
+                and receive notifications when your order is on its way.
+              </p>
+            </div>
+          </div>
+
+          {/* Customer Benefits */}
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="text-center p-6 hover:shadow-lg transition-shadow border-2 border-green-200">
+              <CardHeader>
+                <div className="mx-auto w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
+                  <Shield className="h-6 w-6 text-green-600" />
+                </div>
+                <CardTitle className="text-xl text-green-700">Premium Quality</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Lab-tested products from trusted suppliers. Every item meets our strict quality 
+                  standards for potency, purity, and safety.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="text-center p-6 hover:shadow-lg transition-shadow border-2 border-blue-200">
+              <CardHeader>
+                <div className="mx-auto w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+                  <Smartphone className="h-6 w-6 text-blue-600" />
+                </div>
+                <CardTitle className="text-xl text-blue-700">Easy Mobile Experience</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Shop anywhere, anytime with our mobile-optimized platform. Intuitive design 
+                  makes browsing and ordering effortless on any device.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="text-center p-6 hover:shadow-lg transition-shadow border-2 border-purple-200">
+              <CardHeader>
+                <div className="mx-auto w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+                  <Clock className="h-6 w-6 text-purple-600" />
+                </div>
+                <CardTitle className="text-xl text-purple-700">Fast & Reliable</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Quick processing times and reliable delivery. Most orders ship within 24 hours 
+                  with tracking information provided immediately.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* What Customers Love */}
+      <div className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              What Our Customers Love Most
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              From product management to customer orders, our platform provides all the tools 
-              you need in one integrated solution.
+              Here's what sets us apart and keeps customers coming back for more.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <Star className="h-5 w-5 text-green-600" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Product Variety</h3>
+                  <p className="text-gray-600 text-sm">
+                    "Amazing selection! From flower to edibles to concentrates - they have everything 
+                    I need with detailed product information."
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">- Sarah M., verified customer</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Clock className="h-5 w-5 text-blue-600" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Quick Delivery</h3>
+                  <p className="text-gray-600 text-sm">
+                    "Ordered Monday, received Wednesday. Package was discreet and products were 
+                    exactly as described. Will definitely order again!"
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">- Mike R., verified customer</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                    <Users className="h-5 w-5 text-purple-600" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Customer Service</h3>
+                  <p className="text-gray-600 text-sm">
+                    "Had a question about dosage and got helpful advice immediately. The team 
+                    really knows their products and cares about customers."
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">- Jessica L., verified customer</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Features for Customers */}
+      <div className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Features Designed for You
+            </h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Every feature we build is focused on making your cannabis shopping experience 
+              better, safer, and more convenient.
             </p>
           </div>
 
@@ -69,11 +264,12 @@ export default function Landing() {
                 <div className="mx-auto w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
                   <ShoppingBag className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="text-xl">Product Catalog</CardTitle>
+                <CardTitle className="text-xl">Smart Search</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Manage your product catalog with categories, search functionality, and rich product details.
+                  Find exactly what you're looking for with intelligent filters by type, potency, 
+                  effects, and price range.
                 </p>
               </CardContent>
             </Card>
@@ -83,11 +279,12 @@ export default function Landing() {
                 <div className="mx-auto w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
                   <Package className="h-6 w-6 text-secondary" />
                 </div>
-                <CardTitle className="text-xl">Inventory Tracking</CardTitle>
+                <CardTitle className="text-xl">Real-time Stock</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Real-time stock tracking, low stock alerts, and QR code generation for easy inventory management.
+                  Never worry about out-of-stock surprises. See live inventory levels and get 
+                  notifications when favorites are back.
                 </p>
               </CardContent>
             </Card>
@@ -95,13 +292,14 @@ export default function Landing() {
             <Card className="text-center p-6 hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="mx-auto w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                  <Users className="h-6 w-6 text-purple-600" />
+                  <Truck className="h-6 w-6 text-purple-600" />
                 </div>
-                <CardTitle className="text-xl">Order Management</CardTitle>
+                <CardTitle className="text-xl">Order Tracking</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Complete order workflow from placement to delivery with status tracking and customer communication.
+                  Follow your order from confirmation to delivery with detailed tracking and 
+                  proactive notifications.
                 </p>
               </CardContent>
             </Card>
@@ -111,11 +309,12 @@ export default function Landing() {
                 <div className="mx-auto w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
                   <BarChart3 className="h-6 w-6 text-orange-600" />
                 </div>
-                <CardTitle className="text-xl">Analytics & Reports</CardTitle>
+                <CardTitle className="text-xl">Personal Dashboard</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600">
-                  Comprehensive analytics dashboard with sales metrics, inventory reports, and business insights.
+                  View your order history, track spending, save favorites, and manage your 
+                  preferences in one place.
                 </p>
               </CardContent>
             </Card>
@@ -124,29 +323,71 @@ export default function Landing() {
       </div>
 
       {/* Call to Action */}
-      <div className="bg-gray-50 py-16">
+      <div className="bg-gradient-to-r from-green-600 to-blue-600 py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Ready to streamline your business?
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Ready to Elevate Your Cannabis Experience?
           </h2>
-          <p className="text-xl text-gray-600 mb-8">
-            Join thousands of businesses who trust our platform for their e-commerce and inventory needs.
+          <p className="text-xl text-green-100 mb-8">
+            Join thousands of satisfied customers who trust Doobie Division for their premium 
+            cannabis needs. Start your journey today.
           </p>
-          <Button 
-            onClick={handleLogin}
-            size="lg"
-            className="bg-primary hover:bg-primary/90 text-lg px-8 py-3"
-          >
-            Start Your Journey
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Button 
+              onClick={handleLogin}
+              size="lg"
+              className="bg-white text-green-600 hover:bg-gray-100 text-lg px-8 py-3"
+            >
+              Create Your Account
+            </Button>
+            <div className="flex items-center text-green-100 text-sm">
+              <Shield className="h-4 w-4 mr-2" />
+              SSL Secured • Age Verification Required • Discreet Packaging
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Footer */}
       <footer className="bg-white border-t">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-gray-600">
-            <p>&copy; 2024 Doobie Division. All rights reserved.</p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid md:grid-cols-4 gap-8">
+            <div>
+              <h3 className="font-bold text-lg mb-4 text-primary">Doobie Division</h3>
+              <p className="text-gray-600 text-sm">
+                Your trusted partner for premium cannabis products, delivered with care and discretion.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-3">Customer Care</h4>
+              <ul className="text-sm text-gray-600 space-y-2">
+                <li>Order Support</li>
+                <li>Product Questions</li>
+                <li>Return Policy</li>
+                <li>FAQ</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-3">Products</h4>
+              <ul className="text-sm text-gray-600 space-y-2">
+                <li>Flower</li>
+                <li>Edibles</li>
+                <li>Concentrates</li>
+                <li>Accessories</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-3">Company</h4>
+              <ul className="text-sm text-gray-600 space-y-2">
+                <li>About Us</li>
+                <li>Quality Promise</li>
+                <li>Privacy Policy</li>
+                <li>Terms of Service</li>
+              </ul>
+            </div>
+          </div>
+          <div className="border-t mt-8 pt-8 text-center text-gray-600">
+            <p>&copy; 2024 Doobie Division. All rights reserved. | Must be 21+ to purchase.</p>
           </div>
         </div>
       </footer>
@@ -154,7 +395,7 @@ export default function Landing() {
       <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Authentication</DialogTitle>
+            <DialogTitle>Join Doobie Division</DialogTitle>
           </DialogHeader>
           <AuthForms onSuccess={() => setShowAuthDialog(false)} />
         </DialogContent>
