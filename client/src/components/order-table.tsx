@@ -183,31 +183,31 @@ export default function OrderTable({ orders }: OrderTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-black">Order Number</TableHead>
-              <TableHead className="text-black">Customer</TableHead>
-              <TableHead className="text-black">Total</TableHead>
-              <TableHead className="text-black">Status</TableHead>
-              <TableHead className="text-black">Date</TableHead>
-              <TableHead className="text-right text-black">Actions</TableHead>
+              <TableHead className="text-white">Order Number</TableHead>
+              <TableHead className="text-white">Customer</TableHead>
+              <TableHead className="text-white">Total</TableHead>
+              <TableHead className="text-white">Status</TableHead>
+              <TableHead className="text-white">Date</TableHead>
+              <TableHead className="text-right text-white">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.map((order) => (
               <TableRow key={order.id}>
-                <TableCell className="font-medium text-black">
+                <TableCell className="font-medium text-white">
                   {order.orderNumber}
                 </TableCell>
                 <TableCell>
                   <div>
-                    <div className="font-medium text-black">{order.customerName}</div>
-                    <div className="text-sm text-black">{order.customerEmail}</div>
+                    <div className="font-medium text-white">{order.customerName}</div>
+                    <div className="text-sm text-white">{order.customerEmail}</div>
                   </div>
                 </TableCell>
-                <TableCell className="font-medium text-black">
+                <TableCell className="font-medium text-white">
                   ${Number(order.total).toFixed(2)}
                 </TableCell>
                 <TableCell>{getStatusBadge(order.status)}</TableCell>
-                <TableCell className="text-black">
+                <TableCell className="text-white">
                   {format(new Date(order.createdAt!), "MMM d, yyyy")}
                 </TableCell>
                 <TableCell className="text-right">
@@ -216,7 +216,7 @@ export default function OrderTable({ orders }: OrderTableProps) {
                       value={order.status}
                       onValueChange={(status) => handleStatusUpdate(order.id, status)}
                     >
-                      <SelectTrigger className="w-32 h-8 bg-gray-100 text-black border-gray-300 hover:bg-gray-200">
+                      <SelectTrigger className="w-32 h-8 bg-gray-100 text-white border-gray-300 hover:bg-gray-200">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -231,7 +231,7 @@ export default function OrderTable({ orders }: OrderTableProps) {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4 text-black" />
+                          <MoreHorizontal className="h-4 w-4 text-white" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
