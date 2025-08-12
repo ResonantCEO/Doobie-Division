@@ -284,7 +284,7 @@ export default function StorefrontPage() {
                           // If we have a selected subcategory, go back to parent category view
                           setSelectedCategory(null);
                           // Keep the currentParentCategory to show the subcategories again
-                        } else {
+                        } else if (currentParentCategory) {
                           // If we're viewing subcategories, go back to main categories
                           setCurrentParentCategory(null);
                         }
