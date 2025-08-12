@@ -16,6 +16,11 @@ export default function StorefrontPage() {
   const [showDealsOnly, setShowDealsOnly] = useState(false);
   const [currentParentCategory, setCurrentParentCategory] = useState<number | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [navigationHistory, setNavigationHistory] = useState<Array<{
+    parentCategory: number | null;
+    selectedCategory: number | null;
+    showDealsOnly: boolean;
+  }>>([]);
 
     // Fetch all discounted products for hero section (independent of filters)
   const { data: allDiscountedProducts = [] } = useQuery<(Product & { category: Category | null })[]>({
@@ -112,6 +117,14 @@ export default function StorefrontPage() {
   });
 
   const handleCategoryFilter = (categoryId: number | null) => {
+    // Save current state to navigation history before changing
+    const currentState = {
+      parentCategory: currentParentCategory,
+      selectedCategory: selectedCategory,
+      showDealsOnly: showDealsOnly
+    };
+    setNavigationHistory(prev => [...prev, currentState]);
+
     if (categoryId) {
       if (categories.length === 0) return;
 
@@ -227,7 +240,16 @@ export default function StorefrontPage() {
             </p>
             <Button 
               className="bg-white text-primary hover:bg-white/90 drop-shadow-md"
-              onClick={() => setShowDealsOnly(true)}
+              onClick={() => {
+                // Save current state before showing deals
+                const currentState = {
+                  parentCategory: currentParentCategory,
+                  selectedCategory: selectedCategory,
+                  showDealsOnly: showDealsOnly
+                };
+                setNavigationHistory(prev => [...prev, currentState]);
+                setShowDealsOnly(true);
+              }}
             >
               Shop Now
             </Button>
@@ -261,7 +283,17 @@ export default function StorefrontPage() {
               size="sm"
               className="glass-button text-black dark:text-white"
               onClick={() => {
-                handleCategoryFilter(null);
+                // Save current state before going to all products
+                if (currentParentCategory || selectedCategory || showDealsOnly) {
+                  const currentState = {
+                    parentCategory: currentParentCategory,
+                    selectedCategory: selectedCategory,
+                    showDealsOnly: showDealsOnly
+                  };
+                  setNavigationHistory(prev => [...prev, currentState]);
+                }
+                setCurrentParentCategory(null);
+                setSelectedCategory(null);
                 setShowDealsOnly(false);
               }}
             >
@@ -280,15 +312,20 @@ export default function StorefrontPage() {
                       size="sm"
                       className="glass-button text-black dark:text-white"
                       onClick={() => {
-                        if (selectedCategory) {
-                          // If we have a selected subcategory, go back to parent category view
-                          setSelectedCategory(null);
-                          // Keep the currentParentCategory to show the subcategories again
-                        } else if (currentParentCategory) {
-                          // If we're viewing subcategories, go back to main categories
+                        if (navigationHistory.length > 0) {
+                          // Go back to the previous state
+                          const previousState = navigationHistory[navigationHistory.length - 1];
+                          setCurrentParentCategory(previousState.parentCategory);
+                          setSelectedCategory(previousState.selectedCategory);
+                          setShowDealsOnly(previousState.showDealsOnly);
+                          // Remove the last state from history
+                          setNavigationHistory(prev => prev.slice(0, -1));
+                        } else {
+                          // Fallback to main categories if no history
                           setCurrentParentCategory(null);
+                          setSelectedCategory(null);
+                          setShowDealsOnly(false);
                         }
-                        setShowDealsOnly(false);
                       }}
                     >
                       ← Back
