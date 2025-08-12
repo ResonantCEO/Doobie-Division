@@ -178,7 +178,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             </div>
 
             {stockStatus && (
-              <div className="mt-4">
+              <div className="mt-2 sm:mt-4">
                 <div className="flex justify-end">
                   <Badge 
                     variant={stockStatus.variant === "destructive" ? "destructive" : "secondary"}

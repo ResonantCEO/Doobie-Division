@@ -494,4 +494,32 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Custom scrollbar styles */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  /* Mobile-optimized product cards */
+  @media (max-width: 640px) {
+    .product-card-container {
+      height: 280px !important;
+      min-height: 280px !important;
+    }
+  }
+
+  @media (min-width: 641px) and (max-width: 768px) {
+    .product-card-container {
+      height: 320px !important;
+      min-height: 320px !important;
+    }
+  }
+
+  @media (min-width: 769px) {
+    .product-card-container {
+      height: 400px !important;
+      min-height: 400px !important;
+    }
+  }
 }

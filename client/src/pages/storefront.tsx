@@ -181,7 +181,7 @@ export default function StorefrontPage() {
     return hasStock && matchesDeals;
   });
 
-  
+
 
   return (
     <div className="space-y-8">
@@ -244,11 +244,11 @@ export default function StorefrontPage() {
         </div>
 
         {/* Category Filter */}
-        <div className="flex flex-wrap gap-4 items-center">
-          <h3 className="text-lg font-semibold text-black dark:text-white">
+        <div className="flex flex-wrap gap-2 sm:gap-4 items-center">
+          <h3 className="text-base sm:text-lg font-semibold text-black dark:text-white">
             {currentParentCategory ? 'Subcategories:' : 'Categories:'}
           </h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1 sm:gap-2">
             {currentParentCategory ? (
               // Show subcategories when a parent category is selected
               (() => {
@@ -321,7 +321,7 @@ export default function StorefrontPage() {
           <p className="text-muted-foreground/60 mt-2">Try adjusting your search or category filter</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
           {products.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
