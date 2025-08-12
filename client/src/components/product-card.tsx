@@ -174,7 +174,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 <p className="text-sm font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-3">{product.category.name}</p>
               )}
               <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3 mb-3 leading-relaxed">
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 leading-relaxed">
                   {product.description || "No description available"}
                 </p>
               </div>
