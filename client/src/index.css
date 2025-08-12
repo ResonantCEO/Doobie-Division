@@ -501,48 +501,18 @@
     height: 8px;
   }
 
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: rgba(156, 163, 175, 0.5);
-    border-radius: 4px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(156, 163, 175, 0.7);
-  }
-
-  /* Scrollbar utilities for horizontal scrolling */
-  .scrollbar-thin {
-    scrollbar-width: thin;
-  }
-
-  .scrollbar-thumb-gray-300 {
-    scrollbar-color: rgba(209, 213, 219, 0.5) transparent;
-  }
-
-  .dark .scrollbar-thumb-gray-600 {
-    scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
-  }
-
-  .scrollbar-track-transparent {
-    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
-  }
-
   /* Mobile-optimized product cards */
   @media (max-width: 640px) {
     .product-card-container {
       height: 360px !important;
       min-height: 360px !important;
     }
-
+    
     .product-card-inner {
       height: 360px !important;
       min-height: 360px !important;
     }
-
+    
     .product-card-face {
       height: 360px !important;
       min-height: 360px !important;
@@ -554,12 +524,12 @@
       height: 400px !important;
       min-height: 400px !important;
     }
-
+    
     .product-card-inner {
       height: 400px !important;
       min-height: 400px !important;
     }
-
+    
     .product-card-face {
       height: 400px !important;
       min-height: 400px !important;
@@ -571,12 +541,12 @@
       height: 450px !important;
       min-height: 450px !important;
     }
-
+    
     .product-card-inner {
       height: 450px !important;
       min-height: 450px !important;
     }
-
+    
     .product-card-face {
       height: 450px !important;
       min-height: 450px !important;
