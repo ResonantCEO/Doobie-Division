@@ -22,7 +22,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, lt, sql, ilike, or, inArray, exists } from "drizzle-orm";
+import { eq, desc, asc, and, or, like, gte, lte, isNull, inArray, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -164,6 +164,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Category operations
+  async getCategories(): Promise<(Category & { children?: Category[] })[]>;
   async getCategories(): Promise<(Category & { children?: Category[] })[]> {
     const allCategories = await db.select().from(categories)
       .where(eq(categories.isActive, true))
@@ -243,6 +244,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Product operations
+  async getProducts(filters?: {
+    categoryId?: number;
+    categoryIds?: number[];
+    search?: string;
+    status?: string;
+  }): Promise<(Product & { category: Category | null })[]>;
   async getProducts(filters?: {
     categoryId?: number;
     categoryIds?: number[];
@@ -357,6 +364,7 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(desc(products.createdAt));
   }
 
+  async getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined>;
   async getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined> {
     const [product] = await db
       .select({
@@ -441,6 +449,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getLowStockProducts(): Promise<Product[]>;
   async getLowStockProducts(): Promise<Product[]> {
     return await db
       .select()
@@ -450,6 +459,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Order operations
+  async getOrders(filters?: { status?: string; customerId?: string }): Promise<Order[]>;
   async getOrders(filters?: { status?: string; customerId?: string }): Promise<Order[]> {
     let query = db.select().from(orders);
 
@@ -468,6 +478,7 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(desc(orders.createdAt));
   }
 
+  async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined>;
   async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined> {
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
     if (!order) return undefined;
@@ -484,91 +495,68 @@ export class DatabaseStorage implements IStorage {
     return { ...order, items };
   }
 
-  async createOrder(orderData: InsertOrder, itemsData: InsertOrderItem[]): Promise<Order> {
-    // Generate order number
-    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+  async createOrder(orderData: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
+  async createOrder(orderData: InsertOrder, items: InsertOrderItem[]): Promise<Order> {
+    return await db.transaction(async (tx) => {
+      // Generate date-based order number (MMDDYY-N)
+      const now = new Date();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const year = String(now.getFullYear()).slice(-2);
+      const datePrefix = `${month}${day}${year}`;
 
-    // Create the order
-    const [order] = await db.insert(orders).values({
-      ...orderData,
-      orderNumber
-    }).returning();
+      // Find the highest sequential number for today
+      const todayOrders = await tx
+        .select({ orderNumber: orders.orderNumber })
+        .from(orders)
+        .where(sql`${orders.orderNumber} LIKE ${datePrefix + '-%'}`);
 
-    // Create order items
-    const itemsWithOrderId = itemsData.map(item => ({
-      ...item,
-      orderId: order.id,
-    }));
+      let nextSequential = 1;
+      if (todayOrders.length > 0) {
+        const sequentialNumbers = todayOrders
+          .map(order => {
+            const parts = order.orderNumber.split('-');
+            return parts.length === 2 ? parseInt(parts[1]) : 0;
+          })
+          .filter(num => !isNaN(num));
 
-    await db.insert(orderItems).values(itemsWithOrderId);
-
-    // Update product stock and create logs/notifications
-    for (const item of itemsData) {
-      if (item.productId) {
-        const [product] = await db
-          .select()
-          .from(products)
-          .where(eq(products.id, item.productId));
-
-        if (product) {
-          const newStock = product.stock - item.quantity;
-          await db
-            .update(products)
-            .set({ stock: newStock })
-            .where(eq(products.id, item.productId));
-
-          // Log inventory change
-          await db.insert(inventoryLogs).values({
-            productId: item.productId,
-            type: 'sale',
-            quantity: -item.quantity,
-            previousStock: product.stock,
-            newStock: newStock,
-            reason: `Order ${order.orderNumber}`,
-            userId: orderData.customerId,
-          });
-
-          // Check for low stock and create notifications
-          if (newStock <= product.minStockThreshold) {
-            // Create notifications for admin users about low stock
-            const adminUsers = await db
-              .select()
-              .from(users)
-              .where(or(eq(users.role, 'admin'), eq(users.role, 'manager')));
-
-            for (const admin of adminUsers) {
-              await db.insert(notifications).values({
-                userId: admin.id,
-                type: 'low_stock',
-                title: 'Low Stock Alert',
-                message: `${product.name} is running low (${newStock} remaining)`,
-                data: { productId: product.id, productName: product.name, stock: newStock, threshold: product.minStockThreshold },
-              });
-            }
-          }
+        if (sequentialNumbers.length > 0) {
+          nextSequential = Math.max(...sequentialNumbers) + 1;
         }
       }
-    }
 
-    // Create new order notifications for admins and managers
-    const adminUsers = await db
-      .select()
-      .from(users)
-      .where(or(eq(users.role, 'admin'), eq(users.role, 'manager')));
+      const orderNumber = `${datePrefix}-${nextSequential}`;
 
-    for (const admin of adminUsers) {
-      await db.insert(notifications).values({
-        userId: admin.id,
-        type: 'new_order',
-        title: 'New Order Received',
-        message: `Order ${order.orderNumber} from ${order.customerName} - $${order.total}`,
-        data: { orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName, total: order.total },
-      });
-    }
+      // Create the order
+      const [order] = await tx.insert(orders).values({
+        ...orderData,
+        orderNumber,
+      }).returning();
 
-    return order;
+      // Create order items
+      const orderItems = items.map(item => ({
+        ...item,
+        orderId: order.id,
+      }));
+
+      await tx.insert(orderItems).values(orderItems);
+
+      // Reduce stock for each item
+      for (const item of items) {
+        await tx.update(products)
+          .set({
+            stock: sql`${products.stock} - ${item.quantity}`,
+            updatedAt: new Date()
+          })
+          .where(eq(products.id, item.productId));
+      }
+
+      // Get the complete order with items
+      return await this.getOrder(order.id);
+    });
   }
 
+  async updateOrderStatus(id: number, status: string): Promise<Order>;
   async updateOrderStatus(id: number, status: string): Promise<Order> {
     const [updated] = await db
       .update(orders)
@@ -582,7 +570,7 @@ export class DatabaseStorage implements IStorage {
     // Reduce product stock
     await db
       .update(products)
-      .set({ 
+      .set({
         stock: sql`${products.stock} - ${quantity}`,
         updatedAt: new Date()
       })
@@ -619,7 +607,7 @@ export class DatabaseStorage implements IStorage {
     if (allFulfilled) {
       await db
         .update(orders)
-        .set({ 
+        .set({
           status: 'shipped',
           updatedAt: new Date()
         })
@@ -630,6 +618,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Analytics operations
+  async getSalesMetrics(days: number): Promise<{
+    totalSales: number;
+    totalOrders: number;
+    averageOrderValue: number;
+  }>;
   async getSalesMetrics(days: number): Promise<{
     totalSales: number;
     totalOrders: number;
@@ -654,6 +647,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  async getTopProducts(limit: number): Promise<{ product: Product; sales: number; revenue: number }[]>;
   async getTopProducts(limit: number): Promise<{ product: Product; sales: number; revenue: number }[]> {
     const results = await db
       .select({
@@ -675,6 +669,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]>;
   async getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]> {
     const results = await db
       .select({
@@ -691,6 +686,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Notification operations
+  async getNotifications(userId?: string): Promise<Notification[]>;
   async getNotifications(userId?: string): Promise<Notification[]> {
     let query = db.select().from(notifications);
 
@@ -701,16 +697,19 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(desc(notifications.createdAt));
   }
 
+  async createNotification(notification: InsertNotification): Promise<Notification>;
   async createNotification(notification: InsertNotification): Promise<Notification> {
     const [newNotification] = await db.insert(notifications).values(notification).returning();
     return newNotification;
   }
 
+  async markNotificationAsRead(id: number): Promise<void>;
   async markNotificationAsRead(id: number): Promise<void> {
     await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
   }
 
   // User management
+  async getUsersWithStats(): Promise<(User & { orderCount?: number })[]>;
   async getUsersWithStats(): Promise<(User & { orderCount?: number })[]> {
     const results = await db
       .select({
@@ -728,6 +727,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async updateUserStatus(id: string, status: string): Promise<User>;
   async updateUserStatus(id: string, status: string): Promise<User> {
     const [user] = await db
       .update(users)
@@ -741,8 +741,8 @@ export class DatabaseStorage implements IStorage {
 
     // Log the status change
     await this.logUserActivity(
-      id, 
-      'Status Updated', 
+      id,
+      'Status Updated',
       `User status changed to ${status}`,
       { previousStatus: user.status, newStatus: status }
     );
@@ -750,6 +750,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUserRole(id: string, role: string): Promise<User>;
   async updateUserRole(id: string, role: string): Promise<User> {
     const [user] = await db
       .update(users)
@@ -763,8 +764,8 @@ export class DatabaseStorage implements IStorage {
 
     // Log the role change
     await this.logUserActivity(
-      id, 
-      'Role Updated', 
+      id,
+      'Role Updated',
       `User role changed to ${role}`,
       { previousRole: user.role, newRole: role }
     );
@@ -772,6 +773,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUserIdVerification(id: string, status: string): Promise<User>;
   async updateUserIdVerification(id: string, status: string): Promise<User> {
     const [updated] = await db
       .update(users)
@@ -781,6 +783,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async getUsersPendingVerification(): Promise<User[]>;
   async getUsersPendingVerification(): Promise<User[]> {
     return await db
       .select()
@@ -789,12 +792,13 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(users.createdAt));
   }
 
+  async updateUser(id: string, userData: any): Promise<User>;
   async updateUser(id: string, userData: any): Promise<User> {
     const [user] = await db
       .update(users)
       .set({
         firstName: userData.firstName,
-        lastName: userData.lastName,  
+        lastName: userData.lastName,
         email: userData.email,
         role: userData.role,
         status: userData.status,
@@ -810,8 +814,8 @@ export class DatabaseStorage implements IStorage {
     // Log the profile update
     const updatedFields = Object.keys(userData).join(', ');
     await this.logUserActivity(
-      id, 
-      'Profile Updated', 
+      id,
+      'Profile Updated',
       `User profile updated: ${updatedFields}`,
       { updatedFields: userData }
     );
@@ -819,6 +823,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getInventoryLogs(filters?: { days?: number; type?: string; product?: string }): Promise<any[]>;
   async getInventoryLogs(filters?: { days?: number; type?: string; product?: string }): Promise<any[]> {
     let query = db
       .select({
@@ -857,7 +862,8 @@ export class DatabaseStorage implements IStorage {
 
     return await query.orderBy(desc(inventoryLogs.createdAt));
   }
-    
+
+  async logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void>;
   async logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void> {
     try {
       // For now, we'll use the inventory_logs table to store user activity
@@ -879,6 +885,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getUserActivity(userId: string, options: { limit?: number; type?: string } = {}): Promise<any[]>;
   async getUserActivity(userId: string, options: { limit?: number; type?: string } = {}): Promise<any[]> {
     try {
       const { limit = 50 } = options;
