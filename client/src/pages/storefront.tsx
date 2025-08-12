@@ -314,18 +314,68 @@ export default function StorefrontPage() {
         </div>
       </div>
 
-      {/* Products Grid */}
+      {/* Products Display */}
       {products.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground text-lg">No products found</p>
           <p className="text-muted-foreground/60 mt-2">Try adjusting your search or category filter</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        // Show products grouped by category when no specific category/parent is selected and not showing deals only
+        selectedCategory === null && currentParentCategory === null && !showDealsOnly && !debouncedSearchQuery ? (
+          <div className="space-y-8">
+            {categories
+              .filter(category => !category.parentId) // Only show root categories
+              .map((category) => {
+                const categoryProducts = products.filter(product => 
+                  product.category?.id === category.id || 
+                  (product.category?.parentId === category.id)
+                );
+                
+                if (categoryProducts.length === 0) return null;
+                
+                return (
+                  <div key={category.id} className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                        {category.name}
+                      </h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="glass-button text-black dark:text-white"
+                        onClick={() => {
+                          handleCategoryFilter(category.id);
+                          setShowDealsOnly(false);
+                        }}
+                      >
+                        View All
+                      </Button>
+                    </div>
+                    
+                    <div className="relative">
+                      <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
+                        <div className="flex gap-4 sm:gap-6 min-w-max">
+                          {categoryProducts.map((product) => (
+                            <div key={product.id} className="w-48 sm:w-56 flex-shrink-0">
+                              <ProductCard product={product} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        ) : (
+          // Show regular grid when a specific category is selected or when searching/filtering
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )
       )}
     </div>
   );
