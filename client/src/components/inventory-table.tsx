@@ -16,6 +16,7 @@ import { apiRequest } from "@/lib/queryClient";
 import QRCodeModal from "@/components/modals/qr-code-modal";
 import { Edit, QrCode, Trash2, MoreHorizontal, Package, ChevronUp, ChevronDown } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type SortField = 'name' | 'sku' | 'category' | 'price' | 'stock';
 type SortDirection = 'asc' | 'desc';
@@ -301,7 +302,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  
+
                   <div className="mt-3 flex items-center justify-between">
                     <div className="text-sm">
                       {product.sellingMethod === "weight" ? (
@@ -336,7 +337,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       <div className="text-right">
                         <div className={`text-sm font-medium ${
@@ -375,10 +376,9 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={selectedProducts.size === products.length && products.length > 0}
-                  onChange={handleSelectAll}
+                  onCheckedChange={handleSelectAll}
                   className="rounded border-gray-300"
                 />
               </TableHead>
@@ -435,10 +435,9 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
             {sortedProducts.map((product) => (
               <TableRow key={product.id} className={selectedProducts.has(product.id) ? "bg-blue-50" : ""}>
                 <TableCell>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selectedProducts.has(product.id)}
-                    onChange={() => handleSelectProduct(product.id)}
+                    onCheckedChange={() => handleSelectProduct(product.id)}
                     className="rounded border-gray-300"
                   />
                 </TableCell>
