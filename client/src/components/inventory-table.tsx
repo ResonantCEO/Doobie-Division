@@ -260,13 +260,13 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                      <div className="text-sm font-medium text-white line-clamp-1">
                         {product.name}
-                      </h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      </div>
+                      <div className="text-sm text-white line-clamp-1">
                         {product.description}
-                      </p>
-                      <div className="flex items-center mt-1 space-x-4 text-xs text-gray-500 dark:text-gray-400">
+                      </div>
+                      <div className="flex items-center mt-1 space-x-4 text-xs text-white line-clamp-1">
                         <span>SKU: {product.sku}</span>
                         <span>Category: {product.category?.name || "—"}</span>
                       </div>
@@ -308,7 +308,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                       {product.sellingMethod === "weight" ? (
                         <div className="space-y-1">
                           {product.pricePerGram && (
-                            <div className="font-medium text-gray-900 dark:text-gray-100">
+                            <div className="font-medium text-white">
                               {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
                                 <span>
                                   <span className="line-through text-gray-500">${product.pricePerGram}/g</span>
@@ -323,7 +323,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                           )}
                         </div>
                       ) : (
-                        <div className="font-medium text-gray-900 dark:text-gray-100">
+                        <div className="font-medium text-white">
                           {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
                             <span>
                               <span className="line-through text-gray-500">${Number(product.price || 0).toFixed(2)}</span>
@@ -343,7 +343,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                         <div className={`text-sm font-medium ${
                           product.stock === 0 ? "text-red-600" : 
                           product.stock <= product.minStockThreshold ? "text-orange-600" : 
-                          "text-gray-900 dark:text-gray-100"
+                          "text-white"
                         }`}>
                           {product.stock} units
                         </div>
@@ -448,18 +448,18 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                       <AvatarFallback>{product.name.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div>
-                      <div className="text-sm font-medium text-gray-900 line-clamp-1">
+                      <div className="text-sm font-medium text-white line-clamp-1">
                         {product.name}
                       </div>
-                      <div className="text-sm text-gray-500 line-clamp-1">
+                      <div className="text-sm text-white line-clamp-1">
                         {product.description}
                       </div>
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="font-mono text-sm text-black">{product.sku}</TableCell>
-                <TableCell className="text-black">{product.category?.name || "—"}</TableCell>
-                <TableCell className="font-medium text-black">
+                <TableCell className="font-mono text-sm text-white">{product.sku}</TableCell>
+                <TableCell className="text-white">{product.category?.name || "—"}</TableCell>
+                <TableCell className="font-medium text-white">
                   {product.sellingMethod === "weight" ? (
                     <div className="text-sm">
                       {product.pricePerGram && (
@@ -514,7 +514,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                       <span className={`font-medium text-sm ${
                         product.stock === 0 ? "text-red-600" : 
                         product.stock <= product.minStockThreshold ? "text-orange-600" : 
-                        "text-gray-900"
+                        "text-white"
                       }`}>
                         {product.stock} units
                       </span>
@@ -535,7 +535,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                       variant="ghost"
                       size="sm"
                       onClick={() => onStockAdjustment(product)}
-                      className="h-6 w-6 p-0 text-black hover:text-black"
+                      className="h-6 w-6 p-0 text-white hover:text-white"
                       title="Adjust stock"
                     >
                       <Edit className="h-3 w-3" />
@@ -546,7 +546,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="text-black hover:text-black">
+                      <Button variant="ghost" size="sm" className="text-white hover:text-white">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
