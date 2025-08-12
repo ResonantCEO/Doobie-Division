@@ -349,6 +349,7 @@ export default function StorefrontPage() {
               <>
                 {categories
                   .filter(category => !category.parentId) // Only show root categories
+                  .sort((a, b) => a.sortOrder - b.sortOrder) // Sort by sortOrder
                   .map((category) => (
                     <Button
                       key={category.id}
@@ -381,11 +382,11 @@ export default function StorefrontPage() {
             // If we're viewing a parent category with subcategories, group by subcategories
             if (currentParentCategory && !selectedCategory) {
               const subcategoriesForParent = categories.filter(cat => cat.parentId === currentParentCategory);
-              
+
               if (subcategoriesForParent.length > 0) {
                 // Group products by their direct subcategory
                 const productsBySubcategory = new Map<number, (Product & { category: Category | null })[]>();
-                
+
                 // First, group all products by their category ID
                 products.forEach(product => {
                   if (product.category) {
@@ -402,17 +403,17 @@ export default function StorefrontPage() {
                   const getProductsForSubcategory = (subcategoryId: number): (Product & { category: Category | null })[] => {
                     // Get direct products for this subcategory
                     const directProducts = productsBySubcategory.get(subcategoryId) || [];
-                    
+
                     // Get all child categories of this subcategory
                     const childCategories = categories.filter(cat => cat.parentId === subcategoryId);
-                    
+
                     // Get products from all child categories
                     const childProducts: (Product & { category: Category | null })[] = [];
                     childCategories.forEach(childCat => {
                       const childCatProducts = productsBySubcategory.get(childCat.id) || [];
                       childProducts.push(...childCatProducts);
                     });
-                    
+
                     return [...directProducts, ...childProducts];
                   };
 
@@ -431,7 +432,7 @@ export default function StorefrontPage() {
                           {subcategoryProducts.length} products
                         </span>
                       </div>
-                      
+
                       {/* Horizontal Scrolling Product Container */}
                       <div className="relative">
                         {subcategoryProducts.length > 0 ? (
@@ -449,7 +450,7 @@ export default function StorefrontPage() {
                             <p>No products available in this category</p>
                           </div>
                         )}
-                        
+
                         {/* Scroll indicators */}
                         {subcategoryProducts.length > 0 && (
                           <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-white dark:from-gray-900 to-transparent pointer-events-none"></div>
@@ -463,7 +464,7 @@ export default function StorefrontPage() {
 
             // Default behavior: Group products by main parent category (root level)
             const productsByParentCategory = new Map<number | null, (Product & { category: Category | null })[]>();
-            
+
             products.forEach(product => {
               if (!product.category) {
                 // Products without category
@@ -477,7 +478,7 @@ export default function StorefrontPage() {
               // Find the root parent category
               let rootCategoryId = product.category.id;
               let currentCategory = product.category;
-              
+
               // Traverse up the category tree to find the root parent
               while (currentCategory.parentId) {
                 const parentCategory = categories.find(cat => cat.id === currentCategory.parentId);
@@ -488,14 +489,27 @@ export default function StorefrontPage() {
                   break;
                 }
               }
-              
+
               if (!productsByParentCategory.has(rootCategoryId)) {
                 productsByParentCategory.set(rootCategoryId, []);
               }
               productsByParentCategory.get(rootCategoryId)!.push(product);
             });
 
-            return Array.from(productsByParentCategory.entries()).map(([parentCategoryId, categoryProducts]) => {
+            // Sort the root categories by their sortOrder before mapping
+            const sortedRootCategoryIds = Array.from(productsByParentCategory.keys()).sort((a, b) => {
+              if (a === null) return 1; // null (uncategorized) comes last
+              if (b === null) return -1;
+              const categoryA = categories.find(cat => cat.id === a);
+              const categoryB = categories.find(cat => cat.id === b);
+              if (!categoryA) return 1;
+              if (!categoryB) return -1;
+              return categoryA.sortOrder - categoryB.sortOrder;
+            });
+
+
+            return sortedRootCategoryIds.map((parentCategoryId) => {
+              const categoryProducts = productsByParentCategory.get(parentCategoryId) || [];
               if (categoryProducts.length === 0) return null;
 
               // Find the root category info
@@ -519,7 +533,7 @@ export default function StorefrontPage() {
                       {categoryName}
                     </h3>
                   </div>
-                  
+
                   {/* Horizontal Scrolling Product Container */}
                   <div className="relative">
                     <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
@@ -531,7 +545,7 @@ export default function StorefrontPage() {
                         ))}
                       </div>
                     </div>
-                    
+
                     {/* Scroll indicators */}
                     <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-white dark:from-gray-900 to-transparent pointer-events-none"></div>
                   </div>

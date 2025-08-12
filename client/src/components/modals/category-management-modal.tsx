@@ -1,8 +1,9 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { insertCategorySchema } from "@shared/schema";
 import { z } from "zod";
-import { Plus, Edit2, Trash2, ChevronRight } from "lucide-react";
+import { Plus, Edit2, Trash2, ChevronRight, GripVertical } from "lucide-react";
 import type { Category } from "@shared/schema";
 
 const formSchema = insertCategorySchema.extend({
@@ -41,6 +42,7 @@ interface CategoryManagementModalProps {
 export default function CategoryManagementModal({ open, onOpenChange, categories }: CategoryManagementModalProps) {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [mode, setMode] = useState<'create' | 'edit'>('create');
+  const [localCategories, setLocalCategories] = useState<CategoryWithChildren[]>(categories);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -100,6 +102,57 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
     onError: handleError,
   });
 
+  const reorderCategoriesMutation = useMutation({
+    mutationFn: async (reorderedCategories: { id: number; sortOrder: number }[]) => {
+      await Promise.all(
+        reorderedCategories.map(({ id, sortOrder }) =>
+          apiRequest("PUT", `/api/categories/${id}`, { sortOrder })
+        )
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      toast({
+        title: "Success",
+        description: "Categories reordered successfully",
+      });
+    },
+    onError: handleError,
+  });
+
+  // Update local categories when props change
+  useEffect(() => {
+    setLocalCategories(categories);
+  }, [categories]);
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+
+    const rootCategories = localCategories.filter(cat => !cat.parentId);
+    const reorderedCategories = Array.from(rootCategories);
+    const [removed] = reorderedCategories.splice(result.source.index, 1);
+    reorderedCategories.splice(result.destination.index, 0, removed);
+
+    // Update sort orders
+    const updatedCategories = reorderedCategories.map((cat, index) => ({
+      ...cat,
+      sortOrder: index
+    }));
+
+    // Update local state optimistically
+    const nonRootCategories = localCategories.filter(cat => cat.parentId);
+    const newLocalCategories = [...updatedCategories, ...nonRootCategories];
+    setLocalCategories(newLocalCategories);
+
+    // Send updates to server
+    const reorderData = updatedCategories.map((cat, index) => ({
+      id: cat.id,
+      sortOrder: index
+    }));
+    
+    reorderCategoriesMutation.mutate(reorderData);
+  };
+
   function handleError(error: any) {
     if (isUnauthorizedError(error)) {
       toast({
@@ -151,16 +204,26 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
     }
   };
 
-  const renderCategoryTree = (cats: CategoryWithChildren[], level = 0) => {
-    return cats.map((category) => (
-      <div key={category.id} className="space-y-1">
+  const renderCategoryTree = (cats: CategoryWithChildren[], level = 0, isDragDisabled = false) => {
+    return cats.map((category, index) => {
+      const CategoryCard = ({ provided, isDragging }: any = {}) => (
         <div 
+          ref={provided?.innerRef}
+          {...provided?.draggableProps}
           className={`flex items-center justify-between p-3 border rounded-lg transition-colors hover:bg-gray-50 ${
             level > 0 ? `ml-${level * 6} border-dashed border-gray-300` : 'border-gray-200'
-          }`}
-          style={{ marginLeft: level > 0 ? `${level * 1.5}rem` : '0' }}
+          } ${isDragging ? 'shadow-lg' : ''}`}
+          style={{ 
+            marginLeft: level > 0 ? `${level * 1.5}rem` : '0',
+            ...provided?.draggableProps?.style
+          }}
         >
           <div className="flex items-center space-x-2">
+            {level === 0 && !isDragDisabled && (
+              <div {...provided?.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                <GripVertical className="h-4 w-4 text-gray-400" />
+              </div>
+            )}
             {level > 0 && (
               <>
                 <div className="flex items-center text-gray-400">
@@ -196,13 +259,27 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
             </Button>
           </div>
         </div>
-        {category.children && category.children.length > 0 && (
-          <div className="space-y-1">
-            {renderCategoryTree(category.children, level + 1)}
-          </div>
-        )}
-      </div>
-    ));
+      );
+
+      return (
+        <div key={category.id} className="space-y-1">
+          {level === 0 && !isDragDisabled ? (
+            <Draggable draggableId={category.id.toString()} index={index}>
+              {(provided, snapshot) => (
+                <CategoryCard provided={provided} isDragging={snapshot.isDragging} />
+              )}
+            </Draggable>
+          ) : (
+            <CategoryCard />
+          )}
+          {category.children && category.children.length > 0 && (
+            <div className="space-y-1">
+              {renderCategoryTree(category.children, level + 1, true)}
+            </div>
+          )}
+        </div>
+      );
+    });
   };
 
   const getAllCategories = (cats: CategoryWithChildren[]): Category[] => {
@@ -216,7 +293,7 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
     return result;
   };
 
-  const allCategories = getAllCategories(categories);
+  const allCategories = getAllCategories(localCategories);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -336,10 +413,32 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
 
           {/* Category List */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Existing Categories</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Existing Categories</h3>
+              <p className="text-xs text-gray-500">Drag to reorder root categories</p>
+            </div>
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {categories.length > 0 ? (
-                renderCategoryTree(categories)
+              {localCategories.length > 0 ? (
+                <DragDropContext onDragEnd={handleDragEnd}>
+                  <Droppable droppableId="root-categories">
+                    {(provided) => (
+                      <div
+                        {...provided.droppableProps}
+                        ref={provided.innerRef}
+                        className="space-y-3"
+                      >
+                        {renderCategoryTree(localCategories.filter(cat => !cat.parentId))}
+                        {provided.placeholder}
+                        {/* Render subcategories separately */}
+                        {localCategories.filter(cat => cat.parentId).map(category => (
+                          <div key={category.id} className="space-y-1">
+                            {renderCategoryTree([category], 1, true)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
               ) : (
                 <p className="text-gray-500 text-center py-8">No categories created yet</p>
               )}
