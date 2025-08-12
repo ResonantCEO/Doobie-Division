@@ -73,25 +73,23 @@ export default function AnalyticsPage() {
     queryKey: ["/api/analytics/order-status-breakdown"],
   });
 
-  // Sample data for enhanced analytics (in production, these would come from real APIs)
-  const salesData = [
-    { date: "Jan 1", sales: 2400, orders: 24, customers: 12 },
-    { date: "Jan 8", sales: 1398, orders: 18, customers: 10 },
-    { date: "Jan 15", sales: 9800, orders: 42, customers: 28 },
-    { date: "Jan 22", sales: 3908, orders: 28, customers: 18 },
-    { date: "Jan 29", sales: 4800, orders: 35, customers: 22 },
-    { date: "Feb 5", sales: 3800, orders: 31, customers: 19 },
-    { date: "Feb 12", sales: 4300, orders: 37, customers: 24 },
-  ];
+  // Fetch category sales breakdown
+  const { data: categoryData = [] } = useQuery<{ name: string; value: number; revenue: number; fill: string }[]>({
+    queryKey: ["/api/analytics/category-sales"],
+  });
 
-  const customerData = [
-    { month: "Jan", new: 45, returning: 123, churn: 12 },
-    { month: "Feb", new: 52, returning: 134, churn: 8 },
-    { month: "Mar", new: 38, returning: 145, churn: 15 },
-    { month: "Apr", new: 63, returning: 156, churn: 9 },
-    { month: "May", new: 49, returning: 167, churn: 11 },
-    { month: "Jun", new: 71, returning: 178, churn: 7 },
-  ];
+  // Fetch sales data over time
+  const { data: salesData = [] } = useQuery<{ date: string; sales: number; orders: number; customers: number }[]>({
+    queryKey: ["/api/analytics/sales-data", { days: parseInt(timeRange) }],
+  });
+
+  // Generate customer data based on order breakdown
+  const customerData = salesData.slice(-6).map((item, index) => ({
+    month: item.date,
+    new: Math.floor(item.customers * 0.3), // Assume 30% are new customers
+    returning: Math.floor(item.customers * 0.7), // Assume 70% are returning
+    churn: Math.floor(item.customers * 0.1), // Assume 10% churn
+  }));
 
   const marketingData = [
     { channel: "Organic Search", visitors: 1250, conversions: 89, cost: 0 },
@@ -99,13 +97,6 @@ export default function AnalyticsPage() {
     { channel: "Social Media", visitors: 645, conversions: 34, cost: 800 },
     { channel: "Email", visitors: 456, conversions: 78, cost: 200 },
     { channel: "Direct", visitors: 334, conversions: 45, cost: 0 },
-  ];
-
-  const categoryData = [
-    { name: "Flower", value: 45, revenue: 15680, fill: "#8884d8" },
-    { name: "Edibles", value: 30, revenue: 12450, fill: "#82ca9d" },
-    { name: "Concentrates", value: 15, revenue: 8930, fill: "#ffc658" },
-    { name: "Accessories", value: 10, revenue: 3420, fill: "#ff7c7c" },
   ];
 
   const inventoryData = [
@@ -276,7 +267,7 @@ export default function AnalyticsPage() {
                         cx="50%" 
                         cy="50%" 
                         outerRadius="70%" 
-                        dataKey="value" 
+                        dataKey="revenue" 
                         label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         fontSize={10}
                       >
