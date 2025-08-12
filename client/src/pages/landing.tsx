@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,19 +13,19 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white overflow-hidden">
       {/* Navigation */}
       <nav className="bg-black/10 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex-shrink-0">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
                 Doobie Division
               </h1>
             </div>
             <Button 
               onClick={handleLogin} 
-              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 border-0 px-6 py-2 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25"
+              className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 border-0 px-6 py-2 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-green-500/25"
             >
               Sign In
             </Button>
@@ -38,26 +37,26 @@ export default function Landing() {
       <div className="relative py-32 overflow-hidden">
         {/* Animated Background Elements */}
         <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-10 left-10 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
-          <div className="absolute top-20 right-10 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
-          <div className="absolute bottom-20 left-20 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000"></div>
+          <div className="absolute top-10 left-10 w-72 h-72 bg-green-500 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
+          <div className="absolute top-20 right-10 w-72 h-72 bg-emerald-500 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
+          <div className="absolute bottom-20 left-20 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000"></div>
         </div>
-        
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center">
             <div className="mb-6">
-              <span className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 text-sm font-medium mb-8">
+              <span className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 text-sm font-medium mb-8">
                 <Sparkles className="w-4 h-4 mr-2" />
                 Premium Experience
               </span>
             </div>
-            
+
             <h1 className="text-5xl md:text-7xl font-bold mb-8 leading-tight">
-              <span className="bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-white via-green-200 to-emerald-200 bg-clip-text text-transparent">
                 Your Premium
               </span>
               <br />
-              <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-purple-300 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-green-400 via-emerald-400 to-green-300 bg-clip-text text-transparent">
                 Shopping Experience
               </span>
               <br />
@@ -65,22 +64,22 @@ export default function Landing() {
                 Awaits
               </span>
             </h1>
-            
+
             <p className="text-xl md:text-2xl mb-12 text-white/70 max-w-4xl mx-auto leading-relaxed">
               Discover curated products, enjoy seamless ordering, and experience personalized service 
               with our premium marketplace designed for discerning customers.
             </p>
-            
+
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-12">
               <Button 
                 onClick={handleLogin}
                 size="lg"
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-lg px-12 py-4 rounded-full shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105 group"
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-lg px-12 py-4 rounded-full shadow-2xl hover:shadow-green-500/25 transition-all duration-300 hover:scale-105 group"
               >
                 Start Shopping
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
-              
+
               <div className="flex items-center space-x-2 text-white/80">
                 <div className="flex">
                   {[...Array(5)].map((_, i) => (
@@ -90,19 +89,19 @@ export default function Landing() {
                 <span className="text-sm font-medium ml-2">Trusted by 10,000+ customers</span>
               </div>
             </div>
-            
+
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8 max-w-md mx-auto">
               <div className="text-center">
-                <div className="text-2xl font-bold text-purple-300">10K+</div>
+                <div className="text-2xl font-bold text-green-300">10K+</div>
                 <div className="text-sm text-white/60">Happy Customers</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-pink-300">24/7</div>
+                <div className="text-2xl font-bold text-emerald-300">24/7</div>
                 <div className="text-sm text-white/60">Support</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-300">Fast</div>
+                <div className="text-2xl font-bold text-teal-300">Fast</div>
                 <div className="text-sm text-white/60">Delivery</div>
               </div>
             </div>
@@ -114,7 +113,7 @@ export default function Landing() {
       <div className="py-24 bg-gradient-to-b from-transparent to-black/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-emerald-200 bg-clip-text text-transparent">
               Your Journey with Us
             </h2>
             <p className="text-xl text-white/70 max-w-3xl mx-auto leading-relaxed">
@@ -143,14 +142,14 @@ export default function Landing() {
                 step: "03",
                 title: "Order Processing",
                 description: "Professional preparation with real-time updates and quality assurance",
-                color: "from-purple-400 to-violet-500"
+                color: "from-green-400 to-violet-500"
               },
               {
                 icon: Truck,
                 step: "04",
                 title: "Fast Delivery",
                 description: "Quick, discreet delivery with real-time tracking and notifications",
-                color: "from-pink-400 to-rose-500"
+                color: "from-emerald-400 to-rose-500"
               }
             ].map((item, index) => (
               <div key={index} className="group">
@@ -159,11 +158,11 @@ export default function Landing() {
                     <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
                       <item.icon className="w-8 h-8 text-white" />
                     </div>
-                    <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white">
+                    <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center text-sm font-bold text-white">
                       {item.step}
                     </div>
                   </div>
-                  <h3 className="text-xl font-semibold mb-3 text-white group-hover:text-purple-200 transition-colors">
+                  <h3 className="text-xl font-semibold mb-3 text-white group-hover:text-emerald-200 transition-colors">
                     {item.title}
                   </h3>
                   <p className="text-white/70 text-sm leading-relaxed">
@@ -180,7 +179,7 @@ export default function Landing() {
       <div className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-emerald-200 bg-clip-text text-transparent">
               Why Choose Us
             </h2>
             <p className="text-xl text-white/70 max-w-2xl mx-auto">
@@ -238,7 +237,7 @@ export default function Landing() {
                   <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
                     <feature.icon className="w-7 h-7 text-white" />
                   </div>
-                  <h3 className="text-xl font-semibold mb-3 text-white group-hover:text-purple-200 transition-colors">
+                  <h3 className="text-xl font-semibold mb-3 text-white group-hover:text-emerald-200 transition-colors">
                     {feature.title}
                   </h3>
                   <p className="text-white/70 leading-relaxed">
@@ -255,7 +254,7 @@ export default function Landing() {
       <div className="py-24 bg-gradient-to-b from-black/20 to-transparent">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
+            <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-white to-emerald-200 bg-clip-text text-transparent">
               Loved by Thousands
             </h2>
           </div>
@@ -289,7 +288,7 @@ export default function Landing() {
                 </div>
                 <p className="text-white/80 mb-6 leading-relaxed">"{review.text}"</p>
                 <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-semibold mr-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-emerald-400 flex items-center justify-center text-white font-semibold mr-3">
                     {review.name.charAt(0)}
                   </div>
                   <div>
@@ -308,25 +307,25 @@ export default function Landing() {
 
       {/* CTA Section */}
       <div className="py-24 relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-purple-600/20"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 via-emerald-600/20 to-green-600/20"></div>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
+          <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-emerald-200 bg-clip-text text-transparent">
             Ready to Experience the Future?
           </h2>
           <p className="text-xl text-white/70 mb-12 max-w-2xl mx-auto leading-relaxed">
             Join thousands of satisfied customers who trust Doobie Division for their premium shopping needs.
           </p>
-          
+
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
             <Button 
               onClick={handleLogin}
               size="lg"
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xl px-12 py-4 rounded-full shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105 group"
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-xl px-12 py-4 rounded-full shadow-2xl hover:shadow-green-500/25 transition-all duration-300 hover:scale-105 group"
             >
               Get Started Now
               <ArrowRight className="ml-2 w-6 h-6 group-hover:translate-x-1 transition-transform" />
             </Button>
-            
+
             <div className="flex items-center text-white/60 text-sm">
               <Shield className="h-4 w-4 mr-2" />
               SSL Secured • Secure Processing • Discreet Packaging
@@ -340,7 +339,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="grid md:grid-cols-4 gap-8">
             <div className="md:col-span-2">
-              <h3 className="font-bold text-2xl mb-4 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <h3 className="font-bold text-2xl mb-4 bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
                 Doobie Division
               </h3>
               <p className="text-white/70 text-sm leading-relaxed max-w-md">
