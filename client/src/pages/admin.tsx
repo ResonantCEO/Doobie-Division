@@ -164,12 +164,12 @@ export default function AdminPage() {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <div className="font-medium text-black">
+                            <div className="font-medium text-black dark:text-white">
                               {log.product?.name || 'Unknown Product'}
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-black">
+                        <TableCell className="text-black dark:text-white">
                           {log.product?.sku || 'N/A'}
                         </TableCell>
                         <TableCell>
@@ -177,17 +177,17 @@ export default function AdminPage() {
                             {getTypeLabel(log.type)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-black">
-                          <span className={log.type === 'stock_out' ? 'text-red-600' : log.type === 'stock_in' ? 'text-green-600' : ''}>
+                        <TableCell className="text-black dark:text-white">
+                          <span className={log.type === 'stock_out' ? 'text-red-600 dark:text-red-400' : log.type === 'stock_in' ? 'text-green-600 dark:text-green-400' : ''}>
                             {log.type === 'stock_out' ? '-' : log.type === 'stock_in' ? '+' : '±'}{log.quantity}
                           </span>
                         </TableCell>
-                        <TableCell className="text-black">{log.previousStock}</TableCell>
-                        <TableCell className="text-black font-medium">{log.newStock}</TableCell>
-                        <TableCell className="text-black">
+                        <TableCell className="text-black dark:text-white">{log.previousStock}</TableCell>
+                        <TableCell className="text-black dark:text-white font-medium">{log.newStock}</TableCell>
+                        <TableCell className="text-black dark:text-white">
                           {log.user ? `${log.user.firstName} ${log.user.lastName}` : 'System'}
                         </TableCell>
-                        <TableCell className="text-black max-w-xs truncate">
+                        <TableCell className="text-black dark:text-white max-w-xs truncate">
                           {log.reason || 'No reason provided'}
                         </TableCell>
                       </TableRow>
