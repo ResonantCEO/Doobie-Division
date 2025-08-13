@@ -637,42 +637,54 @@ export class DatabaseStorage implements IStorage {
 
         // Restore stock for unfulfilled items
         for (const item of orderItemsData) {
-          if (!item.fulfilled) {
-            // Get current stock first
-            const [currentProduct] = await tx
-              .select({ stock: products.stock, physicalInventory: products.physicalInventory })
-              .from(products)
-              .where(eq(products.id, item.productId));
+          // Only restore stock for unfulfilled items and valid product IDs
+          if (!item.fulfilled && item.productId) {
+            try {
+              // Get current stock first
+              const [currentProduct] = await tx
+                .select({ 
+                  stock: products.stock, 
+                  physicalInventory: products.physicalInventory,
+                  name: products.name 
+                })
+                .from(products)
+                .where(eq(products.id, item.productId));
 
-            if (!currentProduct) {
-              console.warn(`Product ${item.productId} not found during order cancellation`);
-              continue;
+              if (!currentProduct) {
+                console.warn(`Product ${item.productId} not found during order cancellation`);
+                continue;
+              }
+
+              const previousStock = currentProduct.stock;
+              const newStock = previousStock + item.quantity;
+              const previousPhysical = currentProduct.physicalInventory || 0;
+              const newPhysical = previousPhysical + item.quantity;
+
+              // Update stock and physical inventory
+              await tx.update(products)
+                .set({
+                  stock: newStock,
+                  physicalInventory: newPhysical,
+                  updatedAt: new Date()
+                })
+                .where(eq(products.id, item.productId));
+
+              // Log the inventory restoration
+              await tx.insert(inventoryLogs).values({
+                productId: item.productId,
+                type: 'stock_in',
+                quantity: item.quantity,
+                previousStock: previousStock,
+                newStock: newStock,
+                reason: `Order cancellation - Order #${currentOrder.orderNumber}`,
+                userId: null // System operation
+              });
+
+              console.log(`Restored ${item.quantity} units of ${currentProduct.name} (Product ID: ${item.productId})`);
+            } catch (error) {
+              console.error(`Error restoring stock for product ${item.productId}:`, error);
+              // Continue with other items instead of failing the entire transaction
             }
-
-            const previousStock = currentProduct.stock;
-            const newStock = previousStock + item.quantity;
-            const previousPhysical = currentProduct.physicalInventory;
-            const newPhysical = previousPhysical + item.quantity;
-
-            // Update stock and physical inventory
-            await tx.update(products)
-              .set({
-                stock: newStock,
-                physicalInventory: newPhysical,
-                updatedAt: new Date()
-              })
-              .where(eq(products.id, item.productId));
-
-            // Log the inventory restoration
-            await tx.insert(inventoryLogs).values({
-              productId: item.productId,
-              type: 'stock_in',
-              quantity: item.quantity,
-              previousStock: previousStock,
-              newStock: newStock,
-              reason: `Order cancellation - Order #${currentOrder.orderNumber}`,
-              userId: null // System operation
-            });
           }
         }
       }
@@ -683,6 +695,10 @@ export class DatabaseStorage implements IStorage {
         .set({ status, updatedAt: new Date() })
         .where(eq(orders.id, id))
         .returning();
+
+      if (!updated) {
+        throw new Error("Failed to update order status");
+      }
 
       return updated;
     });
