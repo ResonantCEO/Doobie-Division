@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
@@ -43,6 +43,8 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [mode, setMode] = useState<'create' | 'edit'>('create');
   const [localCategories, setLocalCategories] = useState<CategoryWithChildren[]>(categories);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<number | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -149,7 +151,7 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
       id: cat.id,
       sortOrder: index
     }));
-    
+
     reorderCategoriesMutation.mutate(reorderData);
   };
 
@@ -190,9 +192,15 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
     });
   };
 
-  const handleDelete = (category: Category) => {
-    if (confirm(`Are you sure you want to delete "${category.name}"?`)) {
-      deleteCategoryMutation.mutate(category.id);
+  const handleDeleteCategory = (categoryId: number) => {
+    setCategoryToDelete(categoryId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteCategory = () => {
+    if (categoryToDelete) {
+      deleteCategoryMutation.mutate(categoryToDelete);
+      setCategoryToDelete(null);
     }
   };
 
@@ -253,7 +261,7 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
             <Button
               size="sm"
               variant="outline"
-              onClick={() => handleDelete(category)}
+              onClick={() => handleDeleteCategory(category.id)}
             >
               <Trash2 className="h-3 w-3" />
             </Button>
@@ -446,6 +454,17 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
           </div>
         </div>
       </DialogContent>
+
+      <ConfirmationDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={confirmDeleteCategory}
+        title="Delete Category"
+        description="Are you sure you want to delete this category? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </Dialog>
   );
 }

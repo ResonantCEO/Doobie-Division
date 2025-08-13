@@ -10,6 +10,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
@@ -36,6 +37,9 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedProductForQR, setSelectedProductForQR] = useState<Product | null>(null);
   const [qrCodeData, setQrCodeData] = useState<string>("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+
 
   const deleteProductMutation = useMutation({
     mutationFn: async (productId: number) => {
@@ -78,9 +82,16 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
     return null; // Don't show badge for in-stock items
   };
 
-  const handleDeleteProduct = async (productId: number) => {
-    if (confirm("Are you sure you want to delete this product?")) {
-      deleteProductMutation.mutate(productId);
+  const handleDeleteProduct = (product: Product) => {
+    setProductToDelete(product);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (productToDelete) {
+      deleteProductMutation.mutate(productToDelete.id);
+      setDeleteConfirmOpen(false);
+      setProductToDelete(null);
     }
   };
 
@@ -293,7 +304,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                           View QR Code
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => handleDeleteProduct(product.id)}
+                          onClick={() => handleDeleteProduct(product)}
                           className="text-red-600"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
@@ -584,7 +595,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                         View QR Code
                       </DropdownMenuItem>
                       <DropdownMenuItem 
-                        onClick={() => handleDeleteProduct(product.id)}
+                        onClick={() => handleDeleteProduct(product)}
                         className="text-red-600"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -609,6 +620,17 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
           isLoading={qrCodeMutation.isPending}
         />
       )}
+
+      <ConfirmationDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={confirmDelete}
+        title="Delete Product"
+        description="Are you sure you want to delete this product? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </div>
   );
 }
