@@ -525,173 +525,162 @@ export class DatabaseStorage implements IStorage {
 
   async createOrder(orderData: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   async createOrder(orderData: InsertOrder, items: InsertOrderItem[]): Promise<Order> {
-    // Use a transaction to ensure atomicity
-    return await db.transaction(async (tx) => {
-      // Generate date-based order number (MMDDYY-N)
-      const now = new Date();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const year = String(now.getFullYear()).slice(-2);
-      const datePrefix = `${month}${day}${year}`;
+    // Generate date-based order number (MMDDYY-N)
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const datePrefix = `${month}${day}${year}`;
 
-      // Find the highest sequential number for today
-      const todayOrders = await tx
-        .select({ orderNumber: orders.orderNumber })
-        .from(orders)
-        .where(sql`${orders.orderNumber} LIKE ${datePrefix + '-%'}`);
+    // Find the highest sequential number for today
+    const todayOrders = await db
+      .select({ orderNumber: orders.orderNumber })
+      .from(orders)
+      .where(sql`${orders.orderNumber} LIKE ${datePrefix + '-%'}`);
 
-      let nextSequential = 1;
-      if (todayOrders.length > 0) {
-        const sequentialNumbers = todayOrders
-          .map(order => {
-            const parts = order.orderNumber.split('-');
-            return parts.length === 2 ? parseInt(parts[1]) : 0;
-          })
-          .filter(num => !isNaN(num));
+    let nextSequential = 1;
+    if (todayOrders.length > 0) {
+      const sequentialNumbers = todayOrders
+        .map(order => {
+          const parts = order.orderNumber.split('-');
+          return parts.length === 2 ? parseInt(parts[1]) : 0;
+        })
+        .filter(num => !isNaN(num));
 
-        if (sequentialNumbers.length > 0) {
-          nextSequential = Math.max(...sequentialNumbers) + 1;
-        }
+      if (sequentialNumbers.length > 0) {
+        nextSequential = Math.max(...sequentialNumbers) + 1;
+      }
+    }
+
+    const orderNumber = `${datePrefix}-${nextSequential}`;
+
+    // Double-check stock availability
+    for (const item of items) {
+      const [product] = await db
+        .select({ stock: products.stock, name: products.name })
+        .from(products)
+        .where(eq(products.id, item.productId));
+
+      if (!product) {
+        throw new Error(`Product with ID ${item.productId} not found`);
       }
 
-      const orderNumber = `${datePrefix}-${nextSequential}`;
-
-      // Double-check stock availability with row locking
-      for (const item of items) {
-        const [product] = await tx
-          .select({ stock: products.stock, name: products.name })
-          .from(products)
-          .where(eq(products.id, item.productId))
-          .for('update'); // Row-level lock to prevent race conditions
-
-        if (!product) {
-          throw new Error(`Product with ID ${item.productId} not found`);
-        }
-
-        if (product.stock < item.quantity) {
-          throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
-        }
+      if (product.stock < item.quantity) {
+        throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
       }
+    }
 
-      // Create the order
-      const [order] = await tx.insert(orders).values({
-        ...orderData,
-        orderNumber,
-      }).returning();
+    // Create the order
+    const [order] = await db.insert(orders).values({
+      ...orderData,
+      orderNumber,
+    }).returning();
 
-      // Create order items
-      const orderItemsData = items.map(item => ({
-        ...item,
-        orderId: order.id,
-      }));
+    // Create order items
+    const orderItemsData = items.map(item => ({
+      ...item,
+      orderId: order.id,
+    }));
 
-      await tx.insert(orderItems).values(orderItemsData);
+    await db.insert(orderItems).values(orderItemsData);
 
-      // Reduce stock for each item
-      for (const item of items) {
-        const [updatedProduct] = await tx.update(products)
-          .set({
-            stock: sql`${products.stock} - ${item.quantity}`,
-            physicalInventory: sql`${products.physicalInventory} - ${item.quantity}`,
-            updatedAt: new Date()
-          })
-          .where(eq(products.id, item.productId))
-          .returning({ stock: products.stock, name: products.name });
+    // Reduce stock for each item
+    for (const item of items) {
+      await db.update(products)
+        .set({
+          stock: sql`${products.stock} - ${item.quantity}`,
+          physicalInventory: sql`${products.physicalInventory} - ${item.quantity}`,
+          updatedAt: new Date()
+        })
+        .where(eq(products.id, item.productId));
+    }
 
-        // Final check to ensure stock didn't go negative
-        if (updatedProduct.stock < 0) {
-          throw new Error(`Stock went negative for ${updatedProduct.name}. Order cancelled.`);
-        }
-      }
-
-      // Get the complete order with items
-      const fullOrder = await this.getOrder(order.id);
-      return fullOrder!;
-    });
+    // Get the complete order with items
+    const fullOrder = await this.getOrder(order.id);
+    return fullOrder!;
   }
 
   async updateOrderStatus(id: number, status: string): Promise<Order>;
   async updateOrderStatus(id: number, status: string): Promise<Order> {
-    return await db.transaction(async (tx) => {
-      // Get the current order with its items
-      const [currentOrder] = await tx
-        .select()
-        .from(orders)
-        .where(eq(orders.id, id));
+    // Get the current order with its items
+    const [currentOrder] = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, id));
 
-      if (!currentOrder) {
-        throw new Error("Order not found");
-      }
+    if (!currentOrder) {
+      throw new Error("Order not found");
+    }
 
-      // If changing status to cancelled, restore stock for all unfulfilled items
-      if (status === 'cancelled' && currentOrder.status !== 'cancelled') {
-        const orderItemsData = await tx
-          .select({
-            productId: orderItems.productId,
-            quantity: orderItems.quantity,
-            fulfilled: orderItems.fulfilled,
-            productName: orderItems.productName
-          })
-          .from(orderItems)
-          .where(eq(orderItems.orderId, id));
+    // If changing status to cancelled, restore stock for all unfulfilled items
+    if (status === 'cancelled' && currentOrder.status !== 'cancelled') {
+      const orderItemsData = await db
+        .select({
+          productId: orderItems.productId,
+          quantity: orderItems.quantity,
+          fulfilled: orderItems.fulfilled,
+          productName: orderItems.productName
+        })
+        .from(orderItems)
+        .where(eq(orderItems.orderId, id));
 
-        // Process stock restoration for unfulfilled items
-        for (const item of orderItemsData) {
-          if (!item.fulfilled && item.productId) {
-            try {
-              // Get current product stock
-              const [currentProduct] = await tx
-                .select({ id: products.id, name: products.name, stock: products.stock })
-                .from(products)
+      // Process stock restoration for unfulfilled items
+      for (const item of orderItemsData) {
+        if (!item.fulfilled && item.productId) {
+          try {
+            // Get current product stock
+            const [currentProduct] = await db
+              .select({ id: products.id, name: products.name, stock: products.stock })
+              .from(products)
+              .where(eq(products.id, item.productId));
+
+            if (currentProduct) {
+              const previousStock = currentProduct.stock;
+              const newStock = previousStock + item.quantity;
+
+              // Update product stock
+              await db
+                .update(products)
+                .set({ 
+                  stock: newStock,
+                  physicalInventory: newStock,
+                  updatedAt: new Date() 
+                })
                 .where(eq(products.id, item.productId));
 
-              if (currentProduct) {
-                const previousStock = currentProduct.stock;
-                const newStock = previousStock + item.quantity;
+              // Log the inventory restoration
+              await db.insert(inventoryLogs).values({
+                productId: item.productId,
+                type: 'stock_in',
+                quantity: item.quantity,
+                previousStock: previousStock,
+                newStock: newStock,
+                reason: `Order cancellation - Order #${currentOrder.orderNumber}`,
+                userId: null // System operation
+              });
 
-                // Update product stock
-                await tx
-                  .update(products)
-                  .set({ 
-                    stock: newStock,
-                    updatedAt: new Date() 
-                  })
-                  .where(eq(products.id, item.productId));
-
-                // Log the inventory restoration
-                await tx.insert(inventoryLogs).values({
-                  productId: item.productId,
-                  type: 'stock_in',
-                  quantity: item.quantity,
-                  previousStock: previousStock,
-                  newStock: newStock,
-                  reason: `Order cancellation - Order #${currentOrder.orderNumber}`,
-                  userId: null // System operation
-                });
-
-                console.log(`Restored ${item.quantity} units of ${currentProduct.name} (Product ID: ${item.productId})`);
-              }
-            } catch (error) {
-              console.error(`Error restoring stock for product ${item.productId}:`, error);
-              // Continue with other items instead of failing the entire transaction
+              console.log(`Restored ${item.quantity} units of ${currentProduct.name} (Product ID: ${item.productId})`);
             }
+          } catch (error) {
+            console.error(`Error restoring stock for product ${item.productId}:`, error);
+            // Continue with other items instead of failing the entire operation
           }
         }
       }
+    }
 
-      // Update the order status
-      const [updated] = await tx
-        .update(orders)
-        .set({ status, updatedAt: new Date() })
-        .where(eq(orders.id, id))
-        .returning();
+    // Update the order status
+    const [updated] = await db
+      .update(orders)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(orders.id, id))
+      .returning();
 
-      if (!updated) {
-        throw new Error("Failed to update order status");
-      }
+    if (!updated) {
+      throw new Error("Failed to update order status");
+    }
 
-      return updated;
-    });
+    return updated;
   }
 
   async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string) {
