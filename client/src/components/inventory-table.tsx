@@ -365,6 +365,19 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                   </div>
                 </div>
               </div>
+
+              {/* Physical Inventory Display */}
+              <div className="mt-3 border-t border-gray-200 dark:border-gray-700 pt-3">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>Stock: {product.stock} units</div>
+                  <div>Physical: {product.physicalInventory || 0} units</div>
+                </div>
+                {product.physicalInventory !== product.stock && (
+                  <div className="text-xs text-orange-600 mt-1">
+                    Variance: {(product.physicalInventory || 0) - product.stock} units
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>

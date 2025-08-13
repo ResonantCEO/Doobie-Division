@@ -22,7 +22,8 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, and, or, like, gte, lte, isNull, inArray, sql, exists, ilike } from "drizzle-orm";
+import { eq, desc, asc, and, or, like, lte, isNull, inArray, sql, exists, ilike } from "drizzle-orm";
+import { getTableColumns } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -40,7 +41,7 @@ export interface IStorage {
   deleteCategory(id: number): Promise<void>;
 
   // Product operations
-  getProducts(filters?: { categoryId?: number; search?: string; status?: string }): Promise<(Product & { category: Category | null })[]>;
+  getProducts(filters?: { categoryId?: number; categoryIds?: number[]; search?: string; status?: string }): Promise<(Product & { category: Category | null })[]>;
   getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
@@ -80,6 +81,7 @@ export interface IStorage {
   // User activity
   logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void>;
   getUserActivity(userId: string, options?: { limit?: number; type?: string }): Promise<any[]>;
+  getInventoryLogs(filters?: { days?: number; type?: string; product?: string }): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -266,6 +268,7 @@ export class DatabaseStorage implements IStorage {
         categoryId: products.categoryId,
         imageUrl: products.imageUrl,
         stock: products.stock,
+        physicalInventory: products.physicalInventory,
         minStockThreshold: products.minStockThreshold,
         sellingMethod: products.sellingMethod,
         weightUnit: products.weightUnit,
@@ -480,7 +483,7 @@ export class DatabaseStorage implements IStorage {
 
   async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] })>;
   async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined> {
-    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    const [order] = await db.select().from(orders).where(eq(order.id, id));
     if (!order) return undefined;
 
     const items = await db
@@ -765,9 +768,9 @@ export class DatabaseStorage implements IStorage {
     // Update the user role
     const [updatedUser] = await db
       .update(users)
-      .set({ 
+      .set({
         role: role,
-        updatedAt: new Date() 
+        updatedAt: new Date()
       })
       .where(eq(users.id, id))
       .returning();
