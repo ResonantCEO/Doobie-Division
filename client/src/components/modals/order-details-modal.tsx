@@ -22,24 +22,32 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
     queryKey: ["/api/orders", order?.id],
     queryFn: async () => {
       if (!order?.id) return null;
-      const response = await apiRequest("GET", `/api/orders/${order.id}`);
-      return response as Order;
+      const response = await fetch(`/api/orders/${order.id}`, { 
+        credentials: "include" 
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch order details: ${response.statusText}`);
+      }
+      return response.json() as Order;
     },
     enabled: isOpen && !!order?.id,
   });
 
   useEffect(() => {
     if (orderDetails) {
+      console.log('Setting full order from orderDetails:', orderDetails);
       setFullOrder(orderDetails);
     } else if (order) {
+      console.log('Setting full order from order prop:', order);
       setFullOrder(order);
     }
   }, [orderDetails, order]);
 
   // Debug logging
   console.log('Order prop:', order);
-  console.log('Order details:', orderDetails);
-  console.log('Full order:', fullOrder);
+  console.log('Order details from API:', orderDetails);
+  console.log('Full order state:', fullOrder);
+  console.log('Modal open:', isOpen);
 
   if (!order) return null;
 

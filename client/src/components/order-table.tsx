@@ -83,6 +83,9 @@ export default function OrderTable({ orders }: OrderTableProps) {
 
   const handleViewOrder = (orderId: number) => {
     const order = orders.find(o => o.id === orderId);
+    console.log('handleViewOrder - orderId:', orderId);
+    console.log('handleViewOrder - found order:', order);
+    console.log('handleViewOrder - all orders:', orders);
     if (order) {
       setSelectedOrder(order);
       setIsOrderDetailsOpen(true);
@@ -98,6 +101,8 @@ export default function OrderTable({ orders }: OrderTableProps) {
 
   const handleOrderClick = (orderId: number) => {
     const order = orders.find(o => o.id === orderId);
+    console.log('handleOrderClick - orderId:', orderId);
+    console.log('handleOrderClick - found order:', order);
     if (order) {
       setSelectedOrder(order);
       setIsOrderDetailsOpen(true);
