@@ -584,12 +584,11 @@ export class DatabaseStorage implements IStorage {
 
     await db.insert(orderItems).values(orderItemsData);
 
-    // Reduce stock for each item
+    // Reduce stock for each item (but keep physical inventory unchanged until fulfillment)
     for (const item of items) {
       await db.update(products)
         .set({
           stock: sql`${products.stock} - ${item.quantity}`,
-          physicalInventory: sql`${products.physicalInventory} - ${item.quantity}`,
           updatedAt: new Date()
         })
         .where(eq(products.id, item.productId));
@@ -638,12 +637,11 @@ export class DatabaseStorage implements IStorage {
               const previousStock = currentProduct.stock;
               const newStock = previousStock + item.quantity;
 
-              // Update product stock
+              // Update product stock (restore stock only, physical inventory wasn't changed)
               await db
                 .update(products)
                 .set({ 
                   stock: newStock,
-                  physicalInventory: newStock,
                   updatedAt: new Date() 
                 })
                 .where(eq(products.id, item.productId));
@@ -684,11 +682,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string) {
-    // Reduce product stock
+    // Reduce physical inventory (stock is already reduced when order was placed)
     await db
       .update(products)
       .set({
-        stock: sql`${products.stock} - ${quantity}`,
+        physicalInventory: sql`${products.physicalInventory} - ${quantity}`,
         updatedAt: new Date()
       })
       .where(eq(products.id, productId));
