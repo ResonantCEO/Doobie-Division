@@ -175,7 +175,7 @@ export default function UsersPage() {
   const pendingUsers = users.filter(u => u.status === 'pending');
 
   const getRoleBadge = (role: string) => {
-    switch (role) {
+    switch (role?.toLowerCase()) {
       case "admin":
         return <Badge className="role-admin">Admin</Badge>;
       case "manager":
@@ -184,7 +184,7 @@ export default function UsersPage() {
       case "user":
         return <Badge className="role-customer">Customer</Badge>;
       default:
-        return <Badge variant="outline">{role}</Badge>;
+        return <Badge variant="outline">{role || 'Unknown'}</Badge>;
     }
   };
 
@@ -277,6 +277,10 @@ export default function UsersPage() {
     };
     
     updateUserMutation.mutate({ userId: editingUser.id, userData });
+  };
+
+  const handleRoleChange = (userId: string, newRole: string) => {
+    updateRoleMutation.mutate({ userId, role: newRole });
   };
 
   if (isLoading) {
@@ -623,7 +627,7 @@ export default function UsersPage() {
                 <Label htmlFor="role">Role</Label>
                 <Select name="role" defaultValue={editingUser.role === 'user' ? 'customer' : editingUser.role}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="customer">Customer</SelectItem>

@@ -164,7 +164,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Category operations
-  async getCategories(): Promise<(Category & { children?: Category[] })[]>;
+  async getCategories(): Promise<(Category & { children?: Category[] })>;
   async getCategories(): Promise<(Category & { children?: Category[] })[]> {
     const allCategories = await db.select().from(categories)
       .where(eq(categories.isActive, true))
@@ -249,7 +249,7 @@ export class DatabaseStorage implements IStorage {
     categoryIds?: number[];
     search?: string;
     status?: string;
-  }): Promise<(Product & { category: Category | null })[]>;
+  }): Promise<(Product & { category: Category | null })>;
   async getProducts(filters?: {
     categoryId?: number;
     categoryIds?: number[];
@@ -364,7 +364,7 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(desc(products.createdAt));
   }
 
-  async getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined>;
+  async getProduct(id: number): Promise<(Product & { category: Category | null })>;
   async getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined> {
     const [product] = await db
       .select({
@@ -478,7 +478,7 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(desc(orders.createdAt));
   }
 
-  async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined>;
+  async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] })>;
   async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined> {
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
     if (!order) return undefined;
@@ -708,7 +708,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // User management
-  async getUsersWithStats(): Promise<(User & { orderCount?: number })[]>;
+  async getUsersWithStats(): Promise<(User & { orderCount?: number })>;
   async getUsersWithStats(): Promise<(User & { orderCount?: number })[]> {
     const results = await db
       .select({
@@ -751,23 +751,32 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserRole(id: string, role: string): Promise<User>;
   async updateUserRole(id: string, role: string): Promise<User> {
-    const [user] = await db
+    // Get current user data first
+    const currentUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .then(rows => rows[0]);
+
+    if (!currentUser) {
+      throw new Error('User not found');
+    }
+
+    const user = await db
       .update(users)
       .set({ role, updatedAt: new Date() })
       .where(eq(users.id, id))
-      .returning();
+      .returning()
+      .then(rows => rows[0]);
 
-    if (!user) {
-      throw new Error("User not found");
+    if (user) {
+      await this.logUserActivity(
+        id,
+        'Role Updated',
+        `User role changed from ${currentUser.role} to ${role}`,
+        { previousRole: currentUser.role, newRole: role }
+      );
     }
-
-    // Log the role change
-    await this.logUserActivity(
-      id,
-      'Role Updated',
-      `User role changed to ${role}`,
-      { previousRole: user.role, newRole: role }
-    );
 
     return user;
   }
