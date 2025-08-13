@@ -525,62 +525,89 @@ export class DatabaseStorage implements IStorage {
 
   async createOrder(orderData: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   async createOrder(orderData: InsertOrder, items: InsertOrderItem[]): Promise<Order> {
-    // Generate date-based order number (MMDDYY-N)
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    const datePrefix = `${month}${day}${year}`;
+    // Use a transaction to ensure atomicity
+    return await db.transaction(async (tx) => {
+      // Generate date-based order number (MMDDYY-N)
+      const now = new Date();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const year = String(now.getFullYear()).slice(-2);
+      const datePrefix = `${month}${day}${year}`;
 
-    // Find the highest sequential number for today
-    const todayOrders = await db
-      .select({ orderNumber: orders.orderNumber })
-      .from(orders)
-      .where(sql`${orders.orderNumber} LIKE ${datePrefix + '-%'}`);
+      // Find the highest sequential number for today
+      const todayOrders = await tx
+        .select({ orderNumber: orders.orderNumber })
+        .from(orders)
+        .where(sql`${orders.orderNumber} LIKE ${datePrefix + '-%'}`);
 
-    let nextSequential = 1;
-    if (todayOrders.length > 0) {
-      const sequentialNumbers = todayOrders
-        .map(order => {
-          const parts = order.orderNumber.split('-');
-          return parts.length === 2 ? parseInt(parts[1]) : 0;
-        })
-        .filter(num => !isNaN(num));
+      let nextSequential = 1;
+      if (todayOrders.length > 0) {
+        const sequentialNumbers = todayOrders
+          .map(order => {
+            const parts = order.orderNumber.split('-');
+            return parts.length === 2 ? parseInt(parts[1]) : 0;
+          })
+          .filter(num => !isNaN(num));
 
-      if (sequentialNumbers.length > 0) {
-        nextSequential = Math.max(...sequentialNumbers) + 1;
+        if (sequentialNumbers.length > 0) {
+          nextSequential = Math.max(...sequentialNumbers) + 1;
+        }
       }
-    }
 
-    const orderNumber = `${datePrefix}-${nextSequential}`;
+      const orderNumber = `${datePrefix}-${nextSequential}`;
 
-    // Create the order
-    const [order] = await db.insert(orders).values({
-      ...orderData,
-      orderNumber,
-    }).returning();
+      // Double-check stock availability with row locking
+      for (const item of items) {
+        const [product] = await tx
+          .select({ stock: products.stock, name: products.name })
+          .from(products)
+          .where(eq(products.id, item.productId))
+          .for('update'); // Row-level lock to prevent race conditions
 
-    // Create order items
-    const orderItemsData = items.map(item => ({
-      ...item,
-      orderId: order.id,
-    }));
+        if (!product) {
+          throw new Error(`Product with ID ${item.productId} not found`);
+        }
 
-    await db.insert(orderItems).values(orderItemsData);
+        if (product.stock < item.quantity) {
+          throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
+        }
+      }
 
-    // Reduce stock for each item
-    for (const item of items) {
-      await db.update(products)
-        .set({
-          stock: sql`${products.stock} - ${item.quantity}`,
-          updatedAt: new Date()
-        })
-        .where(eq(products.id, item.productId));
-    }
+      // Create the order
+      const [order] = await tx.insert(orders).values({
+        ...orderData,
+        orderNumber,
+      }).returning();
 
-    // Get the complete order with items
-    const fullOrder = await this.getOrder(order.id);
-    return fullOrder!;
+      // Create order items
+      const orderItemsData = items.map(item => ({
+        ...item,
+        orderId: order.id,
+      }));
+
+      await tx.insert(orderItems).values(orderItemsData);
+
+      // Reduce stock for each item
+      for (const item of items) {
+        const [updatedProduct] = await tx.update(products)
+          .set({
+            stock: sql`${products.stock} - ${item.quantity}`,
+            physicalInventory: sql`${products.physicalInventory} - ${item.quantity}`,
+            updatedAt: new Date()
+          })
+          .where(eq(products.id, item.productId))
+          .returning({ stock: products.stock, name: products.name });
+
+        // Final check to ensure stock didn't go negative
+        if (updatedProduct.stock < 0) {
+          throw new Error(`Stock went negative for ${updatedProduct.name}. Order cancelled.`);
+        }
+      }
+
+      // Get the complete order with items
+      const fullOrder = await this.getOrder(order.id);
+      return fullOrder!;
+    });
   }
 
   async updateOrderStatus(id: number, status: string): Promise<Order>;

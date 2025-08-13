@@ -442,18 +442,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const orderData = insertOrderSchema.parse(order);
 
-      // Enrich items with product SKU data
+      // Validate stock availability and enrich items with product SKU data
       const enrichedItems = [];
+      const stockErrors = [];
+
       for (const item of items) {
         const product = await storage.getProduct(item.productId);
-        if (product) {
-          enrichedItems.push({
-            ...item,
-            productSku: product.sku
-          });
-        } else {
-          enrichedItems.push(item);
+        if (!product) {
+          stockErrors.push(`Product with ID ${item.productId} not found`);
+          continue;
         }
+
+        // Check if there's enough stock
+        if (product.stock < item.quantity) {
+          stockErrors.push(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
+          continue;
+        }
+
+        enrichedItems.push({
+          ...item,
+          productSku: product.sku
+        });
+      }
+
+      // If there are stock errors, reject the order
+      if (stockErrors.length > 0) {
+        return res.status(400).json({ 
+          message: "Order cannot be processed due to stock issues",
+          errors: stockErrors
+        });
       }
 
       const itemsData = enrichedItems.map((item: any) => insertOrderItemSchema.parse(item));

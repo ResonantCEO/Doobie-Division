@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/cart-context";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Minus, Plus } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
 
 interface AddToCartModalProps {
@@ -21,6 +20,12 @@ interface AddToCartModalProps {
   onOpenChange: (open: boolean) => void;
   product: (Product & { category: Category | null }) | null;
 }
+
+// Helper function to format price, assuming it exists in your project
+const formatPrice = (price: number | string): string => {
+  const numericPrice = Number(price || 0);
+  return numericPrice.toFixed(2);
+};
 
 export default function AddToCartModal({ open, onOpenChange, product }: AddToCartModalProps) {
   const [quantity, setQuantity] = useState(1);
@@ -76,7 +81,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
     if (isWeightBased) {
       const basePrice = Number(product.pricePerGram) || 0;
       const totalPrice = basePrice * weight;
-      
+
       if (product.discountPercentage && parseFloat(product.discountPercentage) > 0) {
         const discountedPrice = totalPrice * (1 - parseFloat(product.discountPercentage) / 100);
         return discountedPrice.toFixed(2);
@@ -85,7 +90,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
     } else {
       const basePrice = Number(product.price) || 0;
       const totalPrice = basePrice * quantity;
-      
+
       if (product.discountPercentage && parseFloat(product.discountPercentage) > 0) {
         const discountedPrice = totalPrice * (1 - parseFloat(product.discountPercentage) / 100);
         return discountedPrice.toFixed(2);
@@ -152,26 +157,52 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
             <Label htmlFor="amount">
               {isWeightBased ? `Weight (${product.weightUnit || 'grams'})` : 'Quantity (units)'}
             </Label>
-            <Input
-              id="amount"
-              type="number"
-              min="1"
-              max={maxStock}
-              step={isWeightBased ? "0.1" : "1"}
-              value={isWeightBased ? weight : quantity}
-              onChange={(e) => {
-                const value = parseFloat(e.target.value) || 1;
-                if (isWeightBased) {
-                  setWeight(value);
-                } else {
-                  setQuantity(Math.floor(value));
-                }
-              }}
-              className="text-center"
-            />
-            <p className="text-xs text-muted-foreground">
-              Available: {maxStock} {isWeightBased ? product.weightUnit || 'units' : 'units'}
-            </p>
+            
+            {isWeightBased ? (
+              <>
+                <Input
+                  id="amount"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={weight}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value) || 0.1;
+                    setWeight(Math.max(0.1, value));
+                  }}
+                  className="text-center"
+                  disabled={maxStock === 0}
+                />
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  Available: {maxStock > 0 ? `${maxStock} ${product.weightUnit || 'units'}` : "Out of stock"}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center space-x-4">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    disabled={quantity <= 1 || maxStock === 0}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <span className="text-xl font-semibold w-12 text-center">{quantity}</span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                    disabled={quantity >= product.stock || maxStock === 0}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground text-center mt-2">
+                  Available: {maxStock > 0 ? `${maxStock} units` : "Out of stock"}
+                </p>
+              </>
+            )}
           </div>
 
           {/* Price Calculation */}
@@ -206,14 +237,20 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
             Cancel
           </Button>
           <Button 
-            onClick={handleAddToCart}
+            onClick={handleAddToCart} 
             disabled={
               (isWeightBased ? weight : quantity) <= 0 || 
-              (isWeightBased ? weight : quantity) > maxStock
+              (isWeightBased ? weight : quantity) > maxStock ||
+              maxStock === 0
             }
           >
             <ShoppingCart className="h-4 w-4 mr-2" />
-            Add to Cart
+            {maxStock === 0 
+              ? "Out of Stock" 
+              : (isWeightBased ? weight : quantity) > maxStock 
+                ? "Insufficient Stock"
+                : `Add to Cart`
+            }
           </Button>
         </DialogFooter>
       </DialogContent>

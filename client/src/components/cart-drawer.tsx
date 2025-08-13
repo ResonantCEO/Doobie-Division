@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +36,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false); // Added state for checkout process
   const [shippingForm, setShippingForm] = useState({
     customerName: "",
     customerPhone: "",
@@ -51,7 +51,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       const address = [user.address, user.city, user.state, user.postalCode, user.country]
         .filter(Boolean)
         .join(", ");
-      
+
       setShippingForm(prev => ({
         ...prev,
         customerName: fullName,
@@ -68,7 +68,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     }
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (state.items.length === 0) {
       toast({
         title: "Cart is empty",
@@ -78,12 +78,59 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       return;
     }
 
-    setShowConfirmation(true);
+    setIsCheckingOut(true);
+
+    try {
+      // Validate stock for all items before checkout
+      const stockValidation = await Promise.all(
+        state.items.map(async (item) => {
+          const response = await fetch(`/api/products/${item.product.id}`);
+          if (!response.ok) throw new Error('Failed to check stock');
+          const product = await response.json();
+          return {
+            item,
+            product,
+            hasStock: product.stock >= item.quantity
+          };
+        })
+      );
+
+      const outOfStockItems = stockValidation.filter(v => !v.hasStock);
+
+      if (outOfStockItems.length > 0) {
+        toast({
+          title: "Stock Issue",
+          description: `Some items in your cart are no longer available with the requested quantity. Please update your cart.`,
+          variant: "destructive",
+        });
+        setIsCheckingOut(false);
+        return;
+      }
+
+      // Proceed with checkout if all items have sufficient stock
+      setShowConfirmation(true);
+
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to validate stock. Please try again.",
+        variant: "destructive",
+      });
+      setIsCheckingOut(false); // Ensure checkout state is reset on error
+    } finally {
+      // Note: setIsCheckingOut(false) will be called if validation passes and setShowConfirmation is true,
+      // or if an error occurs. We don't want to set it to false here if validation passes,
+      // as the confirmation dialog is still pending.
+      if (!showConfirmation) { // Only reset if we didn't proceed to confirmation
+        setIsCheckingOut(false);
+      }
+    }
   };
+
 
   const handleConfirmOrder = async () => {
     const { customerName, customerPhone, shippingAddress } = shippingForm;
-    
+
     if (!customerName || !shippingAddress) {
       toast({
         title: "Missing information",
@@ -96,7 +143,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     try {
       // Generate order number
       const orderNumber = `ORD-${Date.now()}`;
-      
+
       // Prepare order data
       const orderData = {
         orderNumber,
@@ -111,10 +158,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       };
 
       const orderItems = state.items.map(item => {
-        const itemPrice = item.product.sellingMethod === "weight" 
+        const itemPrice = item.product.sellingMethod === "weight"
           ? Number(item.product.pricePerGram) || 0
           : Number(item.product.price) || 0;
-        
+
         return {
           productId: item.product.id,
           productName: item.product.name,
@@ -145,7 +192,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           shippingAddress: "",
           notes: "",
         });
-        
+        setIsCheckingOut(false); // Reset checkout state after successful order
+
         toast({
           title: "Order placed successfully!",
           description: `Order ${orderNumber} has been confirmed. You'll receive a confirmation email shortly.`,
@@ -158,6 +206,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           description: errorData.message || "There was an error processing your order. Please try again.",
           variant: "destructive",
         });
+        setIsCheckingOut(false); // Reset checkout state on order failure
       }
     } catch (error) {
       toast({
@@ -165,6 +214,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         description: "There was an error processing your order. Please try again.",
         variant: "destructive",
       });
+      setIsCheckingOut(false); // Reset checkout state on catch error
     }
   };
 
@@ -183,7 +233,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             )}
           </SheetTitle>
           <SheetDescription>
-            {state.items.length === 0 
+            {state.items.length === 0
               ? "Your cart is empty. Start shopping to add items!"
               : "Review your items and proceed to checkout"
             }
@@ -197,8 +247,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
               <div className="text-center py-12">
                 <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">Your cart is empty</p>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="mt-4"
                   onClick={() => setIsOpen(false)}
                 >
@@ -235,7 +285,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           </p>
                         )}
                       </div>
-                      
+
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-2 mt-2">
                         <Button
@@ -249,7 +299,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         <Input
                           type="number"
                           min="1"
-                          max={item.product.stock}
                           value={item.quantity}
                           onChange={(e) => handleQuantityChange(item.product.id, parseInt(e.target.value) || 1)}
                           className="h-8 w-16 text-center"
@@ -258,7 +307,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           variant="outline"
                           size="sm"
                           className="h-8 w-8 p-0"
-                          disabled={item.quantity >= item.product.stock}
+                          disabled={item.quantity >= item.product.stock} // Disable if quantity reaches stock
                           onClick={() => handleQuantityChange(item.product.id, item.quantity + 1)}
                         >
                           <Plus className="h-3 w-3" />
@@ -272,10 +321,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
-                      
+
                       {/* Subtotal */}
                       <p className="text-sm font-medium mt-2">
-                        Subtotal: ${(item.product.sellingMethod === "weight" 
+                        Subtotal: ${(item.product.sellingMethod === "weight"
                           ? (Number(item.product.pricePerGram) || 0) * item.quantity
                           : (Number(item.product.price) || 0) * item.quantity
                         ).toFixed(2)}
@@ -307,18 +356,24 @@ export default function CartDrawer({ children }: CartDrawerProps) {
               </div>
 
               <div className="space-y-2">
-                <Button 
+                <Button
                   onClick={handleCheckout}
                   className="w-full"
                   size="lg"
+                  disabled={isCheckingOut} // Disable button during checkout process
                 >
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Proceed to Checkout
+                  {isCheckingOut ? "Processing..." : (
+                    <>
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Proceed to Checkout
+                    </>
+                  )}
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={clearCart}
                   className="w-full"
+                  disabled={isCheckingOut} // Disable button during checkout process
                 >
                   Clear Cart
                 </Button>
@@ -327,7 +382,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           )}
         </div>
       </SheetContent>
-      
+
       {/* Order Confirmation Dialog */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
         <DialogContent className="sm:max-w-[500px]">
@@ -337,7 +392,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
               Please review your order details and provide shipping information.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {/* Order Summary */}
             <div className="bg-muted/50 p-4 rounded-lg">
@@ -346,7 +401,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 {state.items.map((item) => (
                   <div key={item.product.id} className="flex justify-between">
                     <span>{item.product.name} x {item.quantity}</span>
-                    <span>${(item.product.sellingMethod === "weight" 
+                    <span>${(item.product.sellingMethod === "weight"
                       ? (Number(item.product.pricePerGram) || 0) * item.quantity
                       : (Number(item.product.price) || 0) * item.quantity
                     ).toFixed(2)}</span>
@@ -372,7 +427,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   required
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="customerPhone">Phone Number</Label>
                 <Input
@@ -383,7 +438,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   placeholder="Enter your phone number"
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="shippingAddress">Shipping Address *</Label>
                 <Textarea
@@ -395,7 +450,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   required
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="notes">Special Instructions (Optional)</Label>
                 <Textarea
@@ -413,9 +468,13 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             <Button variant="outline" onClick={() => setShowConfirmation(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmOrder}>
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Confirm Order
+            <Button onClick={handleConfirmOrder} disabled={isCheckingOut}>
+              {isCheckingOut ? "Processing..." : (
+                <>
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Confirm Order
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
