@@ -260,13 +260,13 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-white line-clamp-1">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1">
                         {product.name}
                       </div>
-                      <div className="text-sm text-white line-clamp-1">
+                      <div className="text-sm text-gray-600 dark:text-white line-clamp-1">
                         {product.description}
                       </div>
-                      <div className="flex items-center mt-1 space-x-4 text-xs text-white line-clamp-1">
+                      <div className="flex items-center mt-1 space-x-4 text-xs text-gray-600 dark:text-white line-clamp-1">
                         <span>SKU: {product.sku}</span>
                         <span>Category: {product.category?.name || "—"}</span>
                       </div>
@@ -343,7 +343,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                         <div className={`text-sm font-medium ${
                           product.stock === 0 ? "text-red-600" : 
                           product.stock <= product.minStockThreshold ? "text-orange-600" : 
-                          "text-white"
+                          "text-gray-900 dark:text-white"
                         }`}>
                           {product.stock} units
                         </div>
@@ -448,18 +448,18 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                       <AvatarFallback>{product.name.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div>
-                      <div className="text-sm font-medium text-white line-clamp-1">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1">
                         {product.name}
                       </div>
-                      <div className="text-sm text-white line-clamp-1">
+                      <div className="text-sm text-gray-600 dark:text-white line-clamp-1">
                         {product.description}
                       </div>
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="font-mono text-sm text-white">{product.sku}</TableCell>
-                <TableCell className="text-white">{product.category?.name || "—"}</TableCell>
-                <TableCell className="font-medium text-white">
+                <TableCell className="font-mono text-sm text-gray-900 dark:text-white">{product.sku}</TableCell>
+                <TableCell className="text-gray-900 dark:text-white">{product.category?.name || "—"}</TableCell>
+                <TableCell className="font-medium text-gray-900 dark:text-white">
                   {product.sellingMethod === "weight" ? (
                     <div className="text-sm">
                       {product.pricePerGram && (
@@ -514,7 +514,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                       <span className={`font-medium text-sm ${
                         product.stock === 0 ? "text-red-600" : 
                         product.stock <= product.minStockThreshold ? "text-orange-600" : 
-                        "text-white"
+                        "text-gray-900 dark:text-white"
                       }`}>
                         {product.stock} units
                       </span>
@@ -546,7 +546,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="text-white hover:text-white">
+                      <Button variant="ghost" size="sm" className="text-gray-600 dark:text-white hover:text-gray-900 dark:hover:text-white">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
