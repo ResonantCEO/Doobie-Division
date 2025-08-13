@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
-import { Package, User, Calendar, CreditCard, MapPin, Loader2 } from "lucide-react";
+import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Order } from "@shared/schema";
 
@@ -107,11 +106,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="font-medium">{displayOrder.customerName}</p>
-                  <p className="text-gray-600">{displayOrder.customerEmail}</p>
+                  <p className="font-medium">{displayOrder.customerName || "Not provided"}</p>
+                  <p className="text-gray-600">{displayOrder.customerEmail || "Not provided"}</p>
                   {displayOrder.customerPhone && (
                     <p className="text-gray-600">{displayOrder.customerPhone}</p>
                   )}
+                </div>
+                <div className="text-sm">
+                  <pre className="whitespace-pre-wrap text-gray-700">{displayOrder.shippingAddress || "Not provided"}</pre>
                 </div>
               </div>
             </div>
@@ -138,27 +140,32 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
               <h3 className="text-lg font-semibold">Order Items</h3>
               {displayOrder.items && displayOrder.items.length > 0 ? (
                 <div className="space-y-3">
-                  {displayOrder.items.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center p-3 border rounded-lg">
+                  {displayOrder.items.map((item: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                       <div className="flex-1">
-                        <p className="font-medium">{item.productName}</p>
-                        {item.productSku && (
-                          <p className="text-sm text-gray-500">SKU: {item.productSku}</p>
-                        )}
+                        <h4 className="font-medium text-sm">{item.productName || "Unknown Product"}</h4>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          SKU: {item.productSku || "N/A"}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          ${item.productPrice ? parseFloat(item.productPrice).toFixed(2) : "0.00"} × {item.quantity || 0}
+                        </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium">Qty: {item.quantity}</p>
-                        <p className="text-sm text-gray-500">
-                          ${Number(item.price).toFixed(2)} each
-                        </p>
-                        <p className="text-sm font-medium text-gray-900">
-                          ${(Number(item.price) * item.quantity).toFixed(2)}
-                        </p>
-                        {item.fulfilled !== undefined && (
-                          <Badge variant={item.fulfilled ? "default" : "secondary"} className="mt-1">
-                            {item.fulfilled ? "Fulfilled" : "Pending"}
-                          </Badge>
-                        )}
+                        <p className="font-medium text-sm">${item.subtotal ? parseFloat(item.subtotal).toFixed(2) : "0.00"}</p>
+                        <div className="flex items-center space-x-2 mt-1">
+                          {item.fulfilled ? (
+                            <Badge variant="default" className="text-xs">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Fulfilled
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -176,9 +183,9 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                 <h3 className="text-lg font-semibold">Order Summary</h3>
               </div>
               <div className="space-y-2">
-                <div className="flex justify-between text-lg font-semibold">
+                <div className="flex items-center justify-between text-lg font-semibold">
                   <span>Total Amount:</span>
-                  <span>${Number(displayOrder.total).toFixed(2)}</span>
+                  <span>${displayOrder.total ? parseFloat(displayOrder.total).toFixed(2) : "0.00"}</span>
                 </div>
                 {displayOrder.paymentMethod && (
                   <div className="flex justify-between text-sm text-gray-600">
