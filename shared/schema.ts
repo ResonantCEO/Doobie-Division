@@ -72,6 +72,7 @@ export const products = pgTable("products", {
   categoryId: integer("category_id").references(() => categories.id),
   imageUrl: text("image_url"),
   stock: integer("stock").notNull().default(0),
+  physicalInventory: integer("physical_inventory").notNull().default(0), // actual warehouse count
   minStockThreshold: integer("min_stock_threshold").notNull().default(5),
   sellingMethod: varchar("selling_method").notNull().default("units"), // units, weight
   weightUnit: varchar("weight_unit").default("grams"), // grams, ounces
@@ -230,6 +231,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
   price: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   discountPercentage: z.string().nullable().optional(),
+  physicalInventory: z.number().optional(),
 });
 
 export const insertOrderSchema = createInsertSchema(orders).omit({
