@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import OrderDetailsModal from "@/components/modals/order-details-modal";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
@@ -23,6 +24,8 @@ interface OrderTableProps {
 export default function OrderTable({ orders }: OrderTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
@@ -78,10 +81,11 @@ export default function OrderTable({ orders }: OrderTableProps) {
   };
 
   const handleViewOrder = (orderId: number) => {
-    toast({
-      title: "Order Details",
-      description: `Viewing details for order #${orderId}`,
-    });
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      setSelectedOrder(order);
+      setIsOrderDetailsOpen(true);
+    }
   };
 
   const handleContactCustomer = (order: Order) => {
@@ -92,10 +96,11 @@ export default function OrderTable({ orders }: OrderTableProps) {
   };
 
   const handleOrderClick = (orderId: number) => {
-    toast({
-      title: "Order Details",
-      description: `Viewing details for order #${orderId}`,
-    });
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      setSelectedOrder(order);
+      setIsOrderDetailsOpen(true);
+    }
   };
 
   if (orders.length === 0) {
@@ -109,7 +114,16 @@ export default function OrderTable({ orders }: OrderTableProps) {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <>
+      <OrderDetailsModal
+        order={selectedOrder}
+        isOpen={isOrderDetailsOpen}
+        onClose={() => {
+          setIsOrderDetailsOpen(false);
+          setSelectedOrder(null);
+        }}
+      />
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Orders</h3>
       </div>
@@ -268,5 +282,6 @@ export default function OrderTable({ orders }: OrderTableProps) {
         </Table>
       </div>
     </div>
+    </>
   );
 }
