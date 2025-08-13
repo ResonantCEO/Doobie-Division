@@ -535,7 +535,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                       variant="ghost"
                       size="sm"
                       onClick={() => onStockAdjustment(product)}
-                      className="h-6 w-6 p-0 text-white hover:text-white"
+                      className="h-6 w-6 p-0 text-gray-600 dark:text-white hover:text-gray-900 dark:hover:text-white"
                       title="Adjust stock"
                     >
                       <Edit className="h-3 w-3" />
