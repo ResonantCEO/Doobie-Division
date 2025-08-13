@@ -308,7 +308,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                       {product.sellingMethod === "weight" ? (
                         <div className="space-y-1">
                           {product.pricePerGram && (
-                            <div className="font-medium text-white">
+                            <div className="font-medium text-gray-900 dark:text-white">
                               {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
                                 <span>
                                   <span className="line-through text-gray-500">${product.pricePerGram}/g</span>
@@ -323,7 +323,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                           )}
                         </div>
                       ) : (
-                        <div className="font-medium text-white">
+                        <div className="font-medium text-gray-900 dark:text-white">
                           {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
                             <span>
                               <span className="line-through text-gray-500">${Number(product.price || 0).toFixed(2)}</span>
