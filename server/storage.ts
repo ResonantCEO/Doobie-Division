@@ -635,6 +635,65 @@ export class DatabaseStorage implements IStorage {
           .from(orderItems)
           .where(eq(orderItems.orderId, id));
 
+        // Process stock restoration for unfulfilled items
+        for (const item of orderItemsData) {
+          if (!item.fulfilled && item.productId) {
+            try {
+              // Get current product stock
+              const [currentProduct] = await tx
+                .select({ id: products.id, name: products.name, stock: products.stock })
+                .from(products)
+                .where(eq(products.id, item.productId));
+
+              if (currentProduct) {
+                const previousStock = currentProduct.stock;
+                const newStock = previousStock + item.quantity;
+
+                // Update product stock
+                await tx
+                  .update(products)
+                  .set({ 
+                    stock: newStock,
+                    updatedAt: new Date() 
+                  })
+                  .where(eq(products.id, item.productId));
+
+                // Log the inventory restoration
+                await tx.insert(inventoryLogs).values({
+                  productId: item.productId,
+                  type: 'stock_in',
+                  quantity: item.quantity,
+                  previousStock: previousStock,
+                  newStock: newStock,
+                  reason: `Order cancellation - Order #${currentOrder.orderNumber}`,
+                  userId: null // System operation
+                });
+
+                console.log(`Restored ${item.quantity} units of ${currentProduct.name} (Product ID: ${item.productId})`);
+              }
+            } catch (error) {
+              console.error(`Error restoring stock for product ${item.productId}:`, error);
+              // Continue with other items instead of failing the entire transaction
+            }
+          }
+        }
+      }
+
+      // Update the order status
+      const [updated] = await tx
+        .update(orders)
+        .set({ status, updatedAt: new Date() })
+        .where(eq(orders.id, id))
+        .returning();
+
+      if (!updated) {
+        throw new Error("Failed to update order status");
+      }
+
+      return updated;
+    });
+  }
+
         // Restore stock for unfulfilled items
         for (const item of orderItemsData) {
           // Only restore stock for unfulfilled items and valid product IDs
