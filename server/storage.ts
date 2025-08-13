@@ -419,6 +419,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProduct(id: number): Promise<void> {
+    // Check if product is referenced in any order items
+    const orderItemsUsingProduct = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(orderItems)
+      .where(eq(orderItems.productId, id));
+
+    if (Number(orderItemsUsingProduct[0].count) > 0) {
+      throw new Error("Cannot delete product. It is referenced in existing orders.");
+    }
+
     // First delete related inventory logs
     await db.delete(inventoryLogs).where(eq(inventoryLogs.productId, id));
 
