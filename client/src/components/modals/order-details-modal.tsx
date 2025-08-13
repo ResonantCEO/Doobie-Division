@@ -203,12 +203,6 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                   <span>Total Amount:</span>
                   <span>${displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00"}</span>
                 </div>
-                {(displayOrder.paymentMethod || displayOrder.payment_method) && (
-                  <div className="flex justify-between text-sm text-white">
-                    <span>Payment Method:</span>
-                    <span>{displayOrder.paymentMethod || displayOrder.payment_method}</span>
-                  </div>
-                )}
               </div>
             </div>
 
