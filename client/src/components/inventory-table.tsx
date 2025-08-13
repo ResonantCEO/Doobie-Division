@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import QRCodeModal from "@/components/modals/qr-code-modal";
-import { Edit, QrCode, Trash2, MoreHorizontal, Package, ChevronUp, ChevronDown } from "lucide-react";
+import { Edit, QrCode, Trash2, MoreHorizontal, Package, ChevronUp, ChevronDown, AlertTriangle } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -440,6 +440,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                   {getSortIcon('stock')}
                 </div>
               </TableHead>
+              <TableHead>Physical</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -553,6 +554,16 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                     >
                       <Edit className="h-3 w-3" />
                     </Button>
+                  </div>
+                </TableCell>
+                <TableCell className="font-medium text-gray-900 dark:text-white">
+                  <div className="flex flex-col">
+                    <span>{product.physicalInventory || 0} units</span>
+                    {product.physicalInventory !== product.stock && (
+                      <span className="text-xs text-orange-600">
+                        Variance: {(product.physicalInventory || 0) - product.stock}
+                      </span>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>{getStockBadge(product)}</TableCell>
