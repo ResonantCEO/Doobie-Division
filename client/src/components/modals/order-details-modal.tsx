@@ -36,6 +36,11 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
     }
   }, [orderDetails, order]);
 
+  // Debug logging
+  console.log('Order prop:', order);
+  console.log('Order details:', orderDetails);
+  console.log('Full order:', fullOrder);
+
   if (!order) return null;
 
   const displayOrder = fullOrder || order;
@@ -63,7 +68,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Order Details - {displayOrder.orderNumber}
+            Order Details - {displayOrder.orderNumber || displayOrder.order_number || 'N/A'}
           </DialogTitle>
         </DialogHeader>
 
@@ -82,8 +87,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                   <span className="text-sm text-gray-500">Order Date</span>
                 </div>
                 <p className="text-sm">
-                  {displayOrder.createdAt 
-                    ? format(new Date(displayOrder.createdAt), "MMM d, yyyy 'at' h:mm a")
+                  {(displayOrder.createdAt || displayOrder.created_at)
+                    ? format(new Date(displayOrder.createdAt || displayOrder.created_at), "MMM d, yyyy 'at' h:mm a")
                     : "Date not available"
                   }
                 </p>
@@ -106,20 +111,20 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="font-medium">{displayOrder.customerName || "Not provided"}</p>
-                  <p className="text-gray-600">{displayOrder.customerEmail || "Not provided"}</p>
-                  {displayOrder.customerPhone && (
-                    <p className="text-gray-600">{displayOrder.customerPhone}</p>
+                  <p className="font-medium">{displayOrder.customerName || displayOrder.customer_name || "Not provided"}</p>
+                  <p className="text-gray-600">{displayOrder.customerEmail || displayOrder.customer_email || "Not provided"}</p>
+                  {(displayOrder.customerPhone || displayOrder.customer_phone) && (
+                    <p className="text-gray-600">{displayOrder.customerPhone || displayOrder.customer_phone}</p>
                   )}
                 </div>
                 <div className="text-sm">
-                  <pre className="whitespace-pre-wrap text-gray-700">{displayOrder.shippingAddress || "Not provided"}</pre>
+                  <pre className="whitespace-pre-wrap text-gray-700">{displayOrder.shippingAddress || displayOrder.shipping_address || "Not provided"}</pre>
                 </div>
               </div>
             </div>
 
             {/* Shipping Address */}
-            {displayOrder.shippingAddress && (
+            {(displayOrder.shippingAddress || displayOrder.shipping_address) && (
               <>
                 <Separator />
                 <div className="space-y-4">
@@ -128,7 +133,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                     <h3 className="text-lg font-semibold">Shipping Address</h3>
                   </div>
                   <div className="text-sm">
-                    <pre className="whitespace-pre-wrap text-gray-700">{displayOrder.shippingAddress}</pre>
+                    <pre className="whitespace-pre-wrap text-gray-700">{displayOrder.shippingAddress || displayOrder.shipping_address}</pre>
                   </div>
                 </div>
               </>
@@ -141,18 +146,18 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
               {displayOrder.items && displayOrder.items.length > 0 ? (
                 <div className="space-y-3">
                   {displayOrder.items.map((item: any, index: number) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <div key={item.id || index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                       <div className="flex-1">
-                        <h4 className="font-medium text-sm">{item.productName || "Unknown Product"}</h4>
+                        <h4 className="font-medium text-sm">{item.productName || item.product_name || "Unknown Product"}</h4>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          SKU: {item.productSku || "N/A"}
+                          SKU: {item.productSku || item.product_sku || "N/A"}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          ${item.productPrice ? parseFloat(item.productPrice).toFixed(2) : "0.00"} × {item.quantity || 0}
+                          ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-sm">${item.subtotal ? parseFloat(item.subtotal).toFixed(2) : "0.00"}</p>
+                        <p className="font-medium text-sm">${item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00"}</p>
                         <div className="flex items-center space-x-2 mt-1">
                           {item.fulfilled ? (
                             <Badge variant="default" className="text-xs">
@@ -171,7 +176,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-4">No items found for this order</p>
+                <div className="text-center py-4">
+                  <p className="text-gray-500">No items found for this order</p>
+                  <p className="text-xs text-gray-400 mt-1">Items data: {JSON.stringify(displayOrder.items)}</p>
+                </div>
               )}
             </div>
 
@@ -185,12 +193,12 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-lg font-semibold">
                   <span>Total Amount:</span>
-                  <span>${displayOrder.total ? parseFloat(displayOrder.total).toFixed(2) : "0.00"}</span>
+                  <span>${displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00"}</span>
                 </div>
-                {displayOrder.paymentMethod && (
+                {(displayOrder.paymentMethod || displayOrder.payment_method) && (
                   <div className="flex justify-between text-sm text-gray-600">
                     <span>Payment Method:</span>
-                    <span>{displayOrder.paymentMethod}</span>
+                    <span>{displayOrder.paymentMethod || displayOrder.payment_method}</span>
                   </div>
                 )}
               </div>
