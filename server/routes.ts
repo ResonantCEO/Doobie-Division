@@ -441,7 +441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Items data received:', JSON.stringify(items, null, 2));
 
       const orderData = insertOrderSchema.parse(order);
-      
+
       // Enrich items with product SKU data
       const enrichedItems = [];
       for (const item of items) {
@@ -455,7 +455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           enrichedItems.push(item);
         }
       }
-      
+
       const itemsData = enrichedItems.map((item: any) => insertOrderItemSchema.parse(item));
 
       const newOrder = await storage.createOrder(orderData, itemsData);
@@ -670,15 +670,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.params.id;
       const { limit = 50, type } = req.query;
-      
+
       const filters: any = { userId };
       if (type) filters.type = type as string;
-      
+
       const activity = await storage.getUserActivity(userId, {
         limit: parseInt(limit as string),
         type: filters.type
       });
-      
+
       res.json(activity);
     } catch (error) {
       console.error('Error fetching user activity:', error);
