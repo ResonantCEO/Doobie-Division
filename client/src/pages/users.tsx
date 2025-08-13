@@ -503,7 +503,22 @@ export default function UsersPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{getRoleBadge(user.role)}</TableCell>
+                      <TableCell>
+                        <Select 
+                          value={user.role === 'user' ? 'customer' : user.role} 
+                          onValueChange={(newRole) => handleRoleChange(user.id, newRole)}
+                          disabled={updateRoleMutation.isPending}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="customer">Customer</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
                       <TableCell>{getStatusBadge(user.status)}</TableCell>
                       <TableCell className="text-sm text-gray-500 dark:text-gray-400">
                         {user.createdAt ? format(new Date(user.createdAt), "MMM d, yyyy") : "—"}

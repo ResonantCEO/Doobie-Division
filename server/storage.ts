@@ -762,23 +762,29 @@ export class DatabaseStorage implements IStorage {
       throw new Error('User not found');
     }
 
-    const user = await db
+    // Update the user role
+    const [updatedUser] = await db
       .update(users)
-      .set({ role, updatedAt: new Date() })
+      .set({ 
+        role: role,
+        updatedAt: new Date() 
+      })
       .where(eq(users.id, id))
-      .returning()
-      .then(rows => rows[0]);
+      .returning();
 
-    if (user) {
-      await this.logUserActivity(
-        id,
-        'Role Updated',
-        `User role changed from ${currentUser.role} to ${role}`,
-        { previousRole: currentUser.role, newRole: role }
-      );
+    if (!updatedUser) {
+      throw new Error('Failed to update user role');
     }
 
-    return user;
+    // Log the role change
+    await this.logUserActivity(
+      id,
+      'Role Updated',
+      `User role changed from ${currentUser.role} to ${role}`,
+      { previousRole: currentUser.role, newRole: role }
+    );
+
+    return updatedUser;
   }
 
   async updateUserIdVerification(id: string, status: string): Promise<User>;
