@@ -380,11 +380,13 @@ export class DatabaseStorage implements IStorage {
     return product;
   }
 
-  async createProduct(product: InsertProduct): Promise<Product> {
+  async createProduct(productData: InsertProduct): Promise<Product> {
     const processedProduct = {
-      ...product,
-      pricePerGram: product.pricePerGram ? (typeof product.pricePerGram === 'string' ? parseFloat(product.pricePerGram) : product.pricePerGram) : null,
-      pricePerOunce: product.pricePerOunce ? (typeof product.pricePerOunce === 'string' ? parseFloat(product.pricePerOunce) : product.pricePerOunce) : null,
+      ...productData,
+      pricePerGram: productData.pricePerGram ? (typeof productData.pricePerGram === 'string' ? parseFloat(productData.pricePerGram) : productData.pricePerGram) : null,
+      pricePerOunce: productData.pricePerOunce ? (typeof productData.pricePerOunce === 'string' ? parseFloat(productData.pricePerOunce) : productData.pricePerOunce) : null,
+      physicalInventory: productData.stock || 0, // Set physical inventory to match initial stock
+      updatedAt: new Date()
     };
 
     const [newProduct] = await db
@@ -394,13 +396,26 @@ export class DatabaseStorage implements IStorage {
     return newProduct;
   }
 
-  async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product> {
-    const [updated] = await db
-      .update(products)
-      .set({ ...product, updatedAt: new Date() })
+  async updateProduct(id: number, productData: Partial<InsertProduct>): Promise<Product> {
+    // If stock is being updated, also update physical inventory to match
+    const updateData = { ...productData };
+    if (productData.stock !== undefined) {
+      updateData.physicalInventory = productData.stock;
+    }
+
+    const [product] = await db.update(products)
+      .set({
+        ...updateData,
+        updatedAt: new Date()
+      })
       .where(eq(products.id, id))
       .returning();
-    return updated;
+
+    if (!product) {
+      throw new Error("Product not found");
+    }
+
+    return product;
   }
 
   async deleteProduct(id: number): Promise<void> {
@@ -412,31 +427,41 @@ export class DatabaseStorage implements IStorage {
   }
 
   async adjustStock(productId: number, quantity: number, userId: string, reason: string): Promise<void> {
-    const [product] = await db.select().from(products).where(eq(products.id, productId));
-    if (!product) throw new Error("Product not found");
+    const product = await this.getProduct(productId);
+    if (!product) {
+      throw new Error("Product not found");
+    }
 
-    const previousStock = product.stock;
-    const newStock = previousStock + quantity;
+    const newStock = product.stock + quantity;
+    if (newStock < 0) {
+      throw new Error("Insufficient stock");
+    }
 
-    // Update product stock
-    await db
-      .update(products)
-      .set({ stock: newStock, updatedAt: new Date() })
-      .where(eq(products.id, productId));
+    // Use db.transaction for atomic updates
+    await db.transaction(async (tx) => {
+      // Update product stock and physical inventory
+      await tx.update(products)
+        .set({
+          stock: newStock,
+          physicalInventory: newStock, // Update physical inventory to match new stock
+          updatedAt: new Date()
+        })
+        .where(eq(products.id, productId));
 
-    // Log the inventory change
-    await db.insert(inventoryLogs).values({
-      productId,
-      type: quantity > 0 ? 'stock_in' : quantity < 0 ? 'stock_out' : 'adjustment',
-      quantity: Math.abs(quantity),
-      previousStock,
-      newStock,
-      reason,
-      userId,
+      // Log the inventory change
+      await tx.insert(inventoryLogs).values({
+        productId,
+        type: quantity > 0 ? 'stock_in' : 'stock_out',
+        quantity: Math.abs(quantity),
+        previousStock: product.stock,
+        newStock,
+        reason,
+        userId
+      });
     });
 
     // Check if product needs low stock notification
-    if (newStock <= product.minStockThreshold && previousStock > product.minStockThreshold) {
+    if (newStock <= product.minStockThreshold && product.stock > product.minStockThreshold) {
       // Get all admin users for notification
       const adminUsers = await db.select().from(users).where(eq(users.role, 'admin'));
 
