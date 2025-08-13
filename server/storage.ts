@@ -638,26 +638,38 @@ export class DatabaseStorage implements IStorage {
         // Restore stock for unfulfilled items
         for (const item of orderItemsData) {
           if (!item.fulfilled) {
+            // Get current stock first
+            const [currentProduct] = await tx
+              .select({ stock: products.stock, physicalInventory: products.physicalInventory })
+              .from(products)
+              .where(eq(products.id, item.productId));
+
+            if (!currentProduct) {
+              console.warn(`Product ${item.productId} not found during order cancellation`);
+              continue;
+            }
+
+            const previousStock = currentProduct.stock;
+            const newStock = previousStock + item.quantity;
+            const previousPhysical = currentProduct.physicalInventory;
+            const newPhysical = previousPhysical + item.quantity;
+
+            // Update stock and physical inventory
             await tx.update(products)
               .set({
-                stock: sql`${products.stock} + ${item.quantity}`,
-                physicalInventory: sql`${products.physicalInventory} + ${item.quantity}`,
+                stock: newStock,
+                physicalInventory: newPhysical,
                 updatedAt: new Date()
               })
               .where(eq(products.id, item.productId));
 
             // Log the inventory restoration
-            const [product] = await tx
-              .select({ stock: products.stock })
-              .from(products)
-              .where(eq(products.id, item.productId));
-
             await tx.insert(inventoryLogs).values({
               productId: item.productId,
               type: 'stock_in',
               quantity: item.quantity,
-              previousStock: product.stock - item.quantity,
-              newStock: product.stock,
+              previousStock: previousStock,
+              newStock: newStock,
               reason: `Order cancellation - Order #${currentOrder.orderNumber}`,
               userId: null // System operation
             });
