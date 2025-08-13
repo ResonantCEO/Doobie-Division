@@ -74,11 +74,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
             <span className="ml-2">Loading order details...</span>
           </div>
         ) : (
-          <div className="space-y-6"></div>
-        )}</div>
-    </Dialog>
-  );
-          {/* Order Status and Basic Info */}
+          <div className="space-y-6">
+            {/* Order Status and Basic Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -201,7 +198,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                 </div>
               </>
             )}
-        </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
