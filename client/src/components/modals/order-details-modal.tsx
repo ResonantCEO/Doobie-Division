@@ -83,7 +83,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                   <span className="text-sm text-gray-500">Order Date</span>
                 </div>
                 <p className="text-sm">
-                  {format(new Date(displayOrder.createdAt!), "MMM d, yyyy 'at' h:mm a")}
+                  {displayOrder.createdAt 
+                    ? format(new Date(displayOrder.createdAt), "MMM d, yyyy 'at' h:mm a")
+                    : "Date not available"
+                  }
                 </p>
               </div>
               <div className="space-y-3">
