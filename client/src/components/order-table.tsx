@@ -91,6 +91,13 @@ export default function OrderTable({ orders }: OrderTableProps) {
     });
   };
 
+  const handleOrderClick = (orderId: number) => {
+    toast({
+      title: "Order Details",
+      description: `Viewing details for order #${orderId}`,
+    });
+  };
+
   if (orders.length === 0) {
     return (
       <div className="text-center py-12">
@@ -115,9 +122,12 @@ export default function OrderTable({ orders }: OrderTableProps) {
               <div className="space-y-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900 dark:text-gray-100">
+                    <button
+                      onClick={() => handleOrderClick(order.id)}
+                      className="font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 underline cursor-pointer"
+                    >
                       {order.orderNumber}
-                    </div>
+                    </button>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       {format(new Date(order.createdAt!), "MMM d, yyyy")}
                     </div>
@@ -195,7 +205,12 @@ export default function OrderTable({ orders }: OrderTableProps) {
             {orders.map((order) => (
               <TableRow key={order.id}>
                 <TableCell className="font-medium text-white">
-                  {order.orderNumber}
+                  <button
+                    onClick={() => handleOrderClick(order.id)}
+                    className="hover:text-blue-400 underline cursor-pointer"
+                  >
+                    {order.orderNumber}
+                  </button>
                 </TableCell>
                 <TableCell>
                   <div>
