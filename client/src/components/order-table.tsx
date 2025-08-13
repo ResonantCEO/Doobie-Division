@@ -213,36 +213,36 @@ export default function OrderTable({ orders }: OrderTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-white">Order Number</TableHead>
-              <TableHead className="text-white">Customer</TableHead>
-              <TableHead className="text-white">Total</TableHead>
-              <TableHead className="text-white">Status</TableHead>
-              <TableHead className="text-white">Date</TableHead>
-              <TableHead className="text-right text-white">Actions</TableHead>
+              <TableHead className="text-gray-900 dark:text-white">Order Number</TableHead>
+              <TableHead className="text-gray-900 dark:text-white">Customer</TableHead>
+              <TableHead className="text-gray-900 dark:text-white">Total</TableHead>
+              <TableHead className="text-gray-900 dark:text-white">Status</TableHead>
+              <TableHead className="text-gray-900 dark:text-white">Date</TableHead>
+              <TableHead className="text-right text-gray-900 dark:text-white">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.map((order) => (
               <TableRow key={order.id}>
-                <TableCell className="font-medium text-white">
+                <TableCell className="font-medium text-gray-900 dark:text-white">
                   <button
                     onClick={() => handleOrderClick(order.id)}
-                    className="hover:text-blue-400 underline cursor-pointer"
+                    className="hover:text-blue-600 dark:hover:text-blue-400 underline cursor-pointer"
                   >
                     {order.orderNumber}
                   </button>
                 </TableCell>
                 <TableCell>
                   <div>
-                    <div className="font-medium text-white">{order.customerName}</div>
-                    <div className="text-sm text-white">{order.customerEmail}</div>
+                    <div className="font-medium text-gray-900 dark:text-white">{order.customerName}</div>
+                    <div className="text-sm text-gray-600 dark:text-white">{order.customerEmail}</div>
                   </div>
                 </TableCell>
-                <TableCell className="font-medium text-white">
+                <TableCell className="font-medium text-gray-900 dark:text-white">
                   ${Number(order.total).toFixed(2)}
                 </TableCell>
                 <TableCell>{getStatusBadge(order.status)}</TableCell>
-                <TableCell className="text-white">
+                <TableCell className="text-gray-900 dark:text-white">
                   {format(new Date(order.createdAt!), "MMM d, yyyy")}
                 </TableCell>
                 <TableCell className="text-right">
@@ -266,7 +266,7 @@ export default function OrderTable({ orders }: OrderTableProps) {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4 text-white" />
+                          <MoreHorizontal className="h-4 w-4 text-gray-900 dark:text-white" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
