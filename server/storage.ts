@@ -612,12 +612,68 @@ export class DatabaseStorage implements IStorage {
 
   async updateOrderStatus(id: number, status: string): Promise<Order>;
   async updateOrderStatus(id: number, status: string): Promise<Order> {
-    const [updated] = await db
-      .update(orders)
-      .set({ status, updatedAt: new Date() })
-      .where(eq(orders.id, id))
-      .returning();
-    return updated;
+    return await db.transaction(async (tx) => {
+      // Get the current order with its items
+      const [currentOrder] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, id));
+
+      if (!currentOrder) {
+        throw new Error("Order not found");
+      }
+
+      // If changing status to cancelled, restore stock for all unfulfilled items
+      if (status === 'cancelled' && currentOrder.status !== 'cancelled') {
+        const orderItemsData = await tx
+          .select({
+            productId: orderItems.productId,
+            quantity: orderItems.quantity,
+            fulfilled: orderItems.fulfilled,
+            productName: orderItems.productName
+          })
+          .from(orderItems)
+          .where(eq(orderItems.orderId, id));
+
+        // Restore stock for unfulfilled items
+        for (const item of orderItemsData) {
+          if (!item.fulfilled) {
+            await tx.update(products)
+              .set({
+                stock: sql`${products.stock} + ${item.quantity}`,
+                physicalInventory: sql`${products.physicalInventory} + ${item.quantity}`,
+                updatedAt: new Date()
+              })
+              .where(eq(products.id, item.productId));
+
+            // Log the inventory restoration
+            const [product] = await tx
+              .select({ stock: products.stock })
+              .from(products)
+              .where(eq(products.id, item.productId));
+
+            await tx.insert(inventoryLogs).values({
+              productId: item.productId,
+              type: 'stock_in',
+              quantity: item.quantity,
+              previousStock: product.stock - item.quantity,
+              newStock: product.stock,
+              reason: `Order cancellation - Order #${currentOrder.orderNumber}`,
+              userId: null // System operation
+            });
+          }
+        }
+      }
+
+      // Update the order status
+      const [updated] = await tx
+        .update(orders)
+        .set({ status, updatedAt: new Date() })
+        .where(eq(orders.id, id))
+        .returning();
+
+      return updated;
+    });
   }
 
   async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string) {
