@@ -438,37 +438,10 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Cannot delete product. It is referenced in pending or processing orders.");
     }
 
-    // Set product_id to null for order items in non-active orders (cancelled, completed, shipped, delivered)
-    // This maintains order history while allowing product deletion
-    await db
-      .update(orderItems)
-      .set({ productId: null })
-      .where(
-        and(
-          eq(orderItems.productId, id),
-          exists(
-            db
-              .select({ id: orders.id })
-              .from(orders)
-              .where(
-                and(
-                  eq(orders.id, orderItems.orderId),
-                  or(
-                    eq(orders.status, 'cancelled'),
-                    eq(orders.status, 'completed'),
-                    eq(orders.status, 'shipped'),
-                    eq(orders.status, 'delivered')
-                  )
-                )
-              )
-          )
-        )
-      );
-
-    // Delete related inventory logs
+    // First delete related inventory logs
     await db.delete(inventoryLogs).where(eq(inventoryLogs.productId, id));
 
-    // Now delete the product
+    // Then delete the product
     await db.delete(products).where(eq(products.id, id));
   }
 
