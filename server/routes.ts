@@ -10,6 +10,8 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema } from "@shared/schema";
 import { z } from "zod";
+import { db, orders, products, orderItems, eq, sql, desc, and, gte, lt, inArray } from "./db";
+
 
 // Role-based middleware
 const requireRole = (roles: string[]) => {
@@ -620,7 +622,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Analytics routes
+  // Daily analytics endpoints
+  app.get("/api/analytics/hourly-breakdown", isAuthenticated, async (req, res) => {
+    try {
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+      // Get hourly data for today
+      const result = await db
+        .select({
+          hour: sql<string>`EXTRACT(HOUR FROM ${orders.createdAt})`,
+          sales: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
+          orders: sql<number>`COUNT(*)`,
+        })
+        .from(orders)
+        .where(
+          and(
+            gte(orders.createdAt, startOfDay),
+            lt(orders.createdAt, endOfDay),
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+          )
+        )
+        .groupBy(sql`EXTRACT(HOUR FROM ${orders.createdAt})`)
+        .orderBy(sql`EXTRACT(HOUR FROM ${orders.createdAt})`);
+
+      // Format data for chart - create 24 hours with defaults
+      const hourlyData = Array.from({ length: 24 }, (_, i) => {
+        const hour = i;
+        const data = result.find(r => parseInt(r.hour) === hour);
+        return {
+          hour: `${hour.toString().padStart(2, '0')}:00`,
+          sales: data ? parseFloat(data.sales.toString()) : 0,
+          orders: data ? data.orders : 0
+        };
+      });
+
+      res.json(hourlyData);
+    } catch (error) {
+      console.error('Error fetching hourly breakdown:', error);
+      res.status(500).json({ error: 'Failed to fetch hourly breakdown' });
+    }
+  });
+
+  app.get("/api/analytics/daily-top-products", isAuthenticated, async (req, res) => {
+    try {
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+      const topProducts = await db
+        .select({
+          product: products,
+          sales: sql<number>`SUM(${orderItems.quantity})`,
+          revenue: sql<number>`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`
+        })
+        .from(orderItems)
+        .innerJoin(products, eq(orderItems.productId, products.id))
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .where(
+          and(
+            gte(orders.createdAt, startOfDay),
+            lt(orders.createdAt, endOfDay),
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+          )
+        )
+        .groupBy(products.id)
+        .orderBy(desc(sql`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`))
+        .limit(10);
+
+      res.json(topProducts);
+    } catch (error) {
+      console.error('Error fetching daily top products:', error);
+      res.status(500).json({ error: 'Failed to fetch daily top products' });
+    }
+  });
+
+  // Analytics endpoints
   app.get('/api/analytics/metrics/:days', isAuthenticated, async (req, res) => {
     try {
       const days = parseInt(req.params.days) || 30;

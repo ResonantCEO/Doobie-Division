@@ -173,6 +173,43 @@ export default function AnalyticsPage() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  // Fetch daily metrics (today only)
+  const { data: dailyMetrics, isLoading: dailyMetricsLoading } = useQuery<{
+    totalSales: number;
+    totalOrders: number;
+    averageOrderValue: number;
+  }>({
+    queryKey: ["/api/analytics/metrics", 1], // 1 day
+    queryFn: async () => {
+      const response = await fetch(`/api/analytics/metrics/1`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch daily metrics");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Fetch today's hourly breakdown
+  const { data: hourlyData = [], isLoading: hourlyDataLoading } = useQuery<{ hour: string; sales: number; orders: number }[]>({
+    queryKey: ["/api/analytics/hourly-breakdown"],
+    queryFn: async () => {
+      const response = await fetch("/api/analytics/hourly-breakdown", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch hourly breakdown");
+      return response.json();
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes for more frequent updates
+  });
+
+  // Fetch today's top products
+  const { data: dailyTopProducts, isLoading: dailyTopProductsLoading } = useQuery<{ product: Product; sales: number; revenue: number }[]>({
+    queryKey: ["/api/analytics/daily-top-products"],
+    queryFn: async () => {
+      const response = await fetch("/api/analytics/daily-top-products", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch daily top products");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   // Transform products data for inventory aging report
   const inventoryData = allProducts.map(product => ({
     product: product.name,
@@ -264,13 +301,303 @@ export default function AnalyticsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 gap-1 sm:gap-0 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-0 h-auto p-1">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+          <TabsTrigger value="daily" className="text-xs sm:text-sm">Daily</TabsTrigger>
           <TabsTrigger value="sales" className="text-xs sm:text-sm">Sales</TabsTrigger>
           <TabsTrigger value="customers" className="text-xs sm:text-sm">Customers</TabsTrigger>
           <TabsTrigger value="inventory" className="text-xs sm:text-sm">Inventory</TabsTrigger>
           <TabsTrigger value="operations" className="text-xs sm:text-sm">Operations</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="daily" className="space-y-6">
+          {/* Today's Key Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center">
+                  <div className="p-2 sm:p-3 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400">
+                    <DollarSign className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div className="ml-3 sm:ml-4">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Today's Revenue</p>
+                    {dailyMetricsLoading ? (
+                      <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    ) : (
+                      <>
+                        <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">
+                          ${dailyMetrics?.totalSales.toFixed(2) || "0.00"}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Since midnight</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center">
+                  <div className="p-2 sm:p-3 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
+                    <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div className="ml-3 sm:ml-4">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Today's Orders</p>
+                    {dailyMetricsLoading ? (
+                      <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    ) : (
+                      <>
+                        <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">
+                          {dailyMetrics?.totalOrders || 0}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Since midnight</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center">
+                  <div className="p-2 sm:p-3 rounded-full bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400">
+                    <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div className="ml-3 sm:ml-4">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Avg. Order Value</p>
+                    {dailyMetricsLoading ? (
+                      <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    ) : (
+                      <>
+                        <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">
+                          ${dailyMetrics?.averageOrderValue.toFixed(2) || "0.00"}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Today</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center">
+                  <div className="p-2 sm:p-3 rounded-full bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400">
+                    <Clock className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div className="ml-3 sm:ml-4">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Current Hour</p>
+                    <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">
+                      {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Live time</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Hourly Performance and Top Products */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Today's Hourly Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6">
+                {hourlyDataLoading ? (
+                  <div className="h-48 sm:h-64 flex items-center justify-center">
+                    <div className="animate-pulse">
+                      <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </div>
+                  </div>
+                ) : hourlyData.length === 0 ? (
+                  <div className="h-48 sm:h-64 flex items-center justify-center">
+                    <div className="text-center">
+                      <BarChart3 className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500 dark:text-gray-400">No sales data for today yet</p>
+                    </div>
+                  </div>
+                ) : (
+                  <ChartContainer config={chartConfig} className="h-48 sm:h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={hourlyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="hour" fontSize={12} />
+                        <YAxis fontSize={12} />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="sales" fill="var(--color-sales)" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="h-5 w-5" />
+                  Today's Top Sellers
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {dailyTopProductsLoading ? (
+                  <div className="space-y-4">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <Skeleton className="h-10 w-10 rounded" />
+                          <div className="space-y-1">
+                            <Skeleton className="h-4 w-32" />
+                            <Skeleton className="h-3 w-20" />
+                          </div>
+                        </div>
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                    ))}
+                  </div>
+                ) : !dailyTopProducts || dailyTopProducts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500 dark:text-gray-400">No sales today yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {dailyTopProducts.slice(0, 5).map((item, index) => (
+                      <div key={item.product.id} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="flex items-center justify-center w-8 h-8 bg-primary text-primary-foreground rounded-full text-sm font-medium">
+                            #{index + 1}
+                          </div>
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={item.product.imageUrl || undefined} />
+                            <AvatarFallback>{item.product.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1">
+                              {item.product.name}
+                            </p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{item.sales} sold today</p>
+                          </div>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          ${Number(item.revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Daily Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Today's Activity Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Eye className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-medium">Page Views</span>
+                    </div>
+                    <span className="text-sm font-semibold">--</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium">New Customers</span>
+                    </div>
+                    <span className="text-sm font-semibold">--</span>
+                  </div>
+
+                  <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4 text-orange-600" />
+                      <span className="text-sm font-medium">Return Customers</span>
+                    </div>
+                    <span className="text-sm font-semibold">--</span>
+                  </div>
+
+                  <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <MousePointer className="h-4 w-4 text-purple-600" />
+                      <span className="text-sm font-medium">Conversion Rate</span>
+                    </div>
+                    <span className="text-sm font-semibold">--</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Daily Alerts & Notifications
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {lowStockProducts.length > 0 ? (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                        <span className="text-sm font-medium text-red-800 dark:text-red-300">Low Stock Alert</span>
+                      </div>
+                      <p className="text-xs text-red-700 dark:text-red-400">
+                        {lowStockProducts.length} product{lowStockProducts.length !== 1 ? 's' : ''} running low
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-800 dark:text-green-300">All Stock Levels Good</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-800 dark:text-blue-300">System Status</span>
+                    </div>
+                    <p className="text-xs text-blue-700 dark:text-blue-400">All systems operational</p>
+                  </div>
+
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Calendar className="h-4 w-4 text-gray-600" />
+                      <span className="text-sm font-medium text-gray-800 dark:text-gray-300">Today's Date</span>
+                    </div>
+                    <p className="text-xs text-gray-700 dark:text-gray-400">
+                      {new Date().toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-6">
           {/* Key Metrics Overview */}
