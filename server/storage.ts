@@ -500,27 +500,24 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Insufficient stock");
     }
 
-    // Use db.transaction for atomic updates
-    await db.transaction(async (tx) => {
-      // Update product stock and physical inventory
-      await tx.update(products)
-        .set({
-          stock: newStock,
-          physicalInventory: newStock, // Update physical inventory to match new stock
-          updatedAt: new Date()
-        })
-        .where(eq(products.id, productId));
+    // Update product stock and physical inventory
+    await db.update(products)
+      .set({
+        stock: newStock,
+        physicalInventory: newStock, // Update physical inventory to match new stock
+        updatedAt: new Date()
+      })
+      .where(eq(products.id, productId));
 
-      // Log the inventory change
-      await tx.insert(inventoryLogs).values({
-        productId,
-        type: quantity > 0 ? 'stock_in' : 'stock_out',
-        quantity: Math.abs(quantity),
-        previousStock: product.stock,
-        newStock,
-        reason,
-        userId
-      });
+    // Log the inventory change
+    await db.insert(inventoryLogs).values({
+      productId,
+      type: quantity > 0 ? 'stock_in' : 'stock_out',
+      quantity: Math.abs(quantity),
+      previousStock: product.stock,
+      newStock,
+      reason,
+      userId
     });
 
     // Check if product needs low stock notification
