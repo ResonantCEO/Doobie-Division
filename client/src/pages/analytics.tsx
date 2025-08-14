@@ -711,21 +711,21 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          {/* Top Customer Analysis */}
+          {/* Product Performance Analysis */}
           <Card>
             <CardHeader>
-              <CardTitle>Top Customer Analysis</CardTitle>
+              <CardTitle>Product Performance Analysis</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Total Orders</TableHead>
-                      <TableHead>Lifetime Value</TableHead>
-                      <TableHead>Favorite Category</TableHead>
-                      <TableHead>Last Purchase</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Units Sold</TableHead>
+                      <TableHead>Revenue</TableHead>
+                      <TableHead>Profit Margin</TableHead>
+                      <TableHead>Performance</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -733,71 +733,91 @@ export default function AnalyticsPage() {
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback>JD</AvatarFallback>
+                            <AvatarFallback>PF</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">John D.</span>
+                          <span className="font-medium">Premium Flower</span>
                         </div>
                       </TableCell>
-                      <TableCell>47</TableCell>
-                      <TableCell>$2,340</TableCell>
-                      <TableCell><Badge variant="secondary">Flower</Badge></TableCell>
-                      <TableCell>2 days ago</TableCell>
+                      <TableCell>156</TableCell>
+                      <TableCell>$4,680</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">35%</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className="bg-green-100 text-green-800">Excellent</Badge>
+                      </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback>SM</AvatarFallback>
+                            <AvatarFallback>CG</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">Sarah M.</span>
+                          <span className="font-medium">CBD Gummies</span>
                         </div>
                       </TableCell>
-                      <TableCell>38</TableCell>
-                      <TableCell>$1,890</TableCell>
-                      <TableCell><Badge variant="secondary">Edibles</Badge></TableCell>
-                      <TableCell>1 week ago</TableCell>
+                      <TableCell>89</TableCell>
+                      <TableCell>$2,670</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800">42%</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className="bg-blue-100 text-blue-800">Good</Badge>
+                      </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback>MR</AvatarFallback>
+                            <AvatarFallback>VC</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">Mike R.</span>
+                          <span className="font-medium">Vape Cartridges</span>
                         </div>
                       </TableCell>
-                      <TableCell>31</TableCell>
-                      <TableCell>$1,650</TableCell>
-                      <TableCell><Badge variant="secondary">Concentrates</Badge></TableCell>
-                      <TableCell>3 days ago</TableCell>
+                      <TableCell>67</TableCell>
+                      <TableCell>$2,010</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="bg-purple-100 text-purple-800">38%</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className="bg-yellow-100 text-yellow-800">Average</Badge>
+                      </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback>AL</AvatarFallback>
+                            <AvatarFallback>PR</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">Amy L.</span>
+                          <span className="font-medium">Pre-roll Pack</span>
                         </div>
                       </TableCell>
-                      <TableCell>29</TableCell>
-                      <TableCell>$1,520</TableCell>
-                      <TableCell><Badge variant="secondary">Vapes</Badge></TableCell>
-                      <TableCell>5 days ago</TableCell>
+                      <TableCell>45</TableCell>
+                      <TableCell>$1,350</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">45%</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className="bg-blue-100 text-blue-800">Good</Badge>
+                      </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback>CW</AvatarFallback>
+                            <AvatarFallback>CO</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">Chris W.</span>
+                          <span className="font-medium">Concentrates</span>
                         </div>
                       </TableCell>
-                      <TableCell>25</TableCell>
-                      <TableCell>$1,380</TableCell>
-                      <TableCell><Badge variant="secondary">Pre-rolls</Badge></TableCell>
-                      <TableCell>4 days ago</TableCell>
+                      <TableCell>23</TableCell>
+                      <TableCell>$920</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="bg-orange-100 text-orange-800">28%</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-orange-600">Needs Attention</Badge>
+                      </TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
