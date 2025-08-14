@@ -550,14 +550,24 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: products.id,
         name: products.name,
+        description: products.description,
+        price: products.price,
         sku: products.sku,
+        categoryId: products.categoryId,
+        imageUrl: products.imageUrl,
         stock: products.stock,
         physicalInventory: products.physicalInventory,
         minStockThreshold: products.minStockThreshold,
-        categoryName: categories.name,
+        sellingMethod: products.sellingMethod,
+        weightUnit: products.weightUnit,
+        pricePerGram: products.pricePerGram,
+        pricePerOunce: products.pricePerOunce,
+        discountPercentage: products.discountPercentage,
+        isActive: products.isActive,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
       })
       .from(products)
-      .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(
         and(
           eq(products.isActive, true),
