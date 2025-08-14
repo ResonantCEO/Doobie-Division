@@ -658,8 +658,10 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
       )}
       {adjustingStockProduct && (
         <StockAdjustmentModal
-          isOpen={!!adjustingStockProduct}
-          onClose={() => setAdjustingStockProduct(null)}
+          open={!!adjustingStockProduct}
+          onOpenChange={(open) => {
+            if (!open) setAdjustingStockProduct(null);
+          }}
           product={adjustingStockProduct}
         />
       )}
