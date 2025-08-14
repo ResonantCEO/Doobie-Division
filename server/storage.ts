@@ -67,6 +67,12 @@ export interface IStorage {
   getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]>;
   getSalesTrend(days: number): Promise<{ date: string; sales: number; orders: number; customers: number }[]>;
   getCategoryBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]>;
+  getAdvancedMetrics(days: number): Promise<{
+    netProfit: number;
+    salesGrowthRate: number;
+    returnRate: number;
+    abandonedCartRate: number;
+  }>;
 
   // Notification operations
   getNotifications(userId?: string): Promise<Notification[]>;
@@ -1014,14 +1020,13 @@ export class DatabaseStorage implements IStorage {
   async getCategoryBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]> {
     const results = await db
       .select({
-        name: categories.name,
-        value: sql<number>`SUM(${orderItems.quantity})`,
-        revenue: sql<number>`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`,
-        fill: categories.color, // Assuming categories table has a color column for charting
+        categoryName: sql<string>`COALESCE(${categories.name}, 'Uncategorized')`,
+        value: sql<number>`COUNT(${orderItems.id})`,
+        revenue: sql<number>`COALESCE(SUM(CAST(${orderItems.subtotal} AS NUMERIC)), 0)`,
       })
       .from(orderItems)
       .innerJoin(products, eq(orderItems.productId, products.id))
-      .innerJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(categories, eq(products.categoryId, categories.id))
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
       .where(
         or(
@@ -1030,15 +1035,98 @@ export class DatabaseStorage implements IStorage {
           eq(orders.status, 'pending')
         )
       )
-      .groupBy(categories.id, categories.name, categories.color)
-      .orderBy(desc(sql`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`));
+      .groupBy(sql`COALESCE(${categories.name}, 'Uncategorized')`);
 
-    return results.map(r => ({
-      name: r.name,
-      value: Number(r.value),
-      revenue: Number(r.revenue),
-      fill: r.fill || '#8884d8', // Default color if not specified
+    const colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+
+    return results.map((r, index) => ({
+      name: r.categoryName || 'Uncategorized',
+      value: Number(r.value) || 0,
+      revenue: Number(r.revenue) || 0,
+      fill: colors[index % colors.length],
     }));
+  }
+
+  async getAdvancedMetrics(days: number): Promise<{
+    netProfit: number;
+    salesGrowthRate: number;
+    returnRate: number;
+    abandonedCartRate: number;
+  }> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const prevStartDate = new Date();
+    prevStartDate.setDate(prevStartDate.getDate() - (days * 2));
+    const prevEndDate = new Date();
+    prevEndDate.setDate(prevEndDate.getDate() - days);
+
+    // Current period sales
+    const currentSalesResult = await db
+      .select({
+        totalSales: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
+        totalOrders: sql<number>`COUNT(*)`,
+      })
+      .from(orders)
+      .where(
+        and(
+          sql`${orders.createdAt} >= ${startDate}`,
+          or(
+            eq(orders.status, 'shipped'),
+            eq(orders.status, 'processing'),
+            eq(orders.status, 'pending')
+          )
+        )
+      );
+
+    // Previous period sales for growth calculation
+    const prevSalesResult = await db
+      .select({
+        totalSales: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
+      })
+      .from(orders)
+      .where(
+        and(
+          sql`${orders.createdAt} >= ${prevStartDate}`,
+          sql`${orders.createdAt} < ${prevEndDate}`,
+          or(
+            eq(orders.status, 'shipped'),
+            eq(orders.status, 'processing'),
+            eq(orders.status, 'pending')
+          )
+        )
+      );
+
+    // Return rate (cancelled orders / total orders)
+    const returnResult = await db
+      .select({
+        cancelledOrders: sql<number>`COUNT(*)`,
+      })
+      .from(orders)
+      .where(
+        and(
+          sql`${orders.createdAt} >= ${startDate}`,
+          eq(orders.status, 'cancelled')
+        )
+      );
+
+    const currentSales = Number(currentSalesResult[0]?.totalSales || 0);
+    const currentOrders = Number(currentSalesResult[0]?.totalOrders || 0);
+    const prevSales = Number(prevSalesResult[0]?.totalSales || 0);
+    const cancelledOrders = Number(returnResult[0]?.cancelledOrders || 0);
+
+    // Calculate metrics
+    const netProfit = currentSales * 0.3; // Assuming 30% profit margin
+    const salesGrowthRate = prevSales > 0 ? ((currentSales - prevSales) / prevSales) * 100 : 0;
+    const returnRate = currentOrders > 0 ? (cancelledOrders / currentOrders) * 100 : 0;
+    const abandonedCartRate = 25.5; // Mock data - would need cart tracking implementation
+
+    return {
+      netProfit,
+      salesGrowthRate,
+      returnRate,
+      abandonedCartRate,
+    };
   }
 
   // Notification operations

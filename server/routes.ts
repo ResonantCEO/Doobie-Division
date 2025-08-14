@@ -654,6 +654,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Advanced metrics endpoint
+  app.get('/api/analytics/advanced-metrics/:days', isAuthenticated, async (req, res) => {
+    try {
+      const days = parseInt(req.params.days) || 30;
+      const metrics = await storage.getAdvancedMetrics(days);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Advanced metrics error:', error);
+      res.status(500).json({ message: "Failed to fetch advanced metrics" });
+    }
+  });
+
 
   // Customer analytics
   app.get('/api/analytics/customers', isAuthenticated, async (req, res) => {

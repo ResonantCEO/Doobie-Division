@@ -62,6 +62,22 @@ export default function AnalyticsPage() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  // Fetch advanced metrics
+  const { data: advancedMetrics, isLoading: advancedLoading } = useQuery<{
+    netProfit: number;
+    salesGrowthRate: number;
+    returnRate: number;
+    abandonedCartRate: number;
+  }>({
+    queryKey: ["/api/analytics/advanced-metrics", days],
+    queryFn: async () => {
+      const response = await fetch(`/api/analytics/advanced-metrics/${days}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch advanced metrics");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   // Fetch top products
   const { data: topProducts, isLoading: productsLoading } = useQuery<{ product: Product; sales: number; revenue: number }[]>({
     queryKey: ["/api/analytics/top-products", 5],
@@ -156,7 +172,7 @@ export default function AnalyticsPage() {
 
   const totalCustomers = orderBreakdown.reduce((acc, item) => acc + item.count, 0);
 
-  if (salesLoading || productsLoading || lowStockLoading || customersLoading || salesTrendLoading || categoryLoading) {
+  if (salesLoading || productsLoading || lowStockLoading || customersLoading || salesTrendLoading || categoryLoading || advancedLoading) {
     return (
       <div className="space-y-6 p-6">
         <div className="animate-pulse space-y-4">
@@ -411,12 +427,85 @@ export default function AnalyticsPage() {
 
         <TabsContent value="sales" className="space-y-6">
           {/* Sales Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <MetricCard title="Net Profit" value="$8,250" change="+18.2%" icon={DollarSign} color="green" />
-            <MetricCard title="Sales Growth Rate" value="12.5%" change="+2.1%" icon={TrendingUp} color="blue" />
-            <MetricCard title="Return Rate" value="2.3%" change="-0.5%" icon={RefreshCw} color="red" />
-            <MetricCard title="Abandoned Cart Rate" value="68.2%" change="-3.1%" icon={ShoppingCart} color="orange" />
-          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {advancedLoading ? (
+                    <Skeleton className="h-8 w-20 mb-2" />
+                  ) : (
+                    <div className="text-2xl font-bold">
+                      ${advancedMetrics?.netProfit?.toFixed(2) || "0.00"}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Based on 30% profit margin
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Sales Growth Rate</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {advancedLoading ? (
+                    <Skeleton className="h-8 w-16 mb-2" />
+                  ) : (
+                    <div className="text-2xl font-bold">
+                      {advancedMetrics?.salesGrowthRate?.toFixed(1) || "0.0"}%
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    <span className={advancedMetrics?.salesGrowthRate >= 0 ? "text-green-600" : "text-red-600"}>
+                      {advancedMetrics?.salesGrowthRate >= 0 ? "+" : ""}{advancedMetrics?.salesGrowthRate?.toFixed(1) || "0.0"}%
+                    </span> from previous period
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Return Rate</CardTitle>
+                  <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {advancedLoading ? (
+                    <Skeleton className="h-8 w-16 mb-2" />
+                  ) : (
+                    <div className="text-2xl font-bold">
+                      {advancedMetrics?.returnRate?.toFixed(1) || "0.0"}%
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Cancelled orders ratio
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Abandoned Cart Rate</CardTitle>
+                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {advancedLoading ? (
+                    <Skeleton className="h-8 w-16 mb-2" />
+                  ) : (
+                    <div className="text-2xl font-bold">
+                      {advancedMetrics?.abandonedCartRate?.toFixed(1) || "0.0"}%
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Requires cart tracking implementation
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
             {/* Sales Trends */}
