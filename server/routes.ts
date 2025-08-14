@@ -307,14 +307,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      // Create QR code data with product information
-      const qrData = JSON.stringify({
-        id: product.id,
-        sku: product.sku,
-        name: product.name,
-        price: product.price,
-        category: product.category?.name || 'Uncategorized'
-      });
+      // Create QR code data with just the SKU for scanner compatibility
+      const qrData = product.sku;
 
       // Generate QR code as base64 data URL
       const qrCodeUrl = await QRCode.toDataURL(qrData, {
@@ -353,13 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const id of productIds) {
         const product = await storage.getProduct(id);
         if (product) {
-          const qrData = JSON.stringify({
-            id: product.id,
-            sku: product.sku,
-            name: product.name,
-            price: product.price,
-            category: product.category?.name || 'Uncategorized'
-          });
+          const qrData = product.sku;
 
           const qrCodeUrl = await QRCode.toDataURL(qrData, {
             width: 300,

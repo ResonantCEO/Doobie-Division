@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -16,9 +16,45 @@ export default function QRCodeModal({
   open,
   onOpenChange,
   product,
-  qrCodeData
+  qrCodeData: initialQrCodeData
 }: QRCodeModalProps) {
   const { toast } = useToast();
+  const [qrCodeData, setQrCodeData] = useState<string | null>(initialQrCodeData || null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Generate QR code when modal opens and product is available
+  useEffect(() => {
+    if (open && product && !qrCodeData) {
+      generateQRCode();
+    }
+  }, [open, product, qrCodeData]);
+
+  const generateQRCode = async () => {
+    if (!product) return;
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/products/${product.id}/qr-code`, {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate QR code');
+      }
+
+      const data = await response.json();
+      setQrCodeData(data.qrCode);
+    } catch (error: any) {
+      console.error('QR code generation error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate QR code",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleDownload = () => {
     if (!qrCodeData || !product) return;
@@ -96,7 +132,13 @@ export default function QRCodeModal({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          {qrCodeData && product && (
+          {isLoading && (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Generating QR code...</p>
+            </div>
+          )}
+
+          {!isLoading && qrCodeData && product && (
             <>
               <div className="flex justify-center">
                 <img 
@@ -119,6 +161,7 @@ export default function QRCodeModal({
                   variant="outline" 
                   size="sm"
                   onClick={handlePrint}
+                  disabled={!qrCodeData}
                 >
                   <Printer className="h-4 w-4 mr-2" />
                   Print
@@ -127,6 +170,7 @@ export default function QRCodeModal({
                   variant="outline" 
                   size="sm"
                   onClick={handleDownload}
+                  disabled={!qrCodeData}
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Download
@@ -135,9 +179,18 @@ export default function QRCodeModal({
             </>
           )}
           
-          {!qrCodeData && (
+          {!isLoading && !qrCodeData && product && (
+            <div className="text-center py-8 space-y-4">
+              <p className="text-gray-500">Failed to load QR code</p>
+              <Button onClick={generateQRCode} size="sm">
+                Try Again
+              </Button>
+            </div>
+          )}
+
+          {!product && (
             <div className="text-center py-8">
-              <p className="text-gray-500">Loading QR code...</p>
+              <p className="text-gray-500">No product selected</p>
             </div>
           )}
         </div>
