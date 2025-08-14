@@ -22,7 +22,7 @@ import {
   Target,
   Percent,
   Clock,
-  
+
   Star,
   RefreshCw,
   UserPlus,
@@ -138,7 +138,7 @@ export default function AnalyticsPage() {
     { month: "Jun", new: 71, returning: 178, churn: 7 },
   ];
 
-  
+
 
   // Fetch real category breakdown data
   const { data: categoryData = [], isLoading: categoryLoading } = useQuery<{ name: string; value: number; revenue: number; fill: string }[]>({
@@ -423,7 +423,10 @@ export default function AnalyticsPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie 
-                          data={categoryData} 
+                          data={categoryData.map((item, index) => ({
+                            ...item,
+                            fill: `hsl(var(--chart-${(index % 5) + 1}))`
+                          }))}
                           cx="50%" 
                           cy="50%" 
                           outerRadius="70%" 
@@ -431,9 +434,7 @@ export default function AnalyticsPage() {
                           label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                           fontSize={10}
                         >
-                          {categoryData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
+                          {/* Removed the Cell mapping as fill is now directly applied */}
                         </Pie>
                         <ChartTooltip content={<ChartTooltipContent />} />
                       </PieChart>
@@ -825,7 +826,7 @@ export default function AnalyticsPage() {
           </Card>
         </TabsContent>
 
-        
+
 
         <TabsContent value="inventory" className="space-y-6">
           {/* Inventory Metrics */}
