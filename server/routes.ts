@@ -10,7 +10,8 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema } from "@shared/schema";
 import { z } from "zod";
-import { db, orders, products, orderItems, eq, sql, desc, and, gte, lt, inArray } from "./db";
+import { db } from "./db";
+import { orders, products, orderItems, eq, sql, desc, and, gte, lt, inArray } from "drizzle-orm";
 
 
 // Role-based middleware
