@@ -162,12 +162,24 @@ export default function AnalyticsPage() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  const inventoryData = [
-    { product: "Premium Flower", current: 45, threshold: 20, turnover: 2.3 },
-    { product: "CBD Gummies", current: 12, threshold: 15, turnover: 4.1 },
-    { product: "Vape Cartridge", current: 8, threshold: 10, turnover: 3.7 },
-    { product: "Pre-rolls", current: 23, threshold: 25, turnover: 1.8 },
-  ];
+  // Fetch all products for inventory aging report
+  const { data: allProducts = [], isLoading: allProductsLoading } = useQuery<Product[]>({
+    queryKey: ["/api/products/all"],
+    queryFn: async () => {
+      const response = await fetch("/api/products", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch products");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Transform products data for inventory aging report
+  const inventoryData = allProducts.map(product => ({
+    product: product.name,
+    current: product.stock,
+    threshold: product.minStockThreshold,
+    turnover: 2.5 // Default turnover rate - could be calculated from order history
+  }));
 
   const chartConfig = {
     sales: { label: "Sales", color: "hsl(var(--chart-1))" },
@@ -181,7 +193,7 @@ export default function AnalyticsPage() {
 
   const totalCustomers = orderBreakdown.reduce((acc, item) => acc + item.count, 0);
 
-  if (salesLoading || productsLoading || lowStockLoading || customersLoading || salesTrendLoading || categoryLoading || advancedLoading || peakTimesLoading) {
+  if (salesLoading || productsLoading || lowStockLoading || customersLoading || salesTrendLoading || categoryLoading || advancedLoading || peakTimesLoading || allProductsLoading) {
     return (
       <div className="space-y-6 p-6">
         <div className="animate-pulse space-y-4">
