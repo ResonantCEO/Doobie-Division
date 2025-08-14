@@ -474,7 +474,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async adjustStock(productId: number, quantity: number, userId: string, reason: string): Promise<void> {
-    const product = await this.getProduct(productId);
+    // Validate inputs
+    if (!productId || typeof productId !== 'number') {
+      throw new Error("Invalid product ID");
+    }
+    if (typeof quantity !== 'number') {
+      throw new Error("Invalid quantity");
+    }
+    if (!reason || typeof reason !== 'string') {
+      throw new Error("Reason is required");
+    }
+
+    // Get the product directly from the products table
+    const [product] = await db
+      .select()
+      .from(products)
+      .where(eq(products.id, productId));
+
     if (!product) {
       throw new Error("Product not found");
     }

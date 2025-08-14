@@ -244,14 +244,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const productId = parseInt(req.params.id);
       const { quantity, reason } = req.body;
 
-      if (typeof quantity !== 'number' || !reason) {
-        return res.status(400).json({ message: "Quantity and reason are required" });
+      // Validate productId
+      if (isNaN(productId)) {
+        return res.status(400).json({ message: "Invalid product ID" });
       }
 
+      // Validate quantity and reason
+      if (typeof quantity !== 'number' || !reason || typeof reason !== 'string') {
+        return res.status(400).json({ message: "Valid quantity and reason are required" });
+      }
+
+      console.log(`Adjusting stock for product ${productId}: ${quantity} units, reason: ${reason}`);
+      
       await storage.adjustStock(productId, quantity, req.currentUser.id, reason);
       res.status(200).json({ message: "Stock adjusted successfully" });
     } catch (error) {
-      res.status(500).json({ message: "Failed to adjust stock" });
+      console.error("Stock adjustment error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to adjust stock";
+      res.status(500).json({ message: errorMessage });
     }
   });
 
