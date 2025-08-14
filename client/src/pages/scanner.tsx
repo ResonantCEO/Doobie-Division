@@ -15,6 +15,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { Camera, Package, Plus, Minus, RotateCcw, Scan, AlertCircle, CheckCircle, ShoppingCart, Truck, Clock } from "lucide-react";
 import type { Product, Category, Order } from "@shared/schema";
+import jsQR from 'jsqr';
 
 interface ScannedProduct extends Product {
   category: Category | null;
@@ -257,35 +258,44 @@ export default function ScannerPage() {
 
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
-        // Import jsQR dynamically to avoid build issues
-        import('jsqr').then(({ default: jsQR }) => {
-          // Try different detection options for better results
-          const detectionOptions = [
-            { inversionAttempts: "attemptBoth" as const },
-            { inversionAttempts: "onlyInvert" as const },
-            { inversionAttempts: "dontInvert" as const }
-          ];
+        // Add debugging info about the image data
+        if (Math.random() < 0.1) { // Log every 10th frame to avoid spam
+          console.log('Video frame dimensions:', canvas.width, 'x', canvas.height);
+          console.log('Image data length:', imageData.data.length);
+          console.log('Image data sample (first 20 pixels):', Array.from(imageData.data.slice(0, 80)));
+        }
+        
+        // Try different detection options for better results
+        const detectionOptions = [
+          { inversionAttempts: "attemptBoth" as const },
+          { inversionAttempts: "onlyInvert" as const },
+          { inversionAttempts: "dontInvert" as const }
+        ];
 
-          for (const options of detectionOptions) {
-            const code = jsQR(imageData.data, imageData.width, imageData.height, options);
-            
-            if (code && code.data && code.data.trim()) {
-              const now = Date.now();
-              // Prevent duplicate scans within 1.5 seconds
-              if (now - lastScanTime > 1500) {
-                console.log('QR Code detected:', code.data);
-                console.log('QR Code location:', code.location);
-                setLastScanTime(now);
-                setScanningStatus("found");
-                handleQRCodeDetected(code.data);
-                return; // Stop scanning after successful detection
-              }
-              break; // Exit the detection loop if found
-            }
+        for (let i = 0; i < detectionOptions.length; i++) {
+          const options = detectionOptions[i];
+          const code = jsQR(imageData.data, imageData.width, imageData.height, options);
+          
+          if (Math.random() < 0.05) { // Log every 20th attempt
+            console.log(`QR detection attempt ${i + 1} with options:`, options);
+            console.log('Detection result:', code ? 'Found' : 'Not found');
           }
-        }).catch((error) => {
-          console.warn('jsQR not available:', error);
-        });
+          
+          if (code && code.data && code.data.trim()) {
+            const now = Date.now();
+            // Prevent duplicate scans within 1.5 seconds
+            if (now - lastScanTime > 1500) {
+              console.log('🎉 QR Code detected:', code.data);
+              console.log('QR Code location:', code.location);
+              console.log('Detection method:', i + 1, 'with options:', options);
+              setLastScanTime(now);
+              setScanningStatus("found");
+              handleQRCodeDetected(code.data);
+              return; // Stop scanning after successful detection
+            }
+            break; // Exit the detection loop if found
+          }
+        }
       } catch (error) {
         console.error('Error during QR detection:', error);
       }
@@ -706,9 +716,23 @@ export default function ScannerPage() {
                       </div>
                     </div>
 
-                    <Button onClick={stopScanning} variant="outline">
-                      Stop Scanner
-                    </Button>
+                    <div className="flex gap-2 justify-center flex-wrap">
+                      <Button onClick={stopScanning} variant="outline">
+                        Stop Scanner
+                      </Button>
+                      {process.env.NODE_ENV === 'development' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            console.log('Manual scan triggered');
+                            detectQRCode();
+                          }}
+                        >
+                          Scan Now
+                        </Button>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       Scan products for inventory management
                     </p>
@@ -727,7 +751,7 @@ export default function ScannerPage() {
               {/* Manual SKU Lookup */}
               <div className="border-t pt-4">
                 <Label htmlFor="manual-sku-inventory">Manual SKU Lookup</Label>
-                <div className="flex gap-2 mt-2">
+                <div className="flex gap-2 mt-2 flex-wrap">
                   <Input
                     id="manual-sku-inventory"
                     placeholder="Enter SKU (e.g., 0001, 0002)"
@@ -735,6 +759,7 @@ export default function ScannerPage() {
                     onChange={(e) => setManualSku(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleManualLookup()}
                     disabled={lookupProductMutation.isPending}
+                    className="flex-1 min-w-0"
                   />
                   <Button 
                     onClick={handleManualLookup} 
@@ -743,13 +768,35 @@ export default function ScannerPage() {
                     {lookupProductMutation.isPending ? "Searching..." : "Lookup"}
                   </Button>
                   {process.env.NODE_ENV === 'development' && (
-                    <Button 
-                      variant="outline"
-                      onClick={() => handleQRCodeDetected("0008")}
-                      disabled={lookupProductMutation.isPending}
-                    >
-                      Test QR
-                    </Button>
+                    <>
+                      <Button 
+                        variant="outline"
+                        onClick={() => handleQRCodeDetected("0008")}
+                        disabled={lookupProductMutation.isPending}
+                      >
+                        Test QR
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={() => {
+                          if (canvasRef.current) {
+                            const canvas = canvasRef.current;
+                            const dataUrl = canvas.toDataURL();
+                            const link = document.createElement('a');
+                            link.download = 'debug-frame-inventory.png';
+                            link.href = dataUrl;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            console.log('Canvas frame captured for debugging (inventory tab)');
+                          }
+                        }}
+                        disabled={!isScanning}
+                        size="sm"
+                      >
+                        Debug
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -1087,9 +1134,23 @@ export default function ScannerPage() {
                         )}</div>
                     </div>
 
-                    <Button onClick={stopScanning} variant="outline">
-                      Stop Scanner
-                    </Button>
+                    <div className="flex gap-2 justify-center flex-wrap">
+                      <Button onClick={stopScanning} variant="outline">
+                        Stop Scanner
+                      </Button>
+                      {process.env.NODE_ENV === 'development' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            console.log('Manual scan triggered (fulfillment)');
+                            detectQRCode();
+                          }}
+                        >
+                          Scan Now
+                        </Button>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       Scan products to fulfill the selected order
                     </p>
