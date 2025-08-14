@@ -187,8 +187,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error.message.includes('UNIQUE constraint failed') ||
         error.message.includes('sku') && error.message.includes('unique')
       )) {
-        return res.status(400).json({ 
-          message: "duplicate key value violates unique constraint \"products_sku_unique\"" 
+        return res.status(400).json({
+          message: "duplicate key value violates unique constraint \"products_sku_unique\""
         });
       }
 
@@ -227,13 +227,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check for foreign key constraint errors
       if (error instanceof Error && error.message.includes('foreign key')) {
-        return res.status(409).json({ 
-          message: "Cannot delete product. It may be referenced in orders or other records." 
+        return res.status(409).json({
+          message: "Cannot delete product. It may be referenced in orders or other records."
         });
       }
 
-      res.status(500).json({ 
-        message: error instanceof Error ? error.message : "Failed to delete product" 
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Failed to delete product"
       });
     }
   });
@@ -330,7 +330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      res.json({ 
+      res.json({
         qrCode: qrCodeUrl,
         product: {
           id: product.id,
@@ -465,7 +465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If there are stock errors, reject the order
       if (stockErrors.length > 0) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Order cannot be processed due to stock issues",
           errors: stockErrors
         });
@@ -619,6 +619,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch top products" });
     }
   });
+
+  // Order status breakdown for charts
+  app.get('/api/analytics/order-status-breakdown', isAuthenticated, async (req, res) => {
+    try {
+      const breakdown = await storage.getOrderStatusBreakdown();
+      res.json(breakdown);
+    } catch (error) {
+      console.error('Order status breakdown error:', error);
+      res.status(500).json({ message: "Failed to fetch order status breakdown" });
+    }
+  });
+
+  // Sales trend data for charts
+  app.get('/api/analytics/sales-trend/:days', isAuthenticated, async (req, res) => {
+    try {
+      const days = parseInt(req.params.days) || 30;
+      const salesTrend = await storage.getSalesTrend(days);
+      res.json(salesTrend);
+    } catch (error) {
+      console.error('Sales trend error:', error);
+      res.status(500).json({ message: "Failed to fetch sales trend data" });
+    }
+  });
+
+  // Category breakdown for pie chart
+  app.get('/api/analytics/category-breakdown', isAuthenticated, async (req, res) => {
+    try {
+      const categoryBreakdown = await storage.getCategoryBreakdown();
+      res.json(categoryBreakdown);
+    } catch (error) {
+      console.error('Category breakdown error:', error);
+      res.status(500).json({ message: "Failed to fetch category breakdown" });
+    }
+  });
+
 
   // Customer analytics
   app.get('/api/analytics/customers', isAuthenticated, async (req, res) => {

@@ -65,6 +65,8 @@ export interface IStorage {
   }>;
   getTopProducts(limit: number): Promise<{ product: Product; sales: number; revenue: number }[]>;
   getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]>;
+  getSalesTrend(days: number): Promise<{ date: string; sales: number; orders: number; customers: number }[]>;
+  getCategoryBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]>;
 
   // Notification operations
   getNotifications(userId?: string): Promise<Notification[]>;
@@ -942,6 +944,71 @@ export class DatabaseStorage implements IStorage {
     return results.map(r => ({
       status: r.status,
       count: Number(r.count),
+    }));
+  }
+
+  async getSalesTrend(days: number): Promise<{ date: string; sales: number; orders: number; customers: number }[]>;
+  async getSalesTrend(days: number): Promise<{ date: string; sales: number; orders: number; customers: number }[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const results = await db
+      .select({
+        date: sql<string>`DATE_TRUNC('day', ${orders.createdAt})`,
+        sales: sql<number>`SUM(CAST(${orders.total} AS NUMERIC))`,
+        orders: sql<number>`COUNT(*)`,
+        customers: sql<number>`COUNT(DISTINCT ${orders.customerId})`,
+      })
+      .from(orders)
+      .where(
+        and(
+          sql`${orders.createdAt} >= ${startDate}`,
+          or(
+            eq(orders.status, 'shipped'),
+            eq(orders.status, 'processing'),
+            eq(orders.status, 'pending')
+          )
+        )
+      )
+      .groupBy(sql`DATE_TRUNC('day', ${orders.createdAt})`)
+      .orderBy(asc(sql`DATE_TRUNC('day', ${orders.createdAt})`));
+
+    return results.map(r => ({
+      date: r.date,
+      sales: Number(r.sales),
+      orders: Number(r.orders),
+      customers: Number(r.customers),
+    }));
+  }
+
+  async getCategoryBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]>;
+  async getCategoryBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]> {
+    const results = await db
+      .select({
+        name: categories.name,
+        value: sql<number>`SUM(${orderItems.quantity})`,
+        revenue: sql<number>`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`,
+        fill: categories.color, // Assuming categories table has a color column for charting
+      })
+      .from(orderItems)
+      .innerJoin(products, eq(orderItems.productId, products.id))
+      .innerJoin(categories, eq(products.categoryId, categories.id))
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(
+        or(
+          eq(orders.status, 'shipped'),
+          eq(orders.status, 'processing'),
+          eq(orders.status, 'pending')
+        )
+      )
+      .groupBy(categories.id, categories.name, categories.color)
+      .orderBy(desc(sql`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`));
+
+    return results.map(r => ({
+      name: r.name,
+      value: Number(r.value),
+      revenue: Number(r.revenue),
+      fill: r.fill || '#8884d8', // Default color if not specified
     }));
   }
 

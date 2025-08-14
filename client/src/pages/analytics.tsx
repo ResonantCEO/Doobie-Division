@@ -98,16 +98,16 @@ export default function AnalyticsPage() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Sample data for enhanced analytics (in production, these would come from real APIs)
-  const salesData = [
-    { date: "Jan 1", sales: 2400, orders: 24, customers: 12 },
-    { date: "Jan 8", sales: 1398, orders: 18, customers: 10 },
-    { date: "Jan 15", sales: 9800, orders: 42, customers: 28 },
-    { date: "Jan 22", sales: 3908, orders: 28, customers: 18 },
-    { date: "Jan 29", sales: 4800, orders: 35, customers: 22 },
-    { date: "Feb 5", sales: 3800, orders: 31, customers: 19 },
-    { date: "Feb 12", sales: 4300, orders: 37, customers: 24 },
-  ];
+  // Fetch real sales trend data
+  const { data: salesData = [], isLoading: salesTrendLoading } = useQuery<{ date: string; sales: number; orders: number; customers: number }[]>({
+    queryKey: ["/api/analytics/sales-trend", days],
+    queryFn: async () => {
+      const response = await fetch(`/api/analytics/sales-trend/${days}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch sales trend");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
   const customerDataSample = [
     { month: "Jan", new: 45, returning: 123, churn: 12 },
@@ -126,12 +126,16 @@ export default function AnalyticsPage() {
     { channel: "Direct", visitors: 334, conversions: 45, cost: 0 },
   ];
 
-  const categoryData = [
-    { name: "Flower", value: 45, revenue: 15680, fill: "#8884d8" },
-    { name: "Edibles", value: 30, revenue: 12450, fill: "#82ca9d" },
-    { name: "Concentrates", value: 15, revenue: 8930, fill: "#ffc658" },
-    { name: "Accessories", value: 10, revenue: 3420, fill: "#ff7c7c" },
-  ];
+  // Fetch real category breakdown data
+  const { data: categoryData = [], isLoading: categoryLoading } = useQuery<{ name: string; value: number; revenue: number; fill: string }[]>({
+    queryKey: ["/api/analytics/category-breakdown"],
+    queryFn: async () => {
+      const response = await fetch("/api/analytics/category-breakdown", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch category breakdown");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
   const inventoryData = [
     { product: "Premium Flower", current: 45, threshold: 20, turnover: 2.3 },
@@ -152,7 +156,7 @@ export default function AnalyticsPage() {
 
   const totalCustomers = orderBreakdown.reduce((acc, item) => acc + item.count, 0);
 
-  if (salesLoading || productsLoading || lowStockLoading || customersLoading) {
+  if (salesLoading || productsLoading || lowStockLoading || customersLoading || salesTrendLoading || categoryLoading) {
     return (
       <div className="space-y-6 p-6">
         <div className="animate-pulse space-y-4">
@@ -340,17 +344,26 @@ export default function AnalyticsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-6">
-                <ChartContainer config={chartConfig} className="h-48 sm:h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={salesData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" fontSize={12} />
-                      <YAxis fontSize={12} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Area type="monotone" dataKey="sales" stroke="var(--color-sales)" fill="var(--color-sales)" fillOpacity={0.2} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
+                {salesData.length === 0 ? (
+                  <div className="h-48 sm:h-64 flex items-center justify-center">
+                    <div className="text-center">
+                      <BarChart3 className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500 dark:text-gray-400">No sales data available for this period</p>
+                    </div>
+                  </div>
+                ) : (
+                  <ChartContainer config={chartConfig} className="h-48 sm:h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={salesData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" fontSize={12} />
+                        <YAxis fontSize={12} />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Area type="monotone" dataKey="sales" stroke="var(--color-sales)" fill="var(--color-sales)" fillOpacity={0.2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                )}
               </CardContent>
             </Card>
 
@@ -362,26 +375,35 @@ export default function AnalyticsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-6">
-                <ChartContainer config={chartConfig} className="h-48 sm:h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie 
-                        data={categoryData} 
-                        cx="50%" 
-                        cy="50%" 
-                        outerRadius="70%" 
-                        dataKey="value" 
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        fontSize={10}
-                      >
-                        {categoryData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
+                {categoryData.length === 0 ? (
+                  <div className="h-48 sm:h-64 flex items-center justify-center">
+                    <div className="text-center">
+                      <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500 dark:text-gray-400">No category sales data available</p>
+                    </div>
+                  </div>
+                ) : (
+                  <ChartContainer config={chartConfig} className="h-48 sm:h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie 
+                          data={categoryData} 
+                          cx="50%" 
+                          cy="50%" 
+                          outerRadius="70%" 
+                          dataKey="value" 
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          fontSize={10}
+                        >
+                          {categoryData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                )}
               </CardContent>
             </Card>
           </div>
