@@ -124,16 +124,13 @@ export default function ScannerPage() {
           video: { 
             facingMode: 'environment', 
             width: { ideal: 1280, min: 640 }, 
-            height: { ideal: 720, min: 480 },
-            focusMode: 'continuous',
-            advanced: [{ focusMode: 'continuous' }]
+            height: { ideal: 720, min: 480 }
           } 
         },
         { 
           video: { 
             width: { ideal: 1280, min: 640 }, 
-            height: { ideal: 720, min: 480 },
-            focusMode: 'continuous'
+            height: { ideal: 720, min: 480 }
           } 
         },
         { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
@@ -172,22 +169,23 @@ export default function ScannerPage() {
         video.onloadedmetadata = () => {
           video.play().then(() => {
             console.log('Video started, dimensions:', video.videoWidth, 'x', video.videoHeight);
-            // Start QR detection after video is playing
+            // Add a small delay to ensure video is fully ready
             setTimeout(() => {
-              if (isScanning) {
+              if (isScanning && videoRef.current && videoRef.current.videoWidth > 0) {
+                console.log('Starting QR code detection...');
                 detectQRCode();
               }
             }, 500);
-          }).catch(e => {
-            console.error('Video play error:', e);
-            setScanningError("Failed to start video. Please try again.");
-            setScanningStatus("error");
+          }).catch((playError) => {
+            console.error('Video play error:', playError);
+            throw new Error('Unable to start video stream. Please try again.');
           });
         };
-        
-        video.onerror = (e) => {
-          console.error('Video error:', e);
-          setScanningError("Video error occurred. Please try again.");
+
+        // Handle video errors
+        video.onerror = (error) => {
+          console.error('Video error:', error);
+          setScanningError("Video stream error. Please check camera permissions and try again.");
           setScanningStatus("error");
         };
       }
@@ -195,16 +193,23 @@ export default function ScannerPage() {
 
     } catch (error: any) {
       console.error('Camera access error:', error);
+      console.error('Error name:', error?.name);
+      console.error('Error message:', error?.message);
+      console.error('Error type:', typeof error);
+      console.error('Error keys:', error ? Object.keys(error) : 'No keys');
+      
       let errorMessage = "Unable to access camera.";
       
-      if (error.name === 'NotAllowedError') {
+      if (error?.name === 'NotAllowedError' || error?.message?.includes('Permission denied')) {
         errorMessage = "Camera permission denied. Please allow camera access in your browser settings and refresh the page.";
-      } else if (error.name === 'NotFoundError') {
+      } else if (error?.name === 'NotFoundError') {
         errorMessage = "No camera found on this device.";
-      } else if (error.name === 'NotReadableError') {
+      } else if (error?.name === 'NotReadableError') {
         errorMessage = "Camera is being used by another application.";
-      } else if (error.name === 'OverconstrainedError') {
+      } else if (error?.name === 'OverconstrainedError') {
         errorMessage = "Camera constraints not supported.";
+      } else if (error?.message) {
+        errorMessage = `Camera error: ${error.message}`;
       }
       
       setScanningError(errorMessage);
@@ -242,35 +247,48 @@ export default function ScannerPage() {
     const context = canvas.getContext('2d');
 
     if (video.readyState === video.HAVE_ENOUGH_DATA && context && video.videoWidth > 0 && video.videoHeight > 0) {
-      // Set canvas dimensions to match video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      // Draw the current video frame to canvas
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      try {
+        // Set canvas dimensions to match video
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        // Draw the current video frame to canvas
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
-      // Import jsQR dynamically to avoid build issues
-      import('jsqr').then(({ default: jsQR }) => {
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "attemptBoth",
-        });
+        // Import jsQR dynamically to avoid build issues
+        import('jsqr').then(({ default: jsQR }) => {
+          // Try different detection options for better results
+          const detectionOptions = [
+            { inversionAttempts: "attemptBoth" as const },
+            { inversionAttempts: "onlyInvert" as const },
+            { inversionAttempts: "dontInvert" as const }
+          ];
 
-        if (code && code.data) {
-          const now = Date.now();
-          // Prevent duplicate scans within 1.5 seconds
-          if (now - lastScanTime > 1500) {
-            console.log('QR Code detected:', code.data);
-            setLastScanTime(now);
-            setScanningStatus("found");
-            handleQRCodeDetected(code.data);
-            return; // Stop scanning after successful detection
+          for (const options of detectionOptions) {
+            const code = jsQR(imageData.data, imageData.width, imageData.height, options);
+            
+            if (code && code.data && code.data.trim()) {
+              const now = Date.now();
+              // Prevent duplicate scans within 1.5 seconds
+              if (now - lastScanTime > 1500) {
+                console.log('QR Code detected:', code.data);
+                console.log('QR Code location:', code.location);
+                setLastScanTime(now);
+                setScanningStatus("found");
+                handleQRCodeDetected(code.data);
+                return; // Stop scanning after successful detection
+              }
+              break; // Exit the detection loop if found
+            }
           }
-        }
-      }).catch((error) => {
-        console.warn('jsQR not available:', error);
-      });
+        }).catch((error) => {
+          console.warn('jsQR not available:', error);
+        });
+      } catch (error) {
+        console.error('Error during QR detection:', error);
+      }
     }
 
     // Continue scanning if still active
@@ -282,6 +300,8 @@ export default function ScannerPage() {
   // Handle QR code detection
   const handleQRCodeDetected = (qrData: string) => {
     console.log('QR Code detected:', qrData);
+    console.log('QR Code length:', qrData.length);
+    console.log('QR Code raw bytes:', Array.from(qrData).map(c => c.charCodeAt(0)));
 
     // Try to extract SKU from QR data
     // QR codes generated by the system should contain just the SKU
@@ -289,19 +309,31 @@ export default function ScannerPage() {
     
     // Handle different QR code formats that might contain URLs or other data
     if (sku.includes('/')) {
-      // If it's a URL, try to extract the last part
+      console.log('QR code contains URL-like format, extracting last part');
       const parts = sku.split('/');
       sku = parts[parts.length - 1];
     }
     
+    // Handle common QR code formats
+    if (sku.toLowerCase().startsWith('sku:')) {
+      sku = sku.substring(4);
+    } else if (sku.toLowerCase().startsWith('product:')) {
+      sku = sku.substring(8);
+    }
+    
     // Remove any non-alphanumeric characters except hyphens and underscores
+    const originalSku = sku;
     sku = sku.replace(/[^a-zA-Z0-9\-_]/g, '');
+    
+    console.log('Original SKU after processing:', originalSku);
+    console.log('Cleaned SKU:', sku);
 
     if (sku && sku.length > 0) {
       console.log('Looking up SKU:', sku);
       setScanningStatus("scanning");
       lookupProductMutation.mutate(sku);
     } else {
+      console.warn('No valid SKU found in QR code data:', qrData);
       toast({
         title: "Invalid QR Code",
         description: "QR code does not contain valid product information",
@@ -611,6 +643,118 @@ export default function ScannerPage() {
         </TabsList>
 
         <TabsContent value="inventory" className="space-y-6">
+
+          {/* Scanner Section for Inventory */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scan className="h-5 w-5" />
+                Product Scanner - Inventory Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Camera Section */}
+              <div className="text-center">
+                {!isScanning ? (
+                  <div className="space-y-4">
+                    <Button onClick={startScanning} size="lg" className="w-full sm:w-auto">
+                      <Camera className="h-5 w-5 mr-2" />
+                      Start Camera Scanner
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      Or use manual SKU lookup below
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className={`w-full max-w-md mx-auto rounded-lg border-2 ${getScanningStatusColor()}`}
+                      />
+                      <canvas ref={canvasRef} className="hidden" />
+
+                      {/* Scanning overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="border-2 border-white border-dashed w-48 h-48 rounded-lg animate-pulse">
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Scan className="h-8 w-8 text-white animate-spin" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status indicator */}
+                      <div className="absolute top-2 left-2 right-2">
+                        {scanningStatus === "scanning" && (
+                          <Badge variant="default" className="bg-blue-500">
+                            Scanning for QR codes...
+                          </Badge>
+                        )}
+                        {scanningStatus === "found" && (
+                          <Badge variant="default" className="bg-green-500">
+                            QR Code Found!
+                          </Badge>
+                        )}
+                        {scanningStatus === "error" && (
+                          <Badge variant="destructive">
+                            Scan Error
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <Button onClick={stopScanning} variant="outline">
+                      Stop Scanner
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      Scan products for inventory management
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Error Alert */}
+              {scanningError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{scanningError}</AlertDescription>
+                </Alert>
+              )}
+
+              {/* Manual SKU Lookup */}
+              <div className="border-t pt-4">
+                <Label htmlFor="manual-sku-inventory">Manual SKU Lookup</Label>
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    id="manual-sku-inventory"
+                    placeholder="Enter SKU (e.g., 0001, 0002)"
+                    value={manualSku}
+                    onChange={(e) => setManualSku(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleManualLookup()}
+                    disabled={lookupProductMutation.isPending}
+                  />
+                  <Button 
+                    onClick={handleManualLookup} 
+                    disabled={lookupProductMutation.isPending}
+                  >
+                    {lookupProductMutation.isPending ? "Searching..." : "Lookup"}
+                  </Button>
+                  {process.env.NODE_ENV === 'development' && (
+                    <Button 
+                      variant="outline"
+                      onClick={() => handleQRCodeDetected("0008")}
+                      disabled={lookupProductMutation.isPending}
+                    >
+                      Test QR
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
       {/* Product Information */}
       {scannedProduct && (
@@ -979,6 +1123,15 @@ export default function ScannerPage() {
                   >
                     {lookupProductMutation.isPending ? "Searching..." : "Lookup"}
                   </Button>
+                  {process.env.NODE_ENV === 'development' && (
+                    <Button 
+                      variant="outline"
+                      onClick={() => handleQRCodeDetected("0008")}
+                      disabled={lookupProductMutation.isPending}
+                    >
+                      Test QR
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
