@@ -711,21 +711,21 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          {/* Product Performance Analysis */}
+          {/* Customer Behavior Insights */}
           <Card>
             <CardHeader>
-              <CardTitle>Product Performance Analysis</CardTitle>
+              <CardTitle>Customer Behavior Insights</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Units Sold</TableHead>
-                      <TableHead>Revenue</TableHead>
-                      <TableHead>Profit Margin</TableHead>
-                      <TableHead>Performance</TableHead>
+                      <TableHead>Segment</TableHead>
+                      <TableHead>Avg Order Size</TableHead>
+                      <TableHead>Purchase Frequency</TableHead>
+                      <TableHead>Preferred Category</TableHead>
+                      <TableHead>Loyalty Score</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -733,16 +733,14 @@ export default function AnalyticsPage() {
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback>PF</AvatarFallback>
+                            <AvatarFallback className="bg-purple-100 text-purple-600">VIP</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">Premium Flower</span>
+                          <span className="font-medium">High-Value Customers</span>
                         </div>
                       </TableCell>
-                      <TableCell>156</TableCell>
-                      <TableCell>$4,680</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">35%</Badge>
-                      </TableCell>
+                      <TableCell>$145.60</TableCell>
+                      <TableCell>2.3x/month</TableCell>
+                      <TableCell>Premium Flower</TableCell>
                       <TableCell>
                         <Badge className="bg-green-100 text-green-800">Excellent</Badge>
                       </TableCell>
@@ -751,16 +749,14 @@ export default function AnalyticsPage() {
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback>CG</AvatarFallback>
+                            <AvatarFallback className="bg-blue-100 text-blue-600">REG</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">CBD Gummies</span>
+                          <span className="font-medium">Regular Buyers</span>
                         </div>
                       </TableCell>
-                      <TableCell>89</TableCell>
-                      <TableCell>$2,670</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-800">42%</Badge>
-                      </TableCell>
+                      <TableCell>$89.40</TableCell>
+                      <TableCell>1.8x/month</TableCell>
+                      <TableCell>Edibles</TableCell>
                       <TableCell>
                         <Badge className="bg-blue-100 text-blue-800">Good</Badge>
                       </TableCell>
@@ -769,52 +765,46 @@ export default function AnalyticsPage() {
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback>VC</AvatarFallback>
+                            <AvatarFallback className="bg-orange-100 text-orange-600">NEW</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">Vape Cartridges</span>
+                          <span className="font-medium">New Customers</span>
                         </div>
                       </TableCell>
-                      <TableCell>67</TableCell>
-                      <TableCell>$2,010</TableCell>
+                      <TableCell>$67.20</TableCell>
+                      <TableCell>0.8x/month</TableCell>
+                      <TableCell>Vapes</TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="bg-purple-100 text-purple-800">38%</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className="bg-yellow-100 text-yellow-800">Average</Badge>
+                        <Badge className="bg-yellow-100 text-yellow-800">Building</Badge>
                       </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback>PR</AvatarFallback>
+                            <AvatarFallback className="bg-green-100 text-green-600">BUL</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">Pre-roll Pack</span>
+                          <span className="font-medium">Bulk Buyers</span>
                         </div>
                       </TableCell>
-                      <TableCell>45</TableCell>
-                      <TableCell>$1,350</TableCell>
+                      <TableCell>$198.50</TableCell>
+                      <TableCell>1.2x/month</TableCell>
+                      <TableCell>Pre-rolls</TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">45%</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className="bg-blue-100 text-blue-800">Good</Badge>
+                        <Badge className="bg-green-100 text-green-800">Strong</Badge>
                       </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback>CO</AvatarFallback>
+                            <AvatarFallback className="bg-gray-100 text-gray-600">OCO</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">Concentrates</span>
+                          <span className="font-medium">Occasional Buyers</span>
                         </div>
                       </TableCell>
-                      <TableCell>23</TableCell>
-                      <TableCell>$920</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="bg-orange-100 text-orange-800">28%</Badge>
-                      </TableCell>
+                      <TableCell>$45.80</TableCell>
+                      <TableCell>0.3x/month</TableCell>
+                      <TableCell>Concentrates</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-orange-600">Needs Attention</Badge>
                       </TableCell>
