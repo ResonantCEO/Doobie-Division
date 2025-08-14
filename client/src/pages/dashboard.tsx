@@ -51,17 +51,17 @@ export default function Dashboard() {
       case "storefront":
         return <StorefrontPage />;
       case "inventory":
-        return user.role === 'admin' || user.role === 'manager' ? <InventoryPage /> : <StorefrontPage />;
+        return user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <InventoryPage /> : <StorefrontPage />;
       case "orders":
-        return user.role === 'admin' || user.role === 'manager' ? <OrdersPage /> : <StorefrontPage />;
+        return user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <OrdersPage /> : <StorefrontPage />;
       case "analytics":
-        return user.role === 'admin' || user.role === 'manager' ? <AnalyticsPage /> : <StorefrontPage />;
+        return user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <AnalyticsPage /> : <StorefrontPage />;
       case "users":
         return user.role === 'admin' ? <UsersPage /> : <StorefrontPage />;
       case "admin":
         return user.role === 'admin' ? <AdminPage /> : <StorefrontPage />;
       case "scanner":
-        return user.role === 'admin' || user.role === 'manager' ? <ScannerPage /> : <StorefrontPage />;
+        return user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <ScannerPage /> : <StorefrontPage />;
       default:
         return <StorefrontPage />;
     }
