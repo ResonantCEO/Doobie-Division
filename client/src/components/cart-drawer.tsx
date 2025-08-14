@@ -39,10 +39,12 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const [isCheckingOut, setIsCheckingOut] = useState(false); // Added state for checkout process
   const [shippingForm, setShippingForm] = useState({
     customerName: "",
+    customerEmail: "",
     customerPhone: "",
     shippingAddress: "",
     notes: "",
   });
+  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
 
   // Auto-fill form with user data when confirmation modal opens
   useEffect(() => {
@@ -68,6 +70,26 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     }
   };
 
+  const validateForm = () => {
+    const errors: {[key: string]: string} = {};
+
+    if (!shippingForm.customerName.trim()) {
+      errors.customerName = "Full name is required";
+    }
+    if (!shippingForm.customerEmail.trim()) {
+      errors.customerEmail = "Email is required";
+    }
+    if (!shippingForm.customerPhone.trim()) {
+      errors.customerPhone = "Phone number is required";
+    }
+    if (!shippingForm.shippingAddress.trim()) {
+      errors.shippingAddress = "Shipping address is required";
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleCheckout = async () => {
     if (state.items.length === 0) {
       toast({
@@ -75,6 +97,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         description: "Add some items to your cart before checking out.",
         variant: "destructive",
       });
+      return;
+    }
+
+    if (!validateForm()) {
       return;
     }
 
@@ -131,12 +157,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const handleConfirmOrder = async () => {
     const { customerName, customerPhone, shippingAddress } = shippingForm;
 
-    if (!customerName || !shippingAddress) {
-      toast({
-        title: "Missing information",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
+    if (!validateForm()) {
       return;
     }
 
@@ -183,38 +204,34 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       });
 
       if (response.ok) {
+        const responseData = await response.json();
         clearCart();
         setIsOpen(false);
         setShowConfirmation(false);
         setShippingForm({
           customerName: "",
+          customerEmail: "",
           customerPhone: "",
           shippingAddress: "",
           notes: "",
         });
+        setFormErrors({}); // Clear form errors on successful order
         setIsCheckingOut(false); // Reset checkout state after successful order
 
         toast({
           title: "Order placed successfully!",
-          description: `Order ${orderNumber} has been confirmed. You'll receive a confirmation email shortly.`,
+          description: `Order #${responseData.orderNumber} has been created. You'll receive a confirmation email shortly.`,
         });
       } else {
         const errorData = await response.json();
         console.error("Order creation failed:", errorData);
-        toast({
-          title: "Order failed",
-          description: errorData.message || "There was an error processing your order. Please try again.",
-          variant: "destructive",
-        });
         setIsCheckingOut(false); // Reset checkout state on order failure
+        // Don't show toast, form validation will handle highlighting missing fields
       }
     } catch (error) {
-      toast({
-        title: "Order failed",
-        description: "There was an error processing your order. Please try again.",
-        variant: "destructive",
-      });
+      console.error('Order creation failed:', error);
       setIsCheckingOut(false); // Reset checkout state on catch error
+      // Don't show toast, form validation will handle highlighting missing fields
     }
   };
 
@@ -422,21 +439,61 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 <Input
                   id="customerName"
                   value={shippingForm.customerName}
-                  onChange={(e) => setShippingForm(prev => ({ ...prev, customerName: e.target.value }))}
+                  onChange={(e) => {
+                    setShippingForm(prev => ({ ...prev, customerName: e.target.value }));
+                    if (formErrors.customerName) {
+                      setFormErrors(prev => ({ ...prev, customerName: "" }));
+                    }
+                  }}
                   placeholder="Enter your full name"
+                  className={formErrors.customerName ? "border-red-500 focus:border-red-500" : ""}
                   required
                 />
+                {formErrors.customerName && (
+                  <p className="text-sm text-red-500 mt-1">{formErrors.customerName}</p>
+                )}
               </div>
 
               <div>
-                <Label htmlFor="customerPhone">Phone Number</Label>
+                <Label htmlFor="customerEmail">Email *</Label>
+                <Input
+                  id="customerEmail"
+                  type="email"
+                  value={shippingForm.customerEmail}
+                  onChange={(e) => {
+                    setShippingForm(prev => ({ ...prev, customerEmail: e.target.value }));
+                    if (formErrors.customerEmail) {
+                      setFormErrors(prev => ({ ...prev, customerEmail: "" }));
+                    }
+                  }}
+                  placeholder="Enter your email address"
+                  className={formErrors.customerEmail ? "border-red-500 focus:border-red-500" : ""}
+                  required
+                />
+                {formErrors.customerEmail && (
+                  <p className="text-sm text-red-500 mt-1">{formErrors.customerEmail}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="customerPhone">Phone Number *</Label>
                 <Input
                   id="customerPhone"
                   type="tel"
                   value={shippingForm.customerPhone}
-                  onChange={(e) => setShippingForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                  onChange={(e) => {
+                    setShippingForm(prev => ({ ...prev, customerPhone: e.target.value }));
+                    if (formErrors.customerPhone) {
+                      setFormErrors(prev => ({ ...prev, customerPhone: "" }));
+                    }
+                  }}
                   placeholder="Enter your phone number"
+                  className={formErrors.customerPhone ? "border-red-500 focus:border-red-500" : ""}
+                  required
                 />
+                {formErrors.customerPhone && (
+                  <p className="text-sm text-red-500 mt-1">{formErrors.customerPhone}</p>
+                )}
               </div>
 
               <div>
@@ -444,11 +501,20 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 <Textarea
                   id="shippingAddress"
                   value={shippingForm.shippingAddress}
-                  onChange={(e) => setShippingForm(prev => ({ ...prev, shippingAddress: e.target.value }))}
+                  onChange={(e) => {
+                    setShippingForm(prev => ({ ...prev, shippingAddress: e.target.value }));
+                    if (formErrors.shippingAddress) {
+                      setFormErrors(prev => ({ ...prev, shippingAddress: "" }));
+                    }
+                  }}
                   placeholder="Enter your complete shipping address including street, city, province, and postal code"
                   rows={3}
+                  className={formErrors.shippingAddress ? "border-red-500 focus:border-red-500" : ""}
                   required
                 />
+                {formErrors.shippingAddress && (
+                  <p className="text-sm text-red-500 mt-1">{formErrors.shippingAddress}</p>
+                )}
               </div>
 
               <div>
