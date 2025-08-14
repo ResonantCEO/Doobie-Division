@@ -9,8 +9,11 @@ import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw, UserCheck 
 import type { Order } from "@shared/schema";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/useAuth";
+import { apiRequest } from "@/lib/api";
 
 export default function OrdersPage() {
+  const { user, isLoading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("");
   const queryClient = useQueryClient();
 
@@ -18,7 +21,7 @@ export default function OrdersPage() {
   useOrderNotifications();
 
   // Fetch orders
-  const { data: orders = [], isLoading } = useQuery<Order[]>({
+  const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders", statusFilter || "all"],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -45,6 +48,14 @@ export default function OrdersPage() {
     staleTime: Infinity, // Never consider data stale
     gcTime: Infinity, // Keep in cache indefinitely
   });
+
+  // Fetch staff users if the current user is an admin or manager
+  const { data: staffUsers = [], isLoading: staffLoading } = useQuery({
+    queryKey: ["/api/users/staff"],
+    queryFn: () => apiRequest("GET", "/api/users/staff"),
+    enabled: user?.role === 'admin' || user?.role === 'manager',
+  });
+
 
   const getStatusStats = () => {
     const stats = {
@@ -76,9 +87,12 @@ export default function OrdersPage() {
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
     queryClient.invalidateQueries({ queryKey: ["/api/analytics/order-status-breakdown"] });
+    if (user?.role === 'admin' || user?.role === 'manager') {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/staff"] });
+    }
   };
 
-  if (isLoading) {
+  if (authLoading || ordersLoading || (user?.role === 'admin' || user?.role === 'manager' ? staffLoading : false)) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse space-y-4">
@@ -176,7 +190,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders Table */}
-      <OrderTable orders={orders} />
+      <OrderTable orders={orders} staffUsers={staffUsers} />
     </div>
   );
 }

@@ -248,21 +248,21 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
       <div className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow className="border-gray-700 dark:border-gray-700">
-              <TableHead className="text-gray-300 dark:text-gray-300">Order</TableHead>
-              <TableHead className="text-gray-300 dark:text-gray-300">Customer</TableHead>
-              <TableHead className="text-gray-300 dark:text-gray-300">Total</TableHead>
-              <TableHead className="text-gray-300 dark:text-gray-300">Status</TableHead>
-              <TableHead className="text-gray-300 dark:text-gray-300">Date</TableHead>
+            <TableRow className="border-gray-700">
+              <TableHead className="text-gray-300">Order #</TableHead>
+              <TableHead className="text-gray-300">Customer</TableHead>
+              <TableHead className="text-gray-300">Total</TableHead>
+              <TableHead className="text-gray-300">Status</TableHead>
+              <TableHead className="text-gray-300">Date</TableHead>
               {(user?.role === 'admin' || user?.role === 'manager') && (
-                <TableHead className="text-gray-300 dark:text-gray-300">Assigned</TableHead>
+                <TableHead className="text-gray-300">Assigned To</TableHead>
               )}
-              <TableHead className="text-gray-300 dark:text-gray-300">Actions</TableHead>
+              <TableHead className="text-gray-300">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.map((order) => (
-              <TableRow key={order.id}>
+              <TableRow key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                 <TableCell className="font-medium text-gray-900 dark:text-white">
                   <button
                     onClick={() => handleOrderClick(order.id)}
@@ -272,9 +272,9 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                   </button>
                 </TableCell>
                 <TableCell>
-                  <div>
+                  <div className="text-sm">
                     <div className="font-medium text-gray-900 dark:text-white">{order.customerName}</div>
-                    <div className="text-sm text-gray-600 dark:text-white">{order.customerEmail}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">{order.customerEmail}</div>
                   </div>
                 </TableCell>
                 <TableCell className="font-medium text-gray-900 dark:text-white">
@@ -286,31 +286,33 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                 </TableCell>
                 {(user?.role === 'admin' || user?.role === 'manager') && (
                   <TableCell>
-                    <Select
-                      value={order.assignedUserId || ""}
-                      onValueChange={(assignedUserId) => handleAssignOrder(order.id, assignedUserId)}
-                    >
-                      <SelectTrigger className="w-40 h-8 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
-                        <SelectValue placeholder="Assign to..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Unassigned</SelectItem>
-                        {staffUsers.map((staffUser) => (
-                          <SelectItem key={staffUser.id} value={staffUser.id}>
-                            {staffUser.firstName && staffUser.lastName
-                              ? `${staffUser.firstName} ${staffUser.lastName}`
-                              : staffUser.email || staffUser.id}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {order.assignedUser && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {order.assignedUser.firstName && order.assignedUser.lastName
-                          ? `${order.assignedUser.firstName} ${order.assignedUser.lastName}`
-                          : order.assignedUser.email}
-                      </div>
-                    )}
+                    <div className="space-y-1">
+                      <Select
+                        value={order.assignedUserId || ""}
+                        onValueChange={(assignedUserId) => handleAssignOrder(order.id, assignedUserId)}
+                      >
+                        <SelectTrigger className="w-full min-w-40 h-8 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
+                          <SelectValue placeholder="Assign to staff..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Unassigned</SelectItem>
+                          {staffUsers.map((staffUser) => (
+                            <SelectItem key={staffUser.id} value={staffUser.id}>
+                              {staffUser.firstName && staffUser.lastName
+                                ? `${staffUser.firstName} ${staffUser.lastName}`
+                                : staffUser.email || staffUser.id}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {order.assignedUser && (
+                        <div className="text-xs text-green-600 dark:text-green-400 font-medium">
+                          Assigned to: {order.assignedUser.firstName && order.assignedUser.lastName
+                            ? `${order.assignedUser.firstName} ${order.assignedUser.lastName}`
+                            : order.assignedUser.email}
+                        </div>
+                      )}
+                    </div>
                   </TableCell>
                 )}
                 <TableCell>
