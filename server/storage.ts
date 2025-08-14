@@ -54,8 +54,8 @@ export interface IStorage {
   getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined>;
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
-  fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<any>;
-  markOrderItemAsPacked(orderId: number, productId: number, userId: string): Promise<any>;
+  fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void>;
+  markOrderItemAsPacked(orderId: number, productId: number, userId: string): Promise<{ success: boolean; allPacked: boolean }>;
 
   // Analytics operations
   getSalesMetrics(days: number): Promise<{
@@ -758,87 +758,116 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string) {
-    // Reduce physical inventory (stock is already reduced when order was placed)
-    await db
-      .update(products)
-      .set({
-        physicalInventory: sql`${products.physicalInventory} - ${quantity}`,
-        updatedAt: new Date()
-      })
-      .where(eq(products.id, productId));
-
-    // Mark order item as fulfilled
-    await db
-      .update(orderItems)
-      .set({ fulfilled: true })
-      .where(and(
-        eq(orderItems.orderId, orderId),
-        eq(orderItems.productId, productId)
-      ));
-
-    // Log the inventory adjustment
-    await db.insert(inventoryLogs).values({
-      productId,
-      userId,
-      type: 'adjustment',
-      quantity: -quantity,
-      reason: `Order fulfillment - Order #${orderId}`,
-      createdAt: new Date()
-    });
-
-    // Check if all items in the order are fulfilled
-    const orderItemsResult = await db
-      .select()
-      .from(orderItems)
-      .where(eq(orderItems.orderId, orderId));
-
-    const allFulfilled = orderItemsResult.every(item => item.fulfilled);
-
-    // If all items are fulfilled, update order status to shipped
-    if (allFulfilled) {
-      await db
-        .update(orders)
-        .set({
-          status: 'shipped',
-          updatedAt: new Date()
-        })
-        .where(eq(orders.id, orderId));
-    }
-
-    return { success: true, allFulfilled };
-  }
-
-  async markOrderItemAsPacked(orderId: number, productId: number, userId: string) {
-    // Get current product stock for logging
-    const [product] = await db
-      .select({ stock: products.stock })
-      .from(products)
-      .where(eq(products.id, productId));
-
-    if (!product) {
+  async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void> {
+    // Get the product
+    const product = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+    if (product.length === 0) {
       throw new Error("Product not found");
     }
 
-    // Mark order item as packed (fulfilled) without reducing physical inventory
-    await db
-      .update(orderItems)
-      .set({ fulfilled: true })
-      .where(and(
-        eq(orderItems.orderId, orderId),
-        eq(orderItems.productId, productId)
-      ));
+    const currentStock = product[0].stock;
+    const currentPhysicalInventory = product[0].physicalInventory || 0;
+    const newStock = currentStock - quantity;
+    const newPhysicalInventory = currentPhysicalInventory - quantity;
 
-    // Log the packing activity with current stock values (no change in stock for packing)
-    await db.insert(inventoryLogs).values({
-      productId,
-      userId,
-      type: 'packing',
-      quantity: 0, // No inventory change for packing
-      previousStock: product.stock,
-      newStock: product.stock, // Stock remains the same for packing
-      reason: `Order item packed - Order #${orderId}`,
-      createdAt: new Date()
+    if (newStock < 0) {
+      throw new Error("Insufficient stock");
+    }
+
+    if (newPhysicalInventory < 0) {
+      throw new Error("Insufficient physical inventory");
+    }
+
+    // Update product stock, physical inventory and mark order item as fulfilled
+    await db.transaction(async (tx) => {
+      // Update product stock and physical inventory
+      await tx
+        .update(products)
+        .set({ 
+          stock: newStock,
+          physicalInventory: newPhysicalInventory,
+          updatedAt: new Date()
+        })
+        .where(eq(products.id, productId));
+
+      // Mark order item as fulfilled
+      await tx
+        .update(orderItems)
+        .set({ fulfilled: true })
+        .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
+
+      // Log the stock change
+      await tx.insert(inventoryLogs).values({
+        productId,
+        userId,
+        type: 'stock_out',
+        quantity: -quantity,
+        previousStock: currentStock,
+        newStock: newStock,
+        reason: `Order fulfillment - Order #${orderId} (Stock and physical inventory reduced)`,
+        createdAt: new Date()
+      });
+    });
+  }
+
+  async markOrderItemAsPacked(orderId: number, productId: number, userId: string): Promise<{ success: boolean; allPacked: boolean }> {
+    // Get the product and order item
+    const product = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+    if (product.length === 0) {
+      throw new Error("Product not found");
+    }
+
+    const orderItem = await db
+      .select()
+      .from(orderItems)
+      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)))
+      .limit(1);
+
+    if (orderItem.length === 0) {
+      throw new Error("Order item not found");
+    }
+
+    if (orderItem[0].fulfilled) {
+      throw new Error("Order item already packed");
+    }
+
+    const packedQuantity = orderItem[0].quantity;
+    const currentPhysicalInventory = product[0].physicalInventory || 0;
+    const newPhysicalInventory = currentPhysicalInventory - packedQuantity;
+
+    // Check if there's enough physical inventory
+    if (newPhysicalInventory < 0) {
+      throw new Error(`Insufficient physical inventory. Available: ${currentPhysicalInventory}, Required: ${packedQuantity}`);
+    }
+
+    // Mark the order item as packed (fulfilled = true) and update physical inventory
+    await db.transaction(async (tx) => {
+      // Mark order item as packed
+      await tx
+        .update(orderItems)
+        .set({ fulfilled: true })
+        .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
+
+      // Update physical inventory (reduce by packed quantity)
+      await tx
+        .update(products)
+        .set({ 
+          physicalInventory: newPhysicalInventory,
+          updatedAt: new Date()
+        })
+        .where(eq(products.id, productId));
+
+      // Log the packing activity with physical inventory change
+      await tx.insert(inventoryLogs).values({
+        productId,
+        userId,
+        type: 'packing',
+        quantity: -packedQuantity, // Negative because we're reducing physical inventory
+        previousStock: currentPhysicalInventory,
+        newStock: newPhysicalInventory,
+        reason: `Order item packed - Order #${orderId} (Physical inventory reduced)`,
+        createdAt: new Date()
+      });
     });
 
     // Check if all items in the order are packed

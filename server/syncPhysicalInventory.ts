@@ -6,13 +6,20 @@ async function syncPhysicalInventory() {
   try {
     console.log("Syncing physical inventory with current stock...");
     
-    // Update all products to set physical inventory equal to current stock
-    const result = await db.update(products)
-      .set({ 
-        physicalInventory: products.stock 
-      });
+    // Get all products and update their physical inventory to match current stock
+    const allProducts = await db.select().from(products);
     
-    console.log("Physical inventory sync completed successfully");
+    for (const product of allProducts) {
+      await db.update(products)
+        .set({ 
+          physicalInventory: product.stock 
+        })
+        .where(db.eq(products.id, product.id));
+      
+      console.log(`Updated ${product.name} (ID: ${product.id}): Physical inventory set to ${product.stock}`);
+    }
+    
+    console.log(`Physical inventory sync completed successfully for ${allProducts.length} products`);
   } catch (error) {
     console.error("Error syncing physical inventory:", error);
   } finally {
