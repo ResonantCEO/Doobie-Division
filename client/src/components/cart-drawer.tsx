@@ -39,7 +39,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const [isCheckingOut, setIsCheckingOut] = useState(false); // Added state for checkout process
   const [shippingForm, setShippingForm] = useState({
     customerName: "",
-    customerEmail: "",
     customerPhone: "",
     shippingAddress: "",
     notes: "",
@@ -75,9 +74,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
     if (!shippingForm.customerName.trim()) {
       errors.customerName = "Full name is required";
-    }
-    if (!shippingForm.customerEmail.trim()) {
-      errors.customerEmail = "Email is required";
     }
     if (!shippingForm.customerPhone.trim()) {
       errors.customerPhone = "Phone number is required";
@@ -200,7 +196,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         setShowConfirmation(false);
         setShippingForm({
           customerName: "",
-          customerEmail: "",
           customerPhone: "",
           shippingAddress: "",
           notes: "",
@@ -441,27 +436,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 />
                 {formErrors.customerName && (
                   <p className="text-sm text-red-500 mt-1">{formErrors.customerName}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="customerEmail">Email *</Label>
-                <Input
-                  id="customerEmail"
-                  type="email"
-                  value={shippingForm.customerEmail}
-                  onChange={(e) => {
-                    setShippingForm(prev => ({ ...prev, customerEmail: e.target.value }));
-                    if (formErrors.customerEmail) {
-                      setFormErrors(prev => ({ ...prev, customerEmail: "" }));
-                    }
-                  }}
-                  placeholder="Enter your email address"
-                  className={formErrors.customerEmail ? "border-red-500 focus:border-red-500" : ""}
-                  required
-                />
-                {formErrors.customerEmail && (
-                  <p className="text-sm text-red-500 mt-1">{formErrors.customerEmail}</p>
                 )}
               </div>
 
