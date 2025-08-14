@@ -793,6 +793,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Daily new users endpoint
+  app.get('/api/analytics/daily-new-users', isAuthenticated, async (req, res) => {
+    try {
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+      const newUsersToday = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(users)
+        .where(
+          and(
+            gte(users.createdAt, startOfDay),
+            lt(users.createdAt, endOfDay),
+            eq(users.role, 'customer')
+          )
+        );
+
+      res.json({
+        newUsersToday: Number(newUsersToday[0]?.count || 0)
+      });
+    } catch (error) {
+      console.error('Daily new users error:', error);
+      res.status(500).json({ message: "Failed to fetch daily new users" });
+    }
+  });
+
   // Peak purchase times
   app.get('/api/analytics/peak-times/:days?', isAuthenticated, async (req, res) => {
     try {

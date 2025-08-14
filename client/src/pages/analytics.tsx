@@ -129,6 +129,18 @@ export default function AnalyticsPage() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  // Fetch new users registered today
+  const { data: dailyNewUsersData, isLoading: dailyNewUsersLoading } = useQuery<{ newUsersToday: number }>({
+    queryKey: ["/api/analytics/new-users-today"],
+    queryFn: async () => {
+      const response = await fetch("/api/analytics/new-users-today", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch new users today");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+
   const customerDataSample = [
     { month: "Jan", new: 45, returning: 123, churn: 12 },
     { month: "Feb", new: 52, returning: 134, churn: 8 },
@@ -230,7 +242,7 @@ export default function AnalyticsPage() {
 
   const totalCustomers = orderBreakdown.reduce((acc, item) => acc + item.count, 0);
 
-  if (salesLoading || productsLoading || lowStockLoading || customersLoading || salesTrendLoading || categoryLoading || advancedLoading || peakTimesLoading || allProductsLoading) {
+  if (salesLoading || productsLoading || lowStockLoading || customersLoading || salesTrendLoading || categoryLoading || advancedLoading || peakTimesLoading || allProductsLoading || dailyMetricsLoading || hourlyDataLoading || dailyTopProductsLoading || dailyNewUsersLoading) {
     return (
       <div className="space-y-6 p-6">
         <div className="animate-pulse space-y-4">
@@ -515,7 +527,7 @@ export default function AnalyticsPage() {
                     </div>
                     <span className="text-sm font-semibold">--</span>
                   </div>
-                  
+
                   <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                     <div className="flex items-center gap-2">
                       <UserPlus className="h-4 w-4 text-green-600" />
@@ -532,13 +544,22 @@ export default function AnalyticsPage() {
                     <span className="text-sm font-semibold">--</span>
                   </div>
 
-                  <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <MousePointer className="h-4 w-4 text-purple-600" />
-                      <span className="text-sm font-medium">Conversion Rate</span>
-                    </div>
-                    <span className="text-sm font-semibold">--</span>
-                  </div>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <UserPlus className="h-4 w-4 text-purple-600" />
+                        <span className="text-sm font-medium">New Users Today</span>
+                      </div>
+                      {dailyNewUsersLoading ? (
+                        <Skeleton className="h-6 w-16 mt-2" />
+                      ) : (
+                        <p className="text-lg font-bold mt-1">
+                          {dailyNewUsersData?.newUsersToday || 0}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">Today's registrations</p>
+                    </CardContent>
+                  </Card>
                 </div>
               </CardContent>
             </Card>
