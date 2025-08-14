@@ -571,7 +571,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(products.isActive, true),
-          lte(products.stock, products.minStockThreshold)
+          sql`${products.stock} <= ${products.minStockThreshold}`
         )
       )
       .orderBy(products.stock);
