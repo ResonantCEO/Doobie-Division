@@ -635,7 +635,7 @@ export default function AnalyticsPage() {
         <TabsContent value="customers" className="space-y-6">
           {/* Customer Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <MetricCard title="Customer Acquisition Cost" value="$45.20" change="-8.3%" icon={UserPlus} color="blue" />
+            <MetricCard title="Customer Satisfaction Score" value="4.8/5" change="+0.2" icon={Star} color="blue" />
             <MetricCard title="Customer Retention Rate" value="78.5%" change="+5.2%" icon={Heart} color="green" />
             <MetricCard title="Churn Rate" value="21.5%" change="-5.2%" icon={TrendingUp} color="red" />
             <MetricCard title="Customer Lifetime Value" value="$1,250" change="+12.1%" icon={Award} color="purple" />
