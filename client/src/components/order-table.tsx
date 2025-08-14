@@ -288,14 +288,14 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                   <TableCell>
                     <div className="space-y-1">
                       <Select
-                        value={order.assignedUserId || ""}
-                        onValueChange={(assignedUserId) => handleAssignOrder(order.id, assignedUserId)}
+                        value={order.assignedUserId || "unassigned"}
+                        onValueChange={(assignedUserId) => handleAssignOrder(order.id, assignedUserId === "unassigned" ? "" : assignedUserId)}
                       >
                         <SelectTrigger className="w-full min-w-40 h-8 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
                           <SelectValue placeholder="Assign to staff..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Unassigned</SelectItem>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
                           {staffUsers.map((staffUser) => (
                             <SelectItem key={staffUser.id} value={staffUser.id}>
                               {staffUser.firstName && staffUser.lastName
