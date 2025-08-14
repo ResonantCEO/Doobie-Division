@@ -190,7 +190,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders Table */}
-      <OrderTable orders={orders} staffUsers={staffUsers} />
+      <OrderTable orders={orders} user={user} staffUsers={staffUsers} />
     </div>
   );
 }
