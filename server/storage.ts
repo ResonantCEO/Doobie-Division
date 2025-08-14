@@ -882,7 +882,16 @@ export class DatabaseStorage implements IStorage {
         averageOrderValue: sql<number>`COALESCE(AVG(CAST(${orders.total} AS NUMERIC)), 0)`,
       })
       .from(orders)
-      .where(sql`${orders.createdAt} >= ${startDate}`);
+      .where(
+        and(
+          sql`${orders.createdAt} >= ${startDate}`,
+          or(
+            eq(orders.status, 'shipped'),
+            eq(orders.status, 'processing'),
+            eq(orders.status, 'pending')
+          )
+        )
+      );
 
     return {
       totalSales: Number(metrics.totalSales),
@@ -902,6 +911,13 @@ export class DatabaseStorage implements IStorage {
       .from(orderItems)
       .innerJoin(products, eq(orderItems.productId, products.id))
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(
+        or(
+          eq(orders.status, 'shipped'),
+          eq(orders.status, 'processing'),
+          eq(orders.status, 'pending')
+        )
+      )
       .groupBy(products.id)
       .orderBy(desc(sql`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`))
       .limit(limit);

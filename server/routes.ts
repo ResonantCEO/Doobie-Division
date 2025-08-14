@@ -255,7 +255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`Adjusting stock for product ${productId}: ${quantity} units, reason: ${reason}`);
-      
+
       await storage.adjustStock(productId, quantity, req.currentUser.id, reason);
       res.status(200).json({ message: "Stock adjusted successfully" });
     } catch (error) {
@@ -598,32 +598,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics routes
-  app.get('/api/analytics/metrics', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  app.get('/api/analytics/metrics/:days', isAuthenticated, async (req, res) => {
     try {
-      const days = parseInt(req.query.days as string) || 30;
+      const days = parseInt(req.params.days) || 30;
       const metrics = await storage.getSalesMetrics(days);
       res.json(metrics);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch metrics" });
+      console.error('Analytics metrics error:', error);
+      res.status(500).json({ message: "Failed to fetch analytics metrics" });
     }
   });
 
-  app.get('/api/analytics/top-products', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  app.get('/api/analytics/top-products/:limit', isAuthenticated, async (req, res) => {
     try {
-      const limit = parseInt(req.query.limit as string) || 10;
+      const limit = parseInt(req.params.limit) || 5;
       const topProducts = await storage.getTopProducts(limit);
       res.json(topProducts);
     } catch (error) {
+      console.error('Top products error:', error);
       res.status(500).json({ message: "Failed to fetch top products" });
     }
   });
 
-  app.get('/api/analytics/order-status-breakdown', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  // Customer analytics
+  app.get('/api/analytics/customers', isAuthenticated, async (req, res) => {
     try {
-      const breakdown = await storage.getOrderStatusBreakdown();
-      res.json(breakdown);
+      const users = await storage.getUsersWithStats();
+      const totalCustomers = users.filter(user => user.role === 'customer').length;
+      const newCustomersThisMonth = users.filter(user => {
+        const userDate = new Date(user.createdAt!);
+        const now = new Date();
+        const monthAgo = new Date(now.getFullYear(), now.getMonth(), 1);
+        return user.role === 'customer' && userDate >= monthAgo;
+      }).length;
+
+      res.json({
+        totalCustomers,
+        newCustomersThisMonth,
+        percentageChange: 0 // Calculate based on previous month if needed
+      });
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch order breakdown" });
+      console.error('Customer analytics error:', error);
+      res.status(500).json({ message: "Failed to fetch customer analytics" });
     }
   });
 

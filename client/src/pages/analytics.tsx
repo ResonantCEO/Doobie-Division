@@ -45,22 +45,32 @@ export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState("30");
   const [activeTab, setActiveTab] = useState("overview");
 
+  const days = parseInt(timeRange);
+
   // Fetch sales metrics
-  const { data: metrics, isLoading: metricsLoading } = useQuery<{
+  const { data: salesMetrics, isLoading: salesLoading } = useQuery<{
     totalSales: number;
     totalOrders: number;
     averageOrderValue: number;
   }>({
-    queryKey: ["/api/analytics/metrics", { days: parseInt(timeRange) }],
+    queryKey: ["/api/analytics/metrics", days],
+    queryFn: async () => {
+      const response = await fetch(`/api/analytics/metrics/${days}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch sales metrics");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Fetch top products
-  const { data: topProducts = [], isLoading: topProductsLoading } = useQuery<{
-    product: Product;
-    sales: number;
-    revenue: number;
-  }[]>({
-    queryKey: ["/api/analytics/top-products", { limit: 10 }],
+  const { data: topProducts, isLoading: productsLoading } = useQuery<{ product: Product; sales: number; revenue: number }[]>({
+    queryKey: ["/api/analytics/top-products", 5],
+    queryFn: async () => {
+      const response = await fetch("/api/analytics/top-products/5", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch top products");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Fetch low stock products
@@ -71,6 +81,21 @@ export default function AnalyticsPage() {
   // Fetch order status breakdown
   const { data: orderBreakdown = [] } = useQuery<{ status: string; count: number }[]>({
     queryKey: ["/api/analytics/order-status-breakdown"],
+  });
+
+  // Fetch customer data
+  const { data: customerData, isLoading: customersLoading } = useQuery<{
+    totalCustomers: number;
+    newCustomersThisMonth: number;
+    percentageChange: number;
+  }>({
+    queryKey: ["/api/analytics/customers"],
+    queryFn: async () => {
+      const response = await fetch("/api/analytics/customers", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch customer data");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Sample data for enhanced analytics (in production, these would come from real APIs)
@@ -84,7 +109,7 @@ export default function AnalyticsPage() {
     { date: "Feb 12", sales: 4300, orders: 37, customers: 24 },
   ];
 
-  const customerData = [
+  const customerDataSample = [
     { month: "Jan", new: 45, returning: 123, churn: 12 },
     { month: "Feb", new: 52, returning: 134, churn: 8 },
     { month: "Mar", new: 38, returning: 145, churn: 15 },
@@ -127,15 +152,19 @@ export default function AnalyticsPage() {
 
   const totalCustomers = orderBreakdown.reduce((acc, item) => acc + item.count, 0);
 
-  if (metricsLoading) {
+  if (salesLoading || productsLoading || lowStockLoading || customersLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-8 bg-gray-200 rounded w-1/4 dark:bg-gray-700"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
+              <div key={i} className="h-32 bg-gray-200 rounded dark:bg-gray-700"></div>
             ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="h-64 bg-gray-200 rounded dark:bg-gray-700"></div>
+            <div className="h-64 bg-gray-200 rounded dark:bg-gray-700"></div>
           </div>
         </div>
       </div>
@@ -166,16 +195,16 @@ export default function AnalyticsPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
       <div className="space-y-4">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Analytics & Reports</h2>
-        
+
         {/* Mobile-first filters and actions */}
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-3 sm:items-center">
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-full sm:w-48">
-              <SelectValue />
+              <SelectValue placeholder="Select time range" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="7">Last 7 days</SelectItem>
@@ -184,7 +213,7 @@ export default function AnalyticsPage() {
               <SelectItem value="365">Last year</SelectItem>
             </SelectContent>
           </Select>
-          
+
           <Button onClick={handleExportReport} className="sm:ml-auto">
             <Download className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Export Report</span>
@@ -205,35 +234,100 @@ export default function AnalyticsPage() {
 
         <TabsContent value="overview" className="space-y-6">
           {/* Key Metrics Overview */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <MetricCard
-              title="Total Revenue"
-              value={`$${metrics?.totalSales ? Number(metrics.totalSales).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}`}
-              change="+12.5% from last period"
-              icon={DollarSign}
-              color="green"
-            />
-            <MetricCard
-              title="Total Orders"
-              value={metrics?.totalOrders || 0}
-              change="+8.3% from last period"
-              icon={ShoppingCart}
-              color="blue"
-            />
-            <MetricCard
-              title="Total Customers"
-              value={totalCustomers}
-              change="+15.2% from last period"
-              icon={Users}
-              color="purple"
-            />
-            <MetricCard
-              title="Avg. Order Value"
-              value={`$${metrics?.averageOrderValue ? Number(metrics.averageOrderValue).toFixed(2) : '0.00'}`}
-              change="+3.8% from last period"
-              icon={TrendingUp}
-              color="orange"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center">
+                  <div className="p-2 sm:p-3 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400">
+                    <DollarSign className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div className="ml-3 sm:ml-4">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Total Revenue</p>
+                    {salesLoading ? (
+                      <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    ) : (
+                      <>
+                        <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">
+                          ${salesMetrics?.totalSales.toFixed(2) || "0.00"}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Last {days} days</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center">
+                  <div className="p-2 sm:p-3 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
+                    <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div className="ml-3 sm:ml-4">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Total Orders</p>
+                    {salesLoading ? (
+                      <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    ) : (
+                      <>
+                        <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">
+                          {salesMetrics?.totalOrders || 0}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Last {days} days</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center">
+                  <div className="p-2 sm:p-3 rounded-full bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400">
+                    <Users className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div className="ml-3 sm:ml-4">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Total Customers</p>
+                    {customersLoading ? (
+                      <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    ) : (
+                      <>
+                        <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">
+                          {customerData?.totalCustomers || 0}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                          +{customerData?.newCustomersThisMonth || 0} this month
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center">
+                  <div className="p-2 sm:p-3 rounded-full bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400">
+                    <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div className="ml-3 sm:ml-4">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Avg. Order Value</p>
+                    {salesLoading ? (
+                      <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    ) : (
+                      <>
+                        <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">
+                          ${salesMetrics?.averageOrderValue.toFixed(2) || "0.00"}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Last {days} days</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Quick Overview Charts */}
@@ -295,7 +389,7 @@ export default function AnalyticsPage() {
 
         <TabsContent value="sales" className="space-y-6">
           {/* Sales Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <MetricCard title="Net Profit" value="$8,250" change="+18.2%" icon={DollarSign} color="green" />
             <MetricCard title="Sales Growth Rate" value="12.5%" change="+2.1%" icon={TrendingUp} color="blue" />
             <MetricCard title="Return Rate" value="2.3%" change="-0.5%" icon={RefreshCw} color="red" />
@@ -329,7 +423,7 @@ export default function AnalyticsPage() {
                 <CardTitle>Top Selling Products</CardTitle>
               </CardHeader>
               <CardContent>
-                {topProductsLoading ? (
+                {productsLoading ? (
                   <div className="space-y-4">
                     {[...Array(5)].map((_, i) => (
                       <div key={i} className="flex items-center justify-between">
@@ -404,7 +498,7 @@ export default function AnalyticsPage() {
 
         <TabsContent value="customers" className="space-y-6">
           {/* Customer Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <MetricCard title="Customer Acquisition Cost" value="$45.20" change="-8.3%" icon={UserPlus} color="blue" />
             <MetricCard title="Customer Retention Rate" value="78.5%" change="+5.2%" icon={Heart} color="green" />
             <MetricCard title="Churn Rate" value="21.5%" change="-5.2%" icon={TrendingUp} color="red" />
@@ -420,7 +514,7 @@ export default function AnalyticsPage() {
               <CardContent className="p-4 sm:p-6">
                 <ChartContainer config={chartConfig} className="h-48 sm:h-64 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={customerData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                    <AreaChart data={customerDataSample} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" fontSize={12} />
                       <YAxis fontSize={12} />
@@ -445,7 +539,7 @@ export default function AnalyticsPage() {
                       <span className="text-sm">Age 18-25</span>
                       <span className="text-sm">23%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
                       <div className="bg-blue-600 h-2 rounded-full" style={{ width: '23%' }}></div>
                     </div>
                   </div>
@@ -454,7 +548,7 @@ export default function AnalyticsPage() {
                       <span className="text-sm">Age 26-35</span>
                       <span className="text-sm">42%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
                       <div className="bg-green-600 h-2 rounded-full" style={{ width: '42%' }}></div>
                     </div>
                   </div>
@@ -463,7 +557,7 @@ export default function AnalyticsPage() {
                       <span className="text-sm">Age 36-45</span>
                       <span className="text-sm">25%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
                       <div className="bg-purple-600 h-2 rounded-full" style={{ width: '25%' }}></div>
                     </div>
                   </div>
@@ -472,7 +566,7 @@ export default function AnalyticsPage() {
                       <span className="text-sm">Age 45+</span>
                       <span className="text-sm">10%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
                       <div className="bg-orange-600 h-2 rounded-full" style={{ width: '10%' }}></div>
                     </div>
                   </div>
@@ -536,7 +630,7 @@ export default function AnalyticsPage() {
 
         <TabsContent value="marketing" className="space-y-6">
           {/* Marketing Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <MetricCard title="Website Traffic" value="12,456" change="+22.1%" icon={Globe} color="blue" />
             <MetricCard title="Conversion Rate" value="3.2%" change="+0.8%" icon={Target} color="green" />
             <MetricCard title="Email Open Rate" value="24.5%" change="+1.2%" icon={Mail} color="purple" />
@@ -568,7 +662,7 @@ export default function AnalyticsPage() {
                     </div>
                   ))}
                 </div>
-                
+
                 {/* Desktop Table View */}
                 <div className="hidden md:block overflow-x-auto">
                   <Table>
@@ -658,7 +752,7 @@ export default function AnalyticsPage() {
 
         <TabsContent value="inventory" className="space-y-6">
           {/* Inventory Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <MetricCard title="Stock Turnover Rate" value="3.2x" change="+0.4x" icon={RefreshCw} color="blue" />
             <MetricCard title="Inventory Value" value="$45,280" change="+8.2%" icon={Package} color="green" />
             <MetricCard title="Low Stock Items" value="12" change="-3" icon={AlertTriangle} color="orange" />
@@ -690,7 +784,7 @@ export default function AnalyticsPage() {
                     </div>
                   ))}
                 </div>
-                
+
                 {/* Desktop Table View */}
                 <div className="hidden md:block overflow-x-auto">
                   <Table>
@@ -763,7 +857,7 @@ export default function AnalyticsPage() {
             <CardContent>
               {lowStockLoading ? (
                 <div className="animate-pulse">
-                  <div className="h-64 bg-gray-200 rounded"></div>
+                  <div className="h-64 bg-gray-200 rounded dark:bg-gray-700"></div>
                 </div>
               ) : lowStockProducts.length === 0 ? (
                 <div className="text-center py-8">
@@ -826,7 +920,7 @@ export default function AnalyticsPage() {
 
         <TabsContent value="operations" className="space-y-6">
           {/* Operations Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <MetricCard title="Order Fulfillment Time" value="2.3 days" change="-0.5 days" icon={Clock} color="blue" />
             <MetricCard title="Operational Efficiency" value="94.2%" change="+2.1%" icon={Zap} color="green" />
             <MetricCard title="Cost of Goods Sold" value="$15,680" change="+5.2%" icon={DollarSign} color="orange" />
