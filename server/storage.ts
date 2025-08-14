@@ -780,6 +780,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async markOrderItemAsPacked(orderId: number, productId: number, userId: string) {
+    // Get current product stock for logging
+    const [product] = await db
+      .select({ stock: products.stock })
+      .from(products)
+      .where(eq(products.id, productId));
+
+    if (!product) {
+      throw new Error("Product not found");
+    }
+
     // Mark order item as packed (fulfilled) without reducing physical inventory
     await db
       .update(orderItems)
@@ -789,12 +799,14 @@ export class DatabaseStorage implements IStorage {
         eq(orderItems.productId, productId)
       ));
 
-    // Log the packing activity
+    // Log the packing activity with current stock values (no change in stock for packing)
     await db.insert(inventoryLogs).values({
       productId,
       userId,
       type: 'packing',
       quantity: 0, // No inventory change for packing
+      previousStock: product.stock,
+      newStock: product.stock, // Stock remains the same for packing
       reason: `Order item packed - Order #${orderId}`,
       createdAt: new Date()
     });
