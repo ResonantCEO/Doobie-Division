@@ -711,51 +711,93 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          {/* Customer Segmentation */}
+          {/* Top Customer Analysis */}
           <Card>
             <CardHeader>
-              <CardTitle>Customer Segmentation Report</CardTitle>
+              <CardTitle>Top Customer Analysis</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Segment</TableHead>
-                      <TableHead>Count</TableHead>
-                      <TableHead>Avg. Order Value</TableHead>
-                      <TableHead>Total Revenue</TableHead>
-                      <TableHead>Retention Rate</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Total Orders</TableHead>
+                      <TableHead>Lifetime Value</TableHead>
+                      <TableHead>Favorite Category</TableHead>
+                      <TableHead>Last Purchase</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     <TableRow>
-                      <TableCell>VIP Customers</TableCell>
-                      <TableCell>45</TableCell>
-                      <TableCell>$185.50</TableCell>
-                      <TableCell>$8,347</TableCell>
-                      <TableCell><Badge className="bg-green-100 text-green-800">95%</Badge></TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback>JD</AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">John D.</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>47</TableCell>
+                      <TableCell>$2,340</TableCell>
+                      <TableCell><Badge variant="secondary">Flower</Badge></TableCell>
+                      <TableCell>2 days ago</TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell>Regular Customers</TableCell>
-                      <TableCell>156</TableCell>
-                      <TableCell>$89.20</TableCell>
-                      <TableCell>$13,915</TableCell>
-                      <TableCell><Badge className="bg-blue-100 text-blue-800">78%</Badge></TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback>SM</AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">Sarah M.</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>38</TableCell>
+                      <TableCell>$1,890</TableCell>
+                      <TableCell><Badge variant="secondary">Edibles</Badge></TableCell>
+                      <TableCell>1 week ago</TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell>New Customers</TableCell>
-                      <TableCell>89</TableCell>
-                      <TableCell>$65.30</TableCell>
-                      <TableCell>$5,812</TableCell>
-                      <TableCell><Badge className="bg-orange-100 text-orange-800">45%</Badge></TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback>MR</AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">Mike R.</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>31</TableCell>
+                      <TableCell>$1,650</TableCell>
+                      <TableCell><Badge variant="secondary">Concentrates</Badge></TableCell>
+                      <TableCell>3 days ago</TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell>At-Risk Customers</TableCell>
-                      <TableCell>23</TableCell>
-                      <TableCell>$45.80</TableCell>
-                      <TableCell>$1,053</TableCell>
-                      <TableCell><Badge className="bg-red-100 text-red-800">12%</Badge></TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback>AL</AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">Amy L.</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>29</TableCell>
+                      <TableCell>$1,520</TableCell>
+                      <TableCell><Badge variant="secondary">Vapes</Badge></TableCell>
+                      <TableCell>5 days ago</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback>CW</AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">Chris W.</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>25</TableCell>
+                      <TableCell>$1,380</TableCell>
+                      <TableCell><Badge variant="secondary">Pre-rolls</Badge></TableCell>
+                      <TableCell>4 days ago</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
