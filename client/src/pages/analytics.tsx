@@ -901,8 +901,8 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {categoryBreakdown && categoryBreakdown.length > 0 ? (
-                    categoryBreakdown.map((category, i) => (
+                  {categoryData && categoryData.length > 0 ? (
+                    categoryData.map((category, i) => (
                       <div key={i} className="border rounded-lg p-4">
                         <div className="flex justify-between items-center mb-2">
                           <h4 className="font-medium">{category.name}</h4>
@@ -911,7 +911,7 @@ export default function AnalyticsPage() {
                           </Badge>
                         </div>
                         <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                          <div>Items Sold: {category.count || 0}</div>
+                          <div>Items Sold: {category.value || 0}</div>
                           <div>Revenue: ${Number(category.revenue || 0).toFixed(2)}</div>
                         </div>
                         <div className="mt-2">
@@ -919,7 +919,7 @@ export default function AnalyticsPage() {
                             <div 
                               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                               style={{ 
-                                width: `${Math.min(100, (Number(category.revenue || 0) / Math.max(...(categoryBreakdown.map(c => Number(c.revenue || 0))))) * 100)}%` 
+                                width: `${Math.min(100, (Number(category.revenue || 0) / Math.max(...(categoryData.map(c => Number(c.revenue || 0))))) * 100)}%` 
                               }}
                             ></div>
                           </div>
