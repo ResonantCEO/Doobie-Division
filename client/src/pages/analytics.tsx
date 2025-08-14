@@ -22,9 +22,7 @@ import {
   Target,
   Percent,
   Clock,
-  Mail,
-  Smartphone,
-  Globe,
+  
   Star,
   RefreshCw,
   UserPlus,
@@ -134,13 +132,7 @@ export default function AnalyticsPage() {
     { month: "Jun", new: 71, returning: 178, churn: 7 },
   ];
 
-  const marketingData = [
-    { channel: "Organic Search", visitors: 1250, conversions: 89, cost: 0 },
-    { channel: "Paid Search", visitors: 890, conversions: 67, cost: 2400 },
-    { channel: "Social Media", visitors: 645, conversions: 34, cost: 800 },
-    { channel: "Email", visitors: 456, conversions: 78, cost: 200 },
-    { channel: "Direct", visitors: 334, conversions: 45, cost: 0 },
-  ];
+  
 
   // Fetch real category breakdown data
   const { data: categoryData = [], isLoading: categoryLoading } = useQuery<{ name: string; value: number; revenue: number; fill: string }[]>({
@@ -254,11 +246,10 @@ export default function AnalyticsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-0 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 gap-1 sm:gap-0 h-auto p-1">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
           <TabsTrigger value="sales" className="text-xs sm:text-sm">Sales</TabsTrigger>
           <TabsTrigger value="customers" className="text-xs sm:text-sm">Customers</TabsTrigger>
-          <TabsTrigger value="marketing" className="text-xs sm:text-sm">Marketing</TabsTrigger>
           <TabsTrigger value="inventory" className="text-xs sm:text-sm">Inventory</TabsTrigger>
           <TabsTrigger value="operations" className="text-xs sm:text-sm">Operations</TabsTrigger>
         </TabsList>
@@ -816,127 +807,7 @@ export default function AnalyticsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="marketing" className="space-y-6">
-          {/* Marketing Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <MetricCard title="Website Traffic" value="12,456" change="+22.1%" icon={Globe} color="blue" />
-            <MetricCard title="Conversion Rate" value="3.2%" change="+0.8%" icon={Target} color="green" />
-            <MetricCard title="Email Open Rate" value="24.5%" change="+1.2%" icon={Mail} color="purple" />
-            <MetricCard title="Social Media Engagement" value="8.7%" change="+3.4%" icon={Heart} color="pink" />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Traffic Sources */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Traffic Sources & Conversions</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6">
-                {/* Mobile Card View */}
-                <div className="md:hidden space-y-3">
-                  {marketingData.map((item, i) => (
-                    <div key={i} className="border rounded-lg p-3 space-y-2">
-                      <div className="font-medium text-sm">{item.channel}</div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>Visitors: {item.visitors}</div>
-                        <div>Conversions: {item.conversions}</div>
-                        <div>Cost: ${item.cost}</div>
-                        <div>
-                          <Badge variant={item.cost === 0 ? "secondary" : "default"} className="text-xs">
-                            {item.cost === 0 ? "∞" : `${((item.conversions * 89 - item.cost) / item.cost * 100).toFixed(0)}%`}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Desktop Table View */}
-                <div className="hidden md:block overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Channel</TableHead>
-                        <TableHead>Visitors</TableHead>
-                        <TableHead>Conversions</TableHead>
-                        <TableHead>Cost</TableHead>
-                        <TableHead>ROI</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {marketingData.map((item, i) => (
-                        <TableRow key={i}>
-                          <TableCell className="font-medium">{item.channel}</TableCell>
-                          <TableCell>{item.visitors}</TableCell>
-                          <TableCell>{item.conversions}</TableCell>
-                          <TableCell>${item.cost}</TableCell>
-                          <TableCell>
-                            <Badge variant={item.cost === 0 ? "secondary" : "default"}>
-                              {item.cost === 0 ? "∞" : `${((item.conversions * 89 - item.cost) / item.cost * 100).toFixed(0)}%`}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Campaign Performance */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Campaign Performance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {[
-                    { name: "Summer Sale 2024", ctr: "4.2%", conversions: "145", roi: "245%" },
-                    { name: "New Product Launch", ctr: "3.8%", conversions: "89", roi: "180%" },
-                    { name: "Email Newsletter", ctr: "2.1%", conversions: "67", roi: "320%" },
-                    { name: "Social Media Ads", ctr: "1.9%", conversions: "34", roi: "125%" }
-                  ].map((campaign, i) => (
-                    <div key={i} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium">{campaign.name}</h4>
-                        <Badge className="bg-green-100 text-green-800">{campaign.roi}</Badge>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                        <div>CTR: {campaign.ctr}</div>
-                        <div>Conversions: {campaign.conversions}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Seasonal Analysis */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Seasonal Sales Trends</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6">
-              <ChartContainer config={chartConfig} className="h-48 sm:h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={[
-                    { season: "Spring", sales: 18500, orders: 234 },
-                    { season: "Summer", sales: 24600, orders: 312 },
-                    { season: "Fall", sales: 21300, orders: 267 },
-                    { season: "Winter", sales: 19800, orders: 245 }
-                  ]} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="season" fontSize={12} />
-                    <YAxis fontSize={12} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="sales" fill="var(--color-sales)" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        
 
         <TabsContent value="inventory" className="space-y-6">
           {/* Inventory Metrics */}
