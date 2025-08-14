@@ -894,30 +894,45 @@ export default function AnalyticsPage() {
               </CardContent>
             </Card>
 
-            {/* Supplier Performance */}
+            {/* Product Category Performance */}
             <Card>
               <CardHeader>
-                <CardTitle>Supplier Performance Metrics</CardTitle>
+                <CardTitle>Product Category Performance</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[
-                    { name: "Green Valley Farms", onTime: "98%", quality: "A+", orders: "45" },
-                    { name: "Premium Extracts Co.", onTime: "92%", quality: "A", orders: "23" },
-                    { name: "Local Grow House", onTime: "87%", quality: "B+", orders: "18" },
-                    { name: "Artisan Accessories", onTime: "95%", quality: "A", orders: "12" }
-                  ].map((supplier, i) => (
-                    <div key={i} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium">{supplier.name}</h4>
-                        <Badge className="bg-blue-100 text-blue-800">{supplier.quality}</Badge>
+                  {categoryBreakdown && categoryBreakdown.length > 0 ? (
+                    categoryBreakdown.map((category, i) => (
+                      <div key={i} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-center mb-2">
+                          <h4 className="font-medium">{category.name}</h4>
+                          <Badge className="bg-blue-100 text-blue-800">
+                            ${Number(category.revenue || 0).toFixed(0)}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                          <div>Items Sold: {category.count || 0}</div>
+                          <div>Revenue: ${Number(category.revenue || 0).toFixed(2)}</div>
+                        </div>
+                        <div className="mt-2">
+                          <div className="bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                              style={{ 
+                                width: `${Math.min(100, (Number(category.revenue || 0) / Math.max(...(categoryBreakdown.map(c => Number(c.revenue || 0))))) * 100)}%` 
+                              }}
+                            ></div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                        <div>On-time: {supplier.onTime}</div>
-                        <div>Orders: {supplier.orders}</div>
-                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-gray-500 py-8">
+                      <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <p>No category sales data available</p>
+                      <p className="text-sm">Sales data will appear here once orders are placed</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
