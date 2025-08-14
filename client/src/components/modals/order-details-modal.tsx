@@ -213,11 +213,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
     }
   };
 
-  const handleItemClick = (itemId: number, item: any) => {
+  const handleItemClick = async (itemId: number, item: any) => {
     if (item.fulfilled) return; // Don't allow scanning already fulfilled items
     
     setSelectedItemId(itemId);
     setScanningMode(true);
+    
+    // Immediately start the camera
+    await startScanning();
   };
 
   const cancelScanning = () => {
@@ -366,30 +369,23 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                         </Alert>
                       )}
                       
-                      {!isScanning ? (
-                        <Button onClick={startScanning} className="w-full">
-                          <Camera className="h-4 w-4 mr-2" />
-                          Start Camera Scanner
-                        </Button>
-                      ) : (
-                        <div className="relative">
-                          <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            className="w-full max-w-sm mx-auto rounded-lg border-2 border-blue-500"
-                          />
-                          <canvas ref={canvasRef} className="hidden" />
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="border-2 border-white border-dashed w-32 h-32 rounded-lg animate-pulse">
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Scan className="h-6 w-6 text-white animate-spin" />
-                              </div>
+                      <div className="relative">
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full max-w-sm mx-auto rounded-lg border-2 border-blue-500"
+                        />
+                        <canvas ref={canvasRef} className="hidden" />
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="border-2 border-white border-dashed w-32 h-32 rounded-lg animate-pulse">
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Scan className="h-6 w-6 text-white animate-spin" />
                             </div>
                           </div>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
