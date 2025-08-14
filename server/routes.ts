@@ -702,6 +702,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Inventory analytics endpoints
+  app.get('/api/analytics/inventory-metrics', isAuthenticated, async (req, res) => {
+    try {
+      const metrics = await storage.getInventoryMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error('Inventory metrics error:', error);
+      res.status(500).json({ message: "Failed to fetch inventory metrics" });
+    }
+  });
+
+  app.get('/api/analytics/inventory-aging', isAuthenticated, async (req, res) => {
+    try {
+      const agingReport = await storage.getInventoryAgingReport();
+      res.json(agingReport);
+    } catch (error) {
+      console.error('Inventory aging error:', error);
+      res.status(500).json({ message: "Failed to fetch inventory aging report" });
+    }
+  });
+
+  app.get('/api/analytics/supplier-performance', isAuthenticated, async (req, res) => {
+    try {
+      const suppliers = await storage.getSupplierPerformance();
+      res.json(suppliers);
+    } catch (error) {
+      console.error('Supplier performance error:', error);
+      res.status(500).json({ message: "Failed to fetch supplier performance" });
+    }
+  });
+
   // Notification routes
   app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
     try {
