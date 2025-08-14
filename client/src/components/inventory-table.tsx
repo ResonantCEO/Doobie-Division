@@ -16,7 +16,8 @@ import QRCodeModal from "@/components/modals/qr-code-modal";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { MoreHorizontal, Edit, QrCode, TrendingUp, TrendingDown, Package, Eye, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { MoreHorizontal, Edit, QrCode, TrendingUp, TrendingDown, Package, Eye, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Product, Category, User } from "@shared/schema";
 
 type SortField = 'name' | 'sku' | 'category' | 'price' | 'stock' | 'status';
@@ -220,7 +221,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <span className="text-sm font-medium text-blue-800 dark:text-blue-300">
               {selectedProducts.length} products selected
-            </span></div>
+            </span>
             <div className="flex flex-wrap gap-2">
               <Button 
                 size="sm" 
