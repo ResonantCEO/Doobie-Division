@@ -51,11 +51,11 @@ export default function Dashboard() {
       case "storefront":
         return <StorefrontPage />;
       case "inventory":
-        return user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <InventoryPage /> : <StorefrontPage />;
+        return user.role === 'admin' || user.role === 'manager' ? <InventoryPage /> : <StorefrontPage />;
       case "orders":
         return user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <OrdersPage /> : <StorefrontPage />;
       case "analytics":
-        return user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <AnalyticsPage /> : <StorefrontPage />;
+        return user.role === 'admin' || user.role === 'manager' ? <AnalyticsPage /> : <StorefrontPage />;
       case "users":
         return user.role === 'admin' ? <UsersPage /> : <StorefrontPage />;
       case "admin":
