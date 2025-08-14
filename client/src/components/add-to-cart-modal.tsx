@@ -198,9 +198,11 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-                <p className="text-sm text-muted-foreground text-center mt-2">
-                  Available: {maxStock > 0 ? `${maxStock} units` : "Out of stock"}
-                </p>
+                {(quantity >= maxStock || maxStock === 0) && (
+                  <p className="text-sm text-muted-foreground text-center mt-2">
+                    Available: {maxStock > 0 ? `${maxStock} units` : "Out of stock"}
+                  </p>
+                )}
               </>
             )}
           </div>
