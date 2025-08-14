@@ -94,7 +94,7 @@ export const orders = pgTable("orders", {
   customerId: varchar("customer_id").references(() => users.id),
   customerName: varchar("customer_name").notNull(),
   customerEmail: varchar("customer_email").notNull(),
-  customerPhone: varchar("customer_phone"),
+  customerPhone: varchar("customer_phone").notNull(),
   shippingAddress: text("shipping_address").notNull(),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   status: varchar("status").notNull().default("pending"), // pending, processing, shipped, delivered, cancelled
@@ -242,7 +242,7 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
 }).extend({
   total: z.string().or(z.number()).transform(val => String(val)),
   customerId: z.string().nullable().optional(),
-  customerPhone: z.string().nullable().optional(),
+  customerPhone: z.string().min(1, "Phone number is required"),
   notes: z.string().nullable().optional(),
 });
 
