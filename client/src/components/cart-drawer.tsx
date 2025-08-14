@@ -346,7 +346,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Shipping</span>
-                  <span className="text-primary">Free</span>
+                  <span className="text-primary">Free! Tips for our drivers are always appreciated.</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold">
