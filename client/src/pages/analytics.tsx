@@ -90,6 +90,12 @@ export default function AnalyticsPage() {
   // Fetch low stock products
   const { data: lowStockProducts = [], isLoading: lowStockLoading } = useQuery<Product[]>({
     queryKey: ["/api/products/low-stock"],
+    queryFn: async () => {
+      const response = await fetch("/api/products/low-stock", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch low stock products");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Fetch order status breakdown
