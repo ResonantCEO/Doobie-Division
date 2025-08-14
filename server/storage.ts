@@ -439,7 +439,7 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Cannot delete product. It is referenced in pending or processing orders.");
     }
 
-    // For order items in non-active orders (cancelled, completed, shipped, delivered),
+    // For order items in non-active orders (cancelled, completed, shipped),
     // set product_id to null to preserve order history while allowing product deletion
     await db
       .update(orderItems)
@@ -457,8 +457,7 @@ export class DatabaseStorage implements IStorage {
                   or(
                     eq(orders.status, 'cancelled'),
                     eq(orders.status, 'completed'),
-                    eq(orders.status, 'shipped'),
-                    eq(orders.status, 'delivered')
+                    eq(orders.status, 'shipped')
                   )
                 )
               )

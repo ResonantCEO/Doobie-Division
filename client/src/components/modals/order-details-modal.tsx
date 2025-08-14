@@ -253,9 +253,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
       case "processing":
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Processing</Badge>;
       case "shipped":
-        return <Badge variant="secondary" className="status-out-for-delivery">Shipped</Badge>;
-      case "delivered":
-        return <Badge variant="default" className="status-completed">Delivered</Badge>;
+        return <Badge variant="default" className="status-completed">Shipped</Badge>;
       case "cancelled":
         return <Badge variant="destructive" className="status-cancelled">Cancelled</Badge>;
       default:
