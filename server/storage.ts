@@ -526,11 +526,27 @@ export class DatabaseStorage implements IStorage {
 
   async getLowStockProducts(): Promise<Product[]>;
   async getLowStockProducts(): Promise<Product[]> {
-    return await db
-      .select()
+    const lowStockProducts = await db
+      .select({
+        id: products.id,
+        name: products.name,
+        sku: products.sku,
+        stock: products.stock,
+        physicalInventory: products.physicalInventory,
+        minStockThreshold: products.minStockThreshold,
+        categoryName: categories.name,
+      })
       .from(products)
-      .where(sql`${products.stock} <= ${products.minStockThreshold}`)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(
+        and(
+          eq(products.isActive, true),
+          lte(products.stock, products.minStockThreshold)
+        )
+      )
       .orderBy(products.stock);
+
+    return lowStockProducts;
   }
 
   // Order operations
@@ -687,9 +703,9 @@ export class DatabaseStorage implements IStorage {
               // Update product stock (restore stock only, physical inventory wasn't changed)
               await db
                 .update(products)
-                .set({ 
+                .set({
                   stock: newStock,
-                  updatedAt: new Date() 
+                  updatedAt: new Date()
                 })
                 .where(eq(products.id, item.productId));
 
