@@ -156,58 +156,12 @@ export default function AnalyticsPage() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Fetch inventory metrics
-  const { data: inventoryMetrics, isLoading: inventoryMetricsLoading } = useQuery<{
-    stockTurnoverRate: number;
-    inventoryValue: number;
-    lowStockItems: number;
-    outOfStockItems: number;
-    totalProducts: number;
-  }>({
-    queryKey: ["/api/analytics/inventory-metrics"],
-    queryFn: async () => {
-      const response = await fetch("/api/analytics/inventory-metrics", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch inventory metrics");
-      return response.json();
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  // Fetch inventory aging report
-  const { data: inventoryData = [], isLoading: inventoryDataLoading } = useQuery<{
-    product: string;
-    sku: string;
-    current: number;
-    threshold: number;
-    turnover: number;
-    daysInInventory: number;
-  }[]>({
-    queryKey: ["/api/analytics/inventory-aging"],
-    queryFn: async () => {
-      const response = await fetch("/api/analytics/inventory-aging", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch inventory aging report");
-      return response.json();
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  // Fetch supplier performance
-  const { data: supplierData = [], isLoading: supplierDataLoading } = useQuery<{
-    name: string;
-    onTime: string;
-    quality: string;
-    orders: string;
-    totalValue: number;
-    lastDelivery: Date;
-  }[]>({
-    queryKey: ["/api/analytics/supplier-performance"],
-    queryFn: async () => {
-      const response = await fetch("/api/analytics/supplier-performance", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch supplier performance");
-      return response.json();
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  const inventoryData = [
+    { product: "Premium Flower", current: 45, threshold: 20, turnover: 2.3 },
+    { product: "CBD Gummies", current: 12, threshold: 15, turnover: 4.1 },
+    { product: "Vape Cartridge", current: 8, threshold: 10, turnover: 3.7 },
+    { product: "Pre-rolls", current: 23, threshold: 25, turnover: 1.8 },
+  ];
 
   const chartConfig = {
     sales: { label: "Sales", color: "hsl(var(--chart-1))" },
@@ -221,7 +175,7 @@ export default function AnalyticsPage() {
 
   const totalCustomers = orderBreakdown.reduce((acc, item) => acc + item.count, 0);
 
-  if (salesLoading || productsLoading || lowStockLoading || customersLoading || salesTrendLoading || categoryLoading || advancedLoading || peakTimesLoading || inventoryMetricsLoading || inventoryDataLoading || supplierDataLoading) {
+  if (salesLoading || productsLoading || lowStockLoading || customersLoading || salesTrendLoading || categoryLoading || advancedLoading || peakTimesLoading) {
     return (
       <div className="space-y-6 p-6">
         <div className="animate-pulse space-y-4">
@@ -858,34 +812,10 @@ export default function AnalyticsPage() {
         <TabsContent value="inventory" className="space-y-6">
           {/* Inventory Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <MetricCard 
-              title="Stock Turnover Rate" 
-              value={`${inventoryMetrics?.stockTurnoverRate || 0}x`} 
-              change="+0.4x" 
-              icon={RefreshCw} 
-              color="blue" 
-            />
-            <MetricCard 
-              title="Inventory Value" 
-              value={`$${inventoryMetrics?.inventoryValue?.toLocaleString() || "0"}`} 
-              change="+8.2%" 
-              icon={Package} 
-              color="green" 
-            />
-            <MetricCard 
-              title="Low Stock Items" 
-              value={inventoryMetrics?.lowStockItems?.toString() || "0"} 
-              change="-3" 
-              icon={AlertTriangle} 
-              color="orange" 
-            />
-            <MetricCard 
-              title="Out of Stock" 
-              value={inventoryMetrics?.outOfStockItems?.toString() || "0"} 
-              change="-1" 
-              icon={Package} 
-              color="red" 
-            />
+            <MetricCard title="Stock Turnover Rate" value="3.2x" change="+0.4x" icon={RefreshCw} color="blue" />
+            <MetricCard title="Inventory Value" value="$45,280" change="+8.2%" icon={Package} color="green" />
+            <MetricCard title="Low Stock Items" value="12" change="-3" icon={AlertTriangle} color="orange" />
+            <MetricCard title="Out of Stock" value="3" change="-1" icon={Package} color="red" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -895,73 +825,54 @@ export default function AnalyticsPage() {
                 <CardTitle>Inventory Aging Report</CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-6">
-                {inventoryDataLoading ? (
-                  <div className="space-y-4">
-                    {[...Array(4)].map((_, i) => (
-                      <div key={i} className="h-16 bg-gray-200 rounded animate-pulse" />
-                    ))}
-                  </div>
-                ) : inventoryData.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500 dark:text-gray-400">No inventory data available</p>
-                  </div>
-                ) : (
-                  <>
-                    {/* Mobile Card View */}
-                    <div className="md:hidden space-y-3">
-                      {inventoryData.slice(0, 10).map((item, i) => (
-                        <div key={i} className="border rounded-lg p-3 space-y-2">
-                          <div className="flex justify-between items-center">
-                            <div className="font-medium text-sm">{item.product}</div>
-                            <Badge variant={item.current < item.threshold ? "destructive" : "secondary"} className="text-xs">
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-3">
+                  {inventoryData.map((item, i) => (
+                    <div key={i} className="border rounded-lg p-3 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="font-medium text-sm">{item.product}</div>
+                        <Badge variant={item.current < item.threshold ? "destructive" : "secondary"} className="text-xs">
+                          {item.current < item.threshold ? "Low Stock" : "Normal"}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>Stock: {item.current}</div>
+                        <div>Threshold: {item.threshold}</div>
+                        <div>Turnover: {item.turnover}x</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Current Stock</TableHead>
+                        <TableHead>Threshold</TableHead>
+                        <TableHead>Turnover</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {inventoryData.map((item, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-medium">{item.product}</TableCell>
+                          <TableCell>{item.current}</TableCell>
+                          <TableCell>{item.threshold}</TableCell>
+                          <TableCell>{item.turnover}x</TableCell>
+                          <TableCell>
+                            <Badge variant={item.current < item.threshold ? "destructive" : "secondary"}>
                               {item.current < item.threshold ? "Low Stock" : "Normal"}
                             </Badge>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 text-xs">
-                            <div>Stock: {item.current}</div>
-                            <div>Threshold: {item.threshold}</div>
-                            <div>Turnover: {item.turnover}x</div>
-                          </div>
-                        </div>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </div>
-
-                    {/* Desktop Table View */}
-                    <div className="hidden md:block overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Product</TableHead>
-                            <TableHead>SKU</TableHead>
-                            <TableHead>Current Stock</TableHead>
-                            <TableHead>Threshold</TableHead>
-                            <TableHead>Turnover</TableHead>
-                            <TableHead>Days in Inventory</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {inventoryData.slice(0, 10).map((item, i) => (
-                            <TableRow key={i}>
-                              <TableCell className="font-medium">{item.product}</TableCell>
-                              <TableCell className="font-mono text-sm">{item.sku}</TableCell>
-                              <TableCell>{item.current}</TableCell>
-                              <TableCell>{item.threshold}</TableCell>
-                              <TableCell>{item.turnover}x</TableCell>
-                              <TableCell>{item.daysInInventory} days</TableCell>
-                              <TableCell>
-                                <Badge variant={item.current < item.threshold ? "destructive" : "secondary"}>
-                                  {item.current < item.threshold ? "Low Stock" : "Normal"}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </>
-                )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
 
@@ -971,34 +882,25 @@ export default function AnalyticsPage() {
                 <CardTitle>Supplier Performance Metrics</CardTitle>
               </CardHeader>
               <CardContent>
-                {supplierDataLoading ? (
-                  <div className="space-y-4">
-                    {[...Array(4)].map((_, i) => (
-                      <div key={i} className="h-20 bg-gray-200 rounded animate-pulse" />
-                    ))}
-                  </div>
-                ) : supplierData.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Truck className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500 dark:text-gray-400">No supplier data available</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {supplierData.map((supplier, i) => (
-                      <div key={i} className="border rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <h4 className="font-medium">{supplier.name}</h4>
-                          <Badge className="bg-blue-100 text-blue-800">{supplier.quality}</Badge>
-                        </div>
-                        <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
-                          <div>On-time: {supplier.onTime}</div>
-                          <div>Orders: {supplier.orders}</div>
-                          <div>Value: ${supplier.totalValue?.toLocaleString()}</div>
-                        </div>
+                <div className="space-y-4">
+                  {[
+                    { name: "Green Valley Farms", onTime: "98%", quality: "A+", orders: "45" },
+                    { name: "Premium Extracts Co.", onTime: "92%", quality: "A", orders: "23" },
+                    { name: "Local Grow House", onTime: "87%", quality: "B+", orders: "18" },
+                    { name: "Artisan Accessories", onTime: "95%", quality: "A", orders: "12" }
+                  ].map((supplier, i) => (
+                    <div key={i} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-medium">{supplier.name}</h4>
+                        <Badge className="bg-blue-100 text-blue-800">{supplier.quality}</Badge>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                        <div>On-time: {supplier.onTime}</div>
+                        <div>Orders: {supplier.orders}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </div>
