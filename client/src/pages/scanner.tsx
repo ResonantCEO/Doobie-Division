@@ -562,45 +562,280 @@ export default function ScannerPage() {
         </TabsList>
 
         <TabsContent value="inventory" className="space-y-6">
+          {/* Scanner Section for Inventory Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scan className="h-5 w-5" />
+                Product Scanner - Inventory Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Camera Section */}
+              <div className="text-center">
+                {!isScanning ? (
+                  <div className="space-y-4">
+                    <Button onClick={startScanning} size="lg" className="w-full sm:w-auto">
+                      <Camera className="h-5 w-5 mr-2" />
+                      Start Camera Scanner
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      Or use manual SKU lookup below
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className={`w-full max-w-md mx-auto rounded-lg border-2 ${getScanningStatusColor()}`}
+                      />
+                      <canvas ref={canvasRef} className="hidden" />
 
-      {/* Product Information */}
-      {scannedProduct && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Product Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-start gap-4">
-              <Avatar className="h-16 w-16">
-                <AvatarImage src={scannedProduct.imageUrl || ""} alt={scannedProduct.name} />
-                <AvatarFallback>{scannedProduct.name.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold">{scannedProduct.name}</h3>
-                <p className="text-muted-foreground mb-2">{scannedProduct.description}</p>
-                <div className="flex flex-wrap gap-2 text-sm">
-                  <Badge variant="outline">SKU: {scannedProduct.sku}</Badge>
-                  <Badge variant="outline">Price: ${scannedProduct.price}</Badge>
-                  <Badge variant="outline">
-                    Category: {scannedProduct.category?.name || 'Uncategorized'}
-                  </Badge>
-                  <Badge {...getStockStatus(scannedProduct.stock, scannedProduct.minStockThreshold)}>
-                    Stock: {scannedProduct.stock} units
-                  </Badge>
-                  {scannedProduct.minStockThreshold && (
-                    <Badge variant="outline">
-                      Min Threshold: {scannedProduct.minStockThreshold}
-                    </Badge>
-                  )}
+                      {/* Scanning overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="border-2 border-white border-dashed w-48 h-48 rounded-lg animate-pulse">
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Scan className="h-8 w-8 text-white animate-spin" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status indicator */}
+                      <div className="absolute top-2 left-2 right-2">
+                        {scanningStatus === "scanning" && (
+                          <Badge variant="default" className="bg-blue-500">
+                            Scanning for QR codes...
+                          </Badge>
+                        )}
+                        {scanningStatus === "found" && (
+                          <Badge variant="default" className="bg-green-500">
+                            QR Code Found!
+                          </Badge>
+                        )}
+                        {scanningStatus === "error" && (
+                          <Badge variant="destructive">
+                            Scan Error
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <Button onClick={stopScanning} variant="outline">
+                      Stop Scanner
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      Scan product QR codes to view detailed information
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Error Alert */}
+              {scanningError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{scanningError}</AlertDescription>
+                </Alert>
+              )}
+
+              {/* Manual SKU Lookup */}
+              <div className="border-t pt-4">
+                <Label htmlFor="manual-sku-inventory">Manual SKU Lookup</Label>
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    id="manual-sku-inventory"
+                    placeholder="Enter SKU (e.g., 0001, 0002)"
+                    value={manualSku}
+                    onChange={(e) => setManualSku(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleManualLookup()}
+                    disabled={lookupProductMutation.isPending}
+                  />
+                  <Button 
+                    onClick={handleManualLookup} 
+                    disabled={lookupProductMutation.isPending}
+                  >
+                    {lookupProductMutation.isPending ? "Searching..." : "Lookup"}
+                  </Button>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+
+          {/* Product Information */}
+          {scannedProduct && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Scanned Product Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Product Image */}
+                  <div className="md:col-span-1">
+                    <div className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden">
+                      {scannedProduct.imageUrl ? (
+                        <img 
+                          src={scannedProduct.imageUrl} 
+                          alt={scannedProduct.name}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      ) : (
+                        <div className="text-center">
+                          <Package className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                          <p className="text-sm text-gray-500">No image available</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Product Details */}
+                  <div className="md:col-span-2 space-y-4">
+                    <div>
+                      <h3 className="text-2xl font-bold text-foreground">{scannedProduct.name}</h3>
+                      <p className="text-muted-foreground mt-1">{scannedProduct.description}</p>
+                    </div>
+
+                    {/* Key Information */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-500">SKU</Label>
+                          <p className="text-lg font-semibold">{scannedProduct.sku}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-500">Price</Label>
+                          <p className="text-lg font-semibold">${parseFloat(scannedProduct.price.toString()).toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-500">Category</Label>
+                          <p className="text-lg">{scannedProduct.category?.name || 'Uncategorized'}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-500">Current Stock</Label>
+                          <div className="flex items-center gap-2">
+                            <p className="text-lg font-semibold">{scannedProduct.stock} units</p>
+                            <Badge {...getStockStatus(scannedProduct.stock, scannedProduct.minStockThreshold)}>
+                              {getStockStatus(scannedProduct.stock, scannedProduct.minStockThreshold).label}
+                            </Badge>
+                          </div>
+                        </div>
+                        {scannedProduct.minStockThreshold && (
+                          <div>
+                            <Label className="text-sm font-medium text-gray-500">Min Threshold</Label>
+                            <p className="text-lg">{scannedProduct.minStockThreshold} units</p>
+                          </div>
+                        )}
+                        <div>
+                          <Label className="text-sm font-medium text-gray-500">Status</Label>
+                          <Badge variant={scannedProduct.isActive ? "default" : "secondary"}>
+                            {scannedProduct.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Additional Product Details */}
+                    {(scannedProduct.sellingMethod || scannedProduct.weightUnit || scannedProduct.pricePerGram || scannedProduct.pricePerOunce) && (
+                      <div className="border-t pt-4">
+                        <h4 className="font-semibold mb-3">Additional Details</h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          {scannedProduct.sellingMethod && (
+                            <div>
+                              <Label className="text-xs font-medium text-gray-500">Selling Method</Label>
+                              <p className="capitalize">{scannedProduct.sellingMethod}</p>
+                            </div>
+                          )}
+                          {scannedProduct.weightUnit && (
+                            <div>
+                              <Label className="text-xs font-medium text-gray-500">Weight Unit</Label>
+                              <p className="capitalize">{scannedProduct.weightUnit}</p>
+                            </div>
+                          )}
+                          {scannedProduct.pricePerGram && (
+                            <div>
+                              <Label className="text-xs font-medium text-gray-500">Price per Gram</Label>
+                              <p>${parseFloat(scannedProduct.pricePerGram.toString()).toFixed(2)}</p>
+                            </div>
+                          )}
+                          {scannedProduct.pricePerOunce && (
+                            <div>
+                              <Label className="text-xs font-medium text-gray-500">Price per Ounce</Label>
+                              <p>${parseFloat(scannedProduct.pricePerOunce.toString()).toFixed(2)}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Physical Inventory */}
+                    {scannedProduct.physicalInventory !== undefined && scannedProduct.physicalInventory !== scannedProduct.stock && (
+                      <div className="border-t pt-4">
+                        <h4 className="font-semibold mb-2">Inventory Tracking</h4>
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                          <div className="flex items-center gap-2 text-yellow-800">
+                            <AlertTriangle className="h-4 w-4" />
+                            <span className="font-medium">Stock Discrepancy Detected</span>
+                          </div>
+                          <div className="mt-2 text-sm text-yellow-700">
+                            <p>System Stock: {scannedProduct.stock} units</p>
+                            <p>Physical Count: {scannedProduct.physicalInventory} units</p>
+                            <p>Difference: {scannedProduct.physicalInventory - scannedProduct.stock} units</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Timestamps */}
+                    <div className="border-t pt-4 text-xs text-gray-500">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-xs font-medium">Created</Label>
+                          <p>{scannedProduct.createdAt ? new Date(scannedProduct.createdAt).toLocaleString() : 'N/A'}</p>
+                        </div>
+                        <div>
+                          <Label className="text-xs font-medium">Last Updated</Label>
+                          <p>{scannedProduct.updatedAt ? new Date(scannedProduct.updatedAt).toLocaleString() : 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="border-t pt-4">
+                      <h4 className="font-semibold mb-3">Quick Actions</h4>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          onClick={resetSession}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          Scan Another Product
+                        </Button>
+                        <Button
+                          onClick={() => window.open(`/inventory?search=${scannedProduct.sku}`, '_blank')}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <Package className="h-4 w-4" />
+                          View in Inventory
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
       {/* Stock Adjustment */}
       {scannedProduct && (
