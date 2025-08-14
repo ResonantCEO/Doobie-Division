@@ -130,20 +130,6 @@ The application is designed to be deployed on Replit with integrated authenticat
 
 ## Recent Changes
 
-### August 14, 2025
-- **Enhanced QR Scanner Functionality**: Fixed multiple issues with QR code detection not working properly
-- **Scanner Improvements Made**:
-  - Fixed TypeScript errors in camera constraints configuration
-  - Added multiple detection attempts with different inversion settings for better QR code recognition
-  - Enhanced error handling for camera access issues with detailed logging
-  - Improved QR code data parsing to handle different formats (URLs, prefixed SKUs, etc.)
-  - Added comprehensive debugging information for troubleshooting QR detection
-  - Created unified scanner interface for both inventory management and order fulfillment tabs
-  - Added development test buttons to simulate QR code scanning for debugging
-- **Camera Configuration**: Optimized camera constraints to prioritize environment-facing camera for better QR code scanning
-- **Error Handling**: Enhanced camera permission and error detection with more specific user feedback messages
-- **Debug Features**: Added extensive console logging for QR code detection and camera issues to help diagnose problems
-
 ### July 30, 2025
 - **Fixed Subcategory Display Issue**: Resolved critical bug where clicking on parent categories (Flower, Concentrates) wasn't showing their subcategories
 - **Root Cause**: Backend returned hierarchical category structure with nested `children` arrays, but frontend expected flat array structure for filtering
