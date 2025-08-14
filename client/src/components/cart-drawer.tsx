@@ -100,10 +100,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       return;
     }
 
-    if (!validateForm()) {
-      return;
-    }
-
     setIsCheckingOut(true);
 
     try {
@@ -135,6 +131,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
       // Proceed with checkout if all items have sufficient stock
       setShowConfirmation(true);
+      setIsCheckingOut(false); // Reset checkout state when opening confirmation
 
     } catch (error) {
       toast({
@@ -142,14 +139,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         description: "Failed to validate stock. Please try again.",
         variant: "destructive",
       });
-      setIsCheckingOut(false); // Ensure checkout state is reset on error
-    } finally {
-      // Note: setIsCheckingOut(false) will be called if validation passes and setShowConfirmation is true,
-      // or if an error occurs. We don't want to set it to false here if validation passes,
-      // as the confirmation dialog is still pending.
-      if (!showConfirmation) { // Only reset if we didn't proceed to confirmation
-        setIsCheckingOut(false);
-      }
+      setIsCheckingOut(false);
     }
   };
 
