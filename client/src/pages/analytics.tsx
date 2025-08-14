@@ -637,7 +637,7 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <MetricCard title="Customer Satisfaction Score" value="4.8/5" change="+0.2" icon={Star} color="blue" />
             <MetricCard title="Customer Retention Rate" value="78.5%" change="+5.2%" icon={Heart} color="green" />
-            <MetricCard title="Churn Rate" value="21.5%" change="-5.2%" icon={TrendingUp} color="red" />
+            <MetricCard title="Average Purchase Frequency" value="2.3/month" change="+0.4" icon={RefreshCw} color="blue" />
             <MetricCard title="Customer Lifetime Value" value="$1,250" change="+12.1%" icon={Award} color="purple" />
           </div>
 
