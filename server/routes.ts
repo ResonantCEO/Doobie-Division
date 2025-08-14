@@ -11,7 +11,8 @@ import { setupAuth, isAuthenticated } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { orders, products, orderItems, eq, sql, desc, and, gte, lt, inArray } from "drizzle-orm";
+import { orders, products, orderItems } from "@shared/schema";
+import { eq, sql, desc, and, gte, lt, inArray } from "drizzle-orm";
 
 
 // Role-based middleware
