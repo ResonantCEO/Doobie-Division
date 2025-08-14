@@ -423,19 +423,23 @@ export default function AnalyticsPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie 
-                          data={categoryData.map((item, index) => ({
-                            ...item,
-                            fill: `hsl(var(--chart-${(index % 5) + 1}))`
-                          }))}
+                          data={categoryData.map((item, index) => {
+                            const colors = [
+                              '#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1',
+                              '#d084d0', '#87ceeb', '#dda0dd', '#98fb98', '#f0e68c'
+                            ];
+                            return {
+                              ...item,
+                              fill: colors[index % colors.length]
+                            };
+                          })}
                           cx="50%" 
                           cy="50%" 
                           outerRadius="70%" 
                           dataKey="value" 
                           label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                           fontSize={10}
-                        >
-                          {/* Removed the Cell mapping as fill is now directly applied */}
-                        </Pie>
+                        />
                         <ChartTooltip content={<ChartTooltipContent />} />
                       </PieChart>
                     </ResponsiveContainer>
