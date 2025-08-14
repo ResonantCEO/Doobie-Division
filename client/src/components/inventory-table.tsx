@@ -3,43 +3,40 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import EditProductModal from "@/components/modals/edit-product-modal";
+import StockAdjustmentModal from "@/components/modals/stock-adjustment-modal";
+import QRCodeModal from "@/components/modals/qr-code-modal";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import QRCodeModal from "@/components/modals/qr-code-modal";
-import { Edit, QrCode, Trash2, MoreHorizontal, Package, ChevronUp, ChevronDown, AlertTriangle } from "lucide-react";
-import type { Product, Category } from "@shared/schema";
-import { Checkbox } from "@/components/ui/checkbox";
+import { MoreHorizontal, Edit, QrCode, TrendingUp, TrendingDown, Package, Eye, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import type { Product, Category, User } from "@shared/schema";
 
-type SortField = 'name' | 'sku' | 'category' | 'price' | 'stock';
+type SortField = 'name' | 'sku' | 'category' | 'price' | 'stock' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 interface InventoryTableProps {
   products: (Product & { category: Category | null })[];
-  onStockAdjustment: (product: Product) => void;
-  onEditProduct?: (product: Product & { category: Category | null }) => void;
+  user: User | null | undefined;
+  selectedProducts: number[];
+  onSelectionChange: (productIds: number[]) => void;
 }
 
-export default function InventoryTable({ products, onStockAdjustment, onEditProduct }: InventoryTableProps) {
+export default function InventoryTable({ products, user, selectedProducts, onSelectionChange }: InventoryTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
-  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [adjustingStockProduct, setAdjustingStockProduct] = useState<Product | null>(null);
+  const [qrCodeProduct, setQrCodeProduct] = useState<Product | null>(null);
+  const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [showQRModal, setShowQRModal] = useState(false);
-  const [selectedProductForQR, setSelectedProductForQR] = useState<Product | null>(null);
-  const [qrCodeData, setQrCodeData] = useState<string>("");
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-
 
   const deleteProductMutation = useMutation({
     mutationFn: async (productId: number) => {
@@ -72,27 +69,95 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
     },
   });
 
-  const getStockBadge = (product: Product) => {
+  const getStatusBadge = (product: Product) => {
     if (product.stock === 0) {
-      return <Badge variant="destructive" className="status-out-of-stock">Out of Stock</Badge>;
+      return <Badge variant="destructive">Out of Stock</Badge>;
+    } else if (product.stock <= product.minStockThreshold) {
+      return <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">Low Stock</Badge>;
+    } else {
+      return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">In Stock</Badge>;
     }
-    if (product.stock <= product.minStockThreshold) {
-      return <Badge variant="secondary" className="status-low-stock">Low Stock</Badge>;
-    }
-    return null; // Don't show badge for in-stock items
   };
+
+  const getProductStatus = (product: Product): string => {
+    if (product.stock === 0) {
+      return 'out_of_stock';
+    } else if (product.stock <= product.minStockThreshold) {
+      return 'low_stock';
+    } else {
+      return 'in_stock';
+    }
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4" />;
+    }
+    return sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
+  };
+
+  const sortedProducts = [...products].sort((a, b) => {
+    let aValue: any;
+    let bValue: any;
+
+    switch (sortField) {
+      case 'name':
+        aValue = a.name.toLowerCase();
+        bValue = b.name.toLowerCase();
+        break;
+      case 'sku':
+        aValue = a.sku.toLowerCase();
+        bValue = b.sku.toLowerCase();
+        break;
+      case 'category':
+        aValue = a.category?.name?.toLowerCase() || '';
+        bValue = b.category?.name?.toLowerCase() || '';
+        break;
+      case 'price':
+        aValue = parseFloat(a.price);
+        bValue = parseFloat(b.price);
+        break;
+      case 'stock':
+        aValue = a.stock;
+        bValue = b.stock;
+        break;
+      case 'status':
+        const statusOrder = { 'out_of_stock': 0, 'low_stock': 1, 'in_stock': 2 };
+        aValue = statusOrder[getProductStatus(a) as keyof typeof statusOrder];
+        bValue = statusOrder[getProductStatus(b) as keyof typeof statusOrder];
+        break;
+      default:
+        aValue = a.name.toLowerCase();
+        bValue = b.name.toLowerCase();
+    }
+
+    if (aValue < bValue) {
+      return sortDirection === 'asc' ? -1 : 1;
+    }
+    if (aValue > bValue) {
+      return sortDirection === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
 
   const handleDeleteProduct = (product: Product) => {
-    setProductToDelete(product);
-    setDeleteConfirmOpen(true);
+    setEditingProduct(product); // Reusing editingProduct state for productToDelete for simplicity
+    setAdjustingStockProduct(null); // Clear other modals
+    setQrCodeProduct(null);
+    // Confirm dialog is handled directly in the JSX now
   };
 
-  const confirmDelete = () => {
-    if (productToDelete) {
-      deleteProductMutation.mutate(productToDelete.id);
-      setDeleteConfirmOpen(false);
-      setProductToDelete(null);
-    }
+  const confirmDelete = (productId: number) => {
+    deleteProductMutation.mutate(productId);
   };
 
   // QR code generation mutation
@@ -111,8 +176,8 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
       return response.json();
     },
     onSuccess: (data) => {
-      setQrCodeData(data.qrCode);
-      setShowQRModal(true);
+      setQrCodeProduct(products.find(p => p.id === qrCodeProduct?.id) || null); // Keep track of the product for the modal
+      // The actual QR code data will be passed to the modal
     },
     onError: (error: any) => {
       toast({
@@ -124,87 +189,19 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
   });
 
   const handleViewQRCode = (product: Product) => {
-    setSelectedProductForQR(product);
+    setQrCodeProduct(product);
+    setEditingProduct(null);
+    setAdjustingStockProduct(null);
     qrCodeMutation.mutate(product.id);
-  };
-
-  const handleSelectProduct = (productId: number) => {
-    const newSelected = new Set(selectedProducts);
-    if (newSelected.has(productId)) {
-      newSelected.delete(productId);
-    } else {
-      newSelected.add(productId);
-    }
-    setSelectedProducts(newSelected);
-  };
-
-  const handleSelectAll = () => {
-    if (selectedProducts.size === products.length) {
-      setSelectedProducts(new Set());
-    } else {
-      setSelectedProducts(new Set(products.map(p => p.id)));
-    }
   };
 
   const handleBulkAction = (action: string) => {
     toast({
       title: "Bulk Action",
-      description: `${action} applied to ${selectedProducts.size} products`,
+      description: `${action} applied to ${selectedProducts.length} products`,
     });
-    setSelectedProducts(new Set());
+    onSelectionChange([]); // Clear selection
   };
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
-
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return null;
-    return sortDirection === 'asc' ? 
-      <ChevronUp className="h-4 w-4 ml-1" /> : 
-      <ChevronDown className="h-4 w-4 ml-1" />;
-  };
-
-  const sortedProducts = [...products].sort((a, b) => {
-    if (!sortField) return 0;
-
-    let aValue: string | number;
-    let bValue: string | number;
-
-    switch (sortField) {
-      case 'name':
-        aValue = a.name.toLowerCase();
-        bValue = b.name.toLowerCase();
-        break;
-      case 'sku':
-        aValue = a.sku.toLowerCase();
-        bValue = b.sku.toLowerCase();
-        break;
-      case 'category':
-        aValue = (a.category?.name || '').toLowerCase();
-        bValue = (b.category?.name || '').toLowerCase();
-        break;
-      case 'price':
-        aValue = Number(a.price || 0);
-        bValue = Number(b.price || 0);
-        break;
-      case 'stock':
-        aValue = a.stock;
-        bValue = b.stock;
-        break;
-      default:
-        return 0;
-    }
-
-    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
 
   if (products.length === 0) {
     return (
@@ -218,11 +215,11 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-      {selectedProducts.size > 0 && (
+      {selectedProducts.length > 0 && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800 p-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <span className="text-sm font-medium text-blue-800 dark:text-blue-300">
-              {selectedProducts.size} products selected
+              {selectedProducts.length} products selected
             </span>
             <div className="flex flex-wrap gap-2">
               <Button 
@@ -243,7 +240,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
               <Button 
                 size="sm" 
                 variant="outline"
-                onClick={() => setSelectedProducts(new Set())}
+                onClick={() => onSelectionChange([])}
               >
                 Clear
               </Button>
@@ -256,12 +253,17 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
       <div className="md:hidden">
         <div className="divide-y divide-gray-200 dark:divide-gray-700">
           {sortedProducts.map((product) => (
-            <div key={product.id} className={`p-4 ${selectedProducts.has(product.id) ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}>
+            <div key={product.id} className={`p-4 ${selectedProducts.includes(product.id) ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}>
               <div className="flex items-start space-x-3">
-                <input
-                  type="checkbox"
-                  checked={selectedProducts.has(product.id)}
-                  onChange={() => handleSelectProduct(product.id)}
+                <Checkbox
+                  checked={selectedProducts.includes(product.id)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      onSelectionChange([...selectedProducts, product.id]);
+                    } else {
+                      onSelectionChange(selectedProducts.filter(id => id !== product.id));
+                    }
+                  }}
                   className="mt-1 rounded border-gray-300"
                 />
                 <Avatar className="h-12 w-12">
@@ -289,13 +291,13 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {onEditProduct && (
-                          <DropdownMenuItem onClick={() => onEditProduct(product)}>
+                        {user?.role === 'admin' && (
+                          <DropdownMenuItem onClick={() => setEditingProduct(product)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Edit Product
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => onStockAdjustment(product)}>
+                        <DropdownMenuItem onClick={() => setAdjustingStockProduct(product)}>
                           <Package className="h-4 w-4 mr-2" />
                           Adjust Stock
                         </DropdownMenuItem>
@@ -303,13 +305,15 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                           <QrCode className="h-4 w-4 mr-2" />
                           View QR Code
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDeleteProduct(product)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
+                        {user?.role === 'admin' && (
+                          <DropdownMenuItem 
+                            onClick={() => confirmDelete(product.id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -371,7 +375,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                           />
                         </div>
                       </div>
-                      {getStockBadge(product)}
+                      {getStatusBadge(product)}
                     </div>
                   </div>
                 </div>
@@ -401,68 +405,93 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
             <TableRow>
               <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedProducts.size === products.length && products.length > 0}
-                  onCheckedChange={handleSelectAll}
-                  className="rounded border-gray-300"
+                  checked={selectedProducts.length === sortedProducts.length && sortedProducts.length > 0}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      onSelectionChange(sortedProducts.map(p => p.id));
+                    } else {
+                      onSelectionChange([]);
+                    }
+                  }}
                 />
               </TableHead>
-              <TableHead 
-                className="cursor-pointer hover:bg-gray-50 select-none"
-                onClick={() => handleSort('name')}
-              >
-                <div className="flex items-center">
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSort('name')}
+                  className="h-auto p-0 font-semibold hover:bg-transparent"
+                >
                   Product
                   {getSortIcon('name')}
-                </div>
+                </Button>
               </TableHead>
-              <TableHead 
-                className="cursor-pointer hover:bg-gray-50 select-none"
-                onClick={() => handleSort('sku')}
-              >
-                <div className="flex items-center">
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSort('sku')}
+                  className="h-auto p-0 font-semibold hover:bg-transparent"
+                >
                   SKU
                   {getSortIcon('sku')}
-                </div>
+                </Button>
               </TableHead>
-              <TableHead 
-                className="cursor-pointer hover:bg-gray-50 select-none"
-                onClick={() => handleSort('category')}
-              >
-                <div className="flex items-center">
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSort('category')}
+                  className="h-auto p-0 font-semibold hover:bg-transparent"
+                >
                   Category
                   {getSortIcon('category')}
-                </div>
+                </Button>
               </TableHead>
-              <TableHead 
-                className="cursor-pointer hover:bg-gray-50 select-none"
-                onClick={() => handleSort('price')}
-              >
-                <div className="flex items-center">
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSort('price')}
+                  className="h-auto p-0 font-semibold hover:bg-transparent"
+                >
                   Price
                   {getSortIcon('price')}
-                </div>
+                </Button>
               </TableHead>
-              <TableHead 
-                className="cursor-pointer hover:bg-gray-50 select-none"
-                onClick={() => handleSort('stock')}
-              >
-                <div className="flex items-center">
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSort('stock')}
+                  className="h-auto p-0 font-semibold hover:bg-transparent"
+                >
                   Stock
                   {getSortIcon('stock')}
-                </div>
+                </Button>
               </TableHead>
               <TableHead>Physical</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSort('status')}
+                  className="h-auto p-0 font-semibold hover:bg-transparent"
+                >
+                  Status
+                  {getSortIcon('status')}
+                </Button>
+              </TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedProducts.map((product) => (
-              <TableRow key={product.id} className={selectedProducts.has(product.id) ? "bg-blue-50" : ""}>
+              <TableRow key={product.id} className={selectedProducts.includes(product.id) ? "bg-blue-50" : ""}>
                 <TableCell>
                   <Checkbox
-                    checked={selectedProducts.has(product.id)}
-                    onCheckedChange={() => handleSelectProduct(product.id)}
+                    checked={selectedProducts.includes(product.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        onSelectionChange([...selectedProducts, product.id]);
+                      } else {
+                        onSelectionChange(selectedProducts.filter(id => id !== product.id));
+                      }
+                    }}
                     className="rounded border-gray-300"
                   />
                 </TableCell>
@@ -559,7 +588,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => onStockAdjustment(product)}
+                      onClick={() => setAdjustingStockProduct(product)}
                       className="h-6 w-6 p-0 text-gray-600 dark:text-white hover:text-gray-900 dark:hover:text-white"
                       title="Adjust stock"
                     >
@@ -577,7 +606,7 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                     )}
                   </div>
                 </TableCell>
-                <TableCell>{getStockBadge(product)}</TableCell>
+                <TableCell>{getStatusBadge(product)}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -586,21 +615,29 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onEditProduct && onEditProduct(product)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Product
+                      {user?.role === 'admin' && (
+                        <DropdownMenuItem onClick={() => setEditingProduct(product)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Product
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={() => setAdjustingStockProduct(product)}>
+                        <Package className="h-4 w-4 mr-2" />
+                        Adjust Stock
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleViewQRCode(product)}>
                         <QrCode className="h-4 w-4 mr-2" />
                         View QR Code
                       </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => handleDeleteProduct(product)}
-                        className="text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
+                      {user?.role === 'admin' && (
+                        <DropdownMenuItem 
+                          onClick={() => confirmDelete(product.id)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -610,27 +647,32 @@ export default function InventoryTable({ products, onStockAdjustment, onEditProd
         </Table>
       </div>
 
-      {/* QR Code Modal */}
-      {selectedProductForQR && (
+      {/* Modals */}
+      {editingProduct && user?.role === 'admin' && (
+        <EditProductModal
+          isOpen={!!editingProduct}
+          onClose={() => setEditingProduct(null)}
+          product={editingProduct}
+        />
+      )}
+      {adjustingStockProduct && (
+        <StockAdjustmentModal
+          isOpen={!!adjustingStockProduct}
+          onClose={() => setAdjustingStockProduct(null)}
+          product={adjustingStockProduct}
+        />
+      )}
+      {qrCodeProduct && (
         <QRCodeModal
-          open={showQRModal}
-          onOpenChange={setShowQRModal}
-          product={selectedProductForQR}
-          qrCode={qrCodeData}
+          open={!!qrCodeProduct}
+          onOpenChange={(open) => {
+            if (!open) setQrCodeProduct(null);
+          }}
+          product={qrCodeProduct}
+          qrCode={qrCodeMutation.isSuccess && qrCodeProduct ? qrCodeMutation.data?.qrCode : ''}
           isLoading={qrCodeMutation.isPending}
         />
       )}
-
-      <ConfirmationDialog
-        open={deleteConfirmOpen}
-        onOpenChange={setDeleteConfirmOpen}
-        onConfirm={confirmDelete}
-        title="Delete Product"
-        description="Are you sure you want to delete this product? This action cannot be undone."
-        confirmText="Delete"
-        cancelText="Cancel"
-        variant="destructive"
-      />
     </div>
   );
 }
