@@ -25,6 +25,10 @@ import { db } from "./db";
 import { eq, desc, asc, and, or, like, lte, isNull, inArray, sql, exists, ilike } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
 
+// Create alias for assigned user joins
+import { alias } from "drizzle-orm/pg-core";
+const assignedUser = alias(users, 'assigned_user');
+
 export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
@@ -50,12 +54,13 @@ export interface IStorage {
   getLowStockProducts(): Promise<Product[]>;
 
   // Order operations
-  getOrders(filters?: { status?: string; customerId?: string }): Promise<Order[]>;
+  getOrders(filters?: { status?: string; statuses?: string[]; customerId?: string; assignedUserId?: string }): Promise<Order[]>;
   getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined>;
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
   fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void>;
   markOrderItemAsPacked(orderId: number, productId: number, userId: string): Promise<{ success: boolean; allPacked: boolean }>;
+  assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order>;
 
   // Analytics operations
   getSalesMetrics(days: number): Promise<{
@@ -73,6 +78,7 @@ export interface IStorage {
     returnRate: number;
     abandonedCartRate: number;
   }>;
+  getPeakPurchaseTimes(days?: number): Promise<{ time: string; orders: number; percentage: number }[]>;
 
   // Notification operations
   getNotifications(userId?: string): Promise<Notification[]>;
@@ -86,6 +92,7 @@ export interface IStorage {
   updateUserIdVerification(id: string, status: string): Promise<User>;
   getUsersPendingVerification(): Promise<User[]>;
   updateUser(id: string, userData: any): Promise<User>;
+  getStaffUsers(): Promise<User[]>;
 
   // User activity
   logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void>;
@@ -579,21 +586,52 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Order operations
-  async getOrders(filters?: { status?: string; customerId?: string }): Promise<Order[]>;
-  async getOrders(filters?: { status?: string; customerId?: string }): Promise<Order[]> {
-    let query = db.select().from(orders);
+  async getOrders(filters: { status?: string; statuses?: string[]; customerId?: string; assignedUserId?: string } = {}): Promise<Order[]> {
+    let query = db
+      .select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        customerId: orders.customerId,
+        customerName: orders.customerName,
+        customerEmail: orders.customerEmail,
+        customerPhone: orders.customerPhone,
+        shippingAddress: orders.shippingAddress,
+        total: orders.total,
+        status: orders.status,
+        paymentMethod: orders.paymentMethod,
+        assignedUserId: orders.assignedUserId,
+        notes: orders.notes,
+        createdAt: orders.createdAt,
+        updatedAt: orders.updatedAt,
+        assignedUser: {
+          id: assignedUser.id,
+          firstName: assignedUser.firstName,
+          lastName: assignedUser.lastName,
+          email: assignedUser.email,
+        },
+      })
+      .from(orders)
+      .leftJoin(assignedUser, eq(orders.assignedUserId, assignedUser.id));
 
     const conditions = [];
-    if (filters?.status) {
+    if (filters.status) {
       conditions.push(eq(orders.status, filters.status));
     }
-    if (filters?.customerId) {
-      conditions.push(eq(orders.customerId, filters.customerId));
+    if (filters.statuses) {
+      conditions.push(inArray(orders.status, filters.statuses));
+    }
+    if (filters.customerId) {
+      query = query.where(eq(orders.customerId, filters.customerId));
+    }
+
+    if (filters.assignedUserId) {
+      query = query.where(eq(orders.assignedUserId, filters.assignedUserId));
     }
 
     if (conditions.length > 0) {
       query = query.where(and(...conditions));
     }
+
 
     return await query.orderBy(desc(orders.createdAt));
   }
@@ -691,86 +729,21 @@ export class DatabaseStorage implements IStorage {
     return fullOrder!;
   }
 
-  async updateOrderStatus(id: number, status: string): Promise<Order>;
-  async updateOrderStatus(id: number, status: string): Promise<Order> {
-    // Get the current order with its items
-    const [currentOrder] = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.id, id));
+  async updateOrderStatus(orderId: number, status: string): Promise<Order> {
+    const [updatedOrder] = await db
+      .update(orders)
+      .set({ 
+        status, 
+        updatedAt: new Date() 
+      })
+      .where(eq(orders.id, orderId))
+      .returning();
 
-    if (!currentOrder) {
+    if (!updatedOrder) {
       throw new Error("Order not found");
     }
 
-    // If changing status to cancelled, restore stock for all unfulfilled items
-    if (status === 'cancelled' && currentOrder.status !== 'cancelled') {
-      const orderItemsData = await db
-        .select({
-          productId: orderItems.productId,
-          quantity: orderItems.quantity,
-          fulfilled: orderItems.fulfilled,
-          productName: orderItems.productName
-        })
-        .from(orderItems)
-        .where(eq(orderItems.orderId, id));
-
-      // Process stock restoration for unfulfilled items
-      for (const item of orderItemsData) {
-        if (!item.fulfilled && item.productId) {
-          try {
-            // Get current product stock
-            const [currentProduct] = await db
-              .select({ id: products.id, name: products.name, stock: products.stock })
-              .from(products)
-              .where(eq(products.id, item.productId));
-
-            if (currentProduct) {
-              const previousStock = currentProduct.stock;
-              const newStock = previousStock + item.quantity;
-
-              // Update product stock (restore stock only, physical inventory wasn't changed)
-              await db
-                .update(products)
-                .set({
-                  stock: newStock,
-                  updatedAt: new Date()
-                })
-                .where(eq(products.id, item.productId));
-
-              // Log the inventory restoration
-              await db.insert(inventoryLogs).values({
-                productId: item.productId,
-                type: 'stock_in',
-                quantity: item.quantity,
-                previousStock: previousStock,
-                newStock: newStock,
-                reason: `Order cancellation - Order #${currentOrder.orderNumber}`,
-                userId: null // System operation
-              });
-
-              console.log(`Restored ${item.quantity} units of ${currentProduct.name} (Product ID: ${item.productId})`);
-            }
-          } catch (error) {
-            console.error(`Error restoring stock for product ${item.productId}:`, error);
-            // Continue with other items instead of failing the entire operation
-          }
-        }
-      }
-    }
-
-    // Update the order status
-    const [updated] = await db
-      .update(orders)
-      .set({ status, updatedAt: new Date() })
-      .where(eq(orders.id, id))
-      .returning();
-
-    if (!updated) {
-      throw new Error("Failed to update order status");
-    }
-
-    return updated;
+    return updatedOrder;
   }
 
   async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void> {
@@ -905,6 +878,23 @@ export class DatabaseStorage implements IStorage {
     }
 
     return { success: true, allPacked };
+  }
+
+  async assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order> {
+    const [updatedOrder] = await db
+      .update(orders)
+      .set({ 
+        assignedUserId, 
+        updatedAt: new Date() 
+      })
+      .where(eq(orders.id, orderId))
+      .returning();
+
+    if (!updatedOrder) {
+      throw new Error("Order not found");
+    }
+
+    return updatedOrder;
   }
 
   // Analytics operations
@@ -1176,7 +1166,7 @@ export class DatabaseStorage implements IStorage {
     results.forEach(result => {
       const hour = Number(result.hour);
       const orderCount = Number(result.orderCount);
-      
+
       // Group into 2-hour time slots
       let timeRange: string;
       let startHour: number;
@@ -1355,11 +1345,24 @@ export class DatabaseStorage implements IStorage {
 
   async getUsersPendingVerification(): Promise<User[]>;
   async getUsersPendingVerification(): Promise<User[]> {
-    return await db
+    return db
       .select()
       .from(users)
       .where(eq(users.idVerificationStatus, 'pending'))
       .orderBy(desc(users.createdAt));
+  }
+
+  async getStaffUsers(): Promise<User[]> {
+    return db
+      .select()
+      .from(users)
+      .where(
+        and(
+          or(eq(users.role, 'staff'), eq(users.role, 'manager')),
+          eq(users.status, 'active')
+        )
+      )
+      .orderBy(asc(users.firstName), asc(users.lastName));
   }
 
   async updateUser(id: string, userData: any): Promise<User>;

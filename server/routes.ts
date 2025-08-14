@@ -401,10 +401,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Regular customers can only see their own orders
+      // Role-based filtering
       if (req.currentUser.role === 'customer') {
+        // Regular customers can only see their own orders
         filters.customerId = req.currentUser.id;
+      } else if (req.currentUser.role === 'staff') {
+        // Staff can only see orders assigned to them
+        filters.assignedUserId = req.currentUser.id;
       }
+      // Managers and admins can see all orders
 
       const orders = await storage.getOrders(filters);
       res.json(orders);
@@ -500,6 +505,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(order);
     } catch (error) {
       res.status(500).json({ message: "Failed to update order status" });
+    }
+  });
+
+  app.put('/api/orders/:id/assign', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { assignedUserId } = req.body;
+
+      if (!assignedUserId) {
+        return res.status(400).json({ message: "Assigned user ID is required" });
+      }
+
+      const order = await storage.assignOrderToUser(id, assignedUserId);
+      res.json(order);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to assign order" });
     }
   });
 
@@ -731,6 +752,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(users);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.get('/api/users/staff', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const staffUsers = await storage.getStaffUsers();
+      res.json(staffUsers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch staff users" });
     }
   });
 

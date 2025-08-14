@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import OrderTable from "@/components/order-table";
 import { useOrderNotifications } from "@/hooks/useOrderNotifications";
-import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw } from "lucide-react";
+import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw, UserCheck } from "lucide-react";
 import type { Order } from "@shared/schema";
+import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 
 export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");

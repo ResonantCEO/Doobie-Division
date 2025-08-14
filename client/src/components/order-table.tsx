@@ -16,13 +16,15 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { Eye, Edit, MessageSquare, MoreHorizontal, Package2 } from "lucide-react";
 import { format } from "date-fns";
-import type { Order } from "@shared/schema";
+import type { Order, User } from "@shared/schema";
 
 interface OrderTableProps {
   orders: Order[];
+  user: User | null | undefined; // Assuming user object contains role information
+  staffUsers: User[]; // Array of staff users to populate the dropdown
 }
 
-export default function OrderTable({ orders }: OrderTableProps) {
+export default function OrderTable({ orders, user, staffUsers }: OrderTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -60,6 +62,37 @@ export default function OrderTable({ orders }: OrderTableProps) {
     },
   });
 
+  const assignOrderMutation = useMutation({
+    mutationFn: async ({ orderId, assignedUserId }: { orderId: number; assignedUserId: string }) => {
+      await apiRequest("PUT", `/api/orders/${orderId}/assign`, { assignedUserId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({
+        title: "Success",
+        description: "Order assigned successfully",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to assign order",
+        variant: "destructive",
+      });
+    },
+  });
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
@@ -79,6 +112,10 @@ export default function OrderTable({ orders }: OrderTableProps) {
 
   const handleStatusUpdate = (orderId: number, status: string) => {
     updateStatusMutation.mutate({ orderId, status });
+  };
+
+  const handleAssignOrder = (orderId: number, assignedUserId: string) => {
+    assignOrderMutation.mutate({ orderId, assignedUserId });
   };
 
   const handleViewOrder = (orderId: number) => {
@@ -161,12 +198,12 @@ export default function OrderTable({ orders }: OrderTableProps) {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="text-sm">
                   <div className="font-medium text-gray-900 dark:text-gray-100">{order.customerName}</div>
                   <div className="text-gray-600 dark:text-gray-400">{order.customerEmail}</div>
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row gap-2 pt-2">
                   <Select
                     value={order.status}
@@ -211,13 +248,16 @@ export default function OrderTable({ orders }: OrderTableProps) {
       <div className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="text-gray-900 dark:text-white">Order Number</TableHead>
-              <TableHead className="text-gray-900 dark:text-white">Customer</TableHead>
-              <TableHead className="text-gray-900 dark:text-white">Total</TableHead>
-              <TableHead className="text-gray-900 dark:text-white">Status</TableHead>
-              <TableHead className="text-gray-900 dark:text-white">Date</TableHead>
-              <TableHead className="text-right text-gray-900 dark:text-white">Actions</TableHead>
+            <TableRow className="border-gray-700 dark:border-gray-700">
+              <TableHead className="text-gray-300 dark:text-gray-300">Order</TableHead>
+              <TableHead className="text-gray-300 dark:text-gray-300">Customer</TableHead>
+              <TableHead className="text-gray-300 dark:text-gray-300">Total</TableHead>
+              <TableHead className="text-gray-300 dark:text-gray-300">Status</TableHead>
+              <TableHead className="text-gray-300 dark:text-gray-300">Date</TableHead>
+              {(user?.role === 'admin' || user?.role === 'manager') && (
+                <TableHead className="text-gray-300 dark:text-gray-300">Assigned</TableHead>
+              )}
+              <TableHead className="text-gray-300 dark:text-gray-300">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -242,9 +282,38 @@ export default function OrderTable({ orders }: OrderTableProps) {
                 </TableCell>
                 <TableCell>{getStatusBadge(order.status)}</TableCell>
                 <TableCell className="text-gray-900 dark:text-white">
-                  {format(new Date(order.createdAt!), "MMM d, yyyy")}
+                  {order.createdAt ? format(new Date(order.createdAt), "MMM dd, yyyy") : "N/A"}
                 </TableCell>
-                <TableCell className="text-right">
+                {(user?.role === 'admin' || user?.role === 'manager') && (
+                  <TableCell>
+                    <Select
+                      value={order.assignedUserId || ""}
+                      onValueChange={(assignedUserId) => handleAssignOrder(order.id, assignedUserId)}
+                    >
+                      <SelectTrigger className="w-40 h-8 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
+                        <SelectValue placeholder="Assign to..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Unassigned</SelectItem>
+                        {staffUsers.map((staffUser) => (
+                          <SelectItem key={staffUser.id} value={staffUser.id}>
+                            {staffUser.firstName && staffUser.lastName
+                              ? `${staffUser.firstName} ${staffUser.lastName}`
+                              : staffUser.email || staffUser.id}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {order.assignedUser && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {order.assignedUser.firstName && order.assignedUser.lastName
+                          ? `${order.assignedUser.firstName} ${order.assignedUser.lastName}`
+                          : order.assignedUser.email}
+                      </div>
+                    )}
+                  </TableCell>
+                )}
+                <TableCell>
                   <div className="flex items-center justify-end space-x-2">
                     <Select
                       value={order.status}

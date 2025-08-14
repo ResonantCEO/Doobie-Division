@@ -99,6 +99,7 @@ export const orders = pgTable("orders", {
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   status: varchar("status").notNull().default("pending"), // pending, processing, shipped, delivered, cancelled
   paymentMethod: varchar("payment_method").notNull().default("cod"),
+  assignedUserId: varchar("assigned_user_id").references(() => users.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -172,6 +173,10 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     fields: [orders.customerId],
     references: [users.id],
   }),
+  assignedUser: one(users, {
+    fields: [orders.assignedUserId],
+    references: [users.id],
+  }),
   items: many(orderItems),
 }));
 
@@ -243,6 +248,7 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   total: z.string().or(z.number()).transform(val => String(val)),
   customerId: z.string().nullable().optional(),
   customerPhone: z.string().min(1, "Phone number is required"),
+  assignedUserId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 
@@ -273,7 +279,14 @@ export type Category = typeof categories.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
-export type Order = typeof orders.$inferSelect;
+export type Order = typeof orders.$inferSelect & {
+  assignedUser?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+  };
+};
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertInventoryLog = z.infer<typeof insertInventoryLogSchema>;
