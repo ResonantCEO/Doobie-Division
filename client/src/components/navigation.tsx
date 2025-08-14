@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Bell, Settings, LogOut, ShoppingBag, Package, BarChart3, Users, Home, Search, ShoppingCart, User, ChevronDown, Sun, Moon } from "lucide-react";
+import { Bell, Settings, LogOut, ShoppingBag, Package, BarChart3, Users, Home, Search, ShoppingCart, User, ChevronDown, Sun, Moon, QrCode } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/contexts/theme-context";
 import { useCart } from "@/contexts/cart-context";
@@ -65,7 +65,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   const tabs = [
     { id: "storefront", label: "Storefront", path: "/dashboard/storefront" },
     { id: "inventory", label: "Inventory Management", path: "/dashboard/inventory", roles: ["admin", "manager"] },
-    { id: "orders", label: "Orders", path: "/dashboard/orders", roles: ["admin", "manager"] },
+    { id: "orders", label: "Orders", path: "/dashboard/orders", roles: ["admin", "manager", "staff"] },
     { id: "analytics", label: "Analytics", path: "/dashboard/analytics", roles: ["admin", "manager"] },
     { id: "users", label: "User Management", path: "/dashboard/users", roles: ["admin"] },
     { id: "admin", label: "Admin", path: "/dashboard/admin", roles: ["admin"] },
@@ -211,7 +211,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                 <h1 className="text-xl font-bold text-primary cursor-pointer">Doobie Division!</h1>
               </Link>
             </div>
-            
+
             {/* Second row: Icons */}
             <div className="flex justify-center items-center space-x-4 pb-3">
               {/* Search */}
