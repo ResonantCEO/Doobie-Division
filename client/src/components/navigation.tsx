@@ -65,7 +65,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   const tabs = [
     { id: "storefront", label: "Storefront", path: "/dashboard/storefront" },
     { id: "inventory", label: "Inventory Management", path: "/dashboard/inventory", roles: ["admin", "manager"] },
-    { id: "orders", label: "Orders", path: "/dashboard/orders", roles: ["admin", "manager", "staff"] },
+    { id: "orders", label: "Orders", path: "/dashboard/orders", roles: ["admin", "manager"] },
     { id: "analytics", label: "Analytics", path: "/dashboard/analytics", roles: ["admin", "manager"] },
     { id: "users", label: "User Management", path: "/dashboard/users", roles: ["admin"] },
     { id: "admin", label: "Admin", path: "/dashboard/admin", roles: ["admin"] },

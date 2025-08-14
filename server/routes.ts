@@ -487,7 +487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/orders/:id/status', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+  app.put('/api/orders/:id/status', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { status } = req.body;
@@ -504,7 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Order item packing route (marks as packed without reducing physical inventory)
-  app.post('/api/orders/:id/pack-item', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
+  app.post('/api/orders/:id/pack-item', isAuthenticated, requireRole(['admin', 'manager']), async (req: any, res) => {
     try {
       const orderId = parseInt(req.params.id);
       const { productId } = req.body;
@@ -545,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Order item fulfillment route
-  app.post('/api/orders/:id/fulfill-item', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
+  app.post('/api/orders/:id/fulfill-item', isAuthenticated, requireRole(['admin', 'manager']), async (req: any, res) => {
     try {
       const orderId = parseInt(req.params.id);
       const { productId, quantity } = req.body;
