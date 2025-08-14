@@ -557,14 +557,14 @@ export default function AnalyticsPage() {
                       </div>
                     ))}
                   </div>
-                ) : topProducts.length === 0 ? (
+                ) : !topProducts || topProducts.length === 0 ? (
                   <div className="text-center py-8">
                     <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                     <p className="text-gray-500 dark:text-gray-400">No sales data available</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {topProducts.slice(0, 5).map((item, index) => (
+                    {topProducts?.slice(0, 5).map((item, index) => (
                       <div key={item.product.id} className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-10 w-10">

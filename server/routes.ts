@@ -155,6 +155,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Low stock products - Must come BEFORE /api/products/:id to avoid route conflict
+  app.get('/api/products/low-stock', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const products = await storage.getLowStockProducts();
+      res.json(products);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch low stock products" });
+    }
+  });
+
   app.get('/api/products/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -297,15 +307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Low stock products
-  app.get('/api/products/low-stock', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
-    try {
-      const products = await storage.getLowStockProducts();
-      res.json(products);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch low stock products" });
-    }
-  });
+
 
   // QR Code generation routes
   app.get('/api/products/:id/qr-code', isAuthenticated, requireRole(['admin', 'manager', 'customer']), async (req, res) => {

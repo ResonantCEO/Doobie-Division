@@ -544,7 +544,6 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getLowStockProducts(): Promise<Product[]>;
   async getLowStockProducts(): Promise<Product[]> {
     const lowStockProducts = await db
       .select({
