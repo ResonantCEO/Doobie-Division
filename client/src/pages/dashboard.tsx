@@ -61,7 +61,7 @@ export default function Dashboard() {
       case "admin":
         return user.role === 'admin' ? <AdminPage /> : <StorefrontPage />;
       case "scanner":
-        return user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <ScannerPage /> : <StorefrontPage />;
+        return user.role === 'admin' || user.role === 'manager' ? <ScannerPage /> : <StorefrontPage />;
       default:
         return <StorefrontPage />;
     }
