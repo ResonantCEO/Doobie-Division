@@ -93,6 +93,7 @@ export interface IStorage {
   getUsersPendingVerification(): Promise<User[]>;
   updateUser(id: string, userData: any): Promise<User>;
   getStaffUsers(): Promise<User[]>;
+  getUsersWithRole(role: string): Promise<User[]>;
 
   // User activity
   logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void>;
@@ -537,7 +538,7 @@ export class DatabaseStorage implements IStorage {
     // Check if product needs low stock notification
     if (newStock <= product.minStockThreshold && product.stock > product.minStockThreshold) {
       // Get all admin users for notification
-      const adminUsers = await db.select().from(users).where(eq(users.role, 'admin'));
+      const adminUsers = await this.getUsersWithRole('admin');
 
       for (const admin of adminUsers) {
         await this.createNotification({
@@ -1363,6 +1364,15 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(asc(users.firstName), asc(users.lastName));
+  }
+
+  async getUsersWithRole(role: string): Promise<User[]> {
+    const usersWithRole = await db
+      .select()
+      .from(users)
+      .where(eq(users.role, role));
+
+    return usersWithRole;
   }
 
   async updateUser(id: string, userData: any): Promise<User>;

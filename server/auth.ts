@@ -138,6 +138,28 @@ export async function setupAuth(app: Express) {
           });
         });
       } else {
+        // Create notifications for all admin users about the new registration
+        try {
+          const adminUsers = await storage.getUsersWithRole('admin');
+          for (const admin of adminUsers) {
+            await storage.createNotification({
+              userId: admin.id,
+              type: 'user_approval',
+              title: 'New User Registration',
+              message: `${firstName} ${lastName} (${normalizedEmail}) has registered and is awaiting approval`,
+              data: { 
+                newUserId: userId, 
+                userEmail: normalizedEmail,
+                userName: `${firstName} ${lastName}`,
+                idVerificationStatus: idImageUrl ? "pending" : "not_provided"
+              },
+            });
+          }
+        } catch (error) {
+          console.error('Error creating admin notifications for new user registration:', error);
+          // Don't fail the registration if notification creation fails
+        }
+
         res.status(201).json({ 
           user: null, 
           message: "Registration successful! Your account is pending approval by an administrator." 
