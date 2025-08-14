@@ -153,6 +153,17 @@ export default function AnalyticsPage() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  // Fetch peak purchase times
+  const { data: peakTimesData = [], isLoading: peakTimesLoading } = useQuery<{ time: string; orders: number; percentage: number }[]>({
+    queryKey: ["/api/analytics/peak-times", days],
+    queryFn: async () => {
+      const response = await fetch(`/api/analytics/peak-times/${days}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch peak purchase times");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   const inventoryData = [
     { product: "Premium Flower", current: 45, threshold: 20, turnover: 2.3 },
     { product: "CBD Gummies", current: 12, threshold: 15, turnover: 4.1 },
@@ -172,7 +183,7 @@ export default function AnalyticsPage() {
 
   const totalCustomers = orderBreakdown.reduce((acc, item) => acc + item.count, 0);
 
-  if (salesLoading || productsLoading || lowStockLoading || customersLoading || salesTrendLoading || categoryLoading || advancedLoading) {
+  if (salesLoading || productsLoading || lowStockLoading || customersLoading || salesTrendLoading || categoryLoading || advancedLoading || peakTimesLoading) {
     return (
       <div className="space-y-6 p-6">
         <div className="animate-pulse space-y-4">
@@ -587,22 +598,36 @@ export default function AnalyticsPage() {
               <CardTitle>Peak Purchase Times</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {[
-                  { time: "12:00 PM - 2:00 PM", orders: "145", percentage: "32%" },
-                  { time: "6:00 PM - 8:00 PM", orders: "98", percentage: "22%" },
-                  { time: "8:00 PM - 10:00 PM", orders: "87", percentage: "19%" },
-                  { time: "10:00 AM - 12:00 PM", orders: "76", percentage: "17%" }
-                ].map((item, i) => (
-                  <div key={i} className="flex justify-between items-center">
-                    <span className="text-sm font-medium">{item.time}</span>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm">{item.orders} orders</span>
-                      <Badge variant="outline">{item.percentage}</Badge>
+              {peakTimesLoading ? (
+                <div className="space-y-4">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="flex justify-between items-center">
+                      <Skeleton className="h-4 w-32" />
+                      <div className="flex items-center space-x-2">
+                        <Skeleton className="h-4 w-16" />
+                        <Skeleton className="h-6 w-12" />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : peakTimesData.length === 0 ? (
+                <div className="text-center py-8">
+                  <Clock className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500 dark:text-gray-400">No order data available for peak time analysis</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {peakTimesData.map((item, i) => (
+                    <div key={i} className="flex justify-between items-center">
+                      <span className="text-sm font-medium">{item.time}</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm">{item.orders} orders</span>
+                        <Badge variant="outline">{item.percentage}%</Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

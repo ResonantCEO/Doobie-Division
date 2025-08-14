@@ -1129,6 +1129,108 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  async getPeakPurchaseTimes(days: number = 30): Promise<{ time: string; orders: number; percentage: number }[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // Get hourly order counts
+    const results = await db
+      .select({
+        hour: sql<number>`EXTRACT(HOUR FROM ${orders.createdAt})`,
+        orderCount: sql<number>`COUNT(*)`,
+      })
+      .from(orders)
+      .where(
+        and(
+          sql`${orders.createdAt} >= ${startDate}`,
+          or(
+            eq(orders.status, 'shipped'),
+            eq(orders.status, 'processing'),
+            eq(orders.status, 'pending'),
+            eq(orders.status, 'completed')
+          )
+        )
+      )
+      .groupBy(sql`EXTRACT(HOUR FROM ${orders.createdAt})`)
+      .orderBy(desc(sql`COUNT(*)`));
+
+    // Calculate total orders for percentage calculation
+    const totalOrders = results.reduce((sum, result) => sum + Number(result.orderCount), 0);
+
+    if (totalOrders === 0) {
+      return [];
+    }
+
+    // Group hours into time ranges and format results
+    const timeRanges: { [key: string]: { orders: number; startHour: number; endHour: number } } = {};
+
+    results.forEach(result => {
+      const hour = Number(result.hour);
+      const orderCount = Number(result.orderCount);
+      
+      // Group into 2-hour time slots
+      let timeRange: string;
+      let startHour: number;
+      let endHour: number;
+
+      if (hour >= 10 && hour < 12) {
+        timeRange = "10:00 AM - 12:00 PM";
+        startHour = 10;
+        endHour = 12;
+      } else if (hour >= 12 && hour < 14) {
+        timeRange = "12:00 PM - 2:00 PM";
+        startHour = 12;
+        endHour = 14;
+      } else if (hour >= 18 && hour < 20) {
+        timeRange = "6:00 PM - 8:00 PM";
+        startHour = 18;
+        endHour = 20;
+      } else if (hour >= 20 && hour < 22) {
+        timeRange = "8:00 PM - 10:00 PM";
+        startHour = 20;
+        endHour = 22;
+      } else if (hour >= 22 || hour < 2) {
+        timeRange = "10:00 PM - 12:00 AM";
+        startHour = 22;
+        endHour = 24;
+      } else if (hour >= 8 && hour < 10) {
+        timeRange = "8:00 AM - 10:00 AM";
+        startHour = 8;
+        endHour = 10;
+      } else if (hour >= 14 && hour < 16) {
+        timeRange = "2:00 PM - 4:00 PM";
+        startHour = 14;
+        endHour = 16;
+      } else if (hour >= 16 && hour < 18) {
+        timeRange = "4:00 PM - 6:00 PM";
+        startHour = 16;
+        endHour = 18;
+      } else {
+        // Other hours grouped as "Other times"
+        timeRange = "Other times";
+        startHour = hour;
+        endHour = hour + 1;
+      }
+
+      if (!timeRanges[timeRange]) {
+        timeRanges[timeRange] = { orders: 0, startHour, endHour };
+      }
+      timeRanges[timeRange].orders += orderCount;
+    });
+
+    // Convert to array and calculate percentages
+    const peakTimes = Object.entries(timeRanges)
+      .map(([time, data]) => ({
+        time,
+        orders: data.orders,
+        percentage: Math.round((data.orders / totalOrders) * 100),
+      }))
+      .sort((a, b) => b.orders - a.orders) // Sort by order count descending
+      .slice(0, 6); // Take top 6 time ranges
+
+    return peakTimes;
+  }
+
   // Notification operations
   async getNotifications(userId?: string): Promise<Notification[]>;
   async getNotifications(userId?: string): Promise<Notification[]> {

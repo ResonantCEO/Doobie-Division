@@ -690,6 +690,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Peak purchase times
+  app.get('/api/analytics/peak-times/:days?', isAuthenticated, async (req, res) => {
+    try {
+      const days = parseInt(req.params.days || '30');
+      const peakTimes = await storage.getPeakPurchaseTimes(days);
+      res.json(peakTimes);
+    } catch (error) {
+      console.error('Peak purchase times error:', error);
+      res.status(500).json({ message: "Failed to fetch peak purchase times" });
+    }
+  });
+
   // Notification routes
   app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
     try {
