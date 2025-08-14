@@ -215,12 +215,12 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-      {selectedProducts.length > 0 && (
+      {selectedProducts && selectedProducts.length > 0 && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800 p-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <span className="text-sm font-medium text-blue-800 dark:text-blue-300">
               {selectedProducts.length} products selected
-            </span>
+            </span></div>
             <div className="flex flex-wrap gap-2">
               <Button 
                 size="sm" 
@@ -253,15 +253,15 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
       <div className="md:hidden">
         <div className="divide-y divide-gray-200 dark:divide-gray-700">
           {sortedProducts.map((product) => (
-            <div key={product.id} className={`p-4 ${selectedProducts.includes(product.id) ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}>
+            <div key={product.id} className={`p-4 ${selectedProducts && selectedProducts.includes(product.id) ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}>
               <div className="flex items-start space-x-3">
                 <Checkbox
-                  checked={selectedProducts.includes(product.id)}
+                  checked={selectedProducts ? selectedProducts.includes(product.id) : false}
                   onCheckedChange={(checked) => {
                     if (checked) {
-                      onSelectionChange([...selectedProducts, product.id]);
+                      onSelectionChange([...(selectedProducts || []), product.id]);
                     } else {
-                      onSelectionChange(selectedProducts.filter(id => id !== product.id));
+                      onSelectionChange((selectedProducts || []).filter(id => id !== product.id));
                     }
                   }}
                   className="mt-1 rounded border-gray-300"
@@ -405,7 +405,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
             <TableRow>
               <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedProducts.length === sortedProducts.length && sortedProducts.length > 0}
+                  checked={selectedProducts && selectedProducts.length === sortedProducts.length && sortedProducts.length > 0}
                   onCheckedChange={(checked) => {
                     if (checked) {
                       onSelectionChange(sortedProducts.map(p => p.id));
@@ -481,15 +481,15 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
           </TableHeader>
           <TableBody>
             {sortedProducts.map((product) => (
-              <TableRow key={product.id} className={selectedProducts.includes(product.id) ? "bg-blue-50" : ""}>
+              <TableRow key={product.id} className={selectedProducts && selectedProducts.includes(product.id) ? "bg-blue-50" : ""}>
                 <TableCell>
                   <Checkbox
-                    checked={selectedProducts.includes(product.id)}
+                    checked={selectedProducts ? selectedProducts.includes(product.id) : false}
                     onCheckedChange={(checked) => {
                       if (checked) {
-                        onSelectionChange([...selectedProducts, product.id]);
+                        onSelectionChange([...(selectedProducts || []), product.id]);
                       } else {
-                        onSelectionChange(selectedProducts.filter(id => id !== product.id));
+                        onSelectionChange((selectedProducts || []).filter(id => id !== product.id));
                       }
                     }}
                     className="rounded border-gray-300"
