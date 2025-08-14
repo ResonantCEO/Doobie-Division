@@ -1,10 +1,14 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock } from "lucide-react";
+import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Order } from "@shared/schema";
 
@@ -16,6 +20,19 @@ interface OrderDetailsModalProps {
 
 export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalProps) {
   const [fullOrder, setFullOrder] = useState<Order | null>(null);
+  const [scanningMode, setScanningMode] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanningError, setScanningError] = useState<string>("");
+  const [lastScanTime, setLastScanTime] = useState(0);
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number>();
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch complete order details including items when modal opens
   const { data: orderDetails, isLoading } = useQuery({
@@ -42,6 +59,179 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
       setFullOrder(order);
     }
   }, [orderDetails, order]);
+
+  // Update order item status mutation
+  const updateItemStatusMutation = useMutation({
+    mutationFn: async ({ orderId, productId }: { orderId: number; productId: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/pack-item`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ productId })
+      });
+      if (!response.ok) throw new Error('Failed to update item status');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Item Packed",
+        description: "Order item status updated to packed",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+      setScanningMode(false);
+      setSelectedItemId(null);
+      stopScanning();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update item status",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Start camera for QR scanning
+  const startScanning = async () => {
+    try {
+      setScanningError("");
+      
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera not supported on this device");
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+        setIsScanning(true);
+        
+        videoRef.current.onloadedmetadata = () => {
+          detectQRCode();
+        };
+      }
+    } catch (error: any) {
+      console.error('Camera access error:', error);
+      let errorMessage = "Unable to access camera.";
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage = "Camera permission denied. Please allow camera access and try again.";
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = "No camera found on this device.";
+      }
+      
+      setScanningError(errorMessage);
+      setIsScanning(false);
+      
+      toast({
+        title: "Camera Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Stop camera
+  const stopScanning = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    setIsScanning(false);
+    setScanningError("");
+  }, []);
+
+  // QR code detection
+  const detectQRCode = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current || !isScanning) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA && context) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+      import('jsqr').then(({ default: jsQR }) => {
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        if (code) {
+          const now = Date.now();
+          if (now - lastScanTime > 2000) {
+            setLastScanTime(now);
+            handleQRCodeDetected(code.data);
+          }
+        }
+      }).catch((error) => {
+        console.warn('jsQR not available:', error);
+      });
+    }
+
+    if (isScanning) {
+      animationFrameRef.current = requestAnimationFrame(detectQRCode);
+    }
+  }, [isScanning, lastScanTime]);
+
+  // Handle QR code detection
+  const handleQRCodeDetected = (qrData: string) => {
+    if (!selectedItemId || !fullOrder) return;
+    
+    const selectedItem = fullOrder.items?.find(item => item.id === selectedItemId);
+    if (!selectedItem) return;
+
+    // Extract SKU from QR data (assuming QR contains just the SKU)
+    const scannedSku = qrData.trim();
+    
+    // Check if scanned SKU matches the selected item's SKU
+    if (selectedItem.productSku === scannedSku) {
+      updateItemStatusMutation.mutate({
+        orderId: fullOrder.id,
+        productId: selectedItem.productId!
+      });
+    } else {
+      toast({
+        title: "Wrong Item",
+        description: `Scanned ${scannedSku} but expected ${selectedItem.productSku}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleItemClick = (itemId: number, item: any) => {
+    if (item.fulfilled) return; // Don't allow scanning already fulfilled items
+    
+    setSelectedItemId(itemId);
+    setScanningMode(true);
+  };
+
+  const cancelScanning = () => {
+    setScanningMode(false);
+    setSelectedItemId(null);
+    stopScanning();
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopScanning();
+    };
+  }, [stopScanning]);
 
   // Debug logging
   console.log('Order prop:', order);
@@ -150,11 +340,73 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
             {/* Order Items */}
             <Separator />
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Order Items</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Order Items</h3>
+                {scanningMode && (
+                  <Button onClick={cancelScanning} variant="outline" size="sm">
+                    <X className="h-4 w-4 mr-1" />
+                    Cancel
+                  </Button>
+                )}
+              </div>
+              
+              {scanningMode && selectedItemId && (
+                <Card className="border-blue-500">
+                  <CardContent className="p-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Scan className="h-5 w-5 text-blue-500" />
+                        <h4 className="font-medium">Scan Item to Mark as Packed</h4>
+                      </div>
+                      
+                      {scanningError && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{scanningError}</AlertDescription>
+                        </Alert>
+                      )}
+                      
+                      {!isScanning ? (
+                        <Button onClick={startScanning} className="w-full">
+                          <Camera className="h-4 w-4 mr-2" />
+                          Start Camera Scanner
+                        </Button>
+                      ) : (
+                        <div className="relative">
+                          <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="w-full max-w-sm mx-auto rounded-lg border-2 border-blue-500"
+                          />
+                          <canvas ref={canvasRef} className="hidden" />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="border-2 border-white border-dashed w-32 h-32 rounded-lg animate-pulse">
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Scan className="h-6 w-6 text-white animate-spin" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
               {displayOrder.items && displayOrder.items.length > 0 ? (
                 <div className="space-y-3">
                   {displayOrder.items.map((item: any, index: number) => (
-                    <div key={item.id || index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <div 
+                      key={item.id || index} 
+                      className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                        item.fulfilled 
+                          ? "bg-gray-50 dark:bg-gray-700/50" 
+                          : "bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600/50 cursor-pointer"
+                      } ${selectedItemId === item.id ? "ring-2 ring-blue-500" : ""}`}
+                      onClick={() => !item.fulfilled && handleItemClick(item.id, item)}
+                    >
                       <div className="flex-1">
                         <h4 className="font-medium text-sm text-white">{item.productName || item.product_name || "Unknown Product"}</h4>
                         <p className="text-xs text-white">
@@ -163,14 +415,17 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                         <p className="text-xs text-white">
                           ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
                         </p>
+                        {!item.fulfilled && (
+                          <p className="text-xs text-blue-400 mt-1">Click to scan and mark as packed</p>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="font-medium text-sm text-white">${item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00"}</p>
                         <div className="flex items-center space-x-2 mt-1">
                           {item.fulfilled ? (
-                            <Badge variant="default" className="text-xs">
+                            <Badge variant="default" className="text-xs bg-green-600">
                               <CheckCircle className="h-3 w-3 mr-1" />
-                              Fulfilled
+                              Packed
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="text-xs">

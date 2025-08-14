@@ -55,6 +55,7 @@ export interface IStorage {
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
   fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<any>;
+  markOrderItemAsPacked(orderId: number, productId: number, userId: string): Promise<any>;
 
   // Analytics operations
   getSalesMetrics(days: number): Promise<{
@@ -776,6 +777,48 @@ export class DatabaseStorage implements IStorage {
     }
 
     return { success: true, allFulfilled };
+  }
+
+  async markOrderItemAsPacked(orderId: number, productId: number, userId: string) {
+    // Mark order item as packed (fulfilled) without reducing physical inventory
+    await db
+      .update(orderItems)
+      .set({ fulfilled: true })
+      .where(and(
+        eq(orderItems.orderId, orderId),
+        eq(orderItems.productId, productId)
+      ));
+
+    // Log the packing activity
+    await db.insert(inventoryLogs).values({
+      productId,
+      userId,
+      type: 'packing',
+      quantity: 0, // No inventory change for packing
+      reason: `Order item packed - Order #${orderId}`,
+      createdAt: new Date()
+    });
+
+    // Check if all items in the order are packed
+    const orderItemsResult = await db
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.orderId, orderId));
+
+    const allPacked = orderItemsResult.every(item => item.fulfilled);
+
+    // If all items are packed, update order status to processing
+    if (allPacked) {
+      await db
+        .update(orders)
+        .set({
+          status: 'processing',
+          updatedAt: new Date()
+        })
+        .where(eq(orders.id, orderId));
+    }
+
+    return { success: true, allPacked };
   }
 
   // Analytics operations

@@ -503,6 +503,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Order item packing route (marks as packed without reducing physical inventory)
+  app.post('/api/orders/:id/pack-item', isAuthenticated, requireRole(['admin', 'manager']), async (req: any, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const { productId } = req.body;
+
+      if (!productId) {
+        return res.status(400).json({ message: "Product ID is required" });
+      }
+
+      // Get the order and verify it exists
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Check if order is in a packable status
+      if (!['pending', 'processing'].includes(order.status)) {
+        return res.status(400).json({ message: "Order cannot be packed in its current status" });
+      }
+
+      // Verify the product is part of this order
+      const orderItem = order.items?.find(item => item.productId === productId);
+      if (!orderItem) {
+        return res.status(400).json({ message: "Product is not part of this order" });
+      }
+
+      if (orderItem.fulfilled) {
+        return res.status(400).json({ message: "This order item has already been packed" });
+      }
+
+      // Mark the item as packed (fulfilled)
+      await storage.markOrderItemAsPacked(orderId, productId, req.currentUser.id);
+
+      res.status(200).json({ message: "Order item marked as packed successfully" });
+    } catch (error) {
+      console.error('Order packing error:', error);
+      res.status(500).json({ message: "Failed to mark order item as packed" });
+    }
+  });
+
   // Order item fulfillment route
   app.post('/api/orders/:id/fulfill-item', isAuthenticated, requireRole(['admin', 'manager']), async (req: any, res) => {
     try {
