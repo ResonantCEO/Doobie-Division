@@ -22,7 +22,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, and, or, like, lte, isNull, inArray, sql, exists, ilike, gte } from "drizzle-orm";
+import { eq, desc, asc, and, or, like, lte, isNull, inArray, sql, exists, ilike } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
 
 export interface IStorage {
@@ -73,17 +73,6 @@ export interface IStorage {
     returnRate: number;
     abandonedCartRate: number;
   }>;
-  getPeakPurchaseTimes(days?: number): Promise<{ time: string; orders: number; percentage: number }[]>;
-  getInventoryMetrics(): Promise<{
-    stockTurnoverRate: number;
-    inventoryValue: number;
-    lowStockItems: number;
-    outOfStockItems: number;
-    totalProducts: number;
-  }>;
-  getInventoryAgingReport(): Promise<any[]>;
-  getSupplierPerformance(): Promise<any[]>;
-
 
   // Notification operations
   getNotifications(userId?: string): Promise<Notification[]>;
@@ -105,17 +94,14 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  // Constructor to access db instance
-  private db = db;
-
   // User operations
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await this.db.select().from(users).where(eq(users.id, id));
+    const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await this.db
+    const [user] = await db
       .insert(users)
       .values(userData)
       .onConflictDoUpdate({
@@ -155,7 +141,7 @@ export class DatabaseStorage implements IStorage {
       role
     };
 
-    const [newUser] = await this.db
+    const [newUser] = await db
       .insert(users)
       .values(userData)
       .returning();
@@ -163,7 +149,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await this.db
+    const result = await db
       .select()
       .from(users)
       .where(eq(users.email, email));
@@ -172,7 +158,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserPassword(id: string, hashedPassword: string): Promise<void> {
-    await this.db
+    await db
       .update(users)
       .set({ password: hashedPassword, updatedAt: new Date() })
       .where(eq(users.id, id));
@@ -180,7 +166,7 @@ export class DatabaseStorage implements IStorage {
 
   async getUserCount(): Promise<number> {
     try {
-      const result = await this.db.select({ count: sql`count(*)` }).from(users);
+      const result = await db.select({ count: sql`count(*)` }).from(users);
       return parseInt(result[0].count as string);
     } catch (error) {
       console.error("Error getting user count:", error);
@@ -189,9 +175,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Category operations
-  async getCategories(): Promise<(Category & { children?: Category[] })[]>;
+  async getCategories(): Promise<(Category & { children?: Category[] })>;
   async getCategories(): Promise<(Category & { children?: Category[] })[]> {
-    const allCategories = await this.db.select().from(categories)
+    const allCategories = await db.select().from(categories)
       .where(eq(categories.isActive, true))
       .orderBy(categories.sortOrder, categories.name);
 
@@ -221,12 +207,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
-    const [newCategory] = await this.db.insert(categories).values(category).returning();
+    const [newCategory] = await db.insert(categories).values(category).returning();
     return newCategory;
   }
 
   async updateCategory(id: number, updates: Partial<InsertCategory>): Promise<Category> {
-    const [updatedCategory] = await this.db
+    const [updatedCategory] = await db
       .update(categories)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(categories.id, id))
@@ -236,24 +222,24 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCategory(id: number): Promise<void> {
     // Check if category has children
-    const children = await this.db.select().from(categories).where(eq(categories.parentId, id));
+    const children = await db.select().from(categories).where(eq(categories.parentId, id));
     if (children.length > 0) {
       throw new Error("Cannot delete category with subcategories");
     }
 
     // Check if category has products
-    const productsInCategory = await this.db.select().from(products).where(eq(products.categoryId, id));
+    const productsInCategory = await db.select().from(products).where(eq(products.categoryId, id));
     if (productsInCategory.length > 0) {
       throw new Error("Cannot delete category with products");
     }
 
-    await this.db.delete(categories).where(eq(categories.id, id));
+    await db.delete(categories).where(eq(categories.id, id));
   }
 
   // Optimized helper function to get all descendant category IDs
   private async getDescendantCategoryIds(categoryId: number): Promise<number[]> {
     // Use a more efficient single query to get children
-    const directChildren = await this.db
+    const directChildren = await db
       .select({ id: categories.id })
       .from(categories)
       .where(and(eq(categories.parentId, categoryId), eq(categories.isActive, true)));
@@ -274,14 +260,14 @@ export class DatabaseStorage implements IStorage {
     categoryIds?: number[];
     search?: string;
     status?: string;
-  }): Promise<(Product & { category: Category | null })[]>;
+  }): Promise<(Product & { category: Category | null })>;
   async getProducts(filters?: {
     categoryId?: number;
     categoryIds?: number[];
     search?: string;
     status?: string;
   }): Promise<(Product & { category: Category | null })[]> {
-    let query = this.db
+    let query = db
       .select({
         id: products.id,
         name: products.name,
@@ -314,7 +300,7 @@ export class DatabaseStorage implements IStorage {
 
       // Recursive function to get all descendants
       const getAllDescendants = async (parentId: number): Promise<number[]> => {
-        const directChildren = await this.db
+        const directChildren = await db
           .select({ id: categories.id })
           .from(categories)
           .where(and(eq(categories.parentId, parentId), eq(categories.isActive, true)));
@@ -349,7 +335,7 @@ export class DatabaseStorage implements IStorage {
         or(
           eq(products.categoryId, filters.categoryId),
           exists(
-            this.db
+            db
               .select({ id: categories.id })
               .from(categories)
               .where(
@@ -392,7 +378,7 @@ export class DatabaseStorage implements IStorage {
 
   async getProduct(id: number): Promise<(Product & { category: Category | null })>;
   async getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined> {
-    const [product] = await this.db
+    const [product] = await db
       .select({
         ...products,
         category: categories,
@@ -412,7 +398,7 @@ export class DatabaseStorage implements IStorage {
       updatedAt: new Date()
     };
 
-    const [newProduct] = await this.db
+    const [newProduct] = await db
       .insert(products)
       .values(processedProduct)
       .returning();
@@ -426,7 +412,7 @@ export class DatabaseStorage implements IStorage {
       updateData.physicalInventory = productData.stock;
     }
 
-    const [product] = await this.db.update(products)
+    const [product] = await db.update(products)
       .set({
         ...updateData,
         updatedAt: new Date()
@@ -443,7 +429,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProduct(id: number): Promise<void> {
     // Check if product is referenced in any order items from pending or processing orders
-    const orderItemsInActiveOrders = await this.db
+    const orderItemsInActiveOrders = await db
       .select({ count: sql<number>`COUNT(*)` })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
@@ -463,14 +449,14 @@ export class DatabaseStorage implements IStorage {
 
     // For order items in non-active orders (cancelled, completed, shipped),
     // set product_id to null to preserve order history while allowing product deletion
-    await this.db
+    await db
       .update(orderItems)
       .set({ productId: null })
       .where(
         and(
           eq(orderItems.productId, id),
           exists(
-            this.db
+            db
               .select({ id: orders.id })
               .from(orders)
               .where(
@@ -488,10 +474,10 @@ export class DatabaseStorage implements IStorage {
       );
 
     // Delete related inventory logs
-    await this.db.delete(inventoryLogs).where(eq(inventoryLogs.productId, id));
+    await db.delete(inventoryLogs).where(eq(inventoryLogs.productId, id));
 
     // Now delete the product
-    await this.db.delete(products).where(eq(products.id, id));
+    await db.delete(products).where(eq(products.id, id));
   }
 
   async adjustStock(productId: number, quantity: number, userId: string, reason: string): Promise<void> {
@@ -507,7 +493,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Get the product directly from the products table
-    const [product] = await this.db
+    const [product] = await db
       .select()
       .from(products)
       .where(eq(products.id, productId));
@@ -522,7 +508,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Update product stock and physical inventory
-    await this.db.update(products)
+    await db.update(products)
       .set({
         stock: newStock,
         physicalInventory: newStock, // Update physical inventory to match new stock
@@ -531,7 +517,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(products.id, productId));
 
     // Log the inventory change
-    await this.db.insert(inventoryLogs).values({
+    await db.insert(inventoryLogs).values({
       productId,
       type: quantity > 0 ? 'stock_in' : 'stock_out',
       quantity: Math.abs(quantity),
@@ -544,7 +530,7 @@ export class DatabaseStorage implements IStorage {
     // Check if product needs low stock notification
     if (newStock <= product.minStockThreshold && product.stock > product.minStockThreshold) {
       // Get all admin users for notification
-      const adminUsers = await this.db.select().from(users).where(eq(users.role, 'admin'));
+      const adminUsers = await db.select().from(users).where(eq(users.role, 'admin'));
 
       for (const admin of adminUsers) {
         await this.createNotification({
@@ -560,7 +546,7 @@ export class DatabaseStorage implements IStorage {
 
   async getLowStockProducts(): Promise<Product[]>;
   async getLowStockProducts(): Promise<Product[]> {
-    const lowStockProducts = await this.db
+    const lowStockProducts = await db
       .select({
         id: products.id,
         name: products.name,
@@ -586,7 +572,7 @@ export class DatabaseStorage implements IStorage {
   // Order operations
   async getOrders(filters?: { status?: string; customerId?: string }): Promise<Order[]>;
   async getOrders(filters?: { status?: string; customerId?: string }): Promise<Order[]> {
-    let query = this.db.select().from(orders);
+    let query = db.select().from(orders);
 
     const conditions = [];
     if (filters?.status) {
@@ -605,10 +591,10 @@ export class DatabaseStorage implements IStorage {
 
   async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] })>;
   async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined> {
-    const [order] = await this.db.select().from(orders).where(eq(orders.id, id));
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
     if (!order) return undefined;
 
-    const items = await this.db
+    const items = await db
       .select({
         ...orderItems,
         product: products,
@@ -630,7 +616,7 @@ export class DatabaseStorage implements IStorage {
     const datePrefix = `${month}${day}${year}`;
 
     // Find the highest sequential number for today
-    const todayOrders = await this.db
+    const todayOrders = await db
       .select({ orderNumber: orders.orderNumber })
       .from(orders)
       .where(sql`${orders.orderNumber} LIKE ${datePrefix + '-%'}`);
@@ -653,7 +639,7 @@ export class DatabaseStorage implements IStorage {
 
     // Double-check stock availability
     for (const item of items) {
-      const [product] = await this.db
+      const [product] = await db
         .select({ stock: products.stock, name: products.name })
         .from(products)
         .where(eq(products.id, item.productId));
@@ -668,7 +654,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Create the order
-    const [order] = await this.db.insert(orders).values({
+    const [order] = await db.insert(orders).values({
       ...orderData,
       orderNumber,
     }).returning();
@@ -679,11 +665,11 @@ export class DatabaseStorage implements IStorage {
       orderId: order.id,
     }));
 
-    await this.db.insert(orderItems).values(orderItemsData);
+    await db.insert(orderItems).values(orderItemsData);
 
     // Reduce stock for each item (but keep physical inventory unchanged until fulfillment)
     for (const item of items) {
-      await this.db.update(products)
+      await db.update(products)
         .set({
           stock: sql`${products.stock} - ${item.quantity}`,
           updatedAt: new Date()
@@ -699,7 +685,7 @@ export class DatabaseStorage implements IStorage {
   async updateOrderStatus(id: number, status: string): Promise<Order>;
   async updateOrderStatus(id: number, status: string): Promise<Order> {
     // Get the current order with its items
-    const [currentOrder] = await this.db
+    const [currentOrder] = await db
       .select()
       .from(orders)
       .where(eq(orders.id, id));
@@ -710,7 +696,7 @@ export class DatabaseStorage implements IStorage {
 
     // If changing status to cancelled, restore stock for all unfulfilled items
     if (status === 'cancelled' && currentOrder.status !== 'cancelled') {
-      const orderItemsData = await this.db
+      const orderItemsData = await db
         .select({
           productId: orderItems.productId,
           quantity: orderItems.quantity,
@@ -725,7 +711,7 @@ export class DatabaseStorage implements IStorage {
         if (!item.fulfilled && item.productId) {
           try {
             // Get current product stock
-            const [currentProduct] = await this.db
+            const [currentProduct] = await db
               .select({ id: products.id, name: products.name, stock: products.stock })
               .from(products)
               .where(eq(products.id, item.productId));
@@ -735,7 +721,7 @@ export class DatabaseStorage implements IStorage {
               const newStock = previousStock + item.quantity;
 
               // Update product stock (restore stock only, physical inventory wasn't changed)
-              await this.db
+              await db
                 .update(products)
                 .set({
                   stock: newStock,
@@ -744,7 +730,7 @@ export class DatabaseStorage implements IStorage {
                 .where(eq(products.id, item.productId));
 
               // Log the inventory restoration
-              await this.db.insert(inventoryLogs).values({
+              await db.insert(inventoryLogs).values({
                 productId: item.productId,
                 type: 'stock_in',
                 quantity: item.quantity,
@@ -765,7 +751,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Update the order status
-    const [updated] = await this.db
+    const [updated] = await db
       .update(orders)
       .set({ status, updatedAt: new Date() })
       .where(eq(orders.id, id))
@@ -780,7 +766,7 @@ export class DatabaseStorage implements IStorage {
 
   async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void> {
     // Get the product
-    const product = await this.db.select().from(products).where(eq(products.id, productId)).limit(1);
+    const product = await db.select().from(products).where(eq(products.id, productId)).limit(1);
     if (product.length === 0) {
       throw new Error("Product not found");
     }
@@ -799,7 +785,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Update product stock, physical inventory and mark order item as fulfilled
-    await this.db.transaction(async (tx) => {
+    await db.transaction(async (tx) => {
       // Update product stock and physical inventory
       await tx
         .update(products)
@@ -832,12 +818,12 @@ export class DatabaseStorage implements IStorage {
 
   async markOrderItemAsPacked(orderId: number, productId: number, userId: string): Promise<{ success: boolean; allPacked: boolean }> {
     // Get the product and order item
-    const product = await this.db.select().from(products).where(eq(products.id, productId)).limit(1);
+    const product = await db.select().from(products).where(eq(products.id, productId)).limit(1);
     if (product.length === 0) {
       throw new Error("Product not found");
     }
 
-    const orderItem = await this.db
+    const orderItem = await db
       .select()
       .from(orderItems)
       .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)))
@@ -861,7 +847,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Mark the order item as packed (fulfilled = true) and update physical inventory
-    await this.db.transaction(async (tx) => {
+    await db.transaction(async (tx) => {
       // Mark order item as packed
       await tx
         .update(orderItems)
@@ -891,7 +877,7 @@ export class DatabaseStorage implements IStorage {
     });
 
     // Check if all items in the order are packed
-    const orderItemsResult = await this.db
+    const orderItemsResult = await db
       .select()
       .from(orderItems)
       .where(eq(orderItems.orderId, orderId));
@@ -900,7 +886,7 @@ export class DatabaseStorage implements IStorage {
 
     // If all items are packed, update order status to processing
     if (allPacked) {
-      await this.db
+      await db
         .update(orders)
         .set({
           status: 'processing',
@@ -926,7 +912,7 @@ export class DatabaseStorage implements IStorage {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const [metrics] = await this.db
+    const [metrics] = await db
       .select({
         totalSales: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
         totalOrders: sql<number>`COUNT(*)`,
@@ -953,7 +939,7 @@ export class DatabaseStorage implements IStorage {
 
   async getTopProducts(limit: number): Promise<{ product: Product; sales: number; revenue: number }[]>;
   async getTopProducts(limit: number): Promise<{ product: Product; sales: number; revenue: number }[]> {
-    const results = await this.db
+    const results = await db
       .select({
         product: products,
         sales: sql<number>`SUM(${orderItems.quantity})`,
@@ -982,7 +968,7 @@ export class DatabaseStorage implements IStorage {
 
   async getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]>;
   async getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]> {
-    const results = await this.db
+    const results = await db
       .select({
         status: orders.status,
         count: sql<number>`COUNT(*)`,
@@ -1001,7 +987,7 @@ export class DatabaseStorage implements IStorage {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const results = await this.db
+    const results = await db
       .select({
         date: sql<string>`DATE_TRUNC('day', ${orders.createdAt})`,
         sales: sql<number>`SUM(CAST(${orders.total} AS NUMERIC))`,
@@ -1032,7 +1018,7 @@ export class DatabaseStorage implements IStorage {
 
   async getCategoryBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]>;
   async getCategoryBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]> {
-    const results = await this.db
+    const results = await db
       .select({
         categoryName: sql<string>`COALESCE(${categories.name}, 'Uncategorized')`,
         value: sql<number>`COUNT(${orderItems.id})`,
@@ -1076,7 +1062,7 @@ export class DatabaseStorage implements IStorage {
     prevEndDate.setDate(prevEndDate.getDate() - days);
 
     // Current period sales
-    const currentSalesResult = await this.db
+    const currentSalesResult = await db
       .select({
         totalSales: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
         totalOrders: sql<number>`COUNT(*)`,
@@ -1094,7 +1080,7 @@ export class DatabaseStorage implements IStorage {
       );
 
     // Previous period sales for growth calculation
-    const prevSalesResult = await this.db
+    const prevSalesResult = await db
       .select({
         totalSales: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
       })
@@ -1112,7 +1098,7 @@ export class DatabaseStorage implements IStorage {
       );
 
     // Return rate (cancelled orders / total orders)
-    const returnResult = await this.db
+    const returnResult = await db
       .select({
         cancelledOrders: sql<number>`COUNT(*)`,
       })
@@ -1148,7 +1134,7 @@ export class DatabaseStorage implements IStorage {
     startDate.setDate(startDate.getDate() - days);
 
     // Get hourly order counts
-    const results = await this.db
+    const results = await db
       .select({
         hour: sql<number>`EXTRACT(HOUR FROM ${orders.createdAt})`,
         orderCount: sql<number>`COUNT(*)`,
@@ -1181,7 +1167,7 @@ export class DatabaseStorage implements IStorage {
     results.forEach(result => {
       const hour = Number(result.hour);
       const orderCount = Number(result.orderCount);
-
+      
       // Group into 2-hour time slots
       let timeRange: string;
       let startHour: number;
@@ -1245,116 +1231,10 @@ export class DatabaseStorage implements IStorage {
     return peakTimes;
   }
 
-  async getInventoryMetrics(): Promise<{
-    stockTurnoverRate: number;
-    inventoryValue: number;
-    lowStockItems: number;
-    outOfStockItems: number;
-    totalProducts: number;
-  }> {
-    // Get stock turnover rate (assuming we calculate this based on sales vs average inventory)
-    const totalProducts = await this.db.select({ count: sql<number>`COUNT(*)` }).from(products);
-    const lowStockCount = await this.db
-      .select({ count: sql<number>`COUNT(*)` })
-      .from(products)
-      .where(sql`${products.stock} <= ${products.minStockThreshold}`);
-
-    const outOfStockCount = await this.db
-      .select({ count: sql<number>`COUNT(*)` })
-      .from(products)
-      .where(eq(products.stock, 0));
-
-    // Calculate total inventory value
-    const inventoryValue = await this.db
-      .select({ 
-        total: sql<number>`COALESCE(SUM(${products.stock} * CAST(${products.price} AS NUMERIC)), 0)`
-      })
-      .from(products)
-      .where(eq(products.isActive, true));
-
-    return {
-      stockTurnoverRate: 3.2, // This would need more complex calculation based on sales data
-      inventoryValue: Number(inventoryValue[0]?.total || 0),
-      lowStockItems: lowStockCount[0]?.count || 0,
-      outOfStockItems: outOfStockCount[0]?.count || 0,
-      totalProducts: totalProducts[0]?.count || 0
-    };
-  }
-
-  async getInventoryAgingReport() {
-    const result = await this.db
-      .select({
-        id: products.id,
-        name: products.name,
-        sku: products.sku,
-        stock: products.stock,
-        minStockThreshold: products.minStockThreshold,
-        createdAt: products.createdAt,
-        price: products.price
-      })
-      .from(products)
-      .where(eq(products.isActive, true))
-      .orderBy(desc(products.createdAt))
-      .limit(20);
-
-    return result.map(product => {
-      const daysSinceAdded = Math.floor((Date.now() - new Date(product.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-      const turnoverEstimate = product.stock > 0 ? Math.random() * 4 + 1 : 0; // Placeholder calculation
-
-      return {
-        product: product.name,
-        sku: product.sku,
-        current: product.stock,
-        threshold: product.minStockThreshold,
-        turnover: Number(turnoverEstimate.toFixed(1)),
-        daysInInventory: daysSinceAdded
-      };
-    });
-  }
-
-  async getSupplierPerformance() {
-    // This is placeholder data since we don't have supplier tables yet
-    // In a real implementation, this would query supplier and purchase order tables
-    return [
-      { 
-        name: "Green Valley Farms", 
-        onTime: "98%", 
-        quality: "A+", 
-        orders: "45",
-        totalValue: 15420,
-        lastDelivery: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      },
-      { 
-        name: "Premium Extracts Co.", 
-        onTime: "92%", 
-        quality: "A", 
-        orders: "23",
-        totalValue: 8930,
-        lastDelivery: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
-      },
-      { 
-        name: "Local Grow House", 
-        onTime: "87%", 
-        quality: "B+", 
-        orders: "18",
-        totalValue: 5670,
-        lastDelivery: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000)
-      },
-      { 
-        name: "Artisan Accessories", 
-        onTime: "95%", 
-        quality: "A", 
-        orders: "12",
-        totalValue: 3240,
-        lastDelivery: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
-      }
-    ];
-  }
-
   // Notification operations
   async getNotifications(userId?: string): Promise<Notification[]>;
   async getNotifications(userId?: string): Promise<Notification[]> {
-    let query = this.db.select().from(notifications);
+    let query = db.select().from(notifications);
 
     if (userId) {
       query = query.where(eq(notifications.userId, userId));
@@ -1365,19 +1245,19 @@ export class DatabaseStorage implements IStorage {
 
   async createNotification(notification: InsertNotification): Promise<Notification>;
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    const [newNotification] = await this.db.insert(notifications).values(notification).returning();
+    const [newNotification] = await db.insert(notifications).values(notification).returning();
     return newNotification;
   }
 
   async markNotificationAsRead(id: number): Promise<void>;
   async markNotificationAsRead(id: number): Promise<void> {
-    await this.db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
+    await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
   }
 
   // User management
-  async getUsersWithStats(): Promise<(User & { orderCount?: number })[]>;
+  async getUsersWithStats(): Promise<(User & { orderCount?: number })>;
   async getUsersWithStats(): Promise<(User & { orderCount?: number })[]> {
-    const results = await this.db
+    const results = await db
       .select({
         ...users,
         orderCount: sql<number>`COUNT(${orders.id})`,
@@ -1395,7 +1275,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserStatus(id: string, status: string): Promise<User>;
   async updateUserStatus(id: string, status: string): Promise<User> {
-    const [user] = await this.db
+    const [user] = await db
       .update(users)
       .set({ status, updatedAt: new Date() })
       .where(eq(users.id, id))
@@ -1419,7 +1299,7 @@ export class DatabaseStorage implements IStorage {
   async updateUserRole(id: string, role: string): Promise<User>;
   async updateUserRole(id: string, role: string): Promise<User> {
     // Get current user data first
-    const currentUser = await this.db
+    const currentUser = await db
       .select()
       .from(users)
       .where(eq(users.id, id))
@@ -1430,7 +1310,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Update the user role
-    const [updatedUser] = await this.db
+    const [updatedUser] = await db
       .update(users)
       .set({
         role: role,
@@ -1456,7 +1336,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserIdVerification(id: string, status: string): Promise<User>;
   async updateUserIdVerification(id: string, status: string): Promise<User> {
-    const [updated] = await this.db
+    const [updated] = await db
       .update(users)
       .set({ idVerificationStatus: status, updatedAt: new Date() })
       .where(eq(users.id, id))
@@ -1466,7 +1346,7 @@ export class DatabaseStorage implements IStorage {
 
   async getUsersPendingVerification(): Promise<User[]>;
   async getUsersPendingVerification(): Promise<User[]> {
-    return await this.db
+    return await db
       .select()
       .from(users)
       .where(eq(users.idVerificationStatus, 'pending'))
@@ -1475,7 +1355,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateUser(id: string, userData: any): Promise<User>;
   async updateUser(id: string, userData: any): Promise<User> {
-    const [user] = await this.db
+    const [user] = await db
       .update(users)
       .set({
         firstName: userData.firstName,
@@ -1506,7 +1386,7 @@ export class DatabaseStorage implements IStorage {
 
   async getInventoryLogs(filters?: { days?: number; type?: string; product?: string }): Promise<any[]>;
   async getInventoryLogs(filters?: { days?: number; type?: string; product?: string }): Promise<any[]> {
-    let query = this.db
+    let query = db
       .select({
         ...inventoryLogs,
         product: products,
@@ -1549,7 +1429,7 @@ export class DatabaseStorage implements IStorage {
     try {
       // For now, we'll use the inventory_logs table to store user activity
       // In a production system, you'd want a dedicated user_activity_logs table
-      await this.db.insert(inventoryLogs).values({
+      await db.insert(inventoryLogs).values({
         productId: null,
         userId: userId,
         type: 'user_activity',
@@ -1572,7 +1452,7 @@ export class DatabaseStorage implements IStorage {
       const { limit = 50 } = options;
 
       // Get user activity logs (if any exist)
-      const activityLogs = await this.db
+      const activityLogs = await db
         .select({
           id: inventoryLogs.id,
           action: inventoryLogs.reason,
@@ -1590,7 +1470,7 @@ export class DatabaseStorage implements IStorage {
         .limit(limit);
 
       // Get order-related activities
-      const orderActivities = await this.db
+      const orderActivities = await db
         .select({
           id: orders.id,
           action: sql<string>`'Order placed'`,
