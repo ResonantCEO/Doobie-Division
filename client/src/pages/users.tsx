@@ -180,7 +180,8 @@ export default function UsersPage() {
         return <Badge className="role-admin">Admin</Badge>;
       case "manager":
         return <Badge className="role-manager">Manager</Badge>;
-      
+      case "staff":
+        return <Badge className="role-manager">Staff</Badge>;
       case "customer":
       case "user":
         return <Badge className="role-customer">Customer</Badge>;
@@ -515,6 +516,7 @@ export default function UsersPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="customer">Customer</SelectItem>
+                            <SelectItem value="staff">Staff</SelectItem>
                             <SelectItem value="manager">Manager</SelectItem>
                             <SelectItem value="admin">Admin</SelectItem>
                           </SelectContent>

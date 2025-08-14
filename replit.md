@@ -130,6 +130,13 @@ The application is designed to be deployed on Replit with integrated authenticat
 
 ## Recent Changes
 
+### August 14, 2025
+- **Added Staff Role**: Created new "staff" role that duplicates all manager permissions and access
+- **Backend Updates**: Updated all API endpoints to include "staff" alongside "admin" and "manager" in requireRole middleware
+- **Frontend Updates**: Added staff role option to user management dropdown and role badge display with purple styling
+- **Role Hierarchy**: Customer → Staff → Manager → Admin (Staff and Manager have identical permissions)
+- **Impact**: Staff members can now access all inventory management, product creation, order processing, and analytics features
+
 ### July 30, 2025
 - **Fixed Subcategory Display Issue**: Resolved critical bug where clicking on parent categories (Flower, Concentrates) wasn't showing their subcategories
 - **Root Cause**: Backend returned hierarchical category structure with nested `children` arrays, but frontend expected flat array structure for filtering

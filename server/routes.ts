@@ -64,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
 
   // Image upload endpoint
-  app.post('/api/upload/product-image', isAuthenticated, requireRole(['admin', 'manager']), upload.single('image'), (req: any, res) => {
+  app.post('/api/upload/product-image', isAuthenticated, requireRole(['admin', 'manager', 'staff']), upload.single('image'), (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No image file provided' });
@@ -89,7 +89,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/categories', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  app.post('/api/categories', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     try {
       const categoryData = insertCategorySchema.parse(req.body);
       const category = await storage.createCategory(categoryData);
@@ -102,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/categories/:id', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  app.put('/api/categories/:id', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const categoryData = insertCategorySchema.partial().parse(req.body);
@@ -116,7 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/categories/:id', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  app.delete('/api/categories/:id', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteCategory(id);
@@ -156,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Low stock products - Must come BEFORE /api/products/:id to avoid route conflict
-  app.get('/api/products/low-stock', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  app.get('/api/products/low-stock', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     try {
       const products = await storage.getLowStockProducts();
       res.json(products);
@@ -180,7 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/products', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  app.post('/api/products', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     try {
       const productData = insertProductSchema.parse(req.body);
       const product = await storage.createProduct(productData);
@@ -206,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/products/:id', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  app.put('/api/products/:id', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const productData = insertProductSchema.partial().parse(req.body);
@@ -249,7 +249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stock adjustment route
-  app.post('/api/products/:id/adjust-stock', isAuthenticated, requireRole(['admin', 'manager']), async (req: any, res) => {
+  app.post('/api/products/:id/adjust-stock', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
       const productId = parseInt(req.params.id);
       const { quantity, reason } = req.body;
@@ -276,7 +276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk stock adjustment route for scanner operations
-  app.post('/api/products/bulk-adjust-stock', isAuthenticated, requireRole(['admin', 'manager']), async (req: any, res) => {
+  app.post('/api/products/bulk-adjust-stock', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
       const { adjustments } = req.body;
 
@@ -346,7 +346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/products/generate-qr-codes', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  app.post('/api/products/generate-qr-codes', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     try {
       const { productIds } = req.body;
 
@@ -487,7 +487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/orders/:id/status', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  app.put('/api/orders/:id/status', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { status } = req.body;
@@ -504,7 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Order item packing route (marks as packed without reducing physical inventory)
-  app.post('/api/orders/:id/pack-item', isAuthenticated, requireRole(['admin', 'manager']), async (req: any, res) => {
+  app.post('/api/orders/:id/pack-item', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
       const orderId = parseInt(req.params.id);
       const { productId } = req.body;
@@ -545,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Order item fulfillment route
-  app.post('/api/orders/:id/fulfill-item', isAuthenticated, requireRole(['admin', 'manager']), async (req: any, res) => {
+  app.post('/api/orders/:id/fulfill-item', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
       const orderId = parseInt(req.params.id);
       const { productId, quantity } = req.body;
@@ -799,7 +799,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User activity endpoint
-  app.get('/api/users/:id/activity', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+  app.get('/api/users/:id/activity', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     try {
       const userId = req.params.id;
       const { limit = 50, type } = req.query;
