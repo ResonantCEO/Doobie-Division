@@ -1471,43 +1471,55 @@ export class DatabaseStorage implements IStorage {
   async getUserActivity(userId: string, options: { limit?: number; type?: string } = {}): Promise<any[]>;
   async getUserActivity(userId: string, options: { limit?: number; type?: string } = {}): Promise<any[]> {
     try {
-      const { limit = 50 } = options;
+      const { limit = 50, type } = options;
 
-      // Get user activity logs (if any exist)
-      const activityLogs = await db
+      // Get inventory activity with proper null handling
+      const inventoryActivity = await db
         .select({
           id: inventoryLogs.id,
+          type: inventoryLogs.type,
           action: inventoryLogs.reason,
-          details: inventoryLogs.notes,
-          metadata: inventoryLogs.metadata,
+          details: inventoryLogs.quantity,
           timestamp: inventoryLogs.createdAt,
-          type: inventoryLogs.type
+          productName: sql<string | null>`${products.name}`,
+          productSku: sql<string | null>`${products.sku}`,
         })
         .from(inventoryLogs)
-        .where(and(
-          eq(inventoryLogs.userId, userId),
-          eq(inventoryLogs.type, 'user_activity')
-        ))
+        .leftJoin(products, eq(inventoryLogs.productId, products.id))
+        .where(eq(inventoryLogs.userId, userId))
         .orderBy(desc(inventoryLogs.createdAt))
         .limit(limit);
 
-      // Get order-related activities
-      const orderActivities = await db
+      // Get order activity
+      const orderActivity = await db
         .select({
           id: orders.id,
-          action: sql<string>`'Order placed'`,
-          details: sql<string>`CONCAT('Order #', ${orders.orderNumber}, ' - $', CAST(${orders.total} AS VARCHAR))`,
-          metadata: sql<string>`NULL`,
+          type: sql<string>`'order'`,
+          action: sql<string>`CASE 
+            WHEN ${orders.status} = 'pending' THEN 'Order Placed'
+            WHEN ${orders.status} = 'processing' THEN 'Order Processing'
+            WHEN ${orders.status} = 'shipped' THEN 'Order Shipped'
+            WHEN ${orders.status} = 'completed' THEN 'Order Completed'
+            WHEN ${orders.status} = 'cancelled' THEN 'Order Cancelled'
+            ELSE 'Order Updated'
+          END`,
+          details: orders.total,
           timestamp: orders.createdAt,
-          type: sql<string>`'order'`
+          productName: sql<string | null>`NULL`,
+          productSku: sql<string | null>`NULL`,
         })
         .from(orders)
         .where(eq(orders.customerId, userId))
         .orderBy(desc(orders.createdAt))
-        .limit(10);
+        .limit(limit);
 
-      // Combine and sort by timestamp
-      const allActivity = [...activityLogs, ...orderActivities]
+      // Combine and sort all activities with proper null handling
+      const allActivity = [...inventoryActivity, ...orderActivity]
+        .map(activity => ({
+          ...activity,
+          productName: activity.productName || null,
+          productSku: activity.productSku || null,
+        }))
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, limit);
 
