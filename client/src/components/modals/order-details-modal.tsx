@@ -52,10 +52,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
 
   useEffect(() => {
     if (orderDetails) {
-      console.log('Setting full order from orderDetails:', orderDetails);
+
       setFullOrder(orderDetails);
     } else if (order) {
-      console.log('Setting full order from order prop:', order);
+
       setFullOrder(order);
     }
   }, [orderDetails, order]);
@@ -237,10 +237,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
   }, [stopScanning]);
 
   // Debug logging
-  console.log('Order prop:', order);
-  console.log('Order details from API:', orderDetails);
-  console.log('Full order state:', fullOrder);
-  console.log('Modal open:', isOpen);
+
 
   if (!order) return null;
 

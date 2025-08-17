@@ -163,9 +163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (search) filters.search = search as string;
       if (status) filters.status = status as string;
 
-      console.log('Product query filters:', filters);
       const products = await storage.getProducts(filters);
-      console.log(`Found ${products.length} products`);
       res.json(products);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -282,7 +280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Valid quantity and reason are required" });
       }
 
-      console.log(`Adjusting stock for product ${productId}: ${quantity} units, reason: ${reason}`);
+
 
       await storage.adjustStock(productId, quantity, req.currentUser.id, reason);
       res.status(200).json({ message: "Stock adjusted successfully" });
@@ -460,8 +458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { order, items } = req.body;
 
-      console.log('Order data received:', JSON.stringify(order, null, 2));
-      console.log('Items data received:', JSON.stringify(items, null, 2));
+
 
       const orderData = insertOrderSchema.parse(order);
 
@@ -1056,11 +1053,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
   wss.on('connection', (ws) => {
-    console.log('WebSocket client connected');
+
     wsConnections.add(ws);
     
     ws.on('close', () => {
-      console.log('WebSocket client disconnected');
+
       wsConnections.delete(ws);
     });
     

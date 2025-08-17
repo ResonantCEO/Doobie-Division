@@ -230,8 +230,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
   });
 
   const onSubmit = (data: FormData) => {
-    console.log("Form submitted with data:", data);
-    console.log("Form errors:", form.formState.errors);
+
 
     // Validate required fields
     if (!data.name) {
@@ -280,7 +279,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       return;
     }
 
-    console.log("All validations passed, calling mutation...");
+
     createProductMutation.mutate(data);
   };
 
@@ -548,7 +547,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
               <Button 
                 type="submit" 
                 disabled={createProductMutation.isPending}
-                onClick={() => console.log("Create Product button clicked")}
+                onClick={() => {}}
               >
                 {createProductMutation.isPending ? "Creating..." : "Create Product"}
               </Button>

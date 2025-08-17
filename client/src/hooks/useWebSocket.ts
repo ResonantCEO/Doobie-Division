@@ -10,19 +10,19 @@ export function useWebSocket() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws`;
     
-    console.log('Connecting to WebSocket:', wsUrl);
+
     
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('WebSocket connected');
+
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        console.log('WebSocket message received:', message);
+
         
         switch (message.type) {
           case 'new_order':
@@ -38,7 +38,7 @@ export function useWebSocket() {
             break;
             
           default:
-            console.log('Unknown WebSocket message type:', message.type);
+
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -46,7 +46,7 @@ export function useWebSocket() {
     };
 
     ws.onclose = () => {
-      console.log('WebSocket disconnected');
+
     };
 
     ws.onerror = (error) => {

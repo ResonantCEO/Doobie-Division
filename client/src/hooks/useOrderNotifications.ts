@@ -41,7 +41,7 @@ export function useOrderNotifications() {
         }
       } catch (error) {
         // Silently handle errors to avoid spamming user
-        console.log('Notification check failed:', error);
+
       }
     };
 
