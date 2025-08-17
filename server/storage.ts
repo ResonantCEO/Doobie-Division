@@ -1226,7 +1226,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Notification operations
-  async getNotifications(userId?: string): Promise<Notification[]>;
   async getNotifications(userId?: string): Promise<Notification[]> {
     let query = db.select().from(notifications);
 
@@ -1237,19 +1236,16 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(desc(notifications.createdAt));
   }
 
-  async createNotification(notification: InsertNotification): Promise<Notification>;
   async createNotification(notification: InsertNotification): Promise<Notification> {
     const [newNotification] = await db.insert(notifications).values(notification).returning();
     return newNotification;
   }
 
-  async markNotificationAsRead(id: number): Promise<void>;
   async markNotificationAsRead(id: number): Promise<void> {
     await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
   }
 
   // User management
-  async getUsersWithStats(): Promise<(User & { orderCount?: number })>;
   async getUsersWithStats(): Promise<(User & { orderCount?: number })[]> {
     const results = await db
       .select({

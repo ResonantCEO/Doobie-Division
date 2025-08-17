@@ -500,6 +500,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const newOrder = await storage.createOrder(orderData, itemsData);
       
+      // Create notifications for staff, managers, and admins about the new order
+      try {
+        const staffUsers = await storage.getStaffUsers();
+        for (const user of staffUsers) {
+          await storage.createNotification({
+            userId: user.id,
+            type: 'new_order',
+            title: 'New Order Received',
+            message: `Order #${newOrder.orderNumber} from ${orderData.customerName} ($${orderData.total})`,
+            data: { orderId: newOrder.id, orderNumber: newOrder.orderNumber, total: orderData.total }
+          });
+        }
+      } catch (notificationError) {
+        console.error('Failed to create order notifications:', notificationError);
+        // Don't fail the order creation if notifications fail
+      }
+      
       // Broadcast new order to all connected WebSocket clients
       broadcastToClients({
         type: 'new_order',
