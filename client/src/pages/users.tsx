@@ -42,10 +42,12 @@ import {
   X,
   MoreHorizontal,
   Activity,
-  Save
+  Save,
+  ShoppingCart
 } from "lucide-react";
 import { format } from "date-fns";
 import type { User } from "@shared/schema";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function UsersPage() {
   const { toast } = useToast();
@@ -269,7 +271,7 @@ export default function UsersPage() {
 
   const handleSaveUser = (formData: FormData) => {
     if (!editingUser) return;
-    
+
     const userData = {
       firstName: formData.get('firstName') as string,
       lastName: formData.get('lastName') as string,
@@ -277,7 +279,7 @@ export default function UsersPage() {
       role: formData.get('role') as string,
       status: formData.get('status') as string,
     };
-    
+
     updateUserMutation.mutate({ userId: editingUser.id, userData });
   };
 
@@ -702,7 +704,7 @@ export default function UsersPage() {
               </div>
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
             {/* User Information Panel */}
             <div className="lg:col-span-1 space-y-4">
@@ -821,17 +823,17 @@ export default function UsersPage() {
                       </Badge>
                     </div>
                   </div>
-                  
-                  <div className="max-h-[500px] overflow-y-auto pr-2">
-                    {!Array.isArray(userActivity) || userActivity.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-500 text-lg">No activity found</p>
-                        <p className="text-xs text-gray-400 mt-2">Activities will appear here as the user interacts with the system</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {userActivity.map((activity, index) => {
+
+                  <ScrollArea className="h-[500px] pr-2">
+                    <div className="space-y-4 pr-4">
+                      {!Array.isArray(userActivity) || userActivity.length === 0 ? (
+                        <div className="text-center py-12">
+                          <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <p className="text-gray-500 text-lg">No activity found</p>
+                          <p className="text-xs text-gray-400 mt-2">Activities will appear here as the user interacts with the system</p>
+                        </div>
+                      ) : (
+                        userActivity.map((activity, index) => {
                           const getActivityIcon = (action: string, type: string) => {
                             if (type === 'order') return <ShoppingCart className="h-4 w-4 text-green-600" />;
                             if (action.includes('Login')) return <UserCheck className="h-4 w-4 text-blue-600" />;
@@ -874,12 +876,12 @@ export default function UsersPage() {
                                   </span>
                                 </div>
                               </div>
-                              
+
                               <div className="ml-8 flex space-x-2">
                                 {activity.type === 'order' && <Badge variant="secondary" className="text-xs">Order</Badge>}
                                 {activity.type === 'user_activity' && <Badge variant="outline" className="text-xs">System</Badge>}
                               </div>
-                              
+
                               {activity.metadata && (
                                 <div className="mt-3 ml-8">
                                   <details className="text-xs">
@@ -894,15 +896,15 @@ export default function UsersPage() {
                               )}
                             </div>
                           );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                        })
+                      )}
+                    </div>
+                  </ScrollArea>
                 </CardContent>
               </Card>
             </div>
           </div>
-          
+
           <div className="flex justify-end pt-4 border-t mt-6">
             <Button variant="outline" onClick={() => setActivityModalOpen(false)}>
               Close
