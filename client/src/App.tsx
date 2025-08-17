@@ -18,7 +18,7 @@ import DashboardPage from "@/pages/dashboard";
 import ProfilePage from "@/pages/profile";
 import NotFoundPage from "@/pages/not-found";
 import ScannerPage from "./pages/scanner";
-import CustomerOrdersPage from "@/pages/customer-orders";
+import CustomerOrdersWrapper from "@/pages/customer-orders-wrapper";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -31,6 +31,7 @@ function Router() {
         <>
           <Route path="/" component={Dashboard} />
           <Route path="/dashboard/:tab?" component={Dashboard} />
+          <Route path="/customer-orders" component={CustomerOrdersWrapper} />
         </>
       )}
       <Route path="/dashboard/*" component={Dashboard} />

@@ -72,16 +72,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <Navigation user={user} currentTab={tab} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Updated routing to include customer-orders page */}
-        {location === "/dashboard/storefront" && <StorefrontPage />}
-        {location === "/dashboard/inventory" && (user.role === 'admin' || user.role === 'manager' ? <InventoryPage /> : <StorefrontPage />)}
-        {location === "/dashboard/orders" && (user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <OrdersPage /> : <StorefrontPage />)}
-        {location === "/dashboard/analytics" && (user.role === 'admin' || user.role === 'manager' ? <AnalyticsPage /> : <StorefrontPage />)}
-        {location === "/dashboard/users" && (user.role === 'admin' ? <UsersPage /> : <StorefrontPage />)}
-        {location === "/dashboard/admin" && (user.role === 'admin' ? <AdminPage /> : <StorefrontPage />)}
-        {location === "/dashboard/scanner" && (user.role === 'admin' || user.role === 'manager' ? <ScannerPage /> : <StorefrontPage />)}
-        {location === "/customer-orders" && <CustomerOrdersPage />}
-        {location === "/dashboard" && <StorefrontPage />}
+        {renderTabContent()}
       </main>
     </div>
   );
