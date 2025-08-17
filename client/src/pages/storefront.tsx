@@ -23,7 +23,7 @@ export default function StorefrontPage() {
   }>>([]);
 
     // Fetch all discounted products for hero section (independent of filters)
-  const { data: allDiscountedProducts = [] } = useQuery<(Product & { category: Category | null })[]>({
+  const { data: allDiscountedProducts = [] } = useQuery({
     queryKey: ["/api/products/discounted"],
     queryFn: async () => {
       const response = await fetch('/api/products');
@@ -34,7 +34,7 @@ export default function StorefrontPage() {
       );
     },
     staleTime: 60000, // Cache for 1 minute
-    cacheTime: 300000, // Keep in cache for 5 minutes
+    gcTime: 300000, // Keep in cache for 5 minutes
   });
 
   // Image rotation timer for hero section
@@ -87,7 +87,7 @@ export default function StorefrontPage() {
 
 
   // Fetch products
-  const { data: allProducts = [], isLoading: productsLoading } = useQuery<(Product & { category: Category | null })[]>({
+  const { data: allProducts = [], isLoading: productsLoading } = useQuery({
     queryKey: ["/api/products", debouncedSearchQuery, selectedCategory, currentParentCategory],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -113,7 +113,7 @@ export default function StorefrontPage() {
       return response.json();
     },
     staleTime: 30000, // Cache for 30 seconds
-    cacheTime: 300000, // Keep in cache for 5 minutes
+    gcTime: 300000, // Keep in cache for 5 minutes
   });
 
   const handleCategoryFilter = (categoryId: number | null) => {
@@ -194,11 +194,7 @@ export default function StorefrontPage() {
     return hasStock && matchesDeals;
   });
 
-  // Debug logging to understand what's happening
-  console.log('All products from API:', allProducts.length);
-  console.log('Filtered products:', products.length);
-  console.log('Current parent category:', currentParentCategory);
-  console.log('Products:', products.map(p => ({ id: p.id, name: p.name, categoryId: p.category?.id, categoryName: p.category?.name })));
+
 
 
 

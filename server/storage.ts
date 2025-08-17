@@ -378,7 +378,6 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(desc(products.createdAt));
   }
 
-  async getProduct(id: number): Promise<(Product & { category: Category | null })>;
   async getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined> {
     const [product] = await db
       .select({
@@ -631,7 +630,6 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(desc(orders.createdAt));
   }
 
-  async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] })>;
   async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined> {
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
     if (!order) return undefined;
@@ -648,7 +646,6 @@ export class DatabaseStorage implements IStorage {
     return { ...order, items };
   }
 
-  async createOrder(orderData: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   async createOrder(orderData: InsertOrder, items: InsertOrderItem[]): Promise<Order> {
     // Generate date-based order number (MMDDYY-N)
     const now = new Date();
@@ -897,11 +894,6 @@ export class DatabaseStorage implements IStorage {
     totalSales: number;
     totalOrders: number;
     averageOrderValue: number;
-  }>;
-  async getSalesMetrics(days: number): Promise<{
-    totalSales: number;
-    totalOrders: number;
-    averageOrderValue: number;
   }> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
@@ -931,7 +923,6 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getTopProducts(limit: number): Promise<{ product: Product; sales: number; revenue: number }[]>;
   async getTopProducts(limit: number): Promise<{ product: Product; sales: number; revenue: number }[]> {
     const results = await db
       .select({
@@ -960,7 +951,6 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]>;
   async getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]> {
     const results = await db
       .select({
@@ -976,7 +966,6 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getSalesTrend(days: number): Promise<{ date: string; sales: number; orders: number; customers: number }[]>;
   async getSalesTrend(days: number): Promise<{ date: string; sales: number; orders: number; customers: number }[]> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
@@ -1010,7 +999,6 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getCategoryBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]>;
   async getCategoryBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]> {
     const results = await db
       .select({
@@ -1263,7 +1251,6 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async updateUserStatus(id: string, status: string): Promise<User>;
   async updateUserStatus(id: string, status: string): Promise<User> {
     const [user] = await db
       .update(users)
@@ -1286,7 +1273,6 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserRole(id: string, role: string): Promise<User>;
   async updateUserRole(id: string, role: string): Promise<User> {
     // Get current user data first
     const currentUser = await db
@@ -1324,7 +1310,6 @@ export class DatabaseStorage implements IStorage {
     return updatedUser;
   }
 
-  async updateUserIdVerification(id: string, status: string): Promise<User>;
   async updateUserIdVerification(id: string, status: string): Promise<User> {
     const [updated] = await db
       .update(users)
@@ -1334,7 +1319,6 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getUsersPendingVerification(): Promise<User[]>;
   async getUsersPendingVerification(): Promise<User[]> {
     return db
       .select()
@@ -1365,7 +1349,6 @@ export class DatabaseStorage implements IStorage {
     return usersWithRole;
   }
 
-  async updateUser(id: string, userData: any): Promise<User>;
   async updateUser(id: string, userData: any): Promise<User> {
     const [user] = await db
       .update(users)
@@ -1396,7 +1379,6 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getInventoryLogs(filters?: { days?: number; type?: string; product?: string }): Promise<any[]>;
   async getInventoryLogs(filters?: { days?: number; type?: string; product?: string }): Promise<any[]> {
     let query = db
       .select({
@@ -1436,7 +1418,6 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(desc(inventoryLogs.createdAt));
   }
 
-  async logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void>;
   async logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void> {
     try {
       // For now, we'll use the inventory_logs table to store user activity
@@ -1458,7 +1439,6 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getUserActivity(userId: string, options: { limit?: number; type?: string } = {}): Promise<any[]>;
   async getUserActivity(userId: string, options: { limit?: number; type?: string } = {}): Promise<any[]> {
     try {
       const { limit = 50, type } = options;
