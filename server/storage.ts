@@ -1275,6 +1275,19 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserStatus(id: string, status: string): Promise<User>;
   async updateUserStatus(id: string, status: string): Promise<User> {
+    console.log(`Updating user ${id} status to ${status}`);
+    
+    // Get current user first to log previous status
+    const currentUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .then(rows => rows[0]);
+
+    if (!currentUser) {
+      throw new Error("User not found");
+    }
+
     const [user] = await db
       .update(users)
       .set({ status, updatedAt: new Date() })
@@ -1282,15 +1295,17 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     if (!user) {
-      throw new Error("User not found");
+      throw new Error("Failed to update user status");
     }
+
+    console.log(`User ${id} status updated from ${currentUser.status} to ${status}`);
 
     // Log the status change
     await this.logUserActivity(
       id,
       'Status Updated',
-      `User status changed to ${status}`,
-      { previousStatus: user.status, newStatus: status }
+      `User status changed from ${currentUser.status} to ${status}`,
+      { previousStatus: currentUser.status, newStatus: status }
     );
 
     return user;
