@@ -16,6 +16,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -42,7 +43,8 @@ import {
   X,
   MoreHorizontal,
   Activity,
-  Save
+  Save,
+  ShoppingCart
 } from "lucide-react";
 import { format } from "date-fns";
 import type { User } from "@shared/schema";
@@ -56,6 +58,8 @@ export default function UsersPage() {
   const [activityModalOpen, setActivityModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userActivity, setUserActivity] = useState<any[]>([]);
+  const [editData, setEditData] = useState<any>({});
+
 
   // Fetch users with stats
   const { data: users = [], isLoading } = useQuery<(User & { orderCount?: number })[]>({
@@ -219,12 +223,21 @@ export default function UsersPage() {
     }
   };
 
-  const handleEditUser = (userId: string) => {
-    const user = users.find(u => u.id === userId);
-    if (user) {
-      setEditingUser(user);
-      setEditModalOpen(true);
-    }
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setEditData({
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role === 'user' ? 'customer' : user.role,
+      status: user.status,
+      address: user.address,
+      city: user.city,
+      state: user.state,
+      postalCode: user.postalCode,
+    });
+    setEditModalOpen(true);
   };
 
   const handleViewActivity = async (userId: string) => {
@@ -267,17 +280,21 @@ export default function UsersPage() {
     setPhotoModalOpen(true);
   };
 
-  const handleSaveUser = (formData: FormData) => {
+  const handleSaveUser = () => {
     if (!editingUser) return;
-    
+
     const userData = {
-      firstName: formData.get('firstName') as string,
-      lastName: formData.get('lastName') as string,
-      email: formData.get('email') as string,
-      role: formData.get('role') as string,
-      status: formData.get('status') as string,
+      firstName: editData.firstName,
+      lastName: editData.lastName,
+      email: editData.email,
+      role: editData.role,
+      status: editData.status,
+      address: editData.address,
+      city: editData.city,
+      state: editData.state,
+      postalCode: editData.postalCode,
     };
-    
+
     updateUserMutation.mutate({ userId: editingUser.id, userData });
   };
 
@@ -555,7 +572,7 @@ export default function UsersPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEditUser(user.id)}>
+                              <DropdownMenuItem onClick={() => handleEditUser(user)}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit User
                               </DropdownMenuItem>
@@ -606,87 +623,118 @@ export default function UsersPage() {
       </Dialog>
 
       {/* Edit User Modal */}
-      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
-          </DialogHeader>
-          {editingUser && (
-            <form action={handleSaveUser} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  id="firstName"
-                  name="firstName"
-                  defaultValue={editingUser.firstName || ''}
-                  required
-                />
+      {editingUser && (
+        <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    value={editData.firstName}
+                    onChange={(e) => setEditData({ ...editData, firstName: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={editData.lastName}
+                    onChange={(e) => setEditData({ ...editData, lastName: e.target.value })}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  id="lastName"
-                  name="lastName"
-                  defaultValue={editingUser.lastName || ''}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
-                  name="email"
                   type="email"
-                  defaultValue={editingUser.email}
-                  required
+                  value={editData.email}
+                  onChange={(e) => setEditData({ ...editData, email: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select name="role" defaultValue={editingUser.role === 'user' ? 'customer' : editingUser.role}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="customer">Customer</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="role">Role</Label>
+                  <Select value={editData.role} onValueChange={(value) => setEditData({ ...editData, role: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="customer">Customer</SelectItem>
+                      <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={editData.status} onValueChange={(value) => setEditData({ ...editData, status: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select name="status" defaultValue={editingUser.status}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="suspended">Suspended</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div>
+                <Label htmlFor="address">Address</Label>
+                <Input
+                  id="address"
+                  value={editData.address}
+                  onChange={(e) => setEditData({ ...editData, address: e.target.value })}
+                />
               </div>
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEditModalOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={updateUserMutation.isPending}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </Button>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    value={editData.city}
+                    onChange={(e) => setEditData({ ...editData, city: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="state">State/Province</Label>
+                  <Input
+                    id="state"
+                    value={editData.state}
+                    onChange={(e) => setEditData({ ...editData, state: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="postalCode">Postal Code</Label>
+                  <Input
+                    id="postalCode"
+                    value={editData.postalCode}
+                    onChange={(e) => setEditData({ ...editData, postalCode: e.target.value })}
+                  />
+                </div>
               </div>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingUser(null)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveUser}
+                disabled={updateUserMutation.isPending}
+              >
+                {updateUserMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* User Activity Modal */}
       <Dialog open={activityModalOpen} onOpenChange={setActivityModalOpen}>
@@ -702,7 +750,7 @@ export default function UsersPage() {
               </div>
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
             {/* User Information Panel */}
             <div className="lg:col-span-1 space-y-4">
@@ -821,7 +869,7 @@ export default function UsersPage() {
                       </Badge>
                     </div>
                   </div>
-                  
+
                   <div className="max-h-[500px] overflow-y-auto pr-2">
                     {!Array.isArray(userActivity) || userActivity.length === 0 ? (
                       <div className="text-center py-12">
@@ -874,12 +922,12 @@ export default function UsersPage() {
                                   </span>
                                 </div>
                               </div>
-                              
+
                               <div className="ml-8 flex space-x-2">
                                 {activity.type === 'order' && <Badge variant="secondary" className="text-xs">Order</Badge>}
                                 {activity.type === 'user_activity' && <Badge variant="outline" className="text-xs">System</Badge>}
                               </div>
-                              
+
                               {activity.metadata && (
                                 <div className="mt-3 ml-8">
                                   <details className="text-xs">
@@ -902,7 +950,7 @@ export default function UsersPage() {
               </Card>
             </div>
           </div>
-          
+
           <div className="flex justify-end pt-4 border-t mt-6">
             <Button variant="outline" onClick={() => setActivityModalOpen(false)}>
               Close
