@@ -578,7 +578,7 @@ export default function UsersPage() {
                                   <X className="h-4 w-4 mr-2" />
                                   Suspend User
                                 </DropdownMenuItem>
-                              )}m>
+                              )}
                               <DropdownMenuItem onClick={() => handleViewActivity(user.id)}>
                                 <History className="h-4 w-4 mr-2" />
                                 View Activity
