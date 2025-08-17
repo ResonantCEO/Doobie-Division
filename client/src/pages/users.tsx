@@ -66,20 +66,16 @@ export default function UsersPage() {
   // Update user status mutation
   const updateStatusMutation = useMutation({
     mutationFn: async ({ userId, status }: { userId: string; status: string }) => {
-      const response = await apiRequest("PUT", `/api/users/${userId}/status`, { status });
-      return response;
+      await apiRequest("PUT", `/api/users/${userId}/status`, { status });
     },
-    onSuccess: (data, variables) => {
-      console.log('Status update successful:', data, variables);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      queryClient.refetchQueries({ queryKey: ["/api/users"] });
       toast({
         title: "Success",
-        description: `User status updated to ${variables.status} successfully`,
+        description: "User status updated successfully",
       });
     },
-    onError: (error, variables) => {
-      console.error('Status update failed:', error, variables);
+    onError: (error) => {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -93,7 +89,7 @@ export default function UsersPage() {
       }
       toast({
         title: "Error",
-        description: `Failed to update user status: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        description: "Failed to update user status",
         variant: "destructive",
       });
     },
@@ -221,10 +217,6 @@ export default function UsersPage() {
     if (confirm("Are you sure you want to suspend this user?")) {
       updateStatusMutation.mutate({ userId, status: "suspended" });
     }
-  };
-
-  const handleActivateUser = (userId: string) => {
-    updateStatusMutation.mutate({ userId, status: "active" });
   };
 
   const handleEditUser = (userId: string) => {
@@ -567,18 +559,6 @@ export default function UsersPage() {
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit User
                               </DropdownMenuItem>
-                              {user.status === 'suspended' && (
-                                <DropdownMenuItem onClick={() => handleActivateUser(user.id)}>
-                                  <Check className="h-4 w-4 mr-2" />
-                                  Activate User
-                                </DropdownMenuItem>
-                              )}
-                              {user.status === 'active' && (
-                                <DropdownMenuItem onClick={() => handleSuspendUser(user.id)}>
-                                  <X className="h-4 w-4 mr-2" />
-                                  Suspend User
-                                </DropdownMenuItem>
-                              )}
                               <DropdownMenuItem onClick={() => handleViewActivity(user.id)}>
                                 <History className="h-4 w-4 mr-2" />
                                 View Activity
