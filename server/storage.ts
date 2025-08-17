@@ -268,12 +268,6 @@ export class DatabaseStorage implements IStorage {
     categoryIds?: number[];
     search?: string;
     status?: string;
-  }): Promise<(Product & { category: Category | null })>;
-  async getProducts(filters?: {
-    categoryId?: number;
-    categoryIds?: number[];
-    search?: string;
-    status?: string;
   }): Promise<(Product & { category: Category | null })[]> {
     let query = db
       .select({

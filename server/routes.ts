@@ -12,7 +12,7 @@ import { setupAuth, isAuthenticated } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { orders, products, orderItems } from "@shared/schema";
+import { orders, products, orderItems, users } from "@shared/schema";
 import { eq, sql, desc, and, gte, lt, inArray } from "drizzle-orm";
 
 // WebSocket connection store
@@ -802,8 +802,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/analytics/customers', isAuthenticated, async (req, res) => {
     try {
       const users = await storage.getUsersWithStats();
-      const totalCustomers = users.filter(user => user.role === 'customer').length;
-      const newCustomersThisMonth = users.filter(user => {
+      const totalCustomers = users.filter((user: any) => user.role === 'customer').length;
+      const newCustomersThisMonth = users.filter((user: any) => {
         const userDate = new Date(user.createdAt!);
         const now = new Date();
         const monthAgo = new Date(now.getFullYear(), now.getMonth(), 1);
