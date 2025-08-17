@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,16 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield } from "lucide-react";
 import { Camera } from "lucide-react";
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuContent,
+  NavigationMenuTrigger,
+  NavigationMenuIndicator,
+} from "@/components/ui/navigation-menu"
+
 
 interface NavigationProps {
   user: UserType;
@@ -33,6 +43,8 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   const { theme, toggleTheme } = useTheme();
   const { state: cartState } = useCart();
   const { toast } = useToast();
+  const location = useLocation();
+
 
   // Fetch notifications
   const { data: notifications = [], refetch } = useQuery<any[]>({
@@ -388,32 +400,51 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
       {/* Tab Navigation */}
       <div className="bg-background border-b border-border">
         <div className="max-w-7xl mx-auto">
-          <nav className="-mb-px overflow-x-auto scrollbar-hide">
-            <div className="flex space-x-1 sm:space-x-2 lg:space-x-4 px-2 sm:px-4 lg:px-8 min-w-max">
+          <NavigationMenu className="w-full justify-start">
+            <NavigationMenuList className="-mb-px overflow-x-auto scrollbar-hide">
               {visibleTabs.map((tab) => (
-                <Link key={tab.id} href={tab.path}>
-                  <button
-                    className={`whitespace-nowrap py-3 px-2 sm:px-4 lg:px-6 border-b-2 font-medium text-xs sm:text-sm transition-colors flex-shrink-0 min-w-fit touch-manipulation ${
-                      currentTab === tab.id
-                        ? "border-primary text-primary bg-primary/5"
-                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border hover:bg-muted/50"
-                    }`}
-                  >
-                    {/* Mobile: Show shortened labels */}
-                    <span className="block sm:hidden text-xs">
-                      {tab.label === "Inventory Management" ? "Stock" : 
-                       tab.label === "User Management" ? "Users" :
-                       tab.label === "Analytics" ? "Stats" :
-                       tab.label === "Storefront" ? "Shop" :
-                       tab.label}
-                    </span>
-                    {/* Desktop: Show full labels */}
-                    <span className="hidden sm:block">{tab.label}</span>
-                  </button>
-                </Link>
+                <NavigationMenuItem key={tab.id}>
+                  <Link href={tab.path}>
+                    <NavigationMenuLink
+                      className={`block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground ${
+                        currentTab === tab.id ? 'bg-accent text-accent-foreground' : ''
+                      }`}
+                    >
+                      <div className="text-sm font-medium leading-none">
+                        {/* Mobile: Show shortened labels */}
+                        <span className="block sm:hidden text-xs">
+                          {tab.label === "Inventory Management" ? "Stock" : 
+                           tab.label === "User Management" ? "Users" :
+                           tab.label === "Analytics" ? "Stats" :
+                           tab.label === "Storefront" ? "Shop" :
+                           tab.label}
+                        </span>
+                        {/* Desktop: Show full labels */}
+                        <span className="hidden sm:block">{tab.label}</span>
+                      </div>
+                    </NavigationMenuLink>
+                  </Link>
+                </NavigationMenuItem>
               ))}
-            </div>
-          </nav>
+              {/* Add My Orders link for customers */}
+              {user.role === 'customer' && (
+                <NavigationMenuItem>
+                  <Link href="/customer-orders">
+                    <NavigationMenuLink
+                      className={`block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground ${
+                        location.pathname === '/customer-orders' ? 'bg-accent text-accent-foreground' : ''
+                      }`}
+                    >
+                      <div className="text-sm font-medium leading-none">My Orders</div>
+                      <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">
+                        View your order history and status
+                      </p>
+                    </NavigationMenuLink>
+                  </Link>
+                </NavigationMenuItem>
+              )}
+            </NavigationMenuList>
+          </NavigationMenu>
         </div>
       </div>
     </>
