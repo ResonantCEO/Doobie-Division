@@ -35,7 +35,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   const { toast } = useToast();
 
   // Fetch notifications
-  const { data: notifications = [] } = useQuery<any[]>({
+  const { data: notifications = [], refetch } = useQuery<any[]>({
     queryKey: ["/api/notifications"],
   });
 
@@ -134,26 +134,59 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                         No notifications
                       </p>
                     ) : (
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {notifications.map((notification: any) => (
-                          <div
-                            key={notification.id}
-                            className={`p-2 rounded-md text-sm ${
-                              notification.isRead
-                                ? "bg-background"
-                                : "bg-muted"
-                            }`}
+                      <>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs text-muted-foreground">
+                            {unreadCount} unread
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto p-1 text-xs"
+                            onClick={async () => {
+                              try {
+                                // Mark all notifications as read
+                                await Promise.all(
+                                  notifications
+                                    .filter((n: any) => !n.isRead)
+                                    .map((n: any) =>
+                                      fetch(`/api/notifications/${n.id}/read`, {
+                                        method: 'PUT',
+                                        credentials: 'include',
+                                      })
+                                    )
+                                );
+                                // Refresh notifications
+                                refetch();
+                              } catch (error) {
+                                console.error('Failed to clear notifications:', error);
+                              }
+                            }}
                           >
-                            <div className="font-medium">{notification.title}</div>
-                            <div className="text-muted-foreground text-xs">
-                              {notification.message}
+                            Clear all
+                          </Button>
+                        </div>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {notifications.map((notification: any) => (
+                            <div
+                              key={notification.id}
+                              className={`p-2 rounded-md text-sm ${
+                                notification.isRead
+                                  ? "bg-background"
+                                  : "bg-muted"
+                              }`}
+                            >
+                              <div className="font-medium">{notification.title}</div>
+                              <div className="text-muted-foreground text-xs">
+                                {notification.message}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {new Date(notification.createdAt).toLocaleString()}
+                              </div>
                             </div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {new Date(notification.createdAt).toLocaleString()}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      </>
                     )}
                   </div>
                 </DropdownMenuContent>
@@ -251,26 +284,59 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                         No notifications
                       </p>
                     ) : (
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {notifications.map((notification: any) => (
-                          <div
-                            key={notification.id}
-                            className={`p-2 rounded-md text-sm ${
-                              notification.isRead
-                                ? "bg-background"
-                                : "bg-muted"
-                            }`}
+                      <>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs text-muted-foreground">
+                            {unreadCount} unread
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto p-1 text-xs"
+                            onClick={async () => {
+                              try {
+                                // Mark all notifications as read
+                                await Promise.all(
+                                  notifications
+                                    .filter((n: any) => !n.isRead)
+                                    .map((n: any) =>
+                                      fetch(`/api/notifications/${n.id}/read`, {
+                                        method: 'PUT',
+                                        credentials: 'include',
+                                      })
+                                    )
+                                );
+                                // Refresh notifications
+                                refetch();
+                              } catch (error) {
+                                console.error('Failed to clear notifications:', error);
+                              }
+                            }}
                           >
-                            <div className="font-medium">{notification.title}</div>
-                            <div className="text-muted-foreground text-xs">
-                              {notification.message}
+                            Clear all
+                          </Button>
+                        </div>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {notifications.map((notification: any) => (
+                            <div
+                              key={notification.id}
+                              className={`p-2 rounded-md text-sm ${
+                                notification.isRead
+                                  ? "bg-background"
+                                  : "bg-muted"
+                              }`}
+                            >
+                              <div className="font-medium">{notification.title}</div>
+                              <div className="text-muted-foreground text-xs">
+                                {notification.message}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {new Date(notification.createdAt).toLocaleString()}
+                              </div>
                             </div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {new Date(notification.createdAt).toLocaleString()}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      </>
                     )}
                   </div>
                 </DropdownMenuContent>
