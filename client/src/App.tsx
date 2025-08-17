@@ -18,6 +18,7 @@ import DashboardPage from "@/pages/dashboard";
 import ProfilePage from "@/pages/profile";
 import NotFoundPage from "@/pages/not-found";
 import ScannerPage from "./pages/scanner";
+import CustomerOrdersPage from "@/pages/customer-orders";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -36,12 +37,12 @@ function Router() {
           <Route path="/storefront" component={StorefrontPage} />
           <Route path="/inventory" component={InventoryPage} />
           <Route path="/orders" component={OrdersPage} />
+          <Route path="/my-orders" component={CustomerOrdersPage} />
+          <Route path="/scanner" component={ScannerPage} />
           <Route path="/analytics" component={AnalyticsPage} />
           <Route path="/users" component={UsersPage} />
           <Route path="/profile" component={ProfilePage} />
           <Route path="/wireframe" component={WireframePage} />
-          <Route path="/scanner" component={ScannerPage} />
-          <Route component={NotFoundPage} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
     </Switch>
