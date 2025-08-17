@@ -37,7 +37,7 @@ function Router() {
           <Route path="/storefront" component={StorefrontPage} />
           <Route path="/inventory" component={InventoryPage} />
           <Route path="/orders" component={OrdersPage} />
-          <Route path="/my-orders" component={CustomerOrdersPage} />
+          <Route path="/customer-orders" component={CustomerOrdersPage} />
           <Route path="/scanner" component={ScannerPage} />
           <Route path="/analytics" component={AnalyticsPage} />
           <Route path="/users" component={UsersPage} />
