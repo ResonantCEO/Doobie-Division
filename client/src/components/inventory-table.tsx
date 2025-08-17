@@ -28,9 +28,10 @@ interface InventoryTableProps {
   user: User | null | undefined;
   selectedProducts: number[];
   onSelectionChange: (productIds: number[]) => void;
+  categories?: Category[];
 }
 
-export default function InventoryTable({ products, user, selectedProducts, onSelectionChange }: InventoryTableProps) {
+export default function InventoryTable({ products, user, selectedProducts, onSelectionChange, categories = [] }: InventoryTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);

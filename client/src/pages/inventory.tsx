@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import InventoryTable from "@/components/inventory-table";
@@ -28,8 +29,10 @@ export default function InventoryPage() {
   const [showBulkQRModal, setShowBulkQRModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedProductWithCategory, setSelectedProductWithCategory] = useState<(Product & { category: Category | null }) | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
   const [bulkQRCodes, setBulkQRCodes] = useState<any[]>([]);
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   // Bulk QR code generation mutation
@@ -282,8 +285,10 @@ export default function InventoryPage() {
       {/* Inventory Table */}
       <InventoryTable 
         products={products} 
-        onStockAdjustment={handleStockAdjustment}
-        onEditProduct={handleEditProduct}
+        user={user}
+        selectedProducts={selectedProducts}
+        onSelectionChange={setSelectedProducts}
+        categories={categories}
       />
 
       {/* Modals */}
