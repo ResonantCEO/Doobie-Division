@@ -1,13 +1,15 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Package, MapPin, User, Calendar, DollarSign, Phone, Mail, CheckCircle, Clock, X } from "lucide-react";
 import { format } from "date-fns";
+import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 import type { Order } from "@shared/schema";
 
 interface OrderDetailsModalProps {
@@ -18,6 +20,16 @@ interface OrderDetailsModalProps {
 
 export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalProps) {
   const [fullOrder, setFullOrder] = useState<Order | null>(null);
+  const [scanningMode, setScanningMode] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanningError, setScanningError] = useState<string>("");
+  const [lastScanTime, setLastScanTime] = useState(0);
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number>();
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -40,11 +52,192 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
 
   useEffect(() => {
     if (orderDetails) {
+
       setFullOrder(orderDetails);
     } else if (order) {
+
       setFullOrder(order);
     }
   }, [orderDetails, order]);
+
+  // Update order item status mutation
+  const updateItemStatusMutation = useMutation({
+    mutationFn: async ({ orderId, productId }: { orderId: number; productId: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/pack-item`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ productId })
+      });
+      if (!response.ok) throw new Error('Failed to update item status');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Item Packed",
+        description: "Order item status updated to packed",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+      setScanningMode(false);
+      setSelectedItemId(null);
+      stopScanning();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update item status",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Start camera for QR scanning
+  const startScanning = async () => {
+    try {
+      setScanningError("");
+      
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera not supported on this device");
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+        setIsScanning(true);
+        
+        videoRef.current.onloadedmetadata = () => {
+          detectQRCode();
+        };
+      }
+    } catch (error: any) {
+      console.error('Camera access error:', error);
+      let errorMessage = "Unable to access camera.";
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage = "Camera permission denied. Please allow camera access and try again.";
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = "No camera found on this device.";
+      }
+      
+      setScanningError(errorMessage);
+      setIsScanning(false);
+      
+      toast({
+        title: "Camera Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Stop camera
+  const stopScanning = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    setIsScanning(false);
+    setScanningError("");
+  }, []);
+
+  // QR code detection
+  const detectQRCode = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current || !isScanning) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA && context) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+      import('jsqr').then(({ default: jsQR }) => {
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        if (code) {
+          const now = Date.now();
+          if (now - lastScanTime > 2000) {
+            setLastScanTime(now);
+            handleQRCodeDetected(code.data);
+          }
+        }
+      }).catch((error) => {
+        console.warn('jsQR not available:', error);
+      });
+    }
+
+    if (isScanning) {
+      animationFrameRef.current = requestAnimationFrame(detectQRCode);
+    }
+  }, [isScanning, lastScanTime]);
+
+  // Handle QR code detection
+  const handleQRCodeDetected = (qrData: string) => {
+    if (!selectedItemId || !fullOrder) return;
+    
+    const selectedItem = fullOrder.items?.find(item => item.id === selectedItemId);
+    if (!selectedItem) return;
+
+    // Extract SKU from QR data (assuming QR contains just the SKU)
+    const scannedSku = qrData.trim();
+    
+    // Check if scanned SKU matches the selected item's SKU
+    if (selectedItem.productSku === scannedSku) {
+      updateItemStatusMutation.mutate({
+        orderId: fullOrder.id,
+        productId: selectedItem.productId!
+      });
+    } else {
+      toast({
+        title: "Wrong Item",
+        description: `Scanned ${scannedSku} but expected ${selectedItem.productSku}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleItemClick = async (itemId: number, item: any) => {
+    if (item.fulfilled) return; // Don't allow scanning already fulfilled items
+    
+    setSelectedItemId(itemId);
+    setScanningMode(true);
+    
+    // Immediately start the camera
+    await startScanning();
+  };
+
+  const cancelScanning = () => {
+    setScanningMode(false);
+    setSelectedItemId(null);
+    stopScanning();
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopScanning();
+    };
+  }, [stopScanning]);
+
+  // Debug logging
+
 
   if (!order) return null;
 
@@ -57,196 +250,220 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
       case "processing":
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Processing</Badge>;
       case "shipped":
-        return <Badge variant="secondary" className="bg-green-100 text-green-800">Shipped</Badge>;
-      case "delivered":
-        return <Badge variant="default" className="bg-green-600">Delivered</Badge>;
+        return <Badge variant="default" className="status-completed">Shipped</Badge>;
       case "cancelled":
-        return <Badge variant="destructive">Cancelled</Badge>;
+        return <Badge variant="destructive" className="status-cancelled">Cancelled</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "pending":
-        return <Clock className="h-4 w-4 text-orange-500" />;
-      case "processing":
-        return <Package className="h-4 w-4 text-blue-500" />;
-      case "shipped":
-        return <Package className="h-4 w-4 text-green-500" />;
-      case "delivered":
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case "cancelled":
-        return <X className="h-4 w-4 text-red-500" />;
-      default:
-        return <Package className="h-4 w-4 text-gray-500" />;
-    }
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gray-900 text-white border-gray-700">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl text-white">
+          <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Order Details - {displayOrder.orderNumber}
+            Order Details - {displayOrder.orderNumber || displayOrder.order_number || 'N/A'}
           </DialogTitle>
         </DialogHeader>
 
         {isLoading ? (
-          <div className="space-y-4">
-            <div className="animate-pulse space-y-4">
-              <div className="h-4 bg-gray-700 rounded w-1/4"></div>
-              <div className="h-20 bg-gray-700 rounded"></div>
-              <div className="h-20 bg-gray-700 rounded"></div>
-            </div>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span className="ml-2">Loading order details...</span>
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Order Status and Date */}
+            {/* Order Status and Basic Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="bg-gray-800 border-gray-700">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm font-medium text-gray-300">Order Date</span>
-                  </div>
-                  <p className="text-white">
-                    {displayOrder.createdAt 
-                      ? format(new Date(displayOrder.createdAt), "MMM dd, yyyy 'at' h:mm a")
-                      : "N/A"
-                    }
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gray-800 border-gray-700">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    {getStatusIcon(displayOrder.status)}
-                    <span className="text-sm font-medium text-gray-300">Status</span>
-                  </div>
-                  <div>{getStatusBadge(displayOrder.status)}</div>
-                </CardContent>
-              </Card>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-white" />
+                  <span className="text-sm text-white">Order Date</span>
+                </div>
+                <p className="text-sm">
+                  {(displayOrder.createdAt || displayOrder.created_at)
+                    ? format(new Date(displayOrder.createdAt || displayOrder.created_at), "MMM d, yyyy 'at' h:mm a")
+                    : "Date not available"
+                  }
+                </p>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-white">Status</span>
+                </div>
+                {getStatusBadge(displayOrder.status)}
+              </div>
             </div>
 
+            <Separator />
+
             {/* Customer Information */}
-            <Card className="bg-gray-800 border-gray-700">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <User className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm font-medium text-gray-300">Customer Information</span>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5 text-white" />
+                <h3 className="text-lg font-semibold text-white">Customer Information</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="font-medium text-white">{displayOrder.customerName || displayOrder.customer_name || "Not provided"}</p>
+                  <p className="text-white">{displayOrder.customerEmail || displayOrder.customer_email || "Not provided"}</p>
+                  {(displayOrder.customerPhone || displayOrder.customer_phone) && (
+                    <p className="text-white">{displayOrder.customerPhone || displayOrder.customer_phone}</p>
+                  )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-white font-medium">{displayOrder.customerName}</p>
-                    <div className="flex items-center gap-2 mt-1 text-gray-300">
-                      <Mail className="h-3 w-3" />
-                      <span>{displayOrder.customerEmail}</span>
-                    </div>
-                    {displayOrder.customerPhone && (
-                      <div className="flex items-center gap-2 mt-1 text-gray-300">
-                        <Phone className="h-3 w-3" />
-                        <span>{displayOrder.customerPhone}</span>
-                      </div>
-                    )}
-                  </div>
+                <div className="text-sm">
+                  <pre className="whitespace-pre-wrap text-white">{displayOrder.shippingAddress || displayOrder.shipping_address || "Not provided"}</pre>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Shipping Address */}
-            <Card className="bg-gray-800 border-gray-700">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <MapPin className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm font-medium text-gray-300">Shipping Address</span>
+            {(displayOrder.shippingAddress || displayOrder.shipping_address) && (
+              <>
+                <Separator />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-white" />
+                    <h3 className="text-lg font-semibold text-white">Shipping Address</h3>
+                  </div>
+                  <div className="text-sm">
+                    <pre className="whitespace-pre-wrap text-white">{displayOrder.shippingAddress || displayOrder.shipping_address}</pre>
+                  </div>
                 </div>
-                <p className="text-white">{displayOrder.shippingAddress}</p>
-              </CardContent>
-            </Card>
+              </>
+            )}
 
             {/* Order Items */}
             <Separator />
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-white">Order Items</h3>
+                {scanningMode && (
+                  <Button onClick={cancelScanning} variant="outline" size="sm">
+                    <X className="h-4 w-4 mr-1" />
+                    Cancel
+                  </Button>
+                )}
               </div>
               
-              <div className="space-y-3">
-                {displayOrder.items?.map((item: any) => (
-                  <Card key={item.id} className="bg-gray-800 border-gray-700">
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-white">{item.productName}</h4>
-                          <p className="text-sm text-gray-400">SKU: {item.productSku}</p>
-                          <div className="flex items-center gap-4 mt-2">
-                            <span className="text-sm text-gray-300">
-                              Quantity: {item.quantity}
-                            </span>
-                            <span className="text-sm text-gray-300">
-                              Price: ${Number(item.productPrice).toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium text-white">
-                            ${(Number(item.productPrice) * item.quantity).toFixed(2)}
-                          </p>
-                          <div className="mt-2">
-                            {item.fulfilled ? (
-                              <Badge variant="default" className="bg-green-600">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Fulfilled
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Pending
-                              </Badge>
-                            )}
+              {scanningMode && selectedItemId && (
+                <Card className="border-blue-500">
+                  <CardContent className="p-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Scan className="h-5 w-5 text-blue-500" />
+                        <h4 className="font-medium">Scan Item to Mark as Packed</h4>
+                      </div>
+                      
+                      {scanningError && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{scanningError}</AlertDescription>
+                        </Alert>
+                      )}
+                      
+                      <div className="relative">
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full max-w-sm mx-auto rounded-lg border-2 border-blue-500"
+                        />
+                        <canvas ref={canvasRef} className="hidden" />
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="border-2 border-white border-dashed w-32 h-32 rounded-lg animate-pulse">
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Scan className="h-6 w-6 text-white animate-spin" />
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                )) || (
-                  <p className="text-gray-400 text-center py-4">No items found for this order.</p>
-                )}
-              </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
+              {displayOrder.items && displayOrder.items.length > 0 ? (
+                <div className="space-y-3">
+                  {displayOrder.items.map((item: any, index: number) => (
+                    <div 
+                      key={item.id || index} 
+                      className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                        item.fulfilled 
+                          ? "bg-gray-50 dark:bg-gray-700/50" 
+                          : "bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600/50 cursor-pointer"
+                      } ${selectedItemId === item.id ? "ring-2 ring-blue-500" : ""}`}
+                      onClick={() => !item.fulfilled && handleItemClick(item.id, item)}
+                    >
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm text-white">{item.productName || item.product_name || "Unknown Product"}</h4>
+                        <p className="text-xs text-white">
+                          SKU: {item.productSku || item.product_sku || "N/A"}
+                        </p>
+                        <p className="text-xs text-white">
+                          ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
+                        </p>
+                        {!item.fulfilled && (
+                          <p className="text-xs text-blue-400 mt-1">Click to scan and mark as packed</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-sm text-white">${item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00"}</p>
+                        <div className="flex items-center space-x-2 mt-1">
+                          {item.fulfilled ? (
+                            <Badge variant="default" className="text-xs bg-green-600">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Packed
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-white">No items found for this order</p>
+                  <p className="text-xs text-white mt-1">Items data: {JSON.stringify(displayOrder.items)}</p>
+                </div>
+              )}
             </div>
 
             {/* Order Summary */}
             <Separator />
-            <Card className="bg-gray-800 border-gray-700">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <DollarSign className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm font-medium text-gray-300">Order Summary</span>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-white" />
+                <h3 className="text-lg font-semibold text-white">Order Summary</h3>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-lg font-semibold text-white">
+                  <span>Total Amount:</span>
+                  <span>${displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00"}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-medium text-gray-300">Total Amount:</span>
-                  <span className="text-xl font-bold text-white">
-                    ${Number(displayOrder.total).toFixed(2)}
-                  </span>
+              </div>
+            </div>
+
+            {/* Notes */}
+            {displayOrder.notes && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold text-white">Notes</h3>
+                  <p className="text-sm text-white bg-gray-50 p-3 rounded-lg">
+                    {displayOrder.notes}
+                  </p>
                 </div>
-                {displayOrder.paymentMethod && (
-                  <div className="flex justify-between items-center mt-2">
-                    <span className="text-sm text-gray-400">Payment Method:</span>
-                    <span className="text-sm text-white">{displayOrder.paymentMethod}</span>
-                  </div>
-                )}
-                {displayOrder.notes && (
-                  <div className="mt-3 pt-3 border-t border-gray-700">
-                    <span className="text-sm font-medium text-gray-300">Notes:</span>
-                    <p className="text-sm text-gray-400 mt-1">{displayOrder.notes}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              </>
+            )}
           </div>
         )}
       </DialogContent>
