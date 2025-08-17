@@ -6,6 +6,7 @@ import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import QRCode from "qrcode";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema } from "@shared/schema";
@@ -13,6 +14,19 @@ import { z } from "zod";
 import { db } from "./db";
 import { orders, products, orderItems } from "@shared/schema";
 import { eq, sql, desc, and, gte, lt, inArray } from "drizzle-orm";
+
+// WebSocket connection store
+const wsConnections = new Set<WebSocket>();
+
+// Helper function to broadcast messages to all connected clients
+function broadcastToClients(message: any) {
+  const messageString = JSON.stringify(message);
+  wsConnections.forEach((ws) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(messageString);
+    }
+  });
+}
 
 
 // Role-based middleware
@@ -485,6 +499,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemsData = enrichedItems.map((item: any) => insertOrderItemSchema.parse(item));
 
       const newOrder = await storage.createOrder(orderData, itemsData);
+      
+      // Broadcast new order to all connected WebSocket clients
+      broadcastToClients({
+        type: 'new_order',
+        data: newOrder
+      });
+      
       res.status(201).json(newOrder);
     } catch (error) {
       console.error('Order creation error:', error);
@@ -506,6 +527,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const order = await storage.updateOrderStatus(id, status);
+      
+      // Broadcast order update to all connected WebSocket clients
+      broadcastToClients({
+        type: 'order_updated',
+        data: order
+      });
+      
       res.json(order);
     } catch (error) {
       res.status(500).json({ message: "Failed to update order status" });
@@ -1006,5 +1034,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  
+  // Setup WebSocket server
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  wss.on('connection', (ws) => {
+    console.log('WebSocket client connected');
+    wsConnections.add(ws);
+    
+    ws.on('close', () => {
+      console.log('WebSocket client disconnected');
+      wsConnections.delete(ws);
+    });
+    
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+      wsConnections.delete(ws);
+    });
+  });
+  
   return httpServer;
 }

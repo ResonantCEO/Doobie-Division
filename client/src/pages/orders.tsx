@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import OrderTable from "@/components/order-table";
 import { useOrderNotifications } from "@/hooks/useOrderNotifications";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw, UserCheck } from "lucide-react";
 import type { Order } from "@shared/schema";
 import { format } from "date-fns";
@@ -16,6 +17,9 @@ export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("");
   const queryClient = useQueryClient();
+
+  // Set up real-time WebSocket connection for order updates
+  useWebSocket();
 
   // Set up order notifications
   useOrderNotifications();
