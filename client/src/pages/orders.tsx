@@ -12,7 +12,7 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/api";
-import OrderDetailsModal from "@/components/order-details-modal";
+import OrderDetailsModal from "@/components/modals/order-details-modal";
 
 export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
