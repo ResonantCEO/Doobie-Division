@@ -24,6 +24,7 @@ import {
 import { db } from "./db";
 import { eq, desc, asc, and, or, like, lte, isNull, inArray, sql, exists, ilike } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
+import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
 // Create alias for assigned user joins
 import { alias } from "drizzle-orm/pg-core";
@@ -183,8 +184,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Category operations
-  async getCategories(): Promise<(Category & { children?: Category[] })>;
   async getCategories(): Promise<(Category & { children?: Category[] })[]> {
+    return withCache(categoriesCache, generateCacheKey.categoryHierarchy(), async () => {
     const allCategories = await db.select().from(categories)
       .where(eq(categories.isActive, true))
       .orderBy(categories.sortOrder, categories.name);
@@ -212,10 +213,12 @@ export class DatabaseStorage implements IStorage {
     }
 
     return rootCategories;
+    });
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
     const [newCategory] = await db.insert(categories).values(category).returning();
+    invalidateCache.categories(); // Invalidate categories cache
     return newCategory;
   }
 
@@ -225,6 +228,7 @@ export class DatabaseStorage implements IStorage {
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(categories.id, id))
       .returning();
+    invalidateCache.categories(); // Invalidate categories cache
     return updatedCategory;
   }
 
@@ -242,6 +246,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     await db.delete(categories).where(eq(categories.id, id));
+    invalidateCache.categories(); // Invalidate categories cache
   }
 
   // Optimized helper function to get all descendant category IDs
@@ -895,138 +900,148 @@ export class DatabaseStorage implements IStorage {
     totalOrders: number;
     averageOrderValue: number;
   }> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    return withCache(analyticsCache, generateCacheKey.salesMetrics(days), async () => {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
 
-    const [metrics] = await db
-      .select({
-        totalSales: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
-        totalOrders: sql<number>`COUNT(*)`,
-        averageOrderValue: sql<number>`COALESCE(AVG(CAST(${orders.total} AS NUMERIC)), 0)`,
-      })
-      .from(orders)
-      .where(
-        and(
-          sql`${orders.createdAt} >= ${startDate}`,
-          or(
-            eq(orders.status, 'shipped'),
-            eq(orders.status, 'processing'),
-            eq(orders.status, 'pending')
+      const [metrics] = await db
+        .select({
+          totalSales: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
+          totalOrders: sql<number>`COUNT(*)`,
+          averageOrderValue: sql<number>`COALESCE(AVG(CAST(${orders.total} AS NUMERIC)), 0)`,
+        })
+        .from(orders)
+        .where(
+          and(
+            sql`${orders.createdAt} >= ${startDate}`,
+            or(
+              eq(orders.status, 'shipped'),
+              eq(orders.status, 'processing'),
+              eq(orders.status, 'pending')
+            )
           )
-        )
-      );
+        );
 
-    return {
-      totalSales: Number(metrics.totalSales),
-      totalOrders: Number(metrics.totalOrders),
-      averageOrderValue: Number(metrics.averageOrderValue),
-    };
+      return {
+        totalSales: Number(metrics.totalSales),
+        totalOrders: Number(metrics.totalOrders),
+        averageOrderValue: Number(metrics.averageOrderValue),
+      };
+    });
   }
 
   async getTopProducts(limit: number): Promise<{ product: Product; sales: number; revenue: number }[]> {
-    const results = await db
-      .select({
-        product: products,
-        sales: sql<number>`SUM(${orderItems.quantity})`,
-        revenue: sql<number>`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`,
-      })
-      .from(orderItems)
-      .innerJoin(products, eq(orderItems.productId, products.id))
-      .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .where(
-        or(
-          eq(orders.status, 'shipped'),
-          eq(orders.status, 'processing'),
-          eq(orders.status, 'pending')
-        )
-      )
-      .groupBy(products.id)
-      .orderBy(desc(sql`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`))
-      .limit(limit);
-
-    return results.map(r => ({
-      product: r.product,
-      sales: Number(r.sales),
-      revenue: Number(r.revenue),
-    }));
-  }
-
-  async getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]> {
-    const results = await db
-      .select({
-        status: orders.status,
-        count: sql<number>`COUNT(*)`,
-      })
-      .from(orders)
-      .groupBy(orders.status);
-
-    return results.map(r => ({
-      status: r.status,
-      count: Number(r.count),
-    }));
-  }
-
-  async getSalesTrend(days: number): Promise<{ date: string; sales: number; orders: number; customers: number }[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    const results = await db
-      .select({
-        date: sql<string>`DATE_TRUNC('day', ${orders.createdAt})`,
-        sales: sql<number>`SUM(CAST(${orders.total} AS NUMERIC))`,
-        orders: sql<number>`COUNT(*)`,
-        customers: sql<number>`COUNT(DISTINCT ${orders.customerId})`,
-      })
-      .from(orders)
-      .where(
-        and(
-          sql`${orders.createdAt} >= ${startDate}`,
+    return withCache(analyticsCache, generateCacheKey.topProducts(limit), async () => {
+      const results = await db
+        .select({
+          product: products,
+          sales: sql<number>`SUM(${orderItems.quantity})`,
+          revenue: sql<number>`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`,
+        })
+        .from(orderItems)
+        .innerJoin(products, eq(orderItems.productId, products.id))
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .where(
           or(
             eq(orders.status, 'shipped'),
             eq(orders.status, 'processing'),
             eq(orders.status, 'pending')
           )
         )
-      )
-      .groupBy(sql`DATE_TRUNC('day', ${orders.createdAt})`)
-      .orderBy(asc(sql`DATE_TRUNC('day', ${orders.createdAt})`));
+        .groupBy(products.id)
+        .orderBy(desc(sql`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`))
+        .limit(limit);
 
-    return results.map(r => ({
-      date: r.date,
-      sales: Number(r.sales),
-      orders: Number(r.orders),
-      customers: Number(r.customers),
-    }));
+      return results.map(r => ({
+        product: r.product,
+        sales: Number(r.sales),
+        revenue: Number(r.revenue),
+      }));
+    });
+  }
+
+  async getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]> {
+    return withCache(analyticsCache, generateCacheKey.orderStatusBreakdown(), async () => {
+      const results = await db
+        .select({
+          status: orders.status,
+          count: sql<number>`COUNT(*)`,
+        })
+        .from(orders)
+        .groupBy(orders.status);
+
+      return results.map(r => ({
+        status: r.status,
+        count: Number(r.count),
+      }));
+    });
+  }
+
+  async getSalesTrend(days: number): Promise<{ date: string; sales: number; orders: number; customers: number }[]> {
+    return withCache(analyticsCache, generateCacheKey.salesTrend(days), async () => {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const results = await db
+        .select({
+          date: sql<string>`DATE_TRUNC('day', ${orders.createdAt})`,
+          sales: sql<number>`SUM(CAST(${orders.total} AS NUMERIC))`,
+          orders: sql<number>`COUNT(*)`,
+          customers: sql<number>`COUNT(DISTINCT ${orders.customerId})`,
+        })
+        .from(orders)
+        .where(
+          and(
+            sql`${orders.createdAt} >= ${startDate}`,
+            or(
+              eq(orders.status, 'shipped'),
+              eq(orders.status, 'processing'),
+              eq(orders.status, 'pending')
+            )
+          )
+        )
+        .groupBy(sql`DATE_TRUNC('day', ${orders.createdAt})`)
+        .orderBy(asc(sql`DATE_TRUNC('day', ${orders.createdAt})`));
+
+      return results.map(r => ({
+        date: r.date,
+        sales: Number(r.sales),
+        orders: Number(r.orders),
+        customers: Number(r.customers),
+      }));
+    });
   }
 
   async getCategoryBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]> {
-    const results = await db
-      .select({
-        categoryName: sql<string>`COALESCE(${categories.name}, 'Uncategorized')`,
-        value: sql<number>`COUNT(${orderItems.id})`,
-        revenue: sql<number>`COALESCE(SUM(CAST(${orderItems.subtotal} AS NUMERIC)), 0)`,
-      })
-      .from(orderItems)
-      .innerJoin(products, eq(orderItems.productId, products.id))
-      .leftJoin(categories, eq(products.categoryId, categories.id))
-      .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .where(
-        or(
-          eq(orders.status, 'shipped'),
-          eq(orders.status, 'processing'),
-          eq(orders.status, 'pending')
+    return withCache(analyticsCache, generateCacheKey.categoryBreakdown(), async () => {
+      const results = await db
+        .select({
+          categoryName: sql<string>`COALESCE(${categories.name}, 'Uncategorized')`,
+          value: sql<number>`COUNT(${orderItems.id})`,
+          revenue: sql<number>`COALESCE(SUM(CAST(${orderItems.subtotal} AS NUMERIC)), 0)`,
+        })
+        .from(orderItems)
+        .innerJoin(products, eq(orderItems.productId, products.id))
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .where(
+          or(
+            eq(orders.status, 'shipped'),
+            eq(orders.status, 'processing'),
+            eq(orders.status, 'pending')
+          )
         )
-      )
-      .groupBy(sql`COALESCE(${categories.name}, 'Uncategorized')`);
+        .groupBy(sql`COALESCE(${categories.name}, 'Uncategorized')`);
 
-    const colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+      const colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
-    return results.map((r, index) => ({
-      name: r.categoryName || 'Uncategorized',
-      value: Number(r.value) || 0,
-      revenue: Number(r.revenue) || 0,
-      fill: colors[index % colors.length],
-    }));
+      return results.map((r, index) => ({
+        name: r.categoryName || 'Uncategorized',
+        value: Number(r.value) || 0,
+        revenue: Number(r.revenue) || 0,
+        fill: colors[index % colors.length],
+      }));
+    });
   }
 
   async getAdvancedMetrics(days: number): Promise<{
