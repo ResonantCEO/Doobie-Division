@@ -649,11 +649,14 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
       </div>
 
       {/* Modals */}
-      {editingProduct && user?.role === 'admin' && (
+      {editingProduct && (
         <EditProductModal
-          isOpen={!!editingProduct}
-          onClose={() => setEditingProduct(null)}
+          open={!!editingProduct}
+          onOpenChange={(open) => {
+            if (!open) setEditingProduct(null);
+          }}
           product={editingProduct}
+          categories={categories}
         />
       )}
       {adjustingStockProduct && (
