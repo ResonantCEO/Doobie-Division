@@ -236,6 +236,7 @@ export default function CustomerOrdersPage() {
           setIsOrderDetailsOpen(false);
           setSelectedOrder(null);
         }}
+        userRole={user?.role}
       />
     </div>
   );

@@ -16,21 +16,22 @@ interface OrderDetailsModalProps {
   order: Order | null;
   isOpen: boolean;
   onClose: () => void;
+  userRole?: string; // Added to receive user role
 }
 
-export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalProps) {
+export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: OrderDetailsModalProps) {
   const [fullOrder, setFullOrder] = useState<Order | null>(null);
   const [scanningMode, setScanningMode] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanningError, setScanningError] = useState<string>("");
   const [lastScanTime, setLastScanTime] = useState(0);
-  
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number>();
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -39,8 +40,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
     queryKey: ["/api/orders", order?.id],
     queryFn: async () => {
       if (!order?.id) return null;
-      const response = await fetch(`/api/orders/${order.id}`, { 
-        credentials: "include" 
+      const response = await fetch(`/api/orders/${order.id}`, {
+        credentials: "include"
       });
       if (!response.ok) {
         throw new Error(`Failed to fetch order details: ${response.statusText}`);
@@ -95,24 +96,24 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
   const startScanning = async () => {
     try {
       setScanningError("");
-      
+
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Camera not supported on this device");
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
+        video: {
           facingMode: 'environment',
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
       });
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         setIsScanning(true);
-        
+
         videoRef.current.onloadedmetadata = () => {
           detectQRCode();
         };
@@ -120,16 +121,16 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
     } catch (error: any) {
       console.error('Camera access error:', error);
       let errorMessage = "Unable to access camera.";
-      
+
       if (error.name === 'NotAllowedError') {
         errorMessage = "Camera permission denied. Please allow camera access and try again.";
       } else if (error.name === 'NotFoundError') {
         errorMessage = "No camera found on this device.";
       }
-      
+
       setScanningError(errorMessage);
       setIsScanning(false);
-      
+
       toast({
         title: "Camera Error",
         description: errorMessage,
@@ -191,13 +192,13 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
   // Handle QR code detection
   const handleQRCodeDetected = (qrData: string) => {
     if (!selectedItemId || !fullOrder) return;
-    
+
     const selectedItem = fullOrder.items?.find(item => item.id === selectedItemId);
     if (!selectedItem) return;
 
     // Extract SKU from QR data (assuming QR contains just the SKU)
     const scannedSku = qrData.trim();
-    
+
     // Check if scanned SKU matches the selected item's SKU
     if (selectedItem.productSku === scannedSku) {
       updateItemStatusMutation.mutate({
@@ -215,10 +216,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
 
   const handleItemClick = async (itemId: number, item: any) => {
     if (item.fulfilled) return; // Don't allow scanning already fulfilled items
-    
+
     setSelectedItemId(itemId);
     setScanningMode(true);
-    
+
     // Immediately start the camera
     await startScanning();
   };
@@ -257,6 +258,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
         return <Badge variant="outline">{status}</Badge>;
     }
   };
+
+  const canScan = userRole === 'staff' || userRole === 'manager' || userRole === 'admin';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -347,7 +350,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                   </Button>
                 )}
               </div>
-              
+
               {scanningMode && selectedItemId && (
                 <Card className="border-blue-500">
                   <CardContent className="p-4">
@@ -356,14 +359,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                         <Scan className="h-5 w-5 text-blue-500" />
                         <h4 className="font-medium">Scan Item to Mark as Packed</h4>
                       </div>
-                      
+
                       {scanningError && (
                         <Alert variant="destructive">
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>{scanningError}</AlertDescription>
                         </Alert>
                       )}
-                      
+
                       <div className="relative">
                         <video
                           ref={videoRef}
@@ -385,18 +388,18 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                   </CardContent>
                 </Card>
               )}
-              
+
               {displayOrder.items && displayOrder.items.length > 0 ? (
                 <div className="space-y-3">
                   {displayOrder.items.map((item: any, index: number) => (
-                    <div 
-                      key={item.id || index} 
+                    <div
+                      key={item.id || index}
                       className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
-                        item.fulfilled 
-                          ? "bg-gray-50 dark:bg-gray-700/50" 
+                        item.fulfilled
+                          ? "bg-gray-50 dark:bg-gray-700/50"
                           : "bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600/50 cursor-pointer"
                       } ${selectedItemId === item.id ? "ring-2 ring-blue-500" : ""}`}
-                      onClick={() => !item.fulfilled && handleItemClick(item.id, item)}
+                      onClick={() => !item.fulfilled && canScan && handleItemClick(item.id, item)}
                     >
                       <div className="flex-1">
                         <h4 className="font-medium text-sm text-white">{item.productName || item.product_name || "Unknown Product"}</h4>
@@ -406,7 +409,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                         <p className="text-xs text-white">
                           ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
                         </p>
-                        {!item.fulfilled && (
+                        {!item.fulfilled && canScan && (
                           <p className="text-xs text-blue-400 mt-1">Click to scan and mark as packed</p>
                         )}
                       </div>
@@ -414,12 +417,17 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                         <p className="font-medium text-sm text-white">${item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00"}</p>
                         <div className="flex items-center space-x-2 mt-1">
                           {item.fulfilled ? (
-                            <Badge variant="default" className="text-xs bg-green-600">
+                            <Badge variant="default" className="bg-green-600">
                               <CheckCircle className="h-3 w-3 mr-1" />
                               Packed
                             </Badge>
+                          ) : canScan ? (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                              <Scan className="h-3 w-3 mr-1" />
+                              Click to scan and mark as packed
+                            </Badge>
                           ) : (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="secondary" className="bg-orange-100 text-orange-800">
                               <Clock className="h-3 w-3 mr-1" />
                               Pending
                             </Badge>

@@ -12,11 +12,16 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/api";
+import OrderDetailsModal from "@/components/order-details-modal";
 
 export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("");
   const queryClient = useQueryClient();
+
+  // State for the modal
+  const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Set up real-time WebSocket connection for order updates
   useWebSocket();
@@ -95,6 +100,12 @@ export default function OrdersPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/users/staff"] });
     }
   };
+
+  const handleViewOrderDetails = (order: Order) => {
+    setSelectedOrder(order);
+    setIsOrderDetailsOpen(true);
+  };
+
 
   if (authLoading || ordersLoading || (user?.role === 'admin' || user?.role === 'manager' ? staffLoading : false)) {
     return (
@@ -194,7 +205,17 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders Table */}
-      <OrderTable orders={orders} user={user} staffUsers={staffUsers} />
+      <OrderTable orders={orders} user={user} staffUsers={staffUsers} onViewOrderDetails={handleViewOrderDetails} />
+
+      <OrderDetailsModal
+        order={selectedOrder}
+        isOpen={isOrderDetailsOpen}
+        onClose={() => {
+          setIsOrderDetailsOpen(false);
+          setSelectedOrder(null);
+        }}
+        userRole={user?.role}
+      />
     </div>
   );
 }
