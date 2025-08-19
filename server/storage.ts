@@ -659,7 +659,7 @@ export class DatabaseStorage implements IStorage {
 
       return result.map(row => ({
         ...row,
-        assignedUser: row.assignedUser.id ? row.assignedUser : null
+        assignedUser: row.assignedUser && row.assignedUser.id ? row.assignedUser : null
       }));
     } catch (error) {
       console.error('Error fetching orders:', error);
