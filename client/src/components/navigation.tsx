@@ -436,9 +436,6 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                       }`}
                     >
                       <div className="text-sm font-medium leading-none">My Orders</div>
-                      <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">
-                        View your order history and status
-                      </p>
                     </NavigationMenuLink>
                   </Link>
                 </NavigationMenuItem>
