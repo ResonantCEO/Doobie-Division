@@ -22,7 +22,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, and, or, like, lte, isNull, inArray, sql, exists, ilike } from "drizzle-orm";
+import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, inArray, lte, isNull, like } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
@@ -55,7 +55,7 @@ export interface IStorage {
   getLowStockProducts(): Promise<Product[]>;
 
   // Order operations
-  getOrders(filters?: { status?: string; statuses?: string[]; customerId?: string; assignedUserId?: string }): Promise<Order[]>;
+  getOrders(filters?: { status?: string; statuses?: string[]; customerId?: string; assignedUserId?: string; hideOldDelivered?: boolean }): Promise<Order[]>;
   getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined>;
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
@@ -585,54 +585,86 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Order operations
-  async getOrders(filters: { status?: string; statuses?: string[]; customerId?: string; assignedUserId?: string } = {}): Promise<Order[]> {
-    let query = db
-      .select({
-        id: orders.id,
-        orderNumber: orders.orderNumber,
-        customerId: orders.customerId,
-        customerName: orders.customerName,
-        customerEmail: orders.customerEmail,
-        customerPhone: orders.customerPhone,
-        shippingAddress: orders.shippingAddress,
-        total: orders.total,
-        status: orders.status,
-        paymentMethod: orders.paymentMethod,
-        assignedUserId: orders.assignedUserId,
-        notes: orders.notes,
-        createdAt: orders.createdAt,
-        updatedAt: orders.updatedAt,
-        assignedUser: {
-          id: assignedUser.id,
-          firstName: assignedUser.firstName,
-          lastName: assignedUser.lastName,
-          email: assignedUser.email,
-        },
-      })
-      .from(orders)
-      .leftJoin(assignedUser, eq(orders.assignedUserId, assignedUser.id));
+  async getOrders(filters: {
+    status?: string;
+    statuses?: string[];
+    customerId?: string;
+    assignedUserId?: string;
+    hideOldDelivered?: boolean;
+  } = {}): Promise<Order[]> {
+    try {
+      let query = db
+        .select({
+          id: orders.id,
+          orderNumber: orders.orderNumber,
+          customerId: orders.customerId,
+          customerName: orders.customerName,
+          customerEmail: orders.customerEmail,
+          customerPhone: orders.customerPhone,
+          shippingAddress: orders.shippingAddress,
+          total: orders.total,
+          status: orders.status,
+          paymentMethod: orders.paymentMethod,
+          assignedUserId: orders.assignedUserId,
+          notes: orders.notes,
+          createdAt: orders.createdAt,
+          updatedAt: orders.updatedAt,
+          assignedUser: {
+            id: assignedUser.id,
+            firstName: assignedUser.firstName,
+            lastName: assignedUser.lastName,
+            email: assignedUser.email,
+          },
+        })
+        .from(orders)
+        .leftJoin(assignedUser, eq(orders.assignedUserId, assignedUser.id));
 
-    const conditions = [];
-    if (filters.status) {
-      conditions.push(eq(orders.status, filters.status));
-    }
-    if (filters.statuses) {
-      conditions.push(inArray(orders.status, filters.statuses));
-    }
-    if (filters.customerId) {
-      query = query.where(eq(orders.customerId, filters.customerId));
-    }
+      const conditions = [];
 
-    if (filters.assignedUserId) {
-      query = query.where(eq(orders.assignedUserId, filters.assignedUserId));
+      if (filters.status) {
+        conditions.push(eq(orders.status, filters.status));
+      }
+
+      if (filters.statuses && filters.statuses.length > 0) {
+        conditions.push(inArray(orders.status, filters.statuses));
+      }
+
+      if (filters.customerId) {
+        conditions.push(eq(orders.customerId, filters.customerId));
+      }
+
+      if (filters.assignedUserId) {
+        conditions.push(eq(orders.assignedUserId, filters.assignedUserId));
+      }
+
+      // Hide delivered orders older than 48 hours for customers
+      if (filters.hideOldDelivered) {
+        const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+        conditions.push(
+          or(
+            ne(orders.status, 'delivered'),
+            and(
+              eq(orders.status, 'delivered'),
+              gte(orders.updatedAt, fortyEightHoursAgo)
+            )
+          )
+        );
+      }
+
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions));
+      }
+
+      const result = await query.orderBy(desc(orders.createdAt));
+
+      return result.map(row => ({
+        ...row,
+        assignedUser: row.assignedUser.id ? row.assignedUser : null
+      }));
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      throw error;
     }
-
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-
-
-    return await query.orderBy(desc(orders.createdAt));
   }
 
   async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined> {
@@ -729,9 +761,9 @@ export class DatabaseStorage implements IStorage {
   async updateOrderStatus(orderId: number, status: string): Promise<Order> {
     const [updatedOrder] = await db
       .update(orders)
-      .set({ 
-        status, 
-        updatedAt: new Date() 
+      .set({
+        status,
+        updatedAt: new Date()
       })
       .where(eq(orders.id, orderId))
       .returning();
@@ -768,7 +800,7 @@ export class DatabaseStorage implements IStorage {
       // Update product stock and physical inventory
       await tx
         .update(products)
-        .set({ 
+        .set({
           stock: newStock,
           physicalInventory: newPhysicalInventory,
           updatedAt: new Date()
@@ -836,7 +868,7 @@ export class DatabaseStorage implements IStorage {
       // Update physical inventory (reduce by packed quantity)
       await tx
         .update(products)
-        .set({ 
+        .set({
           physicalInventory: newPhysicalInventory,
           updatedAt: new Date()
         })
@@ -880,9 +912,9 @@ export class DatabaseStorage implements IStorage {
   async assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order> {
     const [updatedOrder] = await db
       .update(orders)
-      .set({ 
-        assignedUserId, 
-        updatedAt: new Date() 
+      .set({
+        assignedUserId,
+        updatedAt: new Date()
       })
       .where(eq(orders.id, orderId))
       .returning();
@@ -1480,7 +1512,7 @@ export class DatabaseStorage implements IStorage {
         .select({
           id: orders.id,
           type: sql<string>`'order'`,
-          action: sql<string>`CASE 
+          action: sql<string>`CASE
             WHEN ${orders.status} = 'pending' THEN 'Order Placed'
             WHEN ${orders.status} = 'processing' THEN 'Order Processing'
             WHEN ${orders.status} = 'shipped' THEN 'Order Shipped'

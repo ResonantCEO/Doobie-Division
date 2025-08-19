@@ -421,6 +421,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.currentUser.role === 'customer') {
         // Regular customers can only see their own orders
         filters.customerId = req.currentUser.id;
+        // Hide delivered orders older than 48 hours for customers
+        filters.hideOldDelivered = true;
       } else if (req.currentUser.role === 'staff') {
         // Staff can only see orders assigned to them
         filters.assignedUserId = req.currentUser.id;
