@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ShoppingBag, Users, BarChart3, Package, Star, Shield, Clock, Smartphone, Truck, ArrowRight, CheckCircle, Zap, Heart, Sparkles } from "lucide-react";
+import { ShoppingBag, Users, BarChart3, Package, Star, Shield, Clock, Smartphone, Truck, ArrowRight, CheckCircle, Zap, Heart, Sparkles, MessageCircle } from "lucide-react";
 import { AuthForms } from "@/components/auth-forms";
+import { Link } from "wouter";
 
 export default function Landing() {
   const [showAuthDialog, setShowAuthDialog] = useState(false);
@@ -343,12 +344,26 @@ export default function Landing() {
             </div>
             <div>
               <h4 className="font-semibold mb-4 text-white">Support</h4>
-              <div className="space-y-2 text-sm">
-                <h4 className="text-white font-medium">Contact Us</h4>
-                <p className="text-gray-400">Get in touch with our support team for any questions or assistance.</p>
-                <a href="mailto:support@doobie-division.com" className="text-green-400 hover:text-green-300 transition-colors block">
-                  support@doobie-division.com
-                </a>
+              <div className="space-y-4 text-sm">
+                <div>
+                  <h4 className="text-white font-medium mb-2">Contact Us</h4>
+                  <p className="text-gray-400 mb-3">Get in touch with our support team for any questions or assistance.</p>
+                  <Link href="/support">
+                    <Button 
+                      size="sm"
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white transition-all duration-300 hover:scale-105"
+                      data-testid="button-support-contact"
+                    >
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Submit Support Ticket
+                    </Button>
+                  </Link>
+                </div>
+                <div className="text-xs text-gray-500">
+                  <p>• Name, phone, email & details required</p>
+                  <p>• 24/7 support available</p>
+                  <p>• Response within 24 hours</p>
+                </div>
               </div>
             </div>
           </div>
