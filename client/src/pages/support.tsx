@@ -151,7 +151,7 @@ export default function SupportPage() {
             </Card>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-8">
+          <div className="max-w-2xl mx-auto">
             {/* Contact Form */}
             <Card>
               <CardHeader>
@@ -255,56 +255,7 @@ export default function SupportPage() {
               </CardContent>
             </Card>
 
-            {/* Support Topics */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Help Topics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 gap-4">
-                    {supportTopics.map((topic, index) => (
-                      <div key={index} className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <topic.icon className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-medium">{topic.title}</h4>
-                          <p className="text-sm text-muted-foreground">{topic.description}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Order Status Guide */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Order Status Guide</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <Badge variant="secondary">Pending</Badge>
-                      <span className="text-sm">Order received, awaiting processing</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <Badge className="bg-blue-100 text-blue-800">Processing</Badge>
-                      <span className="text-sm">Order is being prepared</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <Badge className="bg-yellow-100 text-yellow-800">Shipped</Badge>
-                      <span className="text-sm">Order has been dispatched</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <Badge className="bg-green-100 text-green-800">Delivered</Badge>
-                      <span className="text-sm">Order successfully delivered</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            
           </div>
         </div>
       </div>
