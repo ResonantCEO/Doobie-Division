@@ -228,7 +228,7 @@ export class DatabaseStorage implements IStorage {
   async updateCategory(id: number, updates: Partial<InsertCategory>): Promise<Category> {
     const [updatedCategory] = await db
       .update(categories)
-      .set({ ...updates, updatedAt: new Date() })
+      .set(updates)
       .where(eq(categories.id, id))
       .returning();
     invalidateCache.categories(); // Invalidate categories cache
@@ -393,11 +393,12 @@ export class DatabaseStorage implements IStorage {
       conditions.push(sql`${products.stock} > ${products.minStockThreshold}`);
     }
 
+    let finalQuery = query;
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      finalQuery = query.where(and(...conditions));
     }
 
-    return await query.orderBy(desc(products.createdAt));
+    return await finalQuery.orderBy(desc(products.createdAt));
   }
 
   async getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined> {
@@ -680,15 +681,21 @@ export class DatabaseStorage implements IStorage {
         );
       }
 
+      let finalQuery = query;
       if (conditions.length > 0) {
-        query = query.where(and(...conditions));
+        finalQuery = query.where(and(...conditions));
       }
 
-      const result = await query.orderBy(desc(orders.createdAt));
+      const result = await finalQuery.orderBy(desc(orders.createdAt));
 
       return result.map(row => ({
         ...row,
-        assignedUser: row.assignedUser && row.assignedUser.id ? row.assignedUser : null
+        assignedUser: row.assignedUser && row.assignedUser.id ? {
+          id: row.assignedUser.id,
+          firstName: row.assignedUser.firstName,
+          lastName: row.assignedUser.lastName,
+          email: row.assignedUser.email
+        } : undefined
       }));
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -702,7 +709,15 @@ export class DatabaseStorage implements IStorage {
 
     const items = await db
       .select({
-        ...orderItems,
+        id: orderItems.id,
+        orderId: orderItems.orderId,
+        productId: orderItems.productId,
+        productName: orderItems.productName,
+        productSku: orderItems.productSku,
+        productPrice: orderItems.productPrice,
+        quantity: orderItems.quantity,
+        subtotal: orderItems.subtotal,
+        fulfilled: orderItems.fulfilled,
         product: products,
       })
       .from(orderItems)
@@ -747,7 +762,7 @@ export class DatabaseStorage implements IStorage {
       const [product] = await db
         .select({ stock: products.stock, name: products.name })
         .from(products)
-        .where(eq(products.id, item.productId));
+        .where(eq(products.id, item.productId!));
 
       if (!product) {
         throw new Error(`Product with ID ${item.productId} not found`);
@@ -779,7 +794,7 @@ export class DatabaseStorage implements IStorage {
           stock: sql`${products.stock} - ${item.quantity}`,
           updatedAt: new Date()
         })
-        .where(eq(products.id, item.productId));
+        .where(eq(products.id, item.productId!));
     }
 
     // Get the complete order with items
@@ -1294,7 +1309,8 @@ export class DatabaseStorage implements IStorage {
     let query = db.select().from(notifications);
 
     if (userId) {
-      query = query.where(eq(notifications.userId, userId));
+      const filteredQuery = query.where(eq(notifications.userId, userId));
+      return await filteredQuery.orderBy(desc(notifications.createdAt));
     }
 
     return await query.orderBy(desc(notifications.createdAt));
@@ -1313,7 +1329,24 @@ export class DatabaseStorage implements IStorage {
   async getUsersWithStats(): Promise<(User & { orderCount?: number })[]> {
     const results = await db
       .select({
-        ...users,
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        password: users.password,
+        profileImageUrl: users.profileImageUrl,
+        idImageUrl: users.idImageUrl,
+        verificationPhotoUrl: users.verificationPhotoUrl,
+        idVerificationStatus: users.idVerificationStatus,
+        role: users.role,
+        status: users.status,
+        address: users.address,
+        city: users.city,
+        state: users.state,
+        postalCode: users.postalCode,
+        country: users.country,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
         orderCount: sql<number>`COUNT(${orders.id})`,
       })
       .from(users)
@@ -1322,7 +1355,24 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(users.createdAt));
 
     return results.map(r => ({
-      ...r,
+      id: r.id,
+      email: r.email,
+      firstName: r.firstName,
+      lastName: r.lastName,
+      password: r.password,
+      profileImageUrl: r.profileImageUrl,
+      idImageUrl: r.idImageUrl,
+      verificationPhotoUrl: r.verificationPhotoUrl,
+      idVerificationStatus: r.idVerificationStatus,
+      role: r.role,
+      status: r.status,
+      address: r.address,
+      city: r.city,
+      state: r.state,
+      postalCode: r.postalCode,
+      country: r.country,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
       orderCount: Number(r.orderCount),
     }));
   }
@@ -1512,7 +1562,15 @@ export class DatabaseStorage implements IStorage {
   async getInventoryLogs(filters?: { days?: number; type?: string; product?: string }): Promise<any[]> {
     let query = db
       .select({
-        ...inventoryLogs,
+        id: inventoryLogs.id,
+        productId: inventoryLogs.productId,
+        type: inventoryLogs.type,
+        quantity: inventoryLogs.quantity,
+        previousStock: inventoryLogs.previousStock,
+        newStock: inventoryLogs.newStock,
+        reason: inventoryLogs.reason,
+        userId: inventoryLogs.userId,
+        createdAt: inventoryLogs.createdAt,
         product: products,
         user: users,
       })
@@ -1541,11 +1599,12 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
+    let finalQuery = query;
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      finalQuery = query.where(and(...conditions));
     }
 
-    return await query.orderBy(desc(inventoryLogs.createdAt));
+    return await finalQuery.orderBy(desc(inventoryLogs.createdAt));
   }
 
   async logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void> {
@@ -1553,15 +1612,12 @@ export class DatabaseStorage implements IStorage {
       // For now, we'll use the inventory_logs table to store user activity
       // In a production system, you'd want a dedicated user_activity_logs table
       await db.insert(inventoryLogs).values({
-        productId: null,
         userId: userId,
         type: 'user_activity',
         quantity: 0,
-        previousStock: 0, // Set default value to avoid null constraint
-        newStock: 0, // Set default value to avoid null constraint
-        reason: action,
-        notes: details,
-        metadata: metadata ? JSON.stringify(metadata) : null
+        previousStock: 0,
+        newStock: 0,
+        reason: action
       });
     } catch (error) {
       console.error('Error logging user activity:', error);
@@ -1620,7 +1676,7 @@ export class DatabaseStorage implements IStorage {
           productName: activity.productName || null,
           productSku: activity.productSku || null,
         }))
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .sort((a, b) => new Date(b.timestamp || '').getTime() - new Date(a.timestamp || '').getTime())
         .slice(0, limit);
 
       return allActivity;

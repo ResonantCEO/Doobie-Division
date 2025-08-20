@@ -23,7 +23,9 @@ export const sessions = pgTable(
     sess: jsonb("sess").notNull(),
     expire: timestamp("expire").notNull(),
   },
-  (table) => [index("IDX_session_expire").on(table.expire)]
+  (table) => ({
+    expireIdx: index("IDX_session_expire").on(table.expire),
+  })
 );
 
 // User storage table (required for Replit Auth)
@@ -56,10 +58,10 @@ export const categories = pgTable("categories", {
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  index("IDX_categories_parent_id").on(table.parentId),
-  index("IDX_categories_is_active").on(table.isActive),
-]);
+}, (table) => ({
+  parentIdIdx: index("IDX_categories_parent_id").on(table.parentId),
+  isActiveIdx: index("IDX_categories_is_active").on(table.isActive),
+}));
 
 
 
@@ -82,11 +84,11 @@ export const products = pgTable("products", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-}, (table) => [
-  index("IDX_products_category_id").on(table.categoryId),
-  index("IDX_products_is_active").on(table.isActive),
-  index("IDX_products_created_at").on(table.createdAt),
-]);
+}, (table) => ({
+  categoryIdIdx: index("IDX_products_category_id").on(table.categoryId),
+  isActiveIdx: index("IDX_products_is_active").on(table.isActive),
+  createdAtIdx: index("IDX_products_created_at").on(table.createdAt),
+}));
 
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
