@@ -120,36 +120,7 @@ export default function SupportPage() {
             </p>
           </div>
 
-          {/* Support Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="text-center">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-center mb-4">
-                  <Clock className="h-8 w-8 text-green-600" />
-                </div>
-                <div className="text-2xl font-bold text-green-600">24/7</div>
-                <div className="text-sm text-muted-foreground">Support Available</div>
-              </CardContent>
-            </Card>
-            <Card className="text-center">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-center mb-4">
-                  <MessageCircle className="h-8 w-8 text-blue-600" />
-                </div>
-                <div className="text-2xl font-bold text-blue-600">&lt; 2 hrs</div>
-                <div className="text-sm text-muted-foreground">Average Response</div>
-              </CardContent>
-            </Card>
-            <Card className="text-center">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-center mb-4">
-                  <Star className="h-8 w-8 text-yellow-600" />
-                </div>
-                <div className="text-2xl font-bold text-yellow-600">4.9/5</div>
-                <div className="text-sm text-muted-foreground">Customer Rating</div>
-              </CardContent>
-            </Card>
-          </div>
+          
 
           <div className="max-w-2xl mx-auto">
             {/* Contact Form */}
