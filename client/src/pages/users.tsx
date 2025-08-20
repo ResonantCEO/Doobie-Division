@@ -60,6 +60,8 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userActivity, setUserActivity] = useState<any[]>([]);
   const [editData, setEditData] = useState<any>({});
+  const [suspendConfirmOpen, setSuspendConfirmOpen] = useState(false);
+  const [userToSuspend, setUserToSuspend] = useState<User | null>(null);
 
 
   // Fetch users with stats
@@ -213,15 +215,27 @@ export default function UsersPage() {
   };
 
   const handleRejectUser = (userId: string) => {
-    if (confirm("Are you sure you want to reject this user?")) {
-      updateStatusMutation.mutate({ userId, status: "suspended" });
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      setUserToSuspend(user);
+      setSuspendConfirmOpen(true);
     }
   };
 
   const handleSuspendUser = (userId: string) => {
-    if (confirm("Are you sure you want to suspend this user?")) {
-      updateStatusMutation.mutate({ userId, status: "suspended" });
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      setUserToSuspend(user);
+      setSuspendConfirmOpen(true);
     }
+  };
+
+  const confirmSuspendUser = () => {
+    if (userToSuspend) {
+      updateStatusMutation.mutate({ userId: userToSuspend.id, status: "suspended" });
+    }
+    setSuspendConfirmOpen(false);
+    setUserToSuspend(null);
   };
 
   const handleEditUser = (user: User) => {
@@ -755,6 +769,39 @@ export default function UsersPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Suspend User Confirmation Dialog */}
+      <Dialog open={suspendConfirmOpen} onOpenChange={setSuspendConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Suspend User</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Are you sure you want to suspend {userToSuspend?.firstName} {userToSuspend?.lastName}? 
+              This will prevent them from accessing the system.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setSuspendConfirmOpen(false);
+                setUserToSuspend(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmSuspendUser}
+              disabled={updateStatusMutation.isPending}
+            >
+              {updateStatusMutation.isPending ? "Suspending..." : "Suspend User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* User Activity Modal */}
       <Dialog open={activityModalOpen} onOpenChange={setActivityModalOpen}>
