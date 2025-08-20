@@ -414,11 +414,16 @@ export default function AdminPage() {
                                 <UserIcon className="h-4 w-4 text-gray-400" />
                                 <div>
                                   <div className="font-medium text-black dark:text-white">
-                                    {item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Anonymous'}
+                                    {item.ticket.customerName || (item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Anonymous')}
                                   </div>
                                   <div className="text-sm text-gray-500">
-                                    {item.user?.email || 'No email'}
+                                    {item.ticket.customerEmail || item.user?.email || 'No email'}
                                   </div>
+                                  {item.ticket.customerPhone && (
+                                    <div className="text-xs text-gray-400">
+                                      📞 {item.ticket.customerPhone}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </TableCell>
