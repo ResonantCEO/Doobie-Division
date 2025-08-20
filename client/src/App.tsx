@@ -19,6 +19,7 @@ import ProfilePage from "@/pages/profile";
 import NotFoundPage from "@/pages/not-found";
 import ScannerPage from "./pages/scanner";
 import CustomerOrdersWrapper from "@/pages/customer-orders-wrapper";
+import SupportPage from "@/pages/support";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -43,6 +44,7 @@ function Router() {
           <Route path="/users" component={UsersPage} />
           <Route path="/profile" component={ProfilePage} />
           <Route path="/wireframe" component={WireframePage} />
+          <Route path="/support" component={SupportPage} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
     </Switch>
