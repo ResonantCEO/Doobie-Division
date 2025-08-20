@@ -23,13 +23,9 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt, alias } from "drizzle-orm";
+import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
-
-// Create alias for assigned user joins
-const assignedUser = alias(users, 'assigned_user');
-const assignedUserTable = alias(users, 'assignedUser');
 
 export interface IStorage {
   // User operations
@@ -647,15 +643,10 @@ export class DatabaseStorage implements IStorage {
           notes: orders.notes,
           createdAt: orders.createdAt,
           updatedAt: orders.updatedAt,
-          assignedUser: {
-            id: assignedUser.id,
-            firstName: assignedUser.firstName,
-            lastName: assignedUser.lastName,
-            email: assignedUser.email,
-          },
+          assignedUser: users,
         })
         .from(orders)
-        .leftJoin(assignedUser, eq(orders.assignedUserId, assignedUser.id));
+        .leftJoin(users, eq(orders.assignedUserId, users.id));
 
       const conditions = [];
 
@@ -1439,16 +1430,10 @@ export class DatabaseStorage implements IStorage {
           lastName: users.lastName,
           email: users.email,
         },
-        assignedUser: {
-          id: assignedUserTable.id,
-          firstName: assignedUserTable.firstName,
-          lastName: assignedUserTable.lastName,
-          email: assignedUserTable.email,
-        },
+        assignedUser: users,
       })
       .from(supportTickets)
       .leftJoin(users, eq(supportTickets.userId, users.id))
-      .leftJoin(assignedUserTable, eq(supportTickets.assignedTo, assignedUserTable.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(supportTickets.createdAt));
   }
