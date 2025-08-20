@@ -10,14 +10,37 @@ import { storage } from "./storage";
 
 const SALT_ROUNDS = 12;
 
-// Configure multer for file uploads
-const uploadDir = path.join(process.cwd(), 'uploads', 'id-images');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+// Configure multer for file uploads with proper storage handling
+const idImagesDir = path.join(process.cwd(), 'uploads', 'id-images');
+const verificationPhotosDir = path.join(process.cwd(), 'uploads', 'verification-photos');
+
+// Ensure both directories exist
+if (!fs.existsSync(idImagesDir)) {
+  fs.mkdirSync(idImagesDir, { recursive: true });
+}
+if (!fs.existsSync(verificationPhotosDir)) {
+  fs.mkdirSync(verificationPhotosDir, { recursive: true });
 }
 
+const multerStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    if (file.fieldname === 'idImage') {
+      cb(null, idImagesDir);
+    } else if (file.fieldname === 'verificationPhoto') {
+      cb(null, verificationPhotosDir);
+    } else {
+      cb(new Error('Unknown field name'), '');
+    }
+  },
+  filename: function (req, file, cb) {
+    // Use a hash-based filename (no extension to maintain security)
+    const hash = crypto.createHash('md5').update(file.originalname + Date.now()).digest('hex');
+    cb(null, hash);
+  }
+});
+
 const upload = multer({
-  dest: uploadDir,
+  storage: multerStorage,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
