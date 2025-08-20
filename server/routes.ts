@@ -9,10 +9,10 @@ import QRCode from "qrcode";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
-import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema } from "@shared/schema";
+import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema, insertSupportTicketSchema } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { orders, products, orderItems, users } from "@shared/schema";
+import { orders, products, orderItems, users, supportTickets } from "@shared/schema";
 import { eq, sql, desc, and, gte, lt, inArray } from "drizzle-orm";
 
 // WebSocket connection store
@@ -1148,6 +1148,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(users);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch pending verifications" });
+    }
+  });
+
+  // Support ticket routes
+  app.post('/api/support/contact', async (req, res) => {
+    try {
+      const ticketData = insertSupportTicketSchema.parse(req.body);
+      const ticket = await storage.createSupportTicket(ticketData);
+      res.status(201).json(ticket);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid ticket data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create support ticket" });
+    }
+  });
+
+  app.get('/api/support/tickets', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const { status, priority } = req.query;
+      const filters: any = {};
+      
+      if (status) filters.status = status as string;
+      if (priority) filters.priority = priority as string;
+      
+      const tickets = await storage.getSupportTickets(filters);
+      res.json(tickets);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch support tickets" });
+    }
+  });
+
+  app.put('/api/support/tickets/:id/status', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+
+      if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+      }
+
+      const ticket = await storage.updateSupportTicketStatus(id, status);
+      res.json(ticket);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update ticket status" });
+    }
+  });
+
+  app.put('/api/support/tickets/:id/assign', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { assignedTo } = req.body;
+
+      const ticket = await storage.assignSupportTicket(id, assignedTo);
+      res.json(ticket);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to assign ticket" });
     }
   });
 

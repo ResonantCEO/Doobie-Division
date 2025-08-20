@@ -36,13 +36,18 @@ export default function SupportPage() {
     e.preventDefault();
     
     try {
+      const ticketData = {
+        ...contactForm,
+        userId: user?.id || null
+      };
+
       const response = await fetch("/api/support/contact", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify(contactForm),
+        body: JSON.stringify(ticketData),
       });
 
       if (response.ok) {

@@ -6,6 +6,7 @@ import {
   orderItems,
   inventoryLogs,
   notifications,
+  supportTickets,
   type User,
   type UpsertUser,
   type Category,
@@ -22,13 +23,13 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt } from "drizzle-orm";
+import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt, alias } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
 // Create alias for assigned user joins
-import { alias } from "drizzle-orm/pg-core";
 const assignedUser = alias(users, 'assigned_user');
+const assignedUserTable = alias(users, 'assignedUser');
 
 export interface IStorage {
   // User operations
@@ -100,6 +101,12 @@ export interface IStorage {
   logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void>;
   getUserActivity(userId: string, options?: { limit?: number; type?: string }): Promise<any[]>;
   getInventoryLogs(filters?: { days?: number; type?: string; product?: string }): Promise<any[]>;
+
+  // Support ticket operations
+  createSupportTicket(data: any): Promise<any>;
+  getSupportTickets(filters?: any): Promise<any[]>;
+  updateSupportTicketStatus(id: number, status: string): Promise<any>;
+  assignSupportTicket(id: number, assignedTo: string | null): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1401,9 +1408,69 @@ export class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(users)
-      .where(eq(users.idVerificationStatus, 'pending'))
-      .orderBy(desc(users.createdAt));
+      .where(eq(users.idVerificationStatus, 'pending'));
   }
+
+  async createSupportTicket(data: any) {
+    const [ticket] = await db
+      .insert(supportTickets)
+      .values(data)
+      .returning();
+    return ticket;
+  }
+
+  async getSupportTickets(filters: any = {}) {
+    const conditions = [];
+
+    if (filters.status) {
+      conditions.push(eq(supportTickets.status, filters.status));
+    }
+
+    if (filters.priority) {
+      conditions.push(eq(supportTickets.priority, filters.priority));
+    }
+
+    return db
+      .select({
+        ticket: supportTickets,
+        user: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        },
+        assignedUser: {
+          id: assignedUserTable.id,
+          firstName: assignedUserTable.firstName,
+          lastName: assignedUserTable.lastName,
+          email: assignedUserTable.email,
+        },
+      })
+      .from(supportTickets)
+      .leftJoin(users, eq(supportTickets.userId, users.id))
+      .leftJoin(assignedUserTable, eq(supportTickets.assignedTo, assignedUserTable.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(supportTickets.createdAt));
+  }
+
+  async updateSupportTicketStatus(id: number, status: string) {
+    const [ticket] = await db
+      .update(supportTickets)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(supportTickets.id, id))
+      .returning();
+    return ticket;
+  }
+
+  async assignSupportTicket(id: number, assignedTo: string | null) {
+    const [ticket] = await db
+      .update(supportTickets)
+      .set({ assignedTo, updatedAt: new Date() })
+      .where(eq(supportTickets.id, id))
+      .returning();
+    return ticket;
+  }
+
 
   async getStaffUsers(): Promise<User[]> {
     return db
@@ -1418,7 +1485,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(users.firstName), asc(users.lastName));
   }
 
-  async getUsersWithRole(role: string): Promise<User[]> {
+  async getUsersWithRole(role: string): Promise<User[] M> {
     const usersWithRole = await db
       .select()
       .from(users)
