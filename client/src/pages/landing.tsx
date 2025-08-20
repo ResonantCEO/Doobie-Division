@@ -2,15 +2,72 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ShoppingBag, Users, BarChart3, Package, Star, Shield, Clock, Smartphone, Truck, ArrowRight, CheckCircle, Zap, Heart, Sparkles, MessageCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ShoppingBag, Users, BarChart3, Package, Star, Shield, Clock, Smartphone, Truck, ArrowRight, CheckCircle, Zap, Heart, Sparkles, MessageCircle, Send } from "lucide-react";
 import { AuthForms } from "@/components/auth-forms";
-import { Link } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Landing() {
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [showSupportDialog, setShowSupportDialog] = useState(false);
+  const [supportForm, setSupportForm] = useState({
+    customerName: "",
+    customerEmail: "",
+    customerPhone: "",
+    message: ""
+  });
+  const { toast } = useToast();
 
   const handleLogin = () => {
     setShowAuthDialog(true);
+  };
+
+  const handleSupportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const ticketData = {
+        subject: "Support Request",
+        message: supportForm.message,
+        priority: "normal",
+        customerName: supportForm.customerName,
+        customerEmail: supportForm.customerEmail,
+        customerPhone: supportForm.customerPhone,
+        userId: null
+      };
+
+      const response = await fetch("/api/support/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(ticketData),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Support ticket submitted successfully",
+          description: "We'll get back to you within 24 hours.",
+        });
+        setSupportForm({ 
+          customerName: "", 
+          customerEmail: "", 
+          customerPhone: "", 
+          message: ""
+        });
+        setShowSupportDialog(false);
+      } else {
+        throw new Error("Failed to submit support ticket");
+      }
+    } catch (error) {
+      toast({
+        title: "Failed to submit support ticket",
+        description: "Please try again or contact us directly.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -348,16 +405,15 @@ export default function Landing() {
                 <div>
                   <h4 className="text-white font-medium mb-2">Contact Us</h4>
                   <p className="text-gray-400 mb-3">Get in touch with our support team for any questions or assistance.</p>
-                  <Link href="/support">
-                    <Button 
-                      size="sm"
-                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white transition-all duration-300 hover:scale-105"
-                      data-testid="button-support-contact"
-                    >
-                      <MessageCircle className="h-4 w-4 mr-2" />
-                      Submit Support Ticket
-                    </Button>
-                  </Link>
+                  <Button 
+                    size="sm"
+                    onClick={() => setShowSupportDialog(true)}
+                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white transition-all duration-300 hover:scale-105"
+                    data-testid="button-support-contact"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Submit Support Ticket
+                  </Button>
                 </div>
                 <div className="text-xs text-gray-500">
                   <p>• Name, phone, email & details required</p>
@@ -379,6 +435,86 @@ export default function Landing() {
             <DialogTitle className="text-white">Join Doobie Division</DialogTitle>
           </DialogHeader>
           <AuthForms onSuccess={() => setShowAuthDialog(false)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Support Ticket Dialog */}
+      <Dialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
+        <DialogContent className="bg-slate-900 border-white/20 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center">
+              <MessageCircle className="h-5 w-5 mr-2 text-green-400" />
+              Submit Support Ticket
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSupportSubmit} className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-white mb-2 block">Full Name *</label>
+              <Input
+                value={supportForm.customerName}
+                onChange={(e) => setSupportForm(prev => ({ ...prev, customerName: e.target.value }))}
+                placeholder="Your full name"
+                required
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
+                data-testid="input-support-name"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-white mb-2 block">Phone Number *</label>
+              <Input
+                value={supportForm.customerPhone}
+                onChange={(e) => setSupportForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                placeholder="Your phone number"
+                type="tel"
+                required
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
+                data-testid="input-support-phone"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-white mb-2 block">Email Address *</label>
+              <Input
+                value={supportForm.customerEmail}
+                onChange={(e) => setSupportForm(prev => ({ ...prev, customerEmail: e.target.value }))}
+                placeholder="Your email address"
+                type="email"
+                required
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
+                data-testid="input-support-email"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-white mb-2 block">Support Request Details *</label>
+              <Textarea
+                value={supportForm.message}
+                onChange={(e) => setSupportForm(prev => ({ ...prev, message: e.target.value }))}
+                placeholder="Please describe your question or issue in detail..."
+                rows={4}
+                required
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
+                data-testid="textarea-support-details"
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowSupportDialog(false)}
+                className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800"
+                data-testid="button-support-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                data-testid="button-support-submit"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Submit Ticket
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
