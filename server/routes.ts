@@ -147,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Product routes
   app.get('/api/products', async (req, res) => {
     try {
-      const { categoryId, categoryIds, search, status } = req.query;
+      const { categoryId, categoryIds, search, status, includeInactive } = req.query;
       const filters: any = {};
 
       if (categoryIds) {
@@ -166,6 +166,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For storefront (non-authenticated requests), only show active products
       const isStorefrontRequest = !req.headers.authorization && !(req.cookies && req.cookies['connect.sid']);
       if (isStorefrontRequest) {
+        filters.isActive = true;
+      } else if (includeInactive !== 'true') {
+        // For authenticated requests, only filter by active status if not explicitly including inactive products
         filters.isActive = true;
       }
 

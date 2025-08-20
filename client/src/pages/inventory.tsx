@@ -115,6 +115,9 @@ export default function InventoryPage() {
       
       if (stockFilter) params.append('status', stockFilter);
       
+      // Add parameter to show all products including inactive ones for inventory management
+      params.append('includeInactive', 'true');
+      
       const response = await fetch(`/api/products?${params.toString()}`, {
         credentials: 'include'
       });
