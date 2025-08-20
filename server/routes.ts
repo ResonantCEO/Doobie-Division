@@ -1208,6 +1208,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/support/tickets/:id/response', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { message, type } = req.body;
+
+      if (!message || !type) {
+        return res.status(400).json({ message: "Message and type are required" });
+      }
+
+      const response = await storage.addSupportTicketResponse(id, {
+        message,
+        type,
+        createdBy: req.currentUser.id
+      });
+
+      res.status(201).json(response);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to add ticket response" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Setup WebSocket server

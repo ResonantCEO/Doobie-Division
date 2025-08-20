@@ -157,6 +157,15 @@ export const supportTickets = pgTable("support_tickets", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const supportTicketResponses = pgTable("support_ticket_responses", {
+  id: serial("id").primaryKey(),
+  ticketId: integer("ticket_id").references(() => supportTickets.id),
+  message: text("message").notNull(),
+  type: varchar("type").notNull(), // internal_note, customer_response
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   orders: many(orders),
@@ -226,13 +235,25 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   }),
 }));
 
-export const supportTicketsRelations = relations(supportTickets, ({ one }) => ({
+export const supportTicketsRelations = relations(supportTickets, ({ one, many }) => ({
   user: one(users, {
     fields: [supportTickets.userId],
     references: [users.id],
   }),
   assignedUser: one(users, {
     fields: [supportTickets.assignedTo],
+    references: [users.id],
+  }),
+  responses: many(supportTicketResponses),
+}));
+
+export const supportTicketResponsesRelations = relations(supportTicketResponses, ({ one }) => ({
+  ticket: one(supportTickets, {
+    fields: [supportTicketResponses.ticketId],
+    references: [supportTickets.id],
+  }),
+  createdBy: one(users, {
+    fields: [supportTicketResponses.createdBy],
     references: [users.id],
   }),
 }));
@@ -305,6 +326,11 @@ export const insertSupportTicketSchema = createInsertSchema(supportTickets).exte
   customerPhone: z.string().min(1, "Phone number is required")
 });
 
+export const insertSupportTicketResponseSchema = createInsertSchema(supportTicketResponses).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -329,3 +355,5 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
 export type SupportTicket = typeof supportTickets.$inferSelect;
+export type InsertSupportTicketResponse = z.infer<typeof insertSupportTicketResponseSchema>;
+export type SupportTicketResponse = typeof supportTicketResponses.$inferSelect;

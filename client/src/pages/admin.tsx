@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle } from "lucide-react";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send } from "lucide-react";
 import type { InventoryLog, Product, User, SupportTicket } from "@shared/schema";
 
 interface InventoryLogWithDetails extends InventoryLog {
@@ -45,6 +46,11 @@ export default function AdminPage() {
   const [productFilter, setProductFilter] = useState("");
   const [ticketStatusFilter, setTicketStatusFilter] = useState("all");
   const [ticketPriorityFilter, setTicketPriorityFilter] = useState("all");
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [ticketResponse, setTicketResponse] = useState("");
+  const [responseType, setResponseType] = useState("internal_note"); // internal_note, customer_response
+
 
   // Redirect if not admin
   if (!user || user.role !== 'admin') {
@@ -65,7 +71,7 @@ export default function AdminPage() {
       if (dateFilter && dateFilter !== 'all') params.append('days', dateFilter);
       if (typeFilter && typeFilter !== 'all') params.append('type', typeFilter);
       if (productFilter) params.append('product', productFilter);
-      
+
       const response = await fetch(`/api/admin/inventory-logs?${params}`);
       if (!response.ok) throw new Error('Failed to fetch inventory logs');
       return response.json();
@@ -78,7 +84,7 @@ export default function AdminPage() {
       const params = new URLSearchParams();
       if (ticketStatusFilter && ticketStatusFilter !== 'all') params.append('status', ticketStatusFilter);
       if (ticketPriorityFilter && ticketPriorityFilter !== 'all') params.append('priority', ticketPriorityFilter);
-      
+
       const response = await fetch(`/api/support/tickets?${params}`, {
         credentials: "include"
       });
@@ -138,6 +144,28 @@ export default function AdminPage() {
     },
   });
 
+  const sendTicketResponseMutation = useMutation({
+    mutationFn: async ({ ticketId, response, type }: { ticketId: number; response: string; type: string }) => {
+      const response = await fetch(`/api/support/tickets/${ticketId}/respond`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ response, type }),
+      });
+      if (!response.ok) throw new Error('Failed to send response');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
+      toast({ title: "Response sent successfully" });
+      setShowTicketModal(false);
+      setTicketResponse("");
+    },
+    onError: () => {
+      toast({ title: "Failed to send response", variant: "destructive" });
+    },
+  });
+
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'stock_in': return 'bg-green-100 text-green-800';
@@ -186,6 +214,29 @@ export default function AdminPage() {
     });
   };
 
+  const handleTicketView = (ticket: SupportTicketWithDetails) => {
+    setSelectedTicket(ticket);
+    setShowTicketModal(true);
+  };
+
+  const handleCloseTicketModal = () => {
+    setShowTicketModal(false);
+    setSelectedTicket(null);
+    setTicketResponse("");
+    setResponseType("internal_note");
+  };
+
+  const handleSendResponse = () => {
+    if (selectedTicket && ticketResponse) {
+      sendTicketResponseMutation.mutate({
+        ticketId: selectedTicket.ticket.id,
+        response: ticketResponse,
+        type: responseType,
+      });
+    }
+  };
+
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -227,7 +278,7 @@ export default function AdminPage() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="flex-1">
               <label className="block text-sm font-medium mb-1">Change Type</label>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -358,7 +409,7 @@ export default function AdminPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="flex-1">
                   <label className="block text-sm font-medium mb-1">Priority</label>
                   <Select value={ticketPriorityFilter} onValueChange={setTicketPriorityFilter}>
@@ -463,11 +514,11 @@ export default function AdminPage() {
                                 onValueChange={(assignedTo) => handleAssignTicket(item.ticket.id, assignedTo)}
                               >
                                 <SelectTrigger className="w-40">
-                                  <SelectValue placeholder="Assign..." />
+                                  <SelectValue placeholder="Assign to..." />
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="unassigned">Unassigned</SelectItem>
-                                  {staffUsers.map((staff) => (
+                                  {staffUsers?.map((staff) => (
                                     <SelectItem key={staff.id} value={staff.id}>
                                       {staff.firstName} {staff.lastName}
                                     </SelectItem>
@@ -476,11 +527,51 @@ export default function AdminPage() {
                               </Select>
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center space-x-1">
-                                <Clock className="h-4 w-4 text-gray-400" />
-                                <span className="text-sm text-gray-500">
-                                  {format(new Date(item.ticket.updatedAt!), 'MMM dd')}
-                                </span>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleTicketView(item)}
+                                  className="text-xs"
+                                >
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  View
+                                </Button>
+
+                                <Select
+                                  value={item.ticket.status}
+                                  onValueChange={(value) => updateTicketStatusMutation.mutate({ ticketId: item.ticket.id, status: value })}
+                                >
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="open">Open</SelectItem>
+                                    <SelectItem value="in_progress">In Progress</SelectItem>
+                                    <SelectItem value="resolved">Resolved</SelectItem>
+                                    <SelectItem value="closed">Closed</SelectItem>
+                                  </SelectContent>
+                                </Select>
+
+                                <Select
+                                  value={item.ticket.assignedTo || "unassigned"}
+                                  onValueChange={(value) => assignTicketMutation.mutate({
+                                    ticketId: item.ticket.id,
+                                    assignedTo: value === "unassigned" ? null : value
+                                  })}
+                                >
+                                  <SelectTrigger className="w-40">
+                                    <SelectValue placeholder="Assign to..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                                    {staffUsers?.map((user) => (
+                                      <SelectItem key={user.id} value={user.id}>
+                                        {user.firstName} {user.lastName}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -494,6 +585,65 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Ticket Review Modal */}
+      <Dialog open={showTicketModal} onOpenChange={handleCloseTicketModal}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Ticket #{selectedTicket?.ticket.id} - {selectedTicket?.ticket.subject}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex items-center gap-2">
+              <UserIcon className="h-5 w-5 text-gray-400" />
+              <span className="font-semibold">Customer:</span>
+              <span>{selectedTicket?.ticket.customerName || (selectedTicket?.user ? `${selectedTicket.user.firstName} ${selectedTicket.user.lastName}` : 'Anonymous')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-gray-400" />
+              <span className="font-semibold">Created:</span>
+              <span>{selectedTicket?.ticket.createdAt ? format(new Date(selectedTicket.ticket.createdAt), 'MMM dd, yyyy HH:mm') : 'N/A'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-gray-400" />
+              <span className="font-semibold">Priority:</span>
+              <Badge className={getPriorityColor(selectedTicket?.ticket.priority || 'normal')}>
+                {selectedTicket?.ticket.priority.charAt(0).toUpperCase() + selectedTicket?.ticket.priority.slice(1)}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-gray-400" />
+              <span className="font-semibold">Message:</span>
+              <p className="text-sm text-gray-600 break-words">{selectedTicket?.ticket.message}</p>
+            </div>
+            <hr />
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Your Response</label>
+              <Select value={responseType} onValueChange={setResponseType}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Response Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="internal_note">Internal Note</SelectItem>
+                  <SelectItem value="customer_response">Customer Response</SelectItem>
+                </SelectContent>
+              </Select>
+              <Textarea
+                placeholder={`Write your ${responseType === 'customer_response' ? 'response to the customer' : 'internal note'}...`}
+                value={ticketResponse}
+                onChange={(e) => setTicketResponse(e.target.value)}
+                className="min-h-[100px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseTicketModal}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendResponse} disabled={!ticketResponse || sendTicketResponseMutation.isPending}>
+              {sendTicketResponseMutation.isPending ? 'Sending...' : 'Send Response'}
+            </Button>
+          </DialogFooter>
+        </Dialog>
     </div>
   );
 }

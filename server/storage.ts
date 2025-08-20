@@ -7,6 +7,7 @@ import {
   inventoryLogs,
   notifications,
   supportTickets,
+  supportTicketResponses,
   type User,
   type UpsertUser,
   type Category,
@@ -1460,18 +1461,18 @@ export class DatabaseStorage implements IStorage {
     return ticket;
   }
 
-  async getSupportTickets(filters: any = {}) {
-    const conditions = [];
+  async getSupportTickets(filters: any = {}): Promise<any[]> {
+    const conditions: any[] = [];
 
-    if (filters.status) {
+    if (filters.status && filters.status !== 'all') {
       conditions.push(eq(supportTickets.status, filters.status));
     }
 
-    if (filters.priority) {
+    if (filters.priority && filters.priority !== 'all') {
       conditions.push(eq(supportTickets.priority, filters.priority));
     }
 
-    return db
+    const tickets = await db
       .select({
         ticket: supportTickets,
         user: {
@@ -1486,6 +1487,31 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(supportTickets.userId, users.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(supportTickets.createdAt));
+
+    // Get responses for each ticket
+    for (const ticket of tickets) {
+      const responses = await db
+        .select({
+          id: supportTicketResponses.id,
+          message: supportTicketResponses.message,
+          type: supportTicketResponses.type,
+          createdAt: supportTicketResponses.createdAt,
+          createdBy: {
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+          }
+        })
+        .from(supportTicketResponses)
+        .leftJoin(users, eq(supportTicketResponses.createdBy, users.id))
+        .where(eq(supportTicketResponses.ticketId, ticket.ticket.id))
+        .orderBy(asc(supportTicketResponses.createdAt));
+
+      (ticket as any).responses = responses;
+    }
+
+    return tickets;
   }
 
   async updateSupportTicketStatus(id: number, status: string) {
