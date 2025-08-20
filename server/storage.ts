@@ -1485,7 +1485,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(users.firstName), asc(users.lastName));
   }
 
-  async getUsersWithRole(role: string): Promise<User[] M> {
+  async getUsersWithRole(role: string): Promise<User[]> {
     const usersWithRole = await db
       .select()
       .from(users)
