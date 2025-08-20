@@ -109,17 +109,22 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
       return response.json();
     },
     onSuccess: (response) => {
-      toast({
-        title: "Registration successful",
-        description: response.message,
-      });
-
       // Only auto-login if user session was created (first user)
       if (response.user) {
+        toast({
+          title: "Registration successful",
+          description: response.message,
+        });
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
         onSuccess?.();
       } else {
-        // For pending users, switch to login tab and reset signup step
+        // For pending users, show approval notification
+        toast({
+          title: "Account Approval Required",
+          description: "Your registration is complete, but your account must be approved by our team. We appreciate your patience as we process your request.",
+          duration: 8000, // Show for 8 seconds since it's important information
+        });
+        // Switch to login tab and reset signup step
         setActiveTab("login");
         setSignupStep(1);
       }
