@@ -154,9 +154,9 @@ export default function SupportPage() {
     <>
       <Navigation user={user} currentTab="support" />
       <div className="min-h-screen bg-background p-6">
-        <div className="max-w-6xl mx-auto space-y-8"></div>
+        <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
-        <div className="text-center">
+        <div className="text-center"></div>
           <h1 className="text-4xl font-bold mb-4">Customer Support</h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             We're here to help! Find answers to common questions or get in touch with our support team.
