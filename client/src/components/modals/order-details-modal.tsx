@@ -464,11 +464,13 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
             {displayOrder.notes && (
               <>
                 <Separator />
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold text-white">Notes</h3>
-                  <p className="text-sm text-white bg-gray-50 p-3 rounded-lg">
-                    {displayOrder.notes}
-                  </p>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-white">Notes</h3>
+                  </div>
+                  <div className="text-sm text-white bg-gray-700/50 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-600">
+                    <p className="whitespace-pre-wrap">{displayOrder.notes}</p>
+                  </div>
                 </div>
               </>
             )}
