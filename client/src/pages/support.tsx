@@ -116,7 +116,7 @@ export default function SupportPage() {
           <div className="text-center">
             <h1 className="text-4xl font-bold mb-4">Customer Support</h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              We're here to help! Find answers to common questions or get in touch with our support team.
+              We're here to help! Get in touch with our support team for any assistance you need.
             </p>
           </div>
 
