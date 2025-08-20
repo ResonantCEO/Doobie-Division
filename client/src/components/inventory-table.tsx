@@ -16,7 +16,7 @@ import QRCodeModal from "@/components/modals/qr-code-modal";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { MoreHorizontal, Edit, QrCode, TrendingUp, TrendingDown, Package, Eye, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
+import { MoreHorizontal, Edit, QrCode, TrendingUp, TrendingDown, Package, Eye, ArrowUpDown, ArrowUp, ArrowDown, Trash2, EyeOff } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Product, Category, User } from "@shared/schema";
 
@@ -66,6 +66,39 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
       toast({
         title: "Error",
         description: "Failed to delete product",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleVisibilityMutation = useMutation({
+    mutationFn: async ({ productId, isActive }: { productId: number; isActive: boolean }) => {
+      await apiRequest("PUT", `/api/products/${productId}`, {
+        isActive: !isActive,
+      });
+    },
+    onSuccess: (_, { isActive }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      toast({
+        title: "Success",
+        description: `Product ${!isActive ? 'shown' : 'hidden'} on storefront`,
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to update product visibility",
         variant: "destructive",
       });
     },
@@ -309,6 +342,14 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                         </DropdownMenuItem>
                         {user?.role === 'admin' && (
                           <DropdownMenuItem 
+                            onClick={() => toggleVisibilityMutation.mutate({ productId: product.id, isActive: product.isActive })}
+                          >
+                            {product.isActive ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                            {product.isActive ? 'Hide from Storefront' : 'Show on Storefront'}
+                          </DropdownMenuItem>
+                        )}
+                        {user?.role === 'admin' && (
+                          <DropdownMenuItem 
                             onClick={() => confirmDelete(product.id)}
                             className="text-red-600"
                           >
@@ -417,6 +458,9 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                   }}
                 />
               </TableHead>
+              <TableHead className="w-12">
+                <Eye className="h-4 w-4 text-gray-500" title="Storefront Visibility" />
+              </TableHead>
               <TableHead>
                 <Button
                   variant="ghost"
@@ -496,6 +540,19 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                     }}
                     className="rounded border-gray-300"
                   />
+                </TableCell>
+                <TableCell>
+                  {user?.role === 'admin' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleVisibilityMutation.mutate({ productId: product.id, isActive: product.isActive })}
+                      className={`h-8 w-8 p-0 ${product.isActive ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'}`}
+                      title={product.isActive ? 'Visible on storefront - Click to hide' : 'Hidden from storefront - Click to show'}
+                    >
+                      {product.isActive ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    </Button>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center space-x-3">
@@ -631,6 +688,14 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                         <QrCode className="h-4 w-4 mr-2" />
                         View QR Code
                       </DropdownMenuItem>
+                      {user?.role === 'admin' && (
+                        <DropdownMenuItem 
+                          onClick={() => toggleVisibilityMutation.mutate({ productId: product.id, isActive: product.isActive })}
+                        >
+                          {product.isActive ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                          {product.isActive ? 'Hide from Storefront' : 'Show on Storefront'}
+                        </DropdownMenuItem>
+                      )}
                       {user?.role === 'admin' && (
                         <DropdownMenuItem 
                           onClick={() => confirmDelete(product.id)}
