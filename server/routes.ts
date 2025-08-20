@@ -164,7 +164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status) filters.status = status as string;
 
       // For storefront (non-authenticated requests), only show active products
-      const isStorefrontRequest = !req.headers.authorization && !req.cookies['connect.sid'];
+      const isStorefrontRequest = !req.headers.authorization && !(req.cookies && req.cookies['connect.sid']);
       if (isStorefrontRequest) {
         filters.isActive = true;
       }
