@@ -561,7 +561,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Status is required" });
       }
 
+      // Get the order before updating to access customer information
+      const existingOrder = await storage.getOrder(id);
+      if (!existingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
       const order = await storage.updateOrderStatus(id, status);
+
+      // Create notification for the customer about status change
+      if (existingOrder.customerId) {
+        try {
+          const statusMessages = {
+            'pending': 'Your order is pending confirmation',
+            'processing': 'Your order is being processed',
+            'shipped': 'Your order has been shipped',
+            'delivered': 'Your order has been delivered',
+            'cancelled': 'Your order has been cancelled'
+          };
+
+          const message = statusMessages[status] || `Your order status has been updated to ${status}`;
+
+          await storage.createNotification({
+            userId: existingOrder.customerId,
+            type: 'order_status_update',
+            title: `Order ${existingOrder.orderNumber} Update`,
+            message: message,
+            data: { 
+              orderId: existingOrder.id, 
+              orderNumber: existingOrder.orderNumber, 
+              status: status,
+              total: existingOrder.total 
+            }
+          });
+        } catch (notificationError) {
+          console.error('Failed to create customer notification:', notificationError);
+          // Don't fail the status update if notification creation fails
+        }
+      }
 
       // Broadcast order update to all connected WebSocket clients
       broadcastToClients({

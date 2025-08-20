@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from './use-toast';
@@ -14,7 +13,7 @@ export function useOrderNotifications() {
         const response = await fetch('/api/notifications', {
           credentials: 'include',
         });
-        
+
         if (response.ok) {
           const notifications = await response.json();
           const newOrderNotifications = notifications.filter(
