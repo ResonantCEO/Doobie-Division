@@ -351,15 +351,6 @@ export default function Landing() {
                 </a>
               </div>
             </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-white">Company</h4>
-              <ul className="text-sm text-white/60 space-y-3">
-                <li className="hover:text-white transition-colors cursor-pointer">About Us</li>
-                <li className="hover:text-white transition-colors cursor-pointer">Quality Promise</li>
-                <li className="hover:text-white transition-colors cursor-pointer">Privacy Policy</li>
-                <li className="hover:text-white transition-colors cursor-pointer">Terms of Service</li>
-              </ul>
-            </div>
           </div>
           <div className="border-t border-white/10 mt-12 pt-8 text-center text-white/50 text-sm">
             <p>&copy; 2024 Doobie Division. All rights reserved. | Must be 18+ to purchase.</p>
