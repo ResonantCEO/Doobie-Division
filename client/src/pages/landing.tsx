@@ -23,8 +23,8 @@ export default function Landing() {
                 Doobie Division
               </h1>
             </div>
-            <Button 
-              onClick={handleLogin} 
+            <Button
+              onClick={handleLogin}
               className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 border-0 px-6 py-2 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-green-500/25"
             >
               Sign In
@@ -66,12 +66,12 @@ export default function Landing() {
             </h1>
 
             <p className="text-xl md:text-2xl mb-12 text-white/70 max-w-4xl mx-auto leading-relaxed">
-              Discover curated products, enjoy seamless ordering, and experience personalized service 
+              Discover curated products, enjoy seamless ordering, and experience personalized service
               with our premium marketplace designed for discerning customers.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-12">
-              <Button 
+              <Button
                 onClick={handleLogin}
                 size="lg"
                 className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-lg px-12 py-4 rounded-full shadow-2xl hover:shadow-green-500/25 transition-all duration-300 hover:scale-105 group"
@@ -311,7 +311,7 @@ export default function Landing() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-            <Button 
+            <Button
               onClick={handleLogin}
               size="lg"
               className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-xl px-12 py-4 rounded-full shadow-2xl hover:shadow-green-500/25 transition-all duration-300 hover:scale-105 group"
@@ -337,18 +337,19 @@ export default function Landing() {
                 Doobie Division
               </h3>
               <p className="text-white/70 text-sm leading-relaxed max-w-md">
-                Your trusted partner for premium products, delivered with care and discretion. 
+                Your trusted partner for premium products, delivered with care and discretion.
                 Experience the future of online shopping.
               </p>
             </div>
             <div>
               <h4 className="font-semibold mb-4 text-white">Support</h4>
-              <ul className="text-sm text-white/60 space-y-3">
-                <li className="hover:text-white transition-colors cursor-pointer">Order Support</li>
-                <li className="hover:text-white transition-colors cursor-pointer">Product Questions</li>
-                <li className="hover:text-white transition-colors cursor-pointer">Return Policy</li>
-                <li className="hover:text-white transition-colors cursor-pointer">FAQ</li>
-              </ul>
+              <div className="space-y-2 text-sm">
+                <h4 className="text-white font-medium">Contact Us</h4>
+                <p className="text-gray-400">Get in touch with our support team for any questions or assistance.</p>
+                <a href="mailto:support@doobie-division.com" className="text-green-400 hover:text-green-300 transition-colors block">
+                  support@doobie-division.com
+                </a>
+              </div>
             </div>
             <div>
               <h4 className="font-semibold mb-4 text-white">Company</h4>
