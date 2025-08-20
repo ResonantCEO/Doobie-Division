@@ -342,14 +342,6 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                         </DropdownMenuItem>
                         {user?.role === 'admin' && (
                           <DropdownMenuItem 
-                            onClick={() => toggleVisibilityMutation.mutate({ productId: product.id, isActive: product.isActive })}
-                          >
-                            {product.isActive ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                            {product.isActive ? 'Hide from Storefront' : 'Show on Storefront'}
-                          </DropdownMenuItem>
-                        )}
-                        {user?.role === 'admin' && (
-                          <DropdownMenuItem 
                             onClick={() => confirmDelete(product.id)}
                             className="text-red-600"
                           >
