@@ -163,6 +163,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (search) filters.search = search as string;
       if (status) filters.status = status as string;
 
+      // For storefront (non-authenticated requests), only show active products
+      const isStorefrontRequest = !req.headers.authorization && !req.cookies['connect.sid'];
+      if (isStorefrontRequest) {
+        filters.isActive = true;
+      }
+
       const products = await storage.getProducts(filters);
       res.json(products);
     } catch (error) {
@@ -187,6 +193,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const product = await storage.getProduct(id);
 
       if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      // Only return product if it's active (for storefront)
+      if (!product.isActive && !req.headers.authorization) {
         return res.status(404).json({ message: "Product not found" });
       }
 
@@ -498,7 +509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemsData = enrichedItems.map((item: any) => insertOrderItemSchema.parse(item));
 
       const newOrder = await storage.createOrder(orderData, itemsData);
-      
+
       // Create notifications for staff, managers, and admins about the new order
       try {
         const staffUsers = await storage.getStaffUsers();
@@ -515,13 +526,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Failed to create order notifications:', notificationError);
         // Don't fail the order creation if notifications fail
       }
-      
+
       // Broadcast new order to all connected WebSocket clients
       broadcastToClients({
         type: 'new_order',
         data: newOrder
       });
-      
+
       res.status(201).json(newOrder);
     } catch (error) {
       console.error('Order creation error:', error);
@@ -543,13 +554,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const order = await storage.updateOrderStatus(id, status);
-      
+
       // Broadcast order update to all connected WebSocket clients
       broadcastToClients({
         type: 'order_updated',
         data: order
       });
-      
+
       res.json(order);
     } catch (error) {
       res.status(500).json({ message: "Failed to update order status" });
@@ -1050,24 +1061,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
-  
+
   // Setup WebSocket server
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-  
+
   wss.on('connection', (ws) => {
 
     wsConnections.add(ws);
-    
+
     ws.on('close', () => {
 
       wsConnections.delete(ws);
     });
-    
+
     ws.on('error', (error) => {
       console.error('WebSocket error:', error);
       wsConnections.delete(ws);
     });
   });
-  
+
   return httpServer;
 }

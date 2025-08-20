@@ -22,7 +22,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, inArray, lte, isNull, like } from "drizzle-orm";
+import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
@@ -46,7 +46,7 @@ export interface IStorage {
   deleteCategory(id: number): Promise<void>;
 
   // Product operations
-  getProducts(filters?: { categoryId?: number; categoryIds?: number[]; search?: string; status?: string }): Promise<(Product & { category: Category | null })[]>;
+  getProducts(filters?: { categoryId?: number; categoryIds?: number[]; search?: string; status?: string; isActive?: boolean }): Promise<(Product & { category: Category | null })[]>;
   getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
@@ -273,6 +273,7 @@ export class DatabaseStorage implements IStorage {
     categoryIds?: number[];
     search?: string;
     status?: string;
+    isActive?: boolean;
   }): Promise<(Product & { category: Category | null })[]> {
     let query = db
       .select({
@@ -300,6 +301,11 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(categories, eq(products.categoryId, categories.id));
 
     const conditions = [];
+
+    // Always filter by isActive if specified
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(products.isActive, filters.isActive));
+    }
 
     if (filters?.categoryIds) {
       // Get all relevant category IDs including parent and all descendant categories recursively
@@ -386,7 +392,24 @@ export class DatabaseStorage implements IStorage {
   async getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined> {
     const [product] = await db
       .select({
-        ...products,
+        id: products.id,
+        name: products.name,
+        description: products.description,
+        price: products.price,
+        sku: products.sku,
+        categoryId: products.categoryId,
+        imageUrl: products.imageUrl,
+        stock: products.stock,
+        physicalInventory: products.physicalInventory,
+        minStockThreshold: products.minStockThreshold,
+        sellingMethod: products.sellingMethod,
+        weightUnit: products.weightUnit,
+        pricePerGram: products.pricePerGram,
+        pricePerOunce: products.pricePerOunce,
+        discountPercentage: products.discountPercentage,
+        isActive: products.isActive,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
         category: categories,
       })
       .from(products)
