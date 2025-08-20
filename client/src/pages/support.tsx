@@ -206,23 +206,7 @@ export default function SupportPage() {
                   </Button>
                 </form>
 
-                <div className="mt-6 pt-6 border-t">
-                  <h4 className="font-semibold mb-3">Alternative Contact Methods</h4>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <div className="flex items-center">
-                      <Mail className="h-4 w-4 mr-2" />
-                      <span>Email: support@doobie-division.com</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Phone className="h-4 w-4 mr-2" />
-                      <span>Phone: 1-800-DOOBIE-1 (1-800-366-2431)</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-2" />
-                      <span>Response Time: Usually within 24 hours</span>
-                    </div>
-                  </div>
-                </div>
+                
               </CardContent>
             </Card>
 
