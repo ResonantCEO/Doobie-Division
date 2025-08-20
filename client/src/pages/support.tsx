@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import Navigation from "@/components/navigation";
 import { 
   MessageCircle, 
   Mail, 
@@ -145,9 +146,15 @@ export default function SupportPage() {
     }
   ];
 
+  if (!user) {
+    return <div>Loading...</div>;
+  }
+
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <>
+      <Navigation user={user} currentTab="support" />
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-6xl mx-auto space-y-8"></div>
         {/* Header */}
         <div className="text-center">
           <h1 className="text-4xl font-bold mb-4">Customer Support</h1>
@@ -384,7 +391,8 @@ export default function SupportPage() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
