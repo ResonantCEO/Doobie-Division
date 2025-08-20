@@ -27,6 +27,9 @@ export default function SupportPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [contactForm, setContactForm] = useState({
+    customerName: "",
+    customerEmail: "",
+    customerPhone: "",
     subject: "",
     message: "",
     priority: "normal"
@@ -37,7 +40,12 @@ export default function SupportPage() {
     
     try {
       const ticketData = {
-        ...contactForm,
+        subject: contactForm.subject,
+        message: contactForm.message,
+        priority: contactForm.priority,
+        customerName: contactForm.customerName,
+        customerEmail: contactForm.customerEmail,
+        customerPhone: contactForm.customerPhone,
         userId: user?.id || null
       };
 
@@ -55,7 +63,14 @@ export default function SupportPage() {
           title: "Message sent successfully",
           description: "We'll get back to you within 24 hours.",
         });
-        setContactForm({ subject: "", message: "", priority: "normal" });
+        setContactForm({ 
+          customerName: "", 
+          customerEmail: "", 
+          customerPhone: "", 
+          subject: "", 
+          message: "", 
+          priority: "normal" 
+        });
       } else {
         throw new Error("Failed to send message");
       }
@@ -183,8 +198,39 @@ export default function SupportPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmitContact} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Full Name *</label>
+                    <Input
+                      value={contactForm.customerName}
+                      onChange={(e) => setContactForm(prev => ({ ...prev, customerName: e.target.value }))}
+                      placeholder="Your full name"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Phone Number *</label>
+                    <Input
+                      value={contactForm.customerPhone}
+                      onChange={(e) => setContactForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                      placeholder="Your phone number"
+                      type="tel"
+                      required
+                    />
+                  </div>
+                </div>
                 <div>
-                  <label className="text-sm font-medium mb-1 block">Subject</label>
+                  <label className="text-sm font-medium mb-1 block">Email Address *</label>
+                  <Input
+                    value={contactForm.customerEmail}
+                    onChange={(e) => setContactForm(prev => ({ ...prev, customerEmail: e.target.value }))}
+                    placeholder="Your email address"
+                    type="email"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Subject *</label>
                   <Input
                     value={contactForm.subject}
                     onChange={(e) => setContactForm(prev => ({ ...prev, subject: e.target.value }))}
@@ -210,35 +256,41 @@ export default function SupportPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-1 block">Message</label>
+                  <label className="text-sm font-medium mb-1 block">Support Request Details *</label>
                   <Textarea
                     value={contactForm.message}
                     onChange={(e) => setContactForm(prev => ({ ...prev, message: e.target.value }))}
-                    placeholder="Please provide details about your issue..."
-                    rows={4}
+                    placeholder="Please provide detailed information about your request or issue. Include any relevant order numbers, product names, or error messages..."
+                    rows={5}
                     required
                   />
                 </div>
                 <Button type="submit" className="w-full">
                   <Send className="h-4 w-4 mr-2" />
-                  Send Message
+                  Submit Support Ticket
                 </Button>
               </form>
 
               <div className="mt-6 pt-6 border-t">
-                <h4 className="font-semibold mb-3">Other Ways to Reach Us</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center text-sm">
-                    <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                    support@doobie-division.com
+                <h4 className="font-semibold mb-3">Alternative Contact Methods</h4>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <div className="flex items-center">
+                    <Mail className="h-4 w-4 mr-2" />
+                    <span>Email: support@doobie-division.com</span>
                   </div>
-                  <div className="flex items-center text-sm">
-                    <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                    1-800-DOOBIE-1 (1-800-366-2431)
+                  <div className="flex items-center">
+                    <Phone className="h-4 w-4 mr-2" />
+                    <span>Phone: 1-800-DOOBIE-1 (1-800-366-2431)</span>
                   </div>
-                  <div className="flex items-center text-sm">
-                    <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                    Available 24/7 for urgent issues
+                  <div className="flex items-center">
+                    <Clock className="h-4 w-4 mr-2" />
+                    <span>Response Time: Usually within 24 hours</span>
+                  </div>
+                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                    <p className="text-xs">
+                      <strong>Note:</strong> For fastest response, please use the support ticket form above. 
+                      This helps us track your request and ensures nothing gets lost.
+                    </p>
                   </div>
                 </div>
               </div>

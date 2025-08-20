@@ -143,10 +143,13 @@ export const notifications = pgTable("notifications", {
 export const supportTickets = pgTable("support_tickets", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id),
+  customerName: varchar("customer_name"),
+  customerEmail: varchar("customer_email"),
+  customerPhone: varchar("customer_phone"),
   subject: varchar("subject").notNull(),
   message: text("message").notNull(),
-  priority: varchar("priority").notNull().default("normal"), // low, normal, high
-  status: varchar("status").notNull().default("open"), // open, in_progress, resolved, closed
+  priority: varchar("priority").notNull().default('normal'),
+  status: varchar("status").notNull().default('open'),
   assignedTo: varchar("assigned_to").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -294,13 +297,10 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   createdAt: true,
 });
 
-export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  userId: z.string().nullable().optional(),
-  assignedTo: z.string().nullable().optional(),
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).extend({
+  customerName: z.string().min(1, "Customer name is required"),
+  customerEmail: z.string().email("Valid email is required"),
+  customerPhone: z.string().min(1, "Phone number is required")
 });
 
 // Types
