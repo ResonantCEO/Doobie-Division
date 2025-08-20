@@ -492,6 +492,10 @@ export default function UsersPage() {
                                 className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
                                 onClick={() => handlePhotoClick(user, 'id')}
                                 title="Click to view full size"
+                                onError={(e) => {
+                                  console.error('ID image failed to load:', user.idImageUrl);
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
                               />
                               <span className="text-xs text-gray-500 mt-1">ID</span>
                             </div>
@@ -511,6 +515,10 @@ export default function UsersPage() {
                                 className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
                                 onClick={() => handlePhotoClick(user, 'verification')}
                                 title="Click to view full size"
+                                onError={(e) => {
+                                  console.error('Verification photo failed to load:', user.verificationPhotoUrl);
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
                               />
                               <span className="text-xs text-gray-500 mt-1">Verification</span>
                             </div>

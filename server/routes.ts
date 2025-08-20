@@ -78,6 +78,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Static file serving for uploaded images
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
+  // Configure multer for verification photo uploads
+  const verificationUploadDir = path.join(process.cwd(), 'uploads', 'verification-photos');
+  if (!fs.existsSync(verificationUploadDir)) {
+    fs.mkdirSync(verificationUploadDir, { recursive: true });
+  }
+
+  const verificationStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, verificationUploadDir);
+    },
+    filename: function (req, file, cb) {
+      const uniqueId = uuidv4();
+      const extension = path.extname(file.originalname);
+      cb(null, `${uniqueId}${extension}`);
+    }
+  });
+
+  const verificationUpload = multer({
+    storage: verificationStorage,
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed'));
+      }
+    }
+  });
+
   // Auth middleware
   await setupAuth(app);
 
@@ -92,6 +123,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ imageUrl });
     } catch (error) {
       res.status(500).json({ message: 'Failed to upload image' });
+    }
+  });
+
+  // Verification photo upload endpoint
+  app.post('/api/upload/verification-photo', verificationUpload.single('verificationPhoto'), (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No verification photo provided' });
+      }
+
+      const imageUrl = `/uploads/verification-photos/${req.file.filename}`;
+      res.json({ imageUrl });
+    } catch (error) {
+      console.error('Verification photo upload error:', error);
+      res.status(500).json({ message: 'Failed to upload verification photo' });
     }
   });
 
