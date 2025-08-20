@@ -171,6 +171,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // For authenticated requests, only filter by active status if not explicitly including inactive products
         filters.isActive = true;
       }
+      
+      // Override: If explicitly requesting to include inactive products, don't filter by active status
+      if (includeInactive === 'true') {
+        delete filters.isActive;
+      }
 
       const products = await storage.getProducts(filters);
       res.json(products);

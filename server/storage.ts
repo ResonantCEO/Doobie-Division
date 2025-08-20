@@ -295,14 +295,22 @@ export class DatabaseStorage implements IStorage {
         isActive: products.isActive,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
-        category: categories,
+        category: {
+          id: categories.id,
+          name: categories.name,
+          description: categories.description,
+          parentId: categories.parentId,
+          isActive: categories.isActive,
+          sortOrder: categories.sortOrder,
+          createdAt: categories.createdAt,
+        },
       })
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id));
 
     const conditions = [];
 
-    // Always filter by isActive if specified
+    // Active status filter - only apply if explicitly set
     if (filters?.isActive !== undefined) {
       conditions.push(eq(products.isActive, filters.isActive));
     }
