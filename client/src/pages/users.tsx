@@ -54,6 +54,7 @@ export default function UsersPage() {
   const queryClient = useQueryClient();
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedPhotoType, setSelectedPhotoType] = useState<'id' | 'verification' | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [activityModalOpen, setActivityModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -275,8 +276,9 @@ export default function UsersPage() {
     });
   };
 
-  const handlePhotoClick = (user: User) => {
+  const handlePhotoClick = (user: User, type: 'id' | 'verification') => {
     setSelectedUser(user);
+    setSelectedPhotoType(type);
     setPhotoModalOpen(true);
   };
 
@@ -481,20 +483,20 @@ export default function UsersPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex">
+                        <div className="flex space-x-2">
                           {user.idImageUrl ? (
-                            <div className="flex flex-col items-center mr-2">
+                            <div className="flex flex-col items-center">
                               <img
                                 src={user.idImageUrl}
                                 alt={`${user.firstName} ${user.lastName} ID`}
                                 className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => handlePhotoClick(user)}
+                                onClick={() => handlePhotoClick(user, 'id')}
                                 title="Click to view full size"
                               />
                               <span className="text-xs text-gray-500 mt-1">ID</span>
                             </div>
                           ) : (
-                            <div className="flex flex-col items-center mr-2">
+                            <div className="flex flex-col items-center">
                               <div className="w-12 h-12 bg-gray-100 rounded border flex items-center justify-center">
                                 <span className="text-xs text-gray-400">No ID</span>
                               </div>
@@ -507,7 +509,7 @@ export default function UsersPage() {
                                 src={user.verificationPhotoUrl}
                                 alt={`${user.firstName} ${user.lastName} Verification`}
                                 className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => handlePhotoClick(user)}
+                                onClick={() => handlePhotoClick(user, 'verification')}
                                 title="Click to view full size"
                               />
                               <span className="text-xs text-gray-500 mt-1">Verification</span>
@@ -607,14 +609,22 @@ export default function UsersPage() {
         <DialogContent className="max-w-3xl max-h-[90vh] p-6">
           <DialogHeader>
             <DialogTitle>
-              {selectedUser && `${selectedUser.firstName} ${selectedUser.lastName}'s ID Photo`}
+              {selectedUser && selectedPhotoType === 'id' && `${selectedUser.firstName} ${selectedUser.lastName}'s ID Photo`}
+              {selectedUser && selectedPhotoType === 'verification' && `${selectedUser.firstName} ${selectedUser.lastName}'s Verification Photo`}
             </DialogTitle>
           </DialogHeader>
           <div className="flex justify-center items-center">
-            {selectedUser?.idImageUrl && (
+            {selectedUser && selectedPhotoType === 'id' && selectedUser.idImageUrl && (
               <img
                 src={selectedUser.idImageUrl}
                 alt={`${selectedUser.firstName} ${selectedUser.lastName} ID`}
+                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
+              />
+            )}
+            {selectedUser && selectedPhotoType === 'verification' && selectedUser.verificationPhotoUrl && (
+              <img
+                src={selectedUser.verificationPhotoUrl}
+                alt={`${selectedUser.firstName} ${selectedUser.lastName} Verification`}
                 className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
               />
             )}
