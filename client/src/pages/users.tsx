@@ -517,7 +517,9 @@ export default function UsersPage() {
                                 title="Click to view full size"
                                 onError={(e) => {
                                   console.error('Verification photo failed to load:', user.verificationPhotoUrl);
-                                  (e.target as HTMLImageElement).style.display = 'none';
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yNCAxNkMyMS43OTA5IDE2IDE5Ljk5OTkgMTcuNzkwOSAxOS45OTk5IDIwQzE5Ljk5OTkgMjIuMjA5MSAyMS43OTA5IDI0IDI0IDI0QzI2LjIwOTEgMjQgMjggMjIuMjA5MSAyOCAyMEMyOCAxNy43OTA5IDI2LjIwOTEgMTYgMjQgMTYiIGZpbGw9IiM5Q0E0QUIiLz4KPHBhdGggZD0iTTE2IDM0QzE2IDI5LjU4MTcgMTkuNTgxNyAyNiAyNCAyNkMyOC40MTgzIDI2IDMyIDI5LjU4MTcgMzIgMzRIMTYiIGZpbGw9IiM5Q0E0QUIiLz4KPC9zdmc+';
+                                  target.className = "w-12 h-12 object-cover rounded border bg-gray-100";
                                 }}
                               />
                               <span className="text-xs text-gray-500 mt-1">Verification</span>
