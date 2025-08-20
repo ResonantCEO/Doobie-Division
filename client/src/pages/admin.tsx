@@ -643,7 +643,8 @@ export default function AdminPage() {
               {sendTicketResponseMutation.isPending ? 'Sending...' : 'Send Response'}
             </Button>
           </DialogFooter>
-        </Dialog>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
