@@ -146,14 +146,14 @@ export default function AdminPage() {
 
   const sendTicketResponseMutation = useMutation({
     mutationFn: async ({ ticketId, response, type }: { ticketId: number; response: string; type: string }) => {
-      const response = await fetch(`/api/support/tickets/${ticketId}/respond`, {
+      const res = await fetch(`/api/support/tickets/${ticketId}/respond`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ response, type }),
       });
-      if (!response.ok) throw new Error('Failed to send response');
-      return response.json();
+      if (!res.ok) throw new Error('Failed to send response');
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
