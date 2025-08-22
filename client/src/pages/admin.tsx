@@ -409,14 +409,13 @@ export default function AdminPage() {
                         <TableHead>Date Created</TableHead>
                         <TableHead>Customer</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Assigned To</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {supportTickets.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                          <TableCell colSpan={4} className="text-center py-8 text-gray-500">
                             No support tickets found for the selected filters
                           </TableCell>
                         </TableRow>
@@ -459,11 +458,6 @@ export default function AdminPage() {
                                   <SelectItem value="closed">Closed</SelectItem>
                                 </SelectContent>
                               </Select>
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-gray-500 text-sm">
-                                {item.assignedUser ? `${item.assignedUser.firstName} ${item.assignedUser.lastName}` : 'Unassigned'}
-                              </span>
                             </TableCell>
                             <TableCell>
                               <Button
