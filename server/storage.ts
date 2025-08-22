@@ -24,7 +24,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt } from "drizzle-orm";
+import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt, alias } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
@@ -1458,33 +1458,56 @@ export class DatabaseStorage implements IStorage {
       .insert(supportTickets)
       .values(data)
       .returning();
+
+    // Notify admins about the new ticket
+    const adminUsers = await this.getUsersWithRole('admin');
+    for (const admin of adminUsers) {
+      await this.createNotification({
+        userId: admin.id,
+        type: 'new_support_ticket',
+        title: 'New Support Ticket Submitted',
+        message: `A new support ticket has been submitted by ${data.name || 'a user'}.`,
+        data: { ticketId: ticket.id, subject: ticket.subject },
+      });
+    }
+
     return ticket;
   }
 
-  async getSupportTickets(filters: any = {}): Promise<any[]> {
-    const conditions: any[] = [];
+  async getSupportTickets(filters: any = {}) {
+    const conditions = [];
 
-    if (filters.status && filters.status !== 'all') {
+    if (filters.status) {
       conditions.push(eq(supportTickets.status, filters.status));
     }
 
-    if (filters.priority && filters.priority !== 'all') {
+    if (filters.priority) {
       conditions.push(eq(supportTickets.priority, filters.priority));
     }
+
+    // Create aliases for different user joins
+    const customerUser = alias(users, 'customerUser');
+    const assignedUser = alias(users, 'assignedUser');
 
     const tickets = await db
       .select({
         ticket: supportTickets,
         user: {
-          id: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          email: users.email,
+          id: customerUser.id,
+          firstName: customerUser.firstName,
+          lastName: customerUser.lastName,
+          email: customerUser.email,
         },
-        assignedUser: users,
+        assignedUser: {
+          id: assignedUser.id,
+          firstName: assignedUser.firstName,
+          lastName: assignedUser.lastName,
+          email: assignedUser.email,
+        },
       })
       .from(supportTickets)
-      .leftJoin(users, eq(supportTickets.userId, users.id))
+      .leftJoin(customerUser, eq(supportTickets.userId, customerUser.id))
+      .leftJoin(assignedUser, eq(supportTickets.assignedTo, assignedUser.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(supportTickets.createdAt));
 

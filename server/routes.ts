@@ -1156,6 +1156,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const ticketData = insertSupportTicketSchema.parse(req.body);
       const ticket = await storage.createSupportTicket(ticketData);
+
+      // Create notifications for admins about the new support ticket
+      try {
+        const adminUsers = await storage.getUsersWithRole('admin');
+        const managerUsers = await storage.getUsersWithRole('manager');
+        const allStaff = [...adminUsers, ...managerUsers];
+
+        for (const user of allStaff) {
+          await storage.createNotification({
+            userId: user.id,
+            type: 'new_support_ticket',
+            title: 'New Support Ticket',
+            message: `New support ticket from ${ticketData.customerName}: ${ticketData.subject}`,
+            data: { 
+              ticketId: ticket.id, 
+              customerName: ticketData.customerName, 
+              subject: ticketData.subject,
+              priority: ticketData.priority 
+            }
+          });
+        }
+      } catch (notificationError) {
+        console.error('Failed to create support ticket notifications:', notificationError);
+        // Don't fail the ticket creation if notifications fail
+      }
+
       res.status(201).json(ticket);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1208,22 +1234,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/support/tickets/:id/response', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
+  app.post('/api/support/tickets/:id/respond', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { message, type } = req.body;
+      const { response, type } = req.body;
 
-      if (!message || !type) {
-        return res.status(400).json({ message: "Message and type are required" });
+      if (!response || !type) {
+        return res.status(400).json({ message: "Response and type are required" });
       }
 
-      const response = await storage.addSupportTicketResponse(id, {
-        message,
+      const ticketResponse = await storage.addSupportTicketResponse(id, {
+        message: response,
         type,
         createdBy: req.currentUser.id
       });
 
-      res.status(201).json(response);
+      res.status(201).json(ticketResponse);
     } catch (error) {
       res.status(500).json({ message: "Failed to add ticket response" });
     }
