@@ -57,7 +57,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-300"
             />
           </div>
-          <CardContent className="p-2 sm:p-3 md:p-4 bg-white dark:bg-gray-900 flex flex-col flex-1">
+          <CardContent className="p-2 sm:p-3 md:p-4 bg-white dark:bg-gray-900 flex flex-col flex-1 rounded-b-2xl">
             <div className="flex-1 text-center">
               <h4 className="font-bold text-sm sm:text-base md:text-lg text-purple-600 dark:text-purple-400 line-clamp-1 mb-1 uppercase tracking-wide" style={{ fontFamily: '"Fredoka One", "Bungee", "Chewy", "Modak", cursive, sans-serif' }}>{product.name}</h4>
               {(product as any).company && (
@@ -170,7 +170,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/50"></div>
           </div>
-          <CardContent className="p-4 bg-white dark:bg-gray-900 flex flex-col min-h-0 flex-1 overflow-y-auto">
+          <CardContent className="p-4 bg-white dark:bg-gray-900 flex flex-col min-h-0 flex-1 overflow-y-auto rounded-b-2xl">
             <div className="flex-grow text-center">
               <h4 className="font-bold text-lg text-purple-600 dark:text-purple-400 line-clamp-1 mb-1 uppercase tracking-wide" style={{ fontFamily: '"Fredoka One", "Bungee", "Chewy", "Modak", cursive, sans-serif' }}>{product.name}</h4>
               {(product as any).company && (
