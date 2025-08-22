@@ -49,7 +49,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         onClick={handleCardClick}
       >
         {/* Front of card */}
-        <Card className="product-card-face product-card-front absolute inset-0 w-full h-full overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col backface-hidden transform hover:-translate-y-1">
+        <Card className="product-card-face product-card-front absolute inset-0 w-full h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col backface-hidden transform hover:-translate-y-1">
           <div className="w-full h-32 sm:h-40 md:h-48 overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0">
             <img
               src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"}
@@ -161,7 +161,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </Card>
 
         {/* Back of card */}
-        <Card className="product-card-face product-card-back absolute inset-0 w-full h-full overflow-y-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col backface-hidden rotate-y-180 transform hover:-translate-y-1">
+        <Card className="product-card-face product-card-back absolute inset-0 w-full h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col backface-hidden rotate-y-180 transform hover:-translate-y-1">
           <div className="w-full h-48 overflow-hidden relative bg-gray-100 dark:bg-gray-800 flex-shrink-0">
             <img
               src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"}
@@ -170,7 +170,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/50"></div>
           </div>
-          <CardContent className="p-4 bg-white dark:bg-gray-900 flex flex-col min-h-0 flex-1">
+          <CardContent className="p-4 bg-white dark:bg-gray-900 flex flex-col min-h-0 flex-1 overflow-y-auto">
             <div className="flex-grow text-center">
               <h4 className="font-bold text-lg text-purple-600 dark:text-purple-400 line-clamp-1 mb-1 uppercase tracking-wide" style={{ fontFamily: '"Fredoka One", "Bungee", "Chewy", "Modak", cursive, sans-serif' }}>{product.name}</h4>
               {(product as any).company && (
