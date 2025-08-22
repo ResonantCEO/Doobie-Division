@@ -62,6 +62,12 @@ export default {
           ring: "var(--sidebar-ring)",
         },
       },
+      boxShadow: {
+        '3xl': '0 35px 60px -12px rgba(0, 0, 0, 0.25)',
+        '4xl': '0 45px 80px -15px rgba(0, 0, 0, 0.3)',
+        'card-3d': '0 20px 40px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+        'card-3d-hover': '0 30px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+      },
       keyframes: {
         "accordion-down": {
           from: {
