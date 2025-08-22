@@ -59,9 +59,9 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
           <CardContent className="p-2 sm:p-3 md:p-4 bg-white dark:bg-gray-900 flex flex-col flex-1">
             <div className="flex-1 text-center">
-              <h4 className="font-black text-sm sm:text-base md:text-lg text-purple-600 dark:text-purple-400 line-clamp-1 mb-1 uppercase tracking-wide" style={{ fontFamily: '"Comic Sans MS", cursive, sans-serif' }}>{product.name}</h4>
+              <h4 className="font-bold text-sm sm:text-base md:text-lg text-purple-600 dark:text-purple-400 line-clamp-1 mb-1 uppercase tracking-wide" style={{ fontFamily: '"Georgia", "Times New Roman", serif' }}>{product.name}</h4>
               {(product as any).company && (
-                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{(product as any).company}</p>
+                <p className="text-xs sm:text-sm font-medium text-orange-600 dark:text-orange-400 uppercase tracking-wide">{(product as any).company}</p>
               )}
               {product.category && (
                 <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">{product.category.name}</p>
