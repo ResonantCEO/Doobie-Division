@@ -244,7 +244,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                 <span className="text-xs text-muted-foreground">
                                   {getUnreadCount(tabValue)} unread
                                 </span>
-                                {getFilteredNotifications().length > 0 && (
+                                {getFilteredNotifications().length > 0 && tabValue !== 'all' && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -447,7 +447,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                 <span className="text-xs text-muted-foreground">
                                   {getUnreadCount(tabValue)} unread
                                 </span>
-                                {getFilteredNotifications().length > 0 && (
+                                {getFilteredNotifications().length > 0 && tabValue !== 'all' && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
