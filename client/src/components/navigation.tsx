@@ -217,18 +217,20 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                     try {
                                       const filteredNotifications = getFilteredNotifications();
                                       // Mark filtered notifications as read
-                                      await Promise.all(
-                                        filteredNotifications
-                                          .filter((n: any) => !n.isRead)
-                                          .map((n: any) =>
+                                      const unreadFiltered = filteredNotifications.filter((n: any) => !n.isRead);
+
+                                      if (unreadFiltered.length > 0) {
+                                        await Promise.all(
+                                          unreadFiltered.map((n: any) =>
                                             fetch(`/api/notifications/${n.id}/read`, {
                                               method: 'PUT',
                                               credentials: 'include',
                                             })
                                           )
-                                      );
-                                      // Refresh notifications
-                                      refetch();
+                                        );
+                                        // Refresh notifications
+                                        refetch();
+                                      }
                                     } catch (error) {
                                       console.error('Failed to clear notifications:', error);
                                     }
@@ -414,18 +416,20 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                     try {
                                       const filteredNotifications = getFilteredNotifications();
                                       // Mark filtered notifications as read
-                                      await Promise.all(
-                                        filteredNotifications
-                                          .filter((n: any) => !n.isRead)
-                                          .map((n: any) =>
+                                      const unreadFiltered = filteredNotifications.filter((n: any) => !n.isRead);
+
+                                      if (unreadFiltered.length > 0) {
+                                        await Promise.all(
+                                          unreadFiltered.map((n: any) =>
                                             fetch(`/api/notifications/${n.id}/read`, {
                                               method: 'PUT',
                                               credentials: 'include',
                                             })
                                           )
-                                      );
-                                      // Refresh notifications
-                                      refetch();
+                                        );
+                                        // Refresh notifications
+                                        refetch();
+                                      }
                                     } catch (error) {
                                       console.error('Failed to clear notifications:', error);
                                     }

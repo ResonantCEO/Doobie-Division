@@ -159,7 +159,19 @@ export class DatabaseStorage implements IStorage {
       .insert(users)
       .values(userData)
       .returning();
-      return newUser;
+
+    // Create notification for admins about new user registration
+    const adminUsers = await this.getUsersWithRole('admin');
+    for (const admin of adminUsers) {
+      await this.createNotification({
+        userId: admin.id,
+        type: 'new_user_registration',
+        title: 'New User Registration',
+        message: `${userData.firstName} ${userData.lastName} has registered and is awaiting approval`,
+        data: { userId: newUser.id, userEmail: userData.email, userName: `${userData.firstName} ${userData.lastName}` }
+      });
+    }
+    return newUser;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
@@ -1542,7 +1554,7 @@ export class DatabaseStorage implements IStorage {
       .set({ assignedTo, updatedAt: new Date() })
       .where(eq(supportTickets.id, id))
       .returning();
-    
+
     // If we need assigned user info, fetch it separately
     if (assignedTo && ticket) {
       const assignedUser = await db
@@ -1555,13 +1567,13 @@ export class DatabaseStorage implements IStorage {
         .from(users)
         .where(eq(users.id, assignedTo))
         .limit(1);
-      
+
       return {
         ...ticket,
         assignedUser: assignedUser[0] || null
       };
     }
-    
+
     return ticket;
   }
 
