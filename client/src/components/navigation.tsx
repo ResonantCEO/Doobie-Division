@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Bell, Settings, LogOut, Package, BarChart3, Users, Home, Search, ShoppingCart, User, ChevronDown, Sun, Moon, QrCode } from "lucide-react";
+import { Bell, Settings, LogOut, Package, BarChart3, Users, Home, Search, ShoppingCart, User, ChevronDown, Sun, Moon, QrCode, UserPlus, HeadphonesIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/contexts/theme-context";
 import { useCart } from "@/contexts/cart-context";
@@ -31,6 +31,7 @@ import {
   NavigationMenuTrigger,
   NavigationMenuIndicator,
 } from "@/components/ui/navigation-menu"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 interface NavigationProps {
@@ -44,6 +45,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   const { state: cartState } = useCart();
   const { toast } = useToast();
   const location = useLocation();
+  const [notificationTab, setNotificationTab] = useState("all");
 
 
   // Fetch notifications
@@ -85,6 +87,21 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   ];
 
   const visibleTabs = tabs.filter(tab => !tab.roles || tab.roles.includes(user.role));
+
+  const getUnreadCount = (type: string) => {
+    if (type === 'all') {
+      return notifications.filter((n: any) => !n.isRead).length;
+    }
+    return notifications.filter((n: any) => !n.isRead && n.type === type).length;
+  };
+
+  const getFilteredNotifications = () => {
+    if (notificationTab === 'all') {
+      return notifications;
+    }
+    return notifications.filter((n: any) => n.type === notificationTab);
+  };
+
 
   return (
     <>
@@ -138,68 +155,115 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuContent align="end" className="w-96">
                   <div className="p-2">
-                    <h3 className="font-semibold text-sm mb-2">Notifications</h3>
-                    {notifications.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4 text-center">
-                        No notifications
-                      </p>
-                    ) : (
-                      <>
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs text-muted-foreground">
-                            {unreadCount} unread
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-auto p-1 text-xs"
-                            onClick={async () => {
-                              try {
-                                // Mark all notifications as read
-                                await Promise.all(
-                                  notifications
-                                    .filter((n: any) => !n.isRead)
-                                    .map((n: any) =>
-                                      fetch(`/api/notifications/${n.id}/read`, {
-                                        method: 'PUT',
-                                        credentials: 'include',
-                                      })
-                                    )
-                                );
-                                // Refresh notifications
-                                refetch();
-                              } catch (error) {
-                                console.error('Failed to clear notifications:', error);
-                              }
-                            }}
-                          >
-                            Clear all
-                          </Button>
-                        </div>
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {notifications.map((notification: any) => (
-                            <div
-                              key={notification.id}
-                              className={`p-2 rounded-md text-sm ${
-                                notification.isRead
-                                  ? "bg-background"
-                                  : "bg-muted"
-                              }`}
-                            >
-                              <div className="font-medium">{notification.title}</div>
-                              <div className="text-muted-foreground text-xs">
-                                {notification.message}
+                    <h3 className="font-semibold text-sm mb-3">Notifications</h3>
+                    <Tabs value={notificationTab} onValueChange={setNotificationTab} className="w-full">
+                      <TabsList className="grid w-full grid-cols-4 mb-3">
+                        <TabsTrigger value="all" className="text-xs flex items-center gap-1">
+                          All
+                          {unreadCount > 0 && (
+                            <Badge className="h-4 w-4 p-0 text-[10px] bg-destructive text-destructive-foreground">
+                              {unreadCount}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                        <TabsTrigger value="orders" className="text-xs flex items-center gap-1">
+                          <Package className="h-3 w-3" />
+                          Orders
+                          {getUnreadCount('orders') > 0 && (
+                            <Badge className="h-4 w-4 p-0 text-[10px] bg-destructive text-destructive-foreground">
+                              {getUnreadCount('orders')}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                        <TabsTrigger value="users" className="text-xs flex items-center gap-1">
+                          <UserPlus className="h-3 w-3" />
+                          Users
+                          {getUnreadCount('users') > 0 && (
+                            <Badge className="h-4 w-4 p-0 text-[10px] bg-destructive text-destructive-foreground">
+                              {getUnreadCount('users')}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                        <TabsTrigger value="support" className="text-xs flex items-center gap-1">
+                          <HeadphonesIcon className="h-3 w-3" />
+                          Support
+                          {getUnreadCount('support') > 0 && (
+                            <Badge className="h-4 w-4 p-0 text-[10px] bg-red-500 text-white">
+                              {getUnreadCount('support')}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                      </TabsList>
+
+                      {['all', 'orders', 'users', 'support'].map((tabValue) => (
+                        <TabsContent key={tabValue} value={tabValue} className="mt-0">
+                          {getFilteredNotifications().length === 0 ? (
+                            <p className="text-sm text-muted-foreground py-4 text-center">
+                              No {tabValue === 'all' ? '' : tabValue + ' '}notifications
+                            </p>
+                          ) : (
+                            <>
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-muted-foreground">
+                                  {getUnreadCount(tabValue)} unread
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-auto p-1 text-xs"
+                                  onClick={async () => {
+                                    try {
+                                      const filteredNotifications = getFilteredNotifications();
+                                      // Mark filtered notifications as read
+                                      await Promise.all(
+                                        filteredNotifications
+                                          .filter((n: any) => !n.isRead)
+                                          .map((n: any) =>
+                                            fetch(`/api/notifications/${n.id}/read`, {
+                                              method: 'PUT',
+                                              credentials: 'include',
+                                            })
+                                          )
+                                      );
+                                      // Refresh notifications
+                                      refetch();
+                                    } catch (error) {
+                                      console.error('Failed to clear notifications:', error);
+                                    }
+                                  }}
+                                >
+                                  Clear {tabValue === 'all' ? 'all' : tabValue}
+                                </Button>
                               </div>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {new Date(notification.createdAt).toLocaleString()}
+                              <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {getFilteredNotifications().map((notification: any) => (
+                                  <div
+                                    key={notification.id}
+                                    className={`p-2 rounded-md text-sm ${
+                                      notification.isRead
+                                        ? "bg-background"
+                                        : notification.type === 'new_support_ticket' || notification.type === 'support_ticket_response'
+                                        ? "bg-red-50 dark:bg-red-950/20"
+                                        : "bg-muted"
+                                    }`}
+                                  >
+                                    <div className="font-medium">{notification.title}</div>
+                                    <div className="text-muted-foreground text-xs">
+                                      {notification.message}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      {new Date(notification.createdAt).toLocaleString()}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
+                            </>
+                          )}
+                        </TabsContent>
+                      ))}
+                    </Tabs>
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -288,68 +352,115 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuContent align="end" className="w-80 sm:w-96">
                   <div className="p-2">
-                    <h3 className="font-semibold text-sm mb-2">Notifications</h3>
-                    {notifications.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4 text-center">
-                        No notifications
-                      </p>
-                    ) : (
-                      <>
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs text-muted-foreground">
-                            {unreadCount} unread
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-auto p-1 text-xs"
-                            onClick={async () => {
-                              try {
-                                // Mark all notifications as read
-                                await Promise.all(
-                                  notifications
-                                    .filter((n: any) => !n.isRead)
-                                    .map((n: any) =>
-                                      fetch(`/api/notifications/${n.id}/read`, {
-                                        method: 'PUT',
-                                        credentials: 'include',
-                                      })
-                                    )
-                                );
-                                // Refresh notifications
-                                refetch();
-                              } catch (error) {
-                                console.error('Failed to clear notifications:', error);
-                              }
-                            }}
-                          >
-                            Clear all
-                          </Button>
-                        </div>
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {notifications.map((notification: any) => (
-                            <div
-                              key={notification.id}
-                              className={`p-2 rounded-md text-sm ${
-                                notification.isRead
-                                  ? "bg-background"
-                                  : "bg-muted"
-                              }`}
-                            >
-                              <div className="font-medium">{notification.title}</div>
-                              <div className="text-muted-foreground text-xs">
-                                {notification.message}
+                    <h3 className="font-semibold text-sm mb-3">Notifications</h3>
+                    <Tabs value={notificationTab} onValueChange={setNotificationTab} className="w-full">
+                      <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-3 gap-1">
+                        <TabsTrigger value="all" className="text-xs flex items-center gap-1">
+                          All
+                          {unreadCount > 0 && (
+                            <Badge className="h-4 w-4 p-0 text-[10px] bg-destructive text-destructive-foreground">
+                              {unreadCount}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                        <TabsTrigger value="orders" className="text-xs flex items-center gap-1">
+                          <Package className="h-3 w-3" />
+                          <span className="hidden sm:inline">Orders</span>
+                          {getUnreadCount('orders') > 0 && (
+                            <Badge className="h-4 w-4 p-0 text-[10px] bg-destructive text-destructive-foreground">
+                              {getUnreadCount('orders')}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                        <TabsTrigger value="users" className="text-xs flex items-center gap-1">
+                          <UserPlus className="h-3 w-3" />
+                          <span className="hidden sm:inline">Users</span>
+                          {getUnreadCount('users') > 0 && (
+                            <Badge className="h-4 w-4 p-0 text-[10px] bg-destructive text-destructive-foreground">
+                              {getUnreadCount('users')}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                        <TabsTrigger value="support" className="text-xs flex items-center gap-1">
+                          <HeadphonesIcon className="h-3 w-3" />
+                          <span className="hidden sm:inline">Support</span>
+                          {getUnreadCount('support') > 0 && (
+                            <Badge className="h-4 w-4 p-0 text-[10px] bg-red-500 text-white">
+                              {getUnreadCount('support')}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                      </TabsList>
+
+                      {['all', 'orders', 'users', 'support'].map((tabValue) => (
+                        <TabsContent key={tabValue} value={tabValue} className="mt-0">
+                          {getFilteredNotifications().length === 0 ? (
+                            <p className="text-sm text-muted-foreground py-4 text-center">
+                              No {tabValue === 'all' ? '' : tabValue + ' '}notifications
+                            </p>
+                          ) : (
+                            <>
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-muted-foreground">
+                                  {getUnreadCount(tabValue)} unread
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-auto p-1 text-xs"
+                                  onClick={async () => {
+                                    try {
+                                      const filteredNotifications = getFilteredNotifications();
+                                      // Mark filtered notifications as read
+                                      await Promise.all(
+                                        filteredNotifications
+                                          .filter((n: any) => !n.isRead)
+                                          .map((n: any) =>
+                                            fetch(`/api/notifications/${n.id}/read`, {
+                                              method: 'PUT',
+                                              credentials: 'include',
+                                            })
+                                          )
+                                      );
+                                      // Refresh notifications
+                                      refetch();
+                                    } catch (error) {
+                                      console.error('Failed to clear notifications:', error);
+                                    }
+                                  }}
+                                >
+                                  Clear {tabValue === 'all' ? 'all' : tabValue}
+                                </Button>
                               </div>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {new Date(notification.createdAt).toLocaleString()}
+                              <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {getFilteredNotifications().map((notification: any) => (
+                                  <div
+                                    key={notification.id}
+                                    className={`p-2 rounded-md text-sm ${
+                                      notification.isRead
+                                        ? "bg-background"
+                                        : notification.type === 'new_support_ticket' || notification.type === 'support_ticket_response'
+                                        ? "bg-red-50 dark:bg-red-950/20"
+                                        : "bg-muted"
+                                    }`}
+                                  >
+                                    <div className="font-medium">{notification.title}</div>
+                                    <div className="text-muted-foreground text-xs">
+                                      {notification.message}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      {new Date(notification.createdAt).toLocaleString()}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
+                            </>
+                          )}
+                        </TabsContent>
+                      ))}
+                    </Tabs>
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
