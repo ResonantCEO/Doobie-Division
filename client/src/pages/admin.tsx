@@ -505,10 +505,16 @@ export default function AdminPage() {
                 {selectedTicket?.ticket.priority.charAt(0).toUpperCase() + selectedTicket?.ticket.priority.slice(1)}
               </Badge>
             </div>
-            <div className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5 text-gray-400" />
-              <span className="font-semibold">Message:</span>
-              <p className="text-sm text-gray-600 break-words">{selectedTicket?.ticket.message}</p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5 text-gray-400" />
+                <span className="font-semibold">Message:</span>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-base text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words">
+                  {selectedTicket?.ticket.message}
+                </p>
+              </div>
             </div>
             <hr />
             <div className="space-y-2">
