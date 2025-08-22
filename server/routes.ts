@@ -1170,30 +1170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ticketData = insertSupportTicketSchema.parse(req.body);
       const ticket = await storage.createSupportTicket(ticketData);
 
-      // Create notifications for admins about the new support ticket
-      try {
-        const adminUsers = await storage.getUsersWithRole('admin');
-        const managerUsers = await storage.getUsersWithRole('manager');
-        const allStaff = [...adminUsers, ...managerUsers];
-
-        for (const user of allStaff) {
-          await storage.createNotification({
-            userId: user.id,
-            type: 'new_support_ticket',
-            title: 'New Support Ticket',
-            message: `New support ticket from ${ticketData.customerName}: ${ticketData.subject}`,
-            data: { 
-              ticketId: ticket.id, 
-              customerName: ticketData.customerName, 
-              subject: ticketData.subject,
-              priority: ticketData.priority 
-            }
-          });
-        }
-      } catch (notificationError) {
-        console.error('Failed to create support ticket notifications:', notificationError);
-        // Don't fail the ticket creation if notifications fail
-      }
+      
 
       res.status(201).json(ticket);
     } catch (error) {

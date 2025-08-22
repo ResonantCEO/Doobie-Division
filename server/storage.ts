@@ -1477,15 +1477,23 @@ export class DatabaseStorage implements IStorage {
       .values(data)
       .returning();
 
-    // Notify admins about the new ticket
+    // Notify admins and managers about the new ticket
     const adminUsers = await this.getUsersWithRole('admin');
-    for (const admin of adminUsers) {
+    const managerUsers = await this.getUsersWithRole('manager');
+    const allStaff = [...adminUsers, ...managerUsers];
+
+    for (const user of allStaff) {
       await this.createNotification({
-        userId: admin.id,
+        userId: user.id,
         type: 'new_support_ticket',
-        title: 'New Support Ticket Submitted',
-        message: `A new support ticket has been submitted by ${data.name || 'a user'}.`,
-        data: { ticketId: ticket.id, subject: ticket.subject },
+        title: 'New Support Ticket',
+        message: `New support ticket from ${data.customerName}: ${data.subject}`,
+        data: { 
+          ticketId: ticket.id, 
+          customerName: data.customerName, 
+          subject: data.subject,
+          priority: data.priority 
+        }
       });
     }
 
