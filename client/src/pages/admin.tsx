@@ -93,7 +93,7 @@ export default function AdminPage() {
     }
   });
 
-  
+
 
   const updateTicketStatusMutation = useMutation({
     mutationFn: async ({ ticketId, status }: { ticketId: number; status: string }) => {
@@ -115,7 +115,7 @@ export default function AdminPage() {
     },
   });
 
-  
+
 
   const sendTicketResponseMutation = useMutation({
     mutationFn: async ({ ticketId, response, type }: { ticketId: number; response: string; type: string }) => {
@@ -180,7 +180,7 @@ export default function AdminPage() {
     updateTicketStatusMutation.mutate({ ticketId, status });
   };
 
-  
+
 
   const handleTicketView = (ticket: SupportTicketWithDetails) => {
     setSelectedTicket(ticket);
@@ -361,36 +361,6 @@ export default function AdminPage() {
             <CardContent>
               {/* Filters */}
               <div className="flex gap-4 mb-6">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1">Status</label>
-                  <Select value={ticketStatusFilter} onValueChange={setTicketStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All statuses</SelectItem>
-                      <SelectItem value="open">Open</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="resolved">Resolved</SelectItem>
-                      <SelectItem value="closed">Closed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1">Priority</label>
-                  <Select value={ticketPriorityFilter} onValueChange={setTicketPriorityFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All priorities" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All priorities</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
               {/* Support Tickets Table */}
