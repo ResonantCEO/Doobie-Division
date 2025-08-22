@@ -31,7 +31,7 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
 
   const adjustStockMutation = useMutation({
     mutationFn: async (data: { quantity: number; reason: string }) => {
-      if (!product) throw new Error("No product selected");
+      if (!product || !product.id) throw new Error("No product selected");
       await apiRequest("POST", `/api/products/${product.id}/adjust-stock`, data);
     },
     onSuccess: () => {
@@ -45,7 +45,8 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
       setQuantity("");
       setReason("");
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error('Stock adjustment error:', error);
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -57,9 +58,11 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
         }, 500);
         return;
       }
+      
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to adjust stock";
       toast({
         title: "Error",
-        description: "Failed to adjust stock",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -68,11 +71,20 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!product || !product.id) {
+      toast({
+        title: "Error",
+        description: "No product selected for stock adjustment",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const qty = parseInt(quantity);
-    if (isNaN(qty) || !reason.trim()) {
+    if (isNaN(qty) || qty === 0 || !reason.trim()) {
       toast({
         title: "Invalid Input",
-        description: "Please provide a valid quantity and reason",
+        description: "Please provide a valid non-zero quantity and reason",
         variant: "destructive",
       });
       return;
