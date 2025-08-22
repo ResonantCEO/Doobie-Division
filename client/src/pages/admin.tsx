@@ -461,6 +461,11 @@ export default function AdminPage() {
                               </Select>
                             </TableCell>
                             <TableCell>
+                              <span className="text-gray-500 text-sm">
+                                {item.assignedUser ? `${item.assignedUser.firstName} ${item.assignedUser.lastName}` : 'Unassigned'}
+                              </span>
+                            </TableCell>
+                            <TableCell>
                               <Button
                                 variant="outline"
                                 size="sm"
