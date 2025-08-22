@@ -477,9 +477,9 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                 name="stock"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Stock</FormLabel>
+                    <FormLabel>Stock Quantity ({form.watch("weightUnit")})</FormLabel>
                     <FormControl>
-                      <Input type="number" min="0" placeholder="0" {...field} />
+                      <Input type="number" step="1" placeholder="0" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

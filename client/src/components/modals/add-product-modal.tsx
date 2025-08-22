@@ -491,7 +491,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                     <FormItem>
                       <FormLabel>Stock Quantity ({form.watch("weightUnit")})</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.1" placeholder="0" {...field} />
+                        <Input type="number" step="1" placeholder="0" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
