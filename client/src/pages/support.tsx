@@ -27,9 +27,7 @@ export default function SupportPage() {
     customerName: "",
     customerEmail: "",
     customerPhone: "",
-    subject: "",
-    message: "",
-    priority: "normal"
+    message: ""
   });
 
   const handleSubmitContact = async (e: React.FormEvent) => {
@@ -37,9 +35,9 @@ export default function SupportPage() {
 
     try {
       const ticketData = {
-        subject: contactForm.subject,
+        subject: "Support Request", // Default subject
         message: contactForm.message,
-        priority: contactForm.priority,
+        priority: "normal", // Default priority
         customerName: contactForm.customerName,
         customerEmail: contactForm.customerEmail,
         customerPhone: contactForm.customerPhone,
@@ -64,9 +62,7 @@ export default function SupportPage() {
           customerName: "", 
           customerEmail: "", 
           customerPhone: "", 
-          subject: "", 
-          message: "", 
-          priority: "normal" 
+          message: ""
         });
       } else {
         throw new Error("Failed to send message");
@@ -163,32 +159,6 @@ export default function SupportPage() {
                       type="email"
                       required
                     />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Subject *</label>
-                    <Input
-                      value={contactForm.subject}
-                      onChange={(e) => setContactForm(prev => ({ ...prev, subject: e.target.value }))}
-                      placeholder="Brief description of your issue"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Priority</label>
-                    <div className="flex gap-2">
-                      {["low", "normal", "high"].map((priority) => (
-                        <Button
-                          key={priority}
-                          type="button"
-                          variant={contactForm.priority === priority ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setContactForm(prev => ({ ...prev, priority }))}
-                          className="capitalize"
-                        >
-                          {priority}
-                        </Button>
-                      ))}
-                    </div>
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-1 block">Support Request Details *</label>

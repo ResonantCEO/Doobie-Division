@@ -25,10 +25,10 @@ export default function Landing() {
 
   const handleSupportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const ticketData = {
-        subject: "Support Request",
+        subject: "General Inquiry",
         message: supportForm.message,
         priority: "normal",
         customerName: supportForm.customerName,

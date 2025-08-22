@@ -104,6 +104,7 @@ export interface IStorage {
   getSupportTickets(filters?: any): Promise<any[]>;
   updateSupportTicketStatus(id: number, status: string): Promise<any>;
   assignSupportTicket(id: number, assignedTo: string | null): Promise<any>;
+  addSupportTicketResponse(ticketId: number, responseData: any): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1562,6 +1563,24 @@ export class DatabaseStorage implements IStorage {
     }
     
     return ticket;
+  }
+
+  async addSupportTicketResponse(ticketId: number, responseData: {
+    message: string;
+    type: string;
+    createdBy: string;
+  }) {
+    const [response] = await db
+      .insert(supportTicketResponses)
+      .values({
+        ticketId,
+        message: responseData.message,
+        type: responseData.type,
+        createdBy: responseData.createdBy,
+      })
+      .returning();
+
+    return response;
   }
 
 
