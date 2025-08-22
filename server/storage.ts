@@ -1513,48 +1513,65 @@ export class DatabaseStorage implements IStorage {
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(supportTickets.createdAt));
 
-    // Get responses and assigned user for each ticket
+    // Process each ticket to add responses and assigned user
+    const processedTickets = [];
+    
     for (const ticket of tickets) {
-      const responses = await db
-        .select({
-          id: supportTicketResponses.id,
-          message: supportTicketResponses.message,
-          type: supportTicketResponses.type,
-          createdAt: supportTicketResponses.createdAt,
-          createdBy: {
-            id: users.id,
-            firstName: users.firstName,
-            lastName: users.lastName,
-            email: users.email,
-          }
-        })
-        .from(supportTicketResponses)
-        .leftJoin(users, eq(supportTicketResponses.createdBy, users.id))
-        .where(eq(supportTicketResponses.ticketId, ticket.ticket.id))
-        .orderBy(asc(supportTicketResponses.createdAt));
-
-      // Get assigned user if ticket has one
-      let assignedUser = null;
-      if (ticket.ticket.assignedTo) {
-        const assignedUserResult = await db
+      try {
+        // Get responses for this ticket
+        const responses = await db
           .select({
-            id: users.id,
-            firstName: users.firstName,
-            lastName: users.lastName,
-            email: users.email,
+            id: supportTicketResponses.id,
+            message: supportTicketResponses.message,
+            type: supportTicketResponses.type,
+            createdAt: supportTicketResponses.createdAt,
+            createdBy: {
+              id: users.id,
+              firstName: users.firstName,
+              lastName: users.lastName,
+              email: users.email,
+            }
           })
-          .from(users)
-          .where(eq(users.id, ticket.ticket.assignedTo))
-          .limit(1);
-        
-        assignedUser = assignedUserResult[0] || null;
-      }
+          .from(supportTicketResponses)
+          .leftJoin(users, eq(supportTicketResponses.createdBy, users.id))
+          .where(eq(supportTicketResponses.ticketId, ticket.ticket.id))
+          .orderBy(asc(supportTicketResponses.createdAt));
 
-      (ticket as any).responses = responses;
-      (ticket as any).assignedUser = assignedUser;
+        // Get assigned user if ticket has one
+        let assignedUser = null;
+        if (ticket.ticket.assignedTo) {
+          const assignedUserResult = await db
+            .select({
+              id: users.id,
+              firstName: users.firstName,
+              lastName: users.lastName,
+              email: users.email,
+            })
+            .from(users)
+            .where(eq(users.id, ticket.ticket.assignedTo))
+            .limit(1);
+          
+          assignedUser = assignedUserResult[0] || null;
+        }
+
+        // Create processed ticket object
+        processedTickets.push({
+          ...ticket,
+          responses,
+          assignedUser
+        });
+      } catch (error) {
+        console.error('Error processing ticket:', ticket.ticket.id, error);
+        // Add ticket without responses/assignedUser if there's an error
+        processedTickets.push({
+          ...ticket,
+          responses: [],
+          assignedUser: null
+        });
+      }
     }
 
-    return tickets;
+    return processedTickets;
   }
 
   async updateSupportTicketStatus(id: number, status: string) {
