@@ -157,18 +157,18 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
             <Label htmlFor="amount">
               {isWeightBased ? `Weight (${product.weightUnit || 'grams'})` : 'Quantity (units)'}
             </Label>
-
+            
             {isWeightBased ? (
               <>
                 <Input
                   id="amount"
                   type="number"
-                  min="1"
-                  step="1"
+                  min="0.1"
+                  step="0.1"
                   value={weight}
                   onChange={(e) => {
-                    const value = parseInt(e.target.value) || 1;
-                    setWeight(Math.max(1, value));
+                    const value = parseFloat(e.target.value) || 0.1;
+                    setWeight(Math.max(0.1, value));
                   }}
                   className="text-center"
                   disabled={maxStock === 0}

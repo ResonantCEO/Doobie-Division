@@ -12,7 +12,7 @@ import { setupAuth, isAuthenticated } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema, insertSupportTicketSchema } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { orders, products, orderItems, users, supportTickets, notifications } from "@shared/schema";
+import { orders, products, orderItems, users, supportTickets } from "@shared/schema";
 import { eq, sql, desc, and, gte, lt, inArray } from "drizzle-orm";
 
 // WebSocket connection store
@@ -217,7 +217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // For authenticated requests, only filter by active status if not explicitly including inactive products
         filters.isActive = true;
       }
-
+      
       // Override: If explicitly requesting to include inactive products, don't filter by active status
       if (includeInactive === 'true') {
         delete filters.isActive;
@@ -988,26 +988,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Mark notification as read
-  app.put("/api/notifications/:id/read", isAuthenticated, async (req, res) => {
+  app.put('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.markNotificationAsRead(id);
       res.status(200).json({ message: "Notification marked as read" });
     } catch (error) {
       res.status(500).json({ message: "Failed to mark notification as read" });
-    }
-  });
-
-  // Delete notification
-  app.delete("/api/notifications/:id", isAuthenticated, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      await db.delete(notifications).where(eq(notifications.id, id));
-      res.status(204).send();
-    } catch (error) {
-      console.error('Delete notification error:', error);
-      res.status(500).json({ message: "Failed to delete notification" });
     }
   });
 
@@ -1170,7 +1157,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ticketData = insertSupportTicketSchema.parse(req.body);
       const ticket = await storage.createSupportTicket(ticketData);
 
-      
+      // Create notifications for admins about the new support ticket
+      try {
+        const adminUsers = await storage.getUsersWithRole('admin');
+        const managerUsers = await storage.getUsersWithRole('manager');
+        const allStaff = [...adminUsers, ...managerUsers];
+
+        for (const user of allStaff) {
+          await storage.createNotification({
+            userId: user.id,
+            type: 'new_support_ticket',
+            title: 'New Support Ticket',
+            message: `New support ticket from ${ticketData.customerName}: ${ticketData.subject}`,
+            data: { 
+              ticketId: ticket.id, 
+              customerName: ticketData.customerName, 
+              subject: ticketData.subject,
+              priority: ticketData.priority 
+            }
+          });
+        }
+      } catch (notificationError) {
+        console.error('Failed to create support ticket notifications:', notificationError);
+        // Don't fail the ticket creation if notifications fail
+      }
 
       res.status(201).json(ticket);
     } catch (error) {
@@ -1185,10 +1195,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { status, priority } = req.query;
       const filters: any = {};
-
+      
       if (status) filters.status = status as string;
       if (priority) filters.priority = priority as string;
-
+      
       const tickets = await storage.getSupportTickets(filters);
       res.json(tickets);
     } catch (error) {

@@ -68,7 +68,6 @@ export const categories = pgTable("categories", {
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
-  company: varchar("company"),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }), // nullable for weight-based products
   sku: varchar("sku").notNull().unique(),
@@ -284,7 +283,6 @@ export const insertProductSchema = createInsertSchema(products).omit({
   pricePerGram: z.string().nullable().optional(),
   pricePerOunce: z.string().nullable().optional(),
   price: z.string().nullable().optional(),
-  company: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   discountPercentage: z.string().nullable().optional(),
   physicalInventory: z.number().optional(),

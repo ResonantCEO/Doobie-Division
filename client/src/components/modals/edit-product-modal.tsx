@@ -47,7 +47,6 @@ interface EditProductModalProps {
 
 const formSchema = z.object({
   name: z.string().min(1, "Product name is required"),
-  company: z.string().optional(),
   description: z.string().optional(),
   price: z.string().optional(),
   sku: z.string().min(1, "SKU is required"),
@@ -93,7 +92,6 @@ export default function EditProductModal({ open, onOpenChange, product, categori
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: product.name,
-      company: (product as any).company || "",
       description: product.description || "",
       price: product.price || "",
       sku: product.sku,
@@ -115,7 +113,6 @@ export default function EditProductModal({ open, onOpenChange, product, categori
     if (product && open) {
       form.reset({
         name: product.name,
-        company: (product as any).company || "",
         description: product.description || "",
         price: product.price || "",
         sku: product.sku,
@@ -240,20 +237,6 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                   <FormLabel>Product Name</FormLabel>
                   <FormControl>
                     <Input placeholder="Enter product name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="company"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Company</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter company name" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -477,9 +460,9 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                 name="stock"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Stock Quantity ({form.watch("weightUnit")})</FormLabel>
+                    <FormLabel>Stock</FormLabel>
                     <FormControl>
-                      <Input type="number" step="1" placeholder="0" {...field} />
+                      <Input type="number" min="0" placeholder="0" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -49,20 +49,17 @@ export default function ProductCard({ product }: ProductCardProps) {
         onClick={handleCardClick}
       >
         {/* Front of card */}
-        <Card className="product-card-face product-card-front absolute inset-0 w-full h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col backface-hidden rounded-2xl">
-          <div className="w-full h-32 sm:h-40 md:h-48 overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl">
+        <Card className="product-card-face product-card-front absolute inset-0 w-full h-full overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col backface-hidden">
+          <div className="w-full h-32 sm:h-40 md:h-48 overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0">
             <img
               src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"}
               alt={product.name}
               className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-300"
             />
           </div>
-          <CardContent className="p-2 sm:p-3 md:p-4 bg-white dark:bg-gray-900 flex flex-col flex-1 rounded-b-2xl">
-            <div className="flex-1 text-center">
-              <h4 className="font-bold text-base sm:text-lg md:text-xl text-purple-600 dark:text-purple-400 line-clamp-1 mb-1 uppercase tracking-wide" style={{ fontFamily: '"Fredoka One", "Bungee", "Chewy", "Modak", cursive, sans-serif' }}>{product.name}</h4>
-              {(product as any).company && (
-                <p className="text-sm sm:text-base font-medium text-orange-600 dark:text-orange-400 uppercase tracking-wide">{(product as any).company}</p>
-              )}
+          <CardContent className="p-2 sm:p-3 md:p-4 bg-white dark:bg-gray-900 flex flex-col flex-1">
+            <div className="flex-1">
+              <h4 className="font-bold text-sm sm:text-base md:text-lg text-gray-900 dark:text-white line-clamp-1 mb-1">{product.name}</h4>
               {product.category && (
                 <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">{product.category.name}</p>
               )}
@@ -70,7 +67,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
             <div className="mt-2 sm:mt-3 md:mt-4 space-y-2 sm:space-y-3">
               <div className="flex items-center justify-between">
-                <div className="text-center flex-1">
+                <div className="text-left flex-1">
                   {product.sellingMethod === "weight" ? (
                     <div className="space-y-1">
                       {product.pricePerGram && (
@@ -161,8 +158,8 @@ export default function ProductCard({ product }: ProductCardProps) {
         </Card>
 
         {/* Back of card */}
-        <Card className="product-card-face product-card-back absolute inset-0 w-full h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col backface-hidden rounded-2xl">
-          <div className="w-full h-48 overflow-hidden relative bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl">
+        <Card className="product-card-face product-card-back absolute inset-0 w-full h-full overflow-y-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col backface-hidden rotate-y-180">
+          <div className="w-full h-48 overflow-hidden relative bg-gray-100 dark:bg-gray-800 flex-shrink-0">
             <img
               src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"}
               alt={product.name}
@@ -170,12 +167,9 @@ export default function ProductCard({ product }: ProductCardProps) {
             />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/50"></div>
           </div>
-          <CardContent className="p-4 bg-white dark:bg-gray-900 flex flex-col min-h-0 flex-1 overflow-y-auto rounded-b-2xl">
-            <div className="flex-grow text-center">
-              <h4 className="font-bold text-xl text-purple-600 dark:text-purple-400 line-clamp-1 mb-1 uppercase tracking-wide" style={{ fontFamily: '"Fredoka One", "Bungee", "Chewy", "Modak", cursive, sans-serif' }}>{product.name}</h4>
-              {(product as any).company && (
-                <p className="text-base font-medium text-orange-600 dark:text-orange-400 uppercase tracking-wide mb-2">{(product as any).company}</p>
-              )}
+          <CardContent className="p-4 bg-white dark:bg-gray-900 flex flex-col min-h-0 flex-1">
+            <div className="flex-grow">
+              <h4 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-1 mb-1">{product.name}</h4>
               {product.category && (
                 <p className="text-sm font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-3">{product.category.name}</p>
               )}
@@ -188,7 +182,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
             {stockStatus && (
               <div className="mt-4 flex-shrink-0">
-                <div className="flex justify-center">
+                <div className="flex justify-end">
                   <Badge
                     variant={stockStatus.variant === "destructive" ? "destructive" : "secondary"}
                     className={`
