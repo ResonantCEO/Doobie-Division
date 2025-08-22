@@ -182,7 +182,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
             {stockStatus && (
               <div className="mt-4 flex-shrink-0">
-                <div className="flex justify-end">
+                <div className="flex justify-center">
                   <Badge
                     variant={stockStatus.variant === "destructive" ? "destructive" : "secondary"}
                     className={`
