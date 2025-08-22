@@ -135,15 +135,8 @@ export default function BulkQRModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle className="flex justify-between items-center">
+          <DialogTitle>
             Generated QR Codes ({qrCodes.length})
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => onOpenChange(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </DialogTitle>
         </DialogHeader>
         
