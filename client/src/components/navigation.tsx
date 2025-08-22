@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger 
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Bell, Settings, LogOut, Package, BarChart3, Users, Home, Search, ShoppingCart, User, ChevronDown, Sun, Moon, QrCode, UserPlus, HeadphonesIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -77,13 +77,13 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   };
 
   const tabs = [
-    { id: "storefront", path: "/dashboard/storefront" },
-    { id: "inventory", path: "/dashboard/inventory", roles: ["admin", "manager"] },
-    { id: "orders", path: "/dashboard/orders", roles: ["admin", "manager", "staff"] },
-    { id: "analytics", path: "/dashboard/analytics", roles: ["admin", "manager"] },
-    { id: "users", path: "/dashboard/users", roles: ["admin"] },
-    { id: "admin", path: "/dashboard/admin", roles: ["admin"] },
-    { id: "scanner", path: "/dashboard/scanner", roles: ["admin", "manager"] },
+    { id: "storefront", path: "/dashboard/storefront", label: "Storefront" },
+    { id: "inventory", path: "/dashboard/inventory", roles: ["admin", "manager"], label: "Inventory Management" },
+    { id: "orders", path: "/dashboard/orders", roles: ["admin", "manager", "staff"], label: "Order Management" },
+    { id: "analytics", path: "/dashboard/analytics", roles: ["admin", "manager"], label: "Analytics" },
+    { id: "users", path: "/dashboard/users", roles: ["admin"], label: "User Management" },
+    { id: "admin", path: "/dashboard/admin", roles: ["admin"], label: "Admin Settings" },
+    { id: "scanner", path: "/dashboard/scanner", roles: ["admin", "manager"], label: "Scanner" },
   ];
 
   const visibleTabs = tabs.filter(tab => !tab.roles || tab.roles.includes(user.role));
@@ -95,13 +95,13 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
     if (type === 'orders') {
       return notifications.filter((n: any) => !n.isRead && (
         n.type === 'new_order' ||
-        n.type === 'order_status_update' || 
+        n.type === 'order_status_update' ||
         n.type === 'order_assigned'
       )).length;
     }
     if (type === 'users') {
       return notifications.filter((n: any) => !n.isRead && (
-        n.type === 'user_registration' || 
+        n.type === 'user_registration' ||
         n.type === 'user_approved'
       )).length;
     }
@@ -117,19 +117,19 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
 
     switch (notificationTab) {
       case 'orders':
-        return notifications.filter(n => 
+        return notifications.filter(n =>
           n.type === 'new_order' ||
-          n.type === 'order_status_update' || 
+          n.type === 'order_status_update' ||
           n.type === 'order_assigned'
         );
       case 'users':
-        return notifications.filter(n => 
-          n.type === 'user_registration' || 
+        return notifications.filter(n =>
+          n.type === 'user_registration' ||
           n.type === 'user_approved'
         );
       case 'support':
-        return notifications.filter(n => 
-          n.type === 'new_support_ticket' || 
+        return notifications.filter(n =>
+          n.type === 'new_support_ticket' ||
           n.type === 'support_ticket_response'
         );
       default:
@@ -244,6 +244,32 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                 <span className="text-xs text-muted-foreground">
                                   {getUnreadCount(tabValue)} unread
                                 </span>
+                                {tabValue === 'orders' && getFilteredNotifications().length > 0 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs h-6 px-2"
+                                    onClick={async () => {
+                                      try {
+                                        // Mark all order notifications as read
+                                        const orderNotifications = getFilteredNotifications();
+                                        for (const notification of orderNotifications) {
+                                          if (!notification.isRead) {
+                                            await fetch(`/api/notifications/${notification.id}/read`, {
+                                              method: 'PUT',
+                                              credentials: 'include',
+                                            });
+                                          }
+                                        }
+                                        refetch(); // Refresh notifications
+                                      } catch (error) {
+                                        console.error('Failed to clear order notifications:', error);
+                                      }
+                                    }}
+                                  >
+                                    Clear all
+                                  </Button>
+                                )}
                               </div>
                               <div className="space-y-2 max-h-64 overflow-y-auto">
                                 {getFilteredNotifications().map((notification: any) => (
@@ -414,6 +440,32 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                 <span className="text-xs text-muted-foreground">
                                   {getUnreadCount(tabValue)} unread
                                 </span>
+                                {tabValue === 'orders' && getFilteredNotifications().length > 0 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs h-6 px-2"
+                                    onClick={async () => {
+                                      try {
+                                        // Mark all order notifications as read
+                                        const orderNotifications = getFilteredNotifications();
+                                        for (const notification of orderNotifications) {
+                                          if (!notification.isRead) {
+                                            await fetch(`/api/notifications/${notification.id}/read`, {
+                                              method: 'PUT',
+                                              credentials: 'include',
+                                            });
+                                          }
+                                        }
+                                        refetch(); // Refresh notifications
+                                      } catch (error) {
+                                        console.error('Failed to clear order notifications:', error);
+                                      }
+                                    }}
+                                  >
+                                    Clear all
+                                  </Button>
+                                )}
                               </div>
                               <div className="space-y-2 max-h-64 overflow-y-auto">
                                 {getFilteredNotifications().map((notification: any) => (
@@ -505,10 +557,13 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                       <div className="text-sm font-medium leading-none">
                         {/* Mobile: Show shortened labels */}
                         <span className="block sm:hidden text-xs">
-                          {tab.label === "Inventory Management" ? "Stock" : 
+                          {tab.label === "Inventory Management" ? "Stock" :
                            tab.label === "User Management" ? "Users" :
                            tab.label === "Analytics" ? "Stats" :
                            tab.label === "Storefront" ? "Shop" :
+                           tab.label === "Order Management" ? "Orders" :
+                           tab.label === "Admin Settings" ? "Admin" :
+                           tab.label === "Scanner" ? "Scan" :
                            tab.label}
                         </span>
                         {/* Desktop: Show full labels */}
