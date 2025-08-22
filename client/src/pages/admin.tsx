@@ -93,16 +93,7 @@ export default function AdminPage() {
     }
   });
 
-  const { data: staffUsers = [] } = useQuery<User[]>({
-    queryKey: ["/api/users/staff"],
-    queryFn: async () => {
-      const response = await fetch("/api/users/staff", {
-        credentials: "include"
-      });
-      if (!response.ok) throw new Error('Failed to fetch staff users');
-      return response.json();
-    }
-  });
+  
 
   const updateTicketStatusMutation = useMutation({
     mutationFn: async ({ ticketId, status }: { ticketId: number; status: string }) => {
@@ -124,25 +115,7 @@ export default function AdminPage() {
     },
   });
 
-  const assignTicketMutation = useMutation({
-    mutationFn: async ({ ticketId, assignedTo }: { ticketId: number; assignedTo: string | null }) => {
-      const response = await fetch(`/api/support/tickets/${ticketId}/assign`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ assignedTo }),
-      });
-      if (!response.ok) throw new Error('Failed to assign ticket');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
-      toast({ title: "Ticket assigned successfully" });
-    },
-    onError: () => {
-      toast({ title: "Failed to assign ticket", variant: "destructive" });
-    },
-  });
+  
 
   const sendTicketResponseMutation = useMutation({
     mutationFn: async ({ ticketId, response, type }: { ticketId: number; response: string; type: string }) => {
@@ -207,12 +180,7 @@ export default function AdminPage() {
     updateTicketStatusMutation.mutate({ ticketId, status });
   };
 
-  const handleAssignTicket = (ticketId: number, assignedTo: string) => {
-    assignTicketMutation.mutate({ 
-      ticketId, 
-      assignedTo: assignedTo === "unassigned" ? null : assignedTo 
-    });
-  };
+  
 
   const handleTicketView = (ticket: SupportTicketWithDetails) => {
     setSelectedTicket(ticket);
@@ -476,20 +444,6 @@ export default function AdminPage() {
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="max-w-xs">
-                              <div className="font-medium text-black dark:text-white truncate">
-                                {item.ticket.subject}
-                              </div>
-                              <div className="text-sm text-gray-500 truncate">
-                                {item.ticket.message}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={getPriorityColor(item.ticket.priority)}>
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                {item.ticket.priority.charAt(0).toUpperCase() + item.ticket.priority.slice(1)}
-                              </Badge>
-                            </TableCell>
                             <TableCell>
                               <Select
                                 value={item.ticket.status}
@@ -507,70 +461,15 @@ export default function AdminPage() {
                               </Select>
                             </TableCell>
                             <TableCell>
-                              <Select
-                                value={item.ticket.assignedTo || "unassigned"}
-                                onValueChange={(assignedTo) => handleAssignTicket(item.ticket.id, assignedTo)}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleTicketView(item)}
+                                className="text-xs"
                               >
-                                <SelectTrigger className="w-40">
-                                  <SelectValue placeholder="Assign to..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                                  {staffUsers?.map((staff) => (
-                                    <SelectItem key={staff.id} value={staff.id}>
-                                      {staff.firstName} {staff.lastName}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleTicketView(item)}
-                                  className="text-xs"
-                                >
-                                  <Eye className="h-3 w-3 mr-1" />
-                                  View
-                                </Button>
-
-                                <Select
-                                  value={item.ticket.status}
-                                  onValueChange={(value) => updateTicketStatusMutation.mutate({ ticketId: item.ticket.id, status: value })}
-                                >
-                                  <SelectTrigger className="w-32">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="open">Open</SelectItem>
-                                    <SelectItem value="in_progress">In Progress</SelectItem>
-                                    <SelectItem value="resolved">Resolved</SelectItem>
-                                    <SelectItem value="closed">Closed</SelectItem>
-                                  </SelectContent>
-                                </Select>
-
-                                <Select
-                                  value={item.ticket.assignedTo || "unassigned"}
-                                  onValueChange={(value) => assignTicketMutation.mutate({
-                                    ticketId: item.ticket.id,
-                                    assignedTo: value === "unassigned" ? null : value
-                                  })}
-                                >
-                                  <SelectTrigger className="w-40">
-                                    <SelectValue placeholder="Assign to..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                                    {staffUsers?.map((user) => (
-                                      <SelectItem key={user.id} value={user.id}>
-                                        {user.firstName} {user.lastName}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                                <Eye className="h-3 w-3 mr-1" />
+                                View
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))
