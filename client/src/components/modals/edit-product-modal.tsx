@@ -115,6 +115,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
     if (product && open) {
       form.reset({
         name: product.name,
+        company: (product as any).company || "",
         description: product.description || "",
         price: product.price || "",
         sku: product.sku,

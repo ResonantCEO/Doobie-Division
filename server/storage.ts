@@ -297,6 +297,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: products.id,
         name: products.name,
+        company: products.company,
         description: products.description,
         price: products.price,
         sku: products.sku,
@@ -421,6 +422,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: products.id,
         name: products.name,
+        company: products.company,
         description: products.description,
         price: products.price,
         sku: products.sku,
