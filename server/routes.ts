@@ -1003,9 +1003,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/notifications/:id", isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      await storage.deleteNotification(id);
+      await db.delete(notifications).where(eq(notifications.id, id));
       res.status(204).send();
     } catch (error) {
+      console.error('Delete notification error:', error);
       res.status(500).json({ message: "Failed to delete notification" });
     }
   });
