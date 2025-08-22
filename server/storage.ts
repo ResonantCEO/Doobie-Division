@@ -24,7 +24,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt, alias } from "drizzle-orm";
+import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
@@ -83,6 +83,7 @@ export interface IStorage {
   getNotifications(userId?: string): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
   markNotificationAsRead(id: number): Promise<void>;
+  deleteNotification(id: number): Promise<void>;
 
   // User management
   getUsersWithStats(): Promise<(User & { orderCount?: number })[]>;
@@ -104,6 +105,7 @@ export interface IStorage {
   getSupportTickets(filters?: any): Promise<any[]>;
   updateSupportTicketStatus(id: number, status: string): Promise<any>;
   assignSupportTicket(id: number, assignedTo: string | null): Promise<any>;
+  addSupportTicketResponse(ticketId: number, responseData: any): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -158,7 +160,19 @@ export class DatabaseStorage implements IStorage {
       .insert(users)
       .values(userData)
       .returning();
-      return newUser;
+
+    // Create notification for admins about new user registration
+    const adminUsers = await this.getUsersWithRole('admin');
+    for (const admin of adminUsers) {
+      await this.createNotification({
+        userId: admin.id,
+        type: 'new_user_registration',
+        title: 'New User Registration',
+        message: `${userData.firstName} ${userData.lastName} has registered and is awaiting approval`,
+        data: { userId: newUser.id, userEmail: userData.email, userName: `${userData.firstName} ${userData.lastName}` }
+      });
+    }
+    return newUser;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
@@ -283,6 +297,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: products.id,
         name: products.name,
+        company: products.company,
         description: products.description,
         price: products.price,
         sku: products.sku,
@@ -407,6 +422,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: products.id,
         name: products.name,
+        company: products.company,
         description: products.description,
         price: products.price,
         sku: products.sku,
@@ -1326,6 +1342,10 @@ export class DatabaseStorage implements IStorage {
     await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
   }
 
+  async deleteNotification(id: number): Promise<void> {
+    await db.delete(notifications).where(eq(notifications.id, id));
+  }
+
   // User management
   async getUsersWithStats(): Promise<(User & { orderCount?: number })[]> {
     const results = await db
@@ -1459,15 +1479,23 @@ export class DatabaseStorage implements IStorage {
       .values(data)
       .returning();
 
-    // Notify admins about the new ticket
+    // Notify admins and managers about the new ticket
     const adminUsers = await this.getUsersWithRole('admin');
-    for (const admin of adminUsers) {
+    const managerUsers = await this.getUsersWithRole('manager');
+    const allStaff = [...adminUsers, ...managerUsers];
+
+    for (const user of allStaff) {
       await this.createNotification({
-        userId: admin.id,
+        userId: user.id,
         type: 'new_support_ticket',
-        title: 'New Support Ticket Submitted',
-        message: `A new support ticket has been submitted by ${data.name || 'a user'}.`,
-        data: { ticketId: ticket.id, subject: ticket.subject },
+        title: 'New Support Ticket',
+        message: `New support ticket from ${data.customerName}: ${data.subject}`,
+        data: { 
+          ticketId: ticket.id, 
+          customerName: data.customerName, 
+          subject: data.subject,
+          priority: data.priority 
+        }
       });
     }
 
@@ -1485,56 +1513,80 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(supportTickets.priority, filters.priority));
     }
 
-    // Create aliases for different user joins
-    const customerUser = alias(users, 'customerUser');
-    const assignedUser = alias(users, 'assignedUser');
-
     const tickets = await db
       .select({
         ticket: supportTickets,
         user: {
-          id: customerUser.id,
-          firstName: customerUser.firstName,
-          lastName: customerUser.lastName,
-          email: customerUser.email,
-        },
-        assignedUser: {
-          id: assignedUser.id,
-          firstName: assignedUser.firstName,
-          lastName: assignedUser.lastName,
-          email: assignedUser.email,
-        },
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        }
       })
       .from(supportTickets)
-      .leftJoin(customerUser, eq(supportTickets.userId, customerUser.id))
-      .leftJoin(assignedUser, eq(supportTickets.assignedTo, assignedUser.id))
+      .leftJoin(users, eq(supportTickets.userId, users.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(supportTickets.createdAt));
 
-    // Get responses for each ticket
+    // Process each ticket to add responses and assigned user
+    const processedTickets = [];
+    
     for (const ticket of tickets) {
-      const responses = await db
-        .select({
-          id: supportTicketResponses.id,
-          message: supportTicketResponses.message,
-          type: supportTicketResponses.type,
-          createdAt: supportTicketResponses.createdAt,
-          createdBy: {
-            id: users.id,
-            firstName: users.firstName,
-            lastName: users.lastName,
-            email: users.email,
-          }
-        })
-        .from(supportTicketResponses)
-        .leftJoin(users, eq(supportTicketResponses.createdBy, users.id))
-        .where(eq(supportTicketResponses.ticketId, ticket.ticket.id))
-        .orderBy(asc(supportTicketResponses.createdAt));
+      try {
+        // Get responses for this ticket
+        const responses = await db
+          .select({
+            id: supportTicketResponses.id,
+            message: supportTicketResponses.message,
+            type: supportTicketResponses.type,
+            createdAt: supportTicketResponses.createdAt,
+            createdBy: {
+              id: users.id,
+              firstName: users.firstName,
+              lastName: users.lastName,
+              email: users.email,
+            }
+          })
+          .from(supportTicketResponses)
+          .leftJoin(users, eq(supportTicketResponses.createdBy, users.id))
+          .where(eq(supportTicketResponses.ticketId, ticket.ticket.id))
+          .orderBy(asc(supportTicketResponses.createdAt));
 
-      (ticket as any).responses = responses;
+        // Get assigned user if ticket has one
+        let assignedUser = null;
+        if (ticket.ticket.assignedTo) {
+          const assignedUserResult = await db
+            .select({
+              id: users.id,
+              firstName: users.firstName,
+              lastName: users.lastName,
+              email: users.email,
+            })
+            .from(users)
+            .where(eq(users.id, ticket.ticket.assignedTo))
+            .limit(1);
+          
+          assignedUser = assignedUserResult[0] || null;
+        }
+
+        // Create processed ticket object
+        processedTickets.push({
+          ...ticket,
+          responses,
+          assignedUser
+        });
+      } catch (error) {
+        console.error('Error processing ticket:', ticket.ticket.id, error);
+        // Add ticket without responses/assignedUser if there's an error
+        processedTickets.push({
+          ...ticket,
+          responses: [],
+          assignedUser: null
+        });
+      }
     }
 
-    return tickets;
+    return processedTickets;
   }
 
   async updateSupportTicketStatus(id: number, status: string) {
@@ -1552,7 +1604,45 @@ export class DatabaseStorage implements IStorage {
       .set({ assignedTo, updatedAt: new Date() })
       .where(eq(supportTickets.id, id))
       .returning();
+
+    // If we need assigned user info, fetch it separately
+    if (assignedTo && ticket) {
+      const assignedUser = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        })
+        .from(users)
+        .where(eq(users.id, assignedTo))
+        .limit(1);
+
+      return {
+        ...ticket,
+        assignedUser: assignedUser[0] || null
+      };
+    }
+
     return ticket;
+  }
+
+  async addSupportTicketResponse(ticketId: number, responseData: {
+    message: string;
+    type: string;
+    createdBy: string;
+  }) {
+    const [response] = await db
+      .insert(supportTicketResponses)
+      .values({
+        ticketId,
+        message: responseData.message,
+        type: responseData.type,
+        createdBy: responseData.createdBy,
+      })
+      .returning();
+
+    return response;
   }
 
 

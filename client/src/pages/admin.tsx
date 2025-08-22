@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send } from "lucide-react";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import type { InventoryLog, Product, User, SupportTicket } from "@shared/schema";
 
 interface InventoryLogWithDetails extends InventoryLog {
@@ -36,6 +36,9 @@ interface SupportTicketWithDetails {
   } | null;
 }
 
+type SortField = 'createdAt' | 'product' | 'sku' | 'type' | 'quantity' | 'previousStock' | 'newStock' | 'changedBy' | 'reason';
+type SortDirection = 'asc' | 'desc';
+
 export default function AdminPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -49,7 +52,9 @@ export default function AdminPage() {
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [ticketResponse, setTicketResponse] = useState("");
-  const [responseType, setResponseType] = useState("internal_note"); // internal_note, customer_response
+  const [responseType, setResponseType] = useState("customer_response");
+  const [sortField, setSortField] = useState<SortField>('createdAt');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
 
   // Redirect if not admin
@@ -93,16 +98,7 @@ export default function AdminPage() {
     }
   });
 
-  const { data: staffUsers = [] } = useQuery<User[]>({
-    queryKey: ["/api/users/staff"],
-    queryFn: async () => {
-      const response = await fetch("/api/users/staff", {
-        credentials: "include"
-      });
-      if (!response.ok) throw new Error('Failed to fetch staff users');
-      return response.json();
-    }
-  });
+
 
   const updateTicketStatusMutation = useMutation({
     mutationFn: async ({ ticketId, status }: { ticketId: number; status: string }) => {
@@ -124,25 +120,7 @@ export default function AdminPage() {
     },
   });
 
-  const assignTicketMutation = useMutation({
-    mutationFn: async ({ ticketId, assignedTo }: { ticketId: number; assignedTo: string | null }) => {
-      const response = await fetch(`/api/support/tickets/${ticketId}/assign`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ assignedTo }),
-      });
-      if (!response.ok) throw new Error('Failed to assign ticket');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
-      toast({ title: "Ticket assigned successfully" });
-    },
-    onError: () => {
-      toast({ title: "Failed to assign ticket", variant: "destructive" });
-    },
-  });
+
 
   const sendTicketResponseMutation = useMutation({
     mutationFn: async ({ ticketId, response, type }: { ticketId: number; response: string; type: string }) => {
@@ -207,12 +185,7 @@ export default function AdminPage() {
     updateTicketStatusMutation.mutate({ ticketId, status });
   };
 
-  const handleAssignTicket = (ticketId: number, assignedTo: string) => {
-    assignTicketMutation.mutate({ 
-      ticketId, 
-      assignedTo: assignedTo === "unassigned" ? null : assignedTo 
-    });
-  };
+
 
   const handleTicketView = (ticket: SupportTicketWithDetails) => {
     setSelectedTicket(ticket);
@@ -223,7 +196,6 @@ export default function AdminPage() {
     setShowTicketModal(false);
     setSelectedTicket(null);
     setTicketResponse("");
-    setResponseType("internal_note");
   };
 
   const handleSendResponse = () => {
@@ -235,6 +207,95 @@ export default function AdminPage() {
       });
     }
   };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4" />;
+    }
+    return sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
+  };
+
+  const filteredLogs = inventoryLogs.filter(log => {
+    const matchesSearch = productFilter === "" || 
+      log.product?.name?.toLowerCase().includes(productFilter.toLowerCase()) ||
+      log.product?.sku?.toLowerCase().includes(productFilter.toLowerCase()) ||
+      log.user?.firstName?.toLowerCase().includes(productFilter.toLowerCase()) ||
+      log.user?.lastName?.toLowerCase().includes(productFilter.toLowerCase());
+
+    const matchesType = typeFilter === "all" || log.type === typeFilter;
+
+    return matchesSearch && matchesType;
+  });
+
+  const sortedLogs = [...filteredLogs].sort((a, b) => {
+    let aValue: any;
+    let bValue: any;
+
+    switch (sortField) {
+      case 'createdAt':
+        aValue = new Date(a.createdAt).getTime();
+        bValue = new Date(b.createdAt).getTime();
+        break;
+      case 'product':
+        aValue = a.product?.name?.toLowerCase() || '';
+        bValue = b.product?.name?.toLowerCase() || '';
+        break;
+      case 'sku':
+        aValue = a.product?.sku?.toLowerCase() || '';
+        bValue = b.product?.sku?.toLowerCase() || '';
+        break;
+      case 'type':
+        aValue = a.type.toLowerCase();
+        bValue = b.type.toLowerCase();
+        break;
+      case 'quantity':
+        aValue = Math.abs(a.quantity);
+        bValue = Math.abs(b.quantity);
+        break;
+      case 'previousStock':
+        aValue = a.previousStock;
+        bValue = b.previousStock;
+        break;
+      case 'newStock':
+        aValue = a.newStock;
+        bValue = b.newStock;
+        break;
+      case 'changedBy':
+        const aName = a.user?.firstName && a.user?.lastName 
+          ? `${a.user.firstName} ${a.user.lastName}`.toLowerCase()
+          : a.user?.email?.toLowerCase() || '';
+        const bName = b.user?.firstName && b.user?.lastName 
+          ? `${b.user.firstName} ${b.user.lastName}`.toLowerCase()
+          : b.user?.email?.toLowerCase() || '';
+        aValue = aName;
+        bValue = bName;
+        break;
+      case 'reason':
+        aValue = a.reason?.toLowerCase() || '';
+        bValue = b.reason?.toLowerCase() || '';
+        break;
+      default:
+        aValue = new Date(a.createdAt).getTime();
+        bValue = new Date(b.createdAt).getTime();
+    }
+
+    if (aValue < bValue) {
+      return sortDirection === 'asc' ? -1 : 1;
+    }
+    if (aValue > bValue) {
+      return sortDirection === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
 
 
   return (
@@ -316,26 +377,107 @@ export default function AdminPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date & Time</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Previous Stock</TableHead>
-                    <TableHead>New Stock</TableHead>
-                    <TableHead>Changed By</TableHead>
-                    <TableHead>Reason</TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('createdAt')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Date & Time
+                        {getSortIcon('createdAt')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('product')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Product
+                        {getSortIcon('product')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('sku')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        SKU
+                        {getSortIcon('sku')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('type')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Type
+                        {getSortIcon('type')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('quantity')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Quantity
+                        {getSortIcon('quantity')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('previousStock')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Previous Stock
+                        {getSortIcon('previousStock')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('newStock')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        New Stock
+                        {getSortIcon('newStock')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('changedBy')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Changed By
+                        {getSortIcon('changedBy')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('reason')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Reason
+                        {getSortIcon('reason')}
+                      </Button>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {inventoryLogs.length === 0 ? (
+                  {sortedLogs.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                         No inventory changes found for the selected filters
                       </TableCell>
                     </TableRow>
                   ) : (
-                    inventoryLogs.map((log) => (
+                    sortedLogs.map((log) => (
                       <TableRow key={log.id}>
                         <TableCell className="font-medium">
                           {format(new Date(log.createdAt!), 'MMM dd, yyyy HH:mm')}
@@ -394,36 +536,6 @@ export default function AdminPage() {
             <CardContent>
               {/* Filters */}
               <div className="flex gap-4 mb-6">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1">Status</label>
-                  <Select value={ticketStatusFilter} onValueChange={setTicketStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All statuses</SelectItem>
-                      <SelectItem value="open">Open</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="resolved">Resolved</SelectItem>
-                      <SelectItem value="closed">Closed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1">Priority</label>
-                  <Select value={ticketPriorityFilter} onValueChange={setTicketPriorityFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All priorities" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All priorities</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
               {/* Support Tickets Table */}
@@ -440,17 +552,14 @@ export default function AdminPage() {
                       <TableRow>
                         <TableHead>Date Created</TableHead>
                         <TableHead>Customer</TableHead>
-                        <TableHead>Subject</TableHead>
-                        <TableHead>Priority</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Assigned To</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {supportTickets.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                          <TableCell colSpan={4} className="text-center py-8 text-gray-500">
                             No support tickets found for the selected filters
                           </TableCell>
                         </TableRow>
@@ -478,20 +587,6 @@ export default function AdminPage() {
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="max-w-xs">
-                              <div className="font-medium text-black dark:text-white truncate">
-                                {item.ticket.subject}
-                              </div>
-                              <div className="text-sm text-gray-500 truncate">
-                                {item.ticket.message}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={getPriorityColor(item.ticket.priority)}>
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                {item.ticket.priority.charAt(0).toUpperCase() + item.ticket.priority.slice(1)}
-                              </Badge>
-                            </TableCell>
                             <TableCell>
                               <Select
                                 value={item.ticket.status}
@@ -509,70 +604,15 @@ export default function AdminPage() {
                               </Select>
                             </TableCell>
                             <TableCell>
-                              <Select
-                                value={item.ticket.assignedTo || "unassigned"}
-                                onValueChange={(assignedTo) => handleAssignTicket(item.ticket.id, assignedTo)}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleTicketView(item)}
+                                className="text-xs"
                               >
-                                <SelectTrigger className="w-40">
-                                  <SelectValue placeholder="Assign to..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                                  {staffUsers?.map((staff) => (
-                                    <SelectItem key={staff.id} value={staff.id}>
-                                      {staff.firstName} {staff.lastName}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleTicketView(item)}
-                                  className="text-xs"
-                                >
-                                  <Eye className="h-3 w-3 mr-1" />
-                                  View
-                                </Button>
-
-                                <Select
-                                  value={item.ticket.status}
-                                  onValueChange={(value) => updateTicketStatusMutation.mutate({ ticketId: item.ticket.id, status: value })}
-                                >
-                                  <SelectTrigger className="w-32">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="open">Open</SelectItem>
-                                    <SelectItem value="in_progress">In Progress</SelectItem>
-                                    <SelectItem value="resolved">Resolved</SelectItem>
-                                    <SelectItem value="closed">Closed</SelectItem>
-                                  </SelectContent>
-                                </Select>
-
-                                <Select
-                                  value={item.ticket.assignedTo || "unassigned"}
-                                  onValueChange={(value) => assignTicketMutation.mutate({
-                                    ticketId: item.ticket.id,
-                                    assignedTo: value === "unassigned" ? null : value
-                                  })}
-                                >
-                                  <SelectTrigger className="w-40">
-                                    <SelectValue placeholder="Assign to..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                                    {staffUsers?.map((user) => (
-                                      <SelectItem key={user.id} value={user.id}>
-                                        {user.firstName} {user.lastName}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                                <Eye className="h-3 w-3 mr-1" />
+                                View
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))
@@ -610,25 +650,20 @@ export default function AdminPage() {
                 {selectedTicket?.ticket.priority.charAt(0).toUpperCase() + selectedTicket?.ticket.priority.slice(1)}
               </Badge>
             </div>
-            <div className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5 text-gray-400" />
-              <span className="font-semibold">Message:</span>
-              <p className="text-sm text-gray-600 break-words">{selectedTicket?.ticket.message}</p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5 text-gray-400" />
+                <span className="font-semibold">Message:</span>
+              </div>
+              <p className="text-base text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words">
+                {selectedTicket?.ticket.message}
+              </p>
             </div>
             <hr />
             <div className="space-y-2">
               <label className="block text-sm font-medium">Your Response</label>
-              <Select value={responseType} onValueChange={setResponseType}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Response Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="internal_note">Internal Note</SelectItem>
-                  <SelectItem value="customer_response">Customer Response</SelectItem>
-                </SelectContent>
-              </Select>
               <Textarea
-                placeholder={`Write your ${responseType === 'customer_response' ? 'response to the customer' : 'internal note'}...`}
+                placeholder="Write your response to the customer..."
                 value={ticketResponse}
                 onChange={(e) => setTicketResponse(e.target.value)}
                 className="min-h-[100px]"

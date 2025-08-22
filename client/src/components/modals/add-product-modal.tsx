@@ -24,6 +24,7 @@ import type { Category } from "@shared/schema";
 
 const formSchema = z.object({
   name: z.string().min(1, "Product name is required"),
+  company: z.string().optional(),
   description: z.string().optional(),
   sku: z.string().min(1, "SKU is required"),
   categoryId: z.number().min(1, "Category is required"),
@@ -86,6 +87,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
+      company: "",
       description: "",
       price: "",
       sku: "",
@@ -167,6 +169,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
 
       const payload = {
         name: data.name,
+        company: data.company || null,
         description: data.description || null,
         sku: data.sku,
         categoryId: data.categoryId ? parseInt(data.categoryId) : null,
@@ -300,6 +303,20 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                   <FormLabel>Product Name</FormLabel>
                   <FormControl>
                     <Input placeholder="Enter product name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="company"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Company</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter company name" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -474,7 +491,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                     <FormItem>
                       <FormLabel>Stock Quantity ({form.watch("weightUnit")})</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.1" placeholder="0" {...field} />
+                        <Input type="number" step="1" placeholder="0" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
