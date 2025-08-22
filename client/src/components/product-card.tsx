@@ -49,10 +49,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         onClick={handleCardClick}
       >
         {/* Front of card */}
-        <Card className="product-card-face product-card-front absolute inset-0 w-full h-full overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col backface-hidden" style={{
-          boxShadow: '0 10px 30px rgba(0,0,0,0.2), 0 0 20px rgba(147, 51, 234, 0.1)',
-          transform: 'translateZ(0)'
-        }}>
+        <Card className="product-card-face product-card-front absolute inset-0 w-full h-full overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col backface-hidden">
           <div className="w-full h-32 sm:h-40 md:h-48 overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0">
             <img
               src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"}
@@ -62,16 +59,9 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
           <CardContent className="p-2 sm:p-3 md:p-4 bg-white dark:bg-gray-900 flex flex-col flex-1">
             <div className="flex-1 text-center">
-              <h4 className="font-bold text-sm sm:text-base md:text-lg text-purple-600 dark:text-purple-400 line-clamp-1 mb-1 uppercase tracking-wide" style={{ 
-                fontFamily: '"Georgia", "Times New Roman", serif',
-                textShadow: '2px 2px 4px rgba(0,0,0,0.3), 0px 0px 8px rgba(147, 51, 234, 0.4)',
-                transform: 'perspective(500px) rotateX(10deg)'
-              }}>{product.name}</h4>
+              <h4 className="font-black text-sm sm:text-base md:text-lg text-purple-600 dark:text-purple-400 line-clamp-1 mb-1 uppercase tracking-wide" style={{ fontFamily: '"Comic Sans MS", cursive, sans-serif' }}>{product.name}</h4>
               {(product as any).company && (
-                <p className="text-xs sm:text-sm font-semibold text-orange-500 dark:text-orange-400 uppercase tracking-wide" style={{
-                  textShadow: '1px 1px 2px rgba(0,0,0,0.2)',
-                  transform: 'perspective(300px) rotateY(5deg)'
-                }}>{(product as any).company}</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{(product as any).company}</p>
               )}
               {product.category && (
                 <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">{product.category.name}</p>
@@ -171,10 +161,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </Card>
 
         {/* Back of card */}
-        <Card className="product-card-face product-card-back absolute inset-0 w-full h-full overflow-y-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col backface-hidden rotate-y-180" style={{
-          boxShadow: '0 10px 30px rgba(0,0,0,0.2), 0 0 20px rgba(147, 51, 234, 0.1)',
-          transform: 'rotateY(180deg) translateZ(0)'
-        }}>
+        <Card className="product-card-face product-card-back absolute inset-0 w-full h-full overflow-y-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col backface-hidden rotate-y-180">
           <div className="w-full h-48 overflow-hidden relative bg-gray-100 dark:bg-gray-800 flex-shrink-0">
             <img
               src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"}
