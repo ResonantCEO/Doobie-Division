@@ -1507,9 +1507,16 @@ export class DatabaseStorage implements IStorage {
           lastName: users.lastName,
           email: users.email,
         },
+        assignedUser: {
+          id: sql<string | null>`assigned_users.id`,
+          firstName: sql<string | null>`assigned_users.first_name`,
+          lastName: sql<string | null>`assigned_users.last_name`,
+          email: sql<string | null>`assigned_users.email`,
+        }
       })
       .from(supportTickets)
       .leftJoin(users, eq(supportTickets.userId, users.id))
+      .leftJoin(sql`users as assigned_users`, sql`${supportTickets.assignedTo} = assigned_users.id`)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(supportTickets.createdAt));
 
