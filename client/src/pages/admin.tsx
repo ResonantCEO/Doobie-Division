@@ -440,8 +440,6 @@ export default function AdminPage() {
                       <TableRow>
                         <TableHead>Date Created</TableHead>
                         <TableHead>Customer</TableHead>
-                        <TableHead>Subject</TableHead>
-                        <TableHead>Priority</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Assigned To</TableHead>
                         <TableHead>Actions</TableHead>
@@ -450,7 +448,7 @@ export default function AdminPage() {
                     <TableBody>
                       {supportTickets.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                          <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                             No support tickets found for the selected filters
                           </TableCell>
                         </TableRow>
