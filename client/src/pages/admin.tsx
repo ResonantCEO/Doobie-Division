@@ -49,7 +49,7 @@ export default function AdminPage() {
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [ticketResponse, setTicketResponse] = useState("");
-  const [responseType, setResponseType] = useState("internal_note"); // internal_note, customer_response
+  const [responseType, setResponseType] = useState("customer_response");
 
 
   // Redirect if not admin
@@ -191,7 +191,6 @@ export default function AdminPage() {
     setShowTicketModal(false);
     setSelectedTicket(null);
     setTicketResponse("");
-    setResponseType("internal_note");
   };
 
   const handleSendResponse = () => {
@@ -514,17 +513,8 @@ export default function AdminPage() {
             <hr />
             <div className="space-y-2">
               <label className="block text-sm font-medium">Your Response</label>
-              <Select value={responseType} onValueChange={setResponseType}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Response Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="internal_note">Internal Note</SelectItem>
-                  <SelectItem value="customer_response">Customer Response</SelectItem>
-                </SelectContent>
-              </Select>
               <Textarea
-                placeholder={`Write your ${responseType === 'customer_response' ? 'response to the customer' : 'internal note'}...`}
+                placeholder="Write your response to the customer..."
                 value={ticketResponse}
                 onChange={(e) => setTicketResponse(e.target.value)}
                 className="min-h-[100px]"
