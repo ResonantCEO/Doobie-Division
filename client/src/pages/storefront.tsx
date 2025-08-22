@@ -432,8 +432,8 @@ export default function StorefrontPage() {
                       {/* Horizontal Scrolling Product Container */}
                       <div className="relative">
                         {subcategoryProducts.length > 0 ? (
-                          <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
-                            <div className="flex space-x-4" style={{ minWidth: 'max-content' }}>
+                          <div className="flex space-x-8 overflow-x-auto pb-4 scrollbar-hide">
+                            <div className="flex space-x-8" style={{ minWidth: 'max-content' }}>
                               {subcategoryProducts.map((product) => (
                                 <div key={product.id} className="flex-shrink-0 w-64 sm:w-72">
                                   <ProductCard product={product} />
@@ -532,8 +532,8 @@ export default function StorefrontPage() {
 
                   {/* Horizontal Scrolling Product Container */}
                   <div className="relative">
-                    <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
-                      <div className="flex space-x-4" style={{ minWidth: 'max-content' }}>
+                    <div className="flex space-x-8 overflow-x-auto pb-4 scrollbar-hide">
+                      <div className="flex space-x-8" style={{ minWidth: 'max-content' }}>
                         {categoryProducts.map((product) => (
                           <div key={product.id} className="flex-shrink-0 w-64 sm:w-72">
                             <ProductCard product={product} />
