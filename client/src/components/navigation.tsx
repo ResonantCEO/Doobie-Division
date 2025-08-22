@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger 
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Bell, Settings, LogOut, Package, BarChart3, Users, Home, Search, ShoppingCart, User, ChevronDown, Sun, Moon, QrCode } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -31,6 +31,7 @@ import {
   NavigationMenuTrigger,
   NavigationMenuIndicator,
 } from "@/components/ui/navigation-menu"
+import { format } from "date-fns";
 
 
 interface NavigationProps {
@@ -182,18 +183,36 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                           {notifications.map((notification: any) => (
                             <div
                               key={notification.id}
-                              className={`p-2 rounded-md text-sm ${
-                                notification.isRead
-                                  ? "bg-background"
-                                  : "bg-muted"
+                              className={`p-3 border-b last:border-b-0 ${
+                                notification.type === 'new_support_ticket'
+                                  ? 'bg-red-50 border-red-200'
+                                  : ''
                               }`}
                             >
-                              <div className="font-medium">{notification.title}</div>
-                              <div className="text-muted-foreground text-xs">
-                                {notification.message}
-                              </div>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {new Date(notification.createdAt).toLocaleString()}
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <h4 className={`font-medium text-sm ${
+                                    notification.type === 'new_support_ticket'
+                                      ? 'text-red-900'
+                                      : ''
+                                  }`}>
+                                    {notification.title}
+                                  </h4>
+                                  <p className={`text-sm mt-1 ${
+                                    notification.type === 'new_support_ticket'
+                                      ? 'text-red-700'
+                                      : 'text-gray-600'
+                                  }`}>
+                                    {notification.message}
+                                  </p>
+                                  <p className={`text-xs mt-1 ${
+                                    notification.type === 'new_support_ticket'
+                                      ? 'text-red-500'
+                                      : 'text-gray-500'
+                                  }`}>
+                                    {format(new Date(notification.createdAt), 'PPp')}
+                                  </p>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -332,18 +351,36 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                           {notifications.map((notification: any) => (
                             <div
                               key={notification.id}
-                              className={`p-2 rounded-md text-sm ${
-                                notification.isRead
-                                  ? "bg-background"
-                                  : "bg-muted"
+                              className={`p-3 border-b last:border-b-0 ${
+                                notification.type === 'new_support_ticket'
+                                  ? 'bg-red-50 border-red-200'
+                                  : ''
                               }`}
                             >
-                              <div className="font-medium">{notification.title}</div>
-                              <div className="text-muted-foreground text-xs">
-                                {notification.message}
-                              </div>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {new Date(notification.createdAt).toLocaleString()}
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <h4 className={`font-medium text-sm ${
+                                    notification.type === 'new_support_ticket'
+                                      ? 'text-red-900'
+                                      : ''
+                                  }`}>
+                                    {notification.title}
+                                  </h4>
+                                  <p className={`text-sm mt-1 ${
+                                    notification.type === 'new_support_ticket'
+                                      ? 'text-red-700'
+                                      : 'text-gray-600'
+                                  }`}>
+                                    {notification.message}
+                                  </p>
+                                  <p className={`text-xs mt-1 ${
+                                    notification.type === 'new_support_ticket'
+                                      ? 'text-red-500'
+                                      : 'text-gray-500'
+                                  }`}>
+                                    {format(new Date(notification.createdAt), 'PPp')}
+                                  </p>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -413,7 +450,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                       <div className="text-sm font-medium leading-none">
                         {/* Mobile: Show shortened labels */}
                         <span className="block sm:hidden text-xs">
-                          {tab.label === "Inventory Management" ? "Stock" : 
+                          {tab.label === "Inventory Management" ? "Stock" :
                            tab.label === "User Management" ? "Users" :
                            tab.label === "Analytics" ? "Stats" :
                            tab.label === "Storefront" ? "Shop" :
