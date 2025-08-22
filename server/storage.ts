@@ -24,7 +24,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt, alias } from "drizzle-orm";
+import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
@@ -1485,29 +1485,18 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(supportTickets.priority, filters.priority));
     }
 
-    // Create aliases for different user joins
-    const customerUser = alias(users, 'customerUser');
-    const assignedUser = alias(users, 'assignedUser');
-
     const tickets = await db
       .select({
         ticket: supportTickets,
         user: {
-          id: customerUser.id,
-          firstName: customerUser.firstName,
-          lastName: customerUser.lastName,
-          email: customerUser.email,
-        },
-        assignedUser: {
-          id: assignedUser.id,
-          firstName: assignedUser.firstName,
-          lastName: assignedUser.lastName,
-          email: assignedUser.email,
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
         },
       })
       .from(supportTickets)
-      .leftJoin(customerUser, eq(supportTickets.userId, customerUser.id))
-      .leftJoin(assignedUser, eq(supportTickets.assignedTo, assignedUser.id))
+      .leftJoin(users, eq(supportTickets.userId, users.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(supportTickets.createdAt));
 
@@ -1552,6 +1541,26 @@ export class DatabaseStorage implements IStorage {
       .set({ assignedTo, updatedAt: new Date() })
       .where(eq(supportTickets.id, id))
       .returning();
+    
+    // If we need assigned user info, fetch it separately
+    if (assignedTo && ticket) {
+      const assignedUser = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        })
+        .from(users)
+        .where(eq(users.id, assignedTo))
+        .limit(1);
+      
+      return {
+        ...ticket,
+        assignedUser: assignedUser[0] || null
+      };
+    }
+    
     return ticket;
   }
 
