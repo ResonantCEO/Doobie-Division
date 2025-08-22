@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send } from "lucide-react";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import type { InventoryLog, Product, User, SupportTicket } from "@shared/schema";
 
 interface InventoryLogWithDetails extends InventoryLog {
@@ -36,6 +36,9 @@ interface SupportTicketWithDetails {
   } | null;
 }
 
+type SortField = 'createdAt' | 'product' | 'sku' | 'type' | 'quantity' | 'previousStock' | 'newStock' | 'changedBy' | 'reason';
+type SortDirection = 'asc' | 'desc';
+
 export default function AdminPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -50,6 +53,8 @@ export default function AdminPage() {
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [ticketResponse, setTicketResponse] = useState("");
   const [responseType, setResponseType] = useState("customer_response");
+  const [sortField, setSortField] = useState<SortField>('createdAt');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
 
   // Redirect if not admin
@@ -203,6 +208,95 @@ export default function AdminPage() {
     }
   };
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4" />;
+    }
+    return sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
+  };
+
+  const filteredLogs = inventoryLogs.filter(log => {
+    const matchesSearch = productFilter === "" || 
+      log.product?.name?.toLowerCase().includes(productFilter.toLowerCase()) ||
+      log.product?.sku?.toLowerCase().includes(productFilter.toLowerCase()) ||
+      log.user?.firstName?.toLowerCase().includes(productFilter.toLowerCase()) ||
+      log.user?.lastName?.toLowerCase().includes(productFilter.toLowerCase());
+
+    const matchesType = typeFilter === "all" || log.type === typeFilter;
+
+    return matchesSearch && matchesType;
+  });
+
+  const sortedLogs = [...filteredLogs].sort((a, b) => {
+    let aValue: any;
+    let bValue: any;
+
+    switch (sortField) {
+      case 'createdAt':
+        aValue = new Date(a.createdAt).getTime();
+        bValue = new Date(b.createdAt).getTime();
+        break;
+      case 'product':
+        aValue = a.product?.name?.toLowerCase() || '';
+        bValue = b.product?.name?.toLowerCase() || '';
+        break;
+      case 'sku':
+        aValue = a.product?.sku?.toLowerCase() || '';
+        bValue = b.product?.sku?.toLowerCase() || '';
+        break;
+      case 'type':
+        aValue = a.type.toLowerCase();
+        bValue = b.type.toLowerCase();
+        break;
+      case 'quantity':
+        aValue = Math.abs(a.quantity);
+        bValue = Math.abs(b.quantity);
+        break;
+      case 'previousStock':
+        aValue = a.previousStock;
+        bValue = b.previousStock;
+        break;
+      case 'newStock':
+        aValue = a.newStock;
+        bValue = b.newStock;
+        break;
+      case 'changedBy':
+        const aName = a.user?.firstName && a.user?.lastName 
+          ? `${a.user.firstName} ${a.user.lastName}`.toLowerCase()
+          : a.user?.email?.toLowerCase() || '';
+        const bName = b.user?.firstName && b.user?.lastName 
+          ? `${b.user.firstName} ${b.user.lastName}`.toLowerCase()
+          : b.user?.email?.toLowerCase() || '';
+        aValue = aName;
+        bValue = bName;
+        break;
+      case 'reason':
+        aValue = a.reason?.toLowerCase() || '';
+        bValue = b.reason?.toLowerCase() || '';
+        break;
+      default:
+        aValue = new Date(a.createdAt).getTime();
+        bValue = new Date(b.createdAt).getTime();
+    }
+
+    if (aValue < bValue) {
+      return sortDirection === 'asc' ? -1 : 1;
+    }
+    if (aValue > bValue) {
+      return sortDirection === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
+
 
   return (
     <div className="space-y-6">
@@ -283,26 +377,107 @@ export default function AdminPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date & Time</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Previous Stock</TableHead>
-                    <TableHead>New Stock</TableHead>
-                    <TableHead>Changed By</TableHead>
-                    <TableHead>Reason</TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('createdAt')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Date & Time
+                        {getSortIcon('createdAt')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('product')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Product
+                        {getSortIcon('product')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('sku')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        SKU
+                        {getSortIcon('sku')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('type')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Type
+                        {getSortIcon('type')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('quantity')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Quantity
+                        {getSortIcon('quantity')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('previousStock')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Previous Stock
+                        {getSortIcon('previousStock')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('newStock')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        New Stock
+                        {getSortIcon('newStock')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('changedBy')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Changed By
+                        {getSortIcon('changedBy')}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('reason')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Reason
+                        {getSortIcon('reason')}
+                      </Button>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {inventoryLogs.length === 0 ? (
+                  {sortedLogs.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                         No inventory changes found for the selected filters
                       </TableCell>
                     </TableRow>
                   ) : (
-                    inventoryLogs.map((log) => (
+                    sortedLogs.map((log) => (
                       <TableRow key={log.id}>
                         <TableCell className="font-medium">
                           {format(new Date(log.createdAt!), 'MMM dd, yyyy HH:mm')}
