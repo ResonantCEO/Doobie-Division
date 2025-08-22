@@ -195,38 +195,38 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                     <h3 className="font-semibold text-sm mb-3">Notifications</h3>
                     <Tabs value={notificationTab} onValueChange={setNotificationTab} className="w-full">
                       <TabsList className="grid w-full grid-cols-4 mb-3">
-                        <TabsTrigger value="all" className="text-xs flex items-center gap-1">
+                        <TabsTrigger value="all" className="text-xs flex items-center gap-1.5 relative">
                           All
                           {unreadCount > 0 && (
-                            <Badge className="h-4 w-4 p-0 text-[10px] bg-destructive text-destructive-foreground">
-                              {unreadCount}
+                            <Badge className="h-5 w-5 p-0 text-[10px] bg-red-500 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto">
+                              {unreadCount > 99 ? '99+' : unreadCount}
                             </Badge>
                           )}
                         </TabsTrigger>
-                        <TabsTrigger value="orders" className="text-xs flex items-center gap-1">
+                        <TabsTrigger value="orders" className="text-xs flex items-center gap-1.5 relative">
                           <Package className="h-3 w-3" />
                           Orders
                           {getUnreadCount('orders') > 0 && (
-                            <Badge className="h-4 w-4 p-0 text-[10px] bg-destructive text-destructive-foreground">
-                              {getUnreadCount('orders')}
+                            <Badge className="h-5 w-5 p-0 text-[10px] bg-blue-500 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto">
+                              {getUnreadCount('orders') > 99 ? '99+' : getUnreadCount('orders')}
                             </Badge>
                           )}
                         </TabsTrigger>
-                        <TabsTrigger value="users" className="text-xs flex items-center gap-1">
+                        <TabsTrigger value="users" className="text-xs flex items-center gap-1.5 relative">
                           <UserPlus className="h-3 w-3" />
                           Users
                           {getUnreadCount('users') > 0 && (
-                            <Badge className="h-4 w-4 p-0 text-[10px] bg-destructive text-destructive-foreground">
-                              {getUnreadCount('users')}
+                            <Badge className="h-5 w-5 p-0 text-[10px] bg-green-500 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto">
+                              {getUnreadCount('users') > 99 ? '99+' : getUnreadCount('users')}
                             </Badge>
                           )}
                         </TabsTrigger>
-                        <TabsTrigger value="support" className="text-xs flex items-center gap-1">
+                        <TabsTrigger value="support" className="text-xs flex items-center gap-1.5 relative">
                           <HeadphonesIcon className="h-3 w-3" />
                           Support
                           {getUnreadCount('support') > 0 && (
-                            <Badge className="h-4 w-4 p-0 text-[10px] bg-red-500 text-white">
-                              {getUnreadCount('support')}
+                            <Badge className="h-5 w-5 p-0 text-[10px] bg-red-600 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto animate-pulse">
+                              {getUnreadCount('support') > 99 ? '99+' : getUnreadCount('support')}
                             </Badge>
                           )}
                         </TabsTrigger>
@@ -398,38 +398,38 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                     <h3 className="font-semibold text-sm mb-3">Notifications</h3>
                     <Tabs value={notificationTab} onValueChange={setNotificationTab} className="w-full">
                       <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-3 gap-1">
-                        <TabsTrigger value="all" className="text-xs flex items-center gap-1">
+                        <TabsTrigger value="all" className="text-xs flex items-center gap-1.5 relative">
                           All
                           {unreadCount > 0 && (
-                            <Badge className="h-4 w-4 p-0 text-[10px] bg-destructive text-destructive-foreground">
-                              {unreadCount}
+                            <Badge className="h-5 w-5 p-0 text-[10px] bg-red-500 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto">
+                              {unreadCount > 99 ? '99+' : unreadCount}
                             </Badge>
                           )}
                         </TabsTrigger>
-                        <TabsTrigger value="orders" className="text-xs flex items-center gap-1">
+                        <TabsTrigger value="orders" className="text-xs flex items-center gap-1.5 relative">
                           <Package className="h-3 w-3" />
                           <span className="hidden sm:inline">Orders</span>
                           {getUnreadCount('orders') > 0 && (
-                            <Badge className="h-4 w-4 p-0 text-[10px] bg-destructive text-destructive-foreground">
-                              {getUnreadCount('orders')}
+                            <Badge className="h-5 w-5 p-0 text-[10px] bg-blue-500 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto">
+                              {getUnreadCount('orders') > 99 ? '99+' : getUnreadCount('orders')}
                             </Badge>
                           )}
                         </TabsTrigger>
-                        <TabsTrigger value="users" className="text-xs flex items-center gap-1">
+                        <TabsTrigger value="users" className="text-xs flex items-center gap-1.5 relative">
                           <UserPlus className="h-3 w-3" />
                           <span className="hidden sm:inline">Users</span>
                           {getUnreadCount('users') > 0 && (
-                            <Badge className="h-4 w-4 p-0 text-[10px] bg-destructive text-destructive-foreground">
-                              {getUnreadCount('users')}
+                            <Badge className="h-5 w-5 p-0 text-[10px] bg-green-500 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto">
+                              {getUnreadCount('users') > 99 ? '99+' : getUnreadCount('users')}
                             </Badge>
                           )}
                         </TabsTrigger>
-                        <TabsTrigger value="support" className="text-xs flex items-center gap-1">
+                        <TabsTrigger value="support" className="text-xs flex items-center gap-1.5 relative">
                           <HeadphonesIcon className="h-3 w-3" />
                           <span className="hidden sm:inline">Support</span>
                           {getUnreadCount('support') > 0 && (
-                            <Badge className="h-4 w-4 p-0 text-[10px] bg-red-500 text-white">
-                              {getUnreadCount('support')}
+                            <Badge className="h-5 w-5 p-0 text-[10px] bg-red-600 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto animate-pulse">
+                              {getUnreadCount('support') > 99 ? '99+' : getUnreadCount('support')}
                             </Badge>
                           )}
                         </TabsTrigger>
