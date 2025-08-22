@@ -77,13 +77,13 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   };
 
   const tabs = [
-    { id: "storefront", label: "Storefront", path: "/dashboard/storefront" },
-    { id: "inventory", label: "Inventory Management", path: "/dashboard/inventory", roles: ["admin", "manager"] },
-    { id: "orders", label: "Orders", path: "/dashboard/orders", roles: ["admin", "manager", "staff"] },
-    { id: "analytics", label: "Analytics", path: "/dashboard/analytics", roles: ["admin", "manager"] },
-    { id: "users", label: "User Management", path: "/dashboard/users", roles: ["admin"] },
-    { id: "admin", label: "Admin", path: "/dashboard/admin", roles: ["admin"] },
-    { id: "scanner", label: "Scanner", path: "/dashboard/scanner", roles: ["admin", "manager"] },
+    { id: "storefront", path: "/dashboard/storefront" },
+    { id: "inventory", path: "/dashboard/inventory", roles: ["admin", "manager"] },
+    { id: "orders", path: "/dashboard/orders", roles: ["admin", "manager", "staff"] },
+    { id: "analytics", path: "/dashboard/analytics", roles: ["admin", "manager"] },
+    { id: "users", path: "/dashboard/users", roles: ["admin"] },
+    { id: "admin", path: "/dashboard/admin", roles: ["admin"] },
+    { id: "scanner", path: "/dashboard/scanner", roles: ["admin", "manager"] },
   ];
 
   const visibleTabs = tabs.filter(tab => !tab.roles || tab.roles.includes(user.role));
@@ -100,14 +100,28 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   };
 
   const getFilteredNotifications = () => {
-    if (notificationTab === 'all') {
-      return notifications;
+    if (!notifications) return [];
+
+    switch (notificationTab) {
+      case 'orders':
+        return notifications.filter(n => 
+          n.type === 'new_order' ||
+          n.type === 'order_status_update' || 
+          n.type === 'order_assigned'
+        );
+      case 'users':
+        return notifications.filter(n => 
+          n.type === 'user_registration' || 
+          n.type === 'user_approved'
+        );
+      case 'support':
+        return notifications.filter(n => 
+          n.type === 'new_support_ticket' || 
+          n.type === 'support_ticket_response'
+        );
+      default:
+        return notifications;
     }
-    // Specifically filter for support ticket types
-    if (notificationTab === 'support') {
-      return notifications.filter((n: any) => n.type === 'new_support_ticket' || n.type === 'support_ticket_response');
-    }
-    return notifications.filter((n: any) => n.type === notificationTab);
   };
 
 
