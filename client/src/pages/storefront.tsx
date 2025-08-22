@@ -432,10 +432,10 @@ export default function StorefrontPage() {
                       {/* Horizontal Scrolling Product Container */}
                       <div className="relative">
                         {subcategoryProducts.length > 0 ? (
-                          <div className="flex space-x-8 overflow-x-auto px-4 py-6 scrollbar-hide" style={{ scrollbarGutter: 'stable' }}>
+                          <div className="flex space-x-8 overflow-x-auto px-4 pt-6 pb-12 scrollbar-hide" style={{ scrollbarGutter: 'stable' }}>
                             <div className="flex space-x-8" style={{ minWidth: 'max-content' }}>
                               {subcategoryProducts.map((product) => (
-                                <div key={product.id} className="flex-shrink-0 w-64 sm:w-72">
+                                <div key={product.id} className="flex-shrink-0 w-64 sm:w-72 mb-4">
                                   <ProductCard product={product} />
                                 </div>
                               ))}
