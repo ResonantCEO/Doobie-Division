@@ -510,11 +510,9 @@ export default function AdminPage() {
                 <MessageCircle className="h-5 w-5 text-gray-400" />
                 <span className="font-semibold">Message:</span>
               </div>
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <p className="text-base text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words">
-                  {selectedTicket?.ticket.message}
-                </p>
-              </div>
+              <p className="text-base text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words">
+                {selectedTicket?.ticket.message}
+              </p>
             </div>
             <hr />
             <div className="space-y-2">
