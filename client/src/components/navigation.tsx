@@ -92,6 +92,19 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
     if (type === 'all') {
       return notifications.filter((n: any) => !n.isRead).length;
     }
+    if (type === 'orders') {
+      return notifications.filter((n: any) => !n.isRead && (
+        n.type === 'new_order' ||
+        n.type === 'order_status_update' || 
+        n.type === 'order_assigned'
+      )).length;
+    }
+    if (type === 'users') {
+      return notifications.filter((n: any) => !n.isRead && (
+        n.type === 'user_registration' || 
+        n.type === 'user_approved'
+      )).length;
+    }
     // Specifically check for support ticket types
     if (type === 'support') {
       return notifications.filter((n: any) => !n.isRead && (n.type === 'new_support_ticket' || n.type === 'support_ticket_response')).length;
