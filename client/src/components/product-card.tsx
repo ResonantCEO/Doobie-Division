@@ -215,6 +215,5 @@ export default function ProductCard({ product }: ProductCardProps) {
         product={product}
       />
     </div>
-    </div>
   );
 }
