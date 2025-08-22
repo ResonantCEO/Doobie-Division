@@ -244,26 +244,33 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                 <span className="text-xs text-muted-foreground">
                                   {getUnreadCount(tabValue)} unread
                                 </span>
-                                {tabValue === 'orders' && getFilteredNotifications().length > 0 && (
+                                {getFilteredNotifications().length > 0 && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="text-xs h-6 px-2"
                                     onClick={async () => {
                                       try {
-                                        // Mark all order notifications as read
-                                        const orderNotifications = getFilteredNotifications();
-                                        for (const notification of orderNotifications) {
-                                          if (!notification.isRead) {
-                                            await fetch(`/api/notifications/${notification.id}/read`, {
-                                              method: 'PUT',
-                                              credentials: 'include',
-                                            });
-                                          }
+                                        // Delete all notifications for the current tab
+                                        const notificationsToDelete = getFilteredNotifications();
+                                        for (const notification of notificationsToDelete) {
+                                          await fetch(`/api/notifications/${notification.id}`, {
+                                            method: 'DELETE',
+                                            credentials: 'include',
+                                          });
                                         }
                                         refetch(); // Refresh notifications
+                                        toast({
+                                          title: "Notifications cleared",
+                                          description: `Cleared ${notificationsToDelete.length} ${tabValue === 'all' ? '' : tabValue + ' '}notifications.`,
+                                        });
                                       } catch (error) {
-                                        console.error('Failed to clear order notifications:', error);
+                                        console.error('Failed to clear notifications:', error);
+                                        toast({
+                                          title: "Error",
+                                          description: "Failed to clear notifications.",
+                                          variant: "destructive",
+                                        });
                                       }
                                     }}
                                   >
@@ -440,26 +447,33 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                 <span className="text-xs text-muted-foreground">
                                   {getUnreadCount(tabValue)} unread
                                 </span>
-                                {tabValue === 'orders' && getFilteredNotifications().length > 0 && (
+                                {getFilteredNotifications().length > 0 && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="text-xs h-6 px-2"
                                     onClick={async () => {
                                       try {
-                                        // Mark all order notifications as read
-                                        const orderNotifications = getFilteredNotifications();
-                                        for (const notification of orderNotifications) {
-                                          if (!notification.isRead) {
-                                            await fetch(`/api/notifications/${notification.id}/read`, {
-                                              method: 'PUT',
-                                              credentials: 'include',
-                                            });
-                                          }
+                                        // Delete all notifications for the current tab
+                                        const notificationsToDelete = getFilteredNotifications();
+                                        for (const notification of notificationsToDelete) {
+                                          await fetch(`/api/notifications/${notification.id}`, {
+                                            method: 'DELETE',
+                                            credentials: 'include',
+                                          });
                                         }
                                         refetch(); // Refresh notifications
+                                        toast({
+                                          title: "Notifications cleared",
+                                          description: `Cleared ${notificationsToDelete.length} ${tabValue === 'all' ? '' : tabValue + ' '}notifications.`,
+                                        });
                                       } catch (error) {
-                                        console.error('Failed to clear order notifications:', error);
+                                        console.error('Failed to clear notifications:', error);
+                                        toast({
+                                          title: "Error",
+                                          description: "Failed to clear notifications.",
+                                          variant: "destructive",
+                                        });
                                       }
                                     }}
                                   >
