@@ -217,35 +217,6 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                 <span className="text-xs text-muted-foreground">
                                   {getUnreadCount(tabValue)} unread
                                 </span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-auto p-1 text-xs"
-                                  onClick={async () => {
-                                    try {
-                                      const filteredNotifications = getFilteredNotifications();
-                                      // Mark filtered notifications as read
-                                      const unreadFiltered = filteredNotifications.filter((n: any) => !n.isRead);
-
-                                      if (unreadFiltered.length > 0) {
-                                        await Promise.all(
-                                          unreadFiltered.map((n: any) =>
-                                            fetch(`/api/notifications/${n.id}/read`, {
-                                              method: 'PUT',
-                                              credentials: 'include',
-                                            })
-                                          )
-                                        );
-                                        // Refresh notifications
-                                        refetch();
-                                      }
-                                    } catch (error) {
-                                      console.error('Failed to clear notifications:', error);
-                                    }
-                                  }}
-                                >
-                                  Clear {tabValue === 'all' ? 'all' : tabValue}
-                                </Button>
                               </div>
                               <div className="space-y-2 max-h-64 overflow-y-auto">
                                 {getFilteredNotifications().map((notification: any) => (
@@ -416,35 +387,6 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                 <span className="text-xs text-muted-foreground">
                                   {getUnreadCount(tabValue)} unread
                                 </span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-auto p-1 text-xs"
-                                  onClick={async () => {
-                                    try {
-                                      const filteredNotifications = getFilteredNotifications();
-                                      // Mark filtered notifications as read
-                                      const unreadFiltered = filteredNotifications.filter((n: any) => !n.isRead);
-
-                                      if (unreadFiltered.length > 0) {
-                                        await Promise.all(
-                                          unreadFiltered.map((n: any) =>
-                                            fetch(`/api/notifications/${n.id}/read`, {
-                                              method: 'PUT',
-                                              credentials: 'include',
-                                            })
-                                          )
-                                        );
-                                        // Refresh notifications
-                                        refetch();
-                                      }
-                                    } catch (error) {
-                                      console.error('Failed to clear notifications:', error);
-                                    }
-                                  }}
-                                >
-                                  Clear {tabValue === 'all' ? 'all' : tabValue}
-                                </Button>
                               </div>
                               <div className="space-y-2 max-h-64 overflow-y-auto">
                                 {getFilteredNotifications().map((notification: any) => (
