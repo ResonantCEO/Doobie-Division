@@ -92,12 +92,20 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
     if (type === 'all') {
       return notifications.filter((n: any) => !n.isRead).length;
     }
+    // Specifically check for support ticket types
+    if (type === 'support') {
+      return notifications.filter((n: any) => !n.isRead && (n.type === 'new_support_ticket' || n.type === 'support_ticket_response')).length;
+    }
     return notifications.filter((n: any) => !n.isRead && n.type === type).length;
   };
 
   const getFilteredNotifications = () => {
     if (notificationTab === 'all') {
       return notifications;
+    }
+    // Specifically filter for support ticket types
+    if (notificationTab === 'support') {
+      return notifications.filter((n: any) => n.type === 'new_support_ticket' || n.type === 'support_ticket_response');
     }
     return notifications.filter((n: any) => n.type === notificationTab);
   };
