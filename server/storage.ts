@@ -1506,21 +1506,14 @@ export class DatabaseStorage implements IStorage {
           firstName: users.firstName,
           lastName: users.lastName,
           email: users.email,
-        },
-        assignedUser: {
-          id: sql<string | null>`assigned_users.id`,
-          firstName: sql<string | null>`assigned_users.first_name`,
-          lastName: sql<string | null>`assigned_users.last_name`,
-          email: sql<string | null>`assigned_users.email`,
         }
       })
       .from(supportTickets)
       .leftJoin(users, eq(supportTickets.userId, users.id))
-      .leftJoin(sql`users as assigned_users`, sql`${supportTickets.assignedTo} = assigned_users.id`)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(supportTickets.createdAt));
 
-    // Get responses for each ticket
+    // Get responses and assigned user for each ticket
     for (const ticket of tickets) {
       const responses = await db
         .select({
@@ -1540,7 +1533,25 @@ export class DatabaseStorage implements IStorage {
         .where(eq(supportTicketResponses.ticketId, ticket.ticket.id))
         .orderBy(asc(supportTicketResponses.createdAt));
 
+      // Get assigned user if ticket has one
+      let assignedUser = null;
+      if (ticket.ticket.assignedTo) {
+        const assignedUserResult = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+          })
+          .from(users)
+          .where(eq(users.id, ticket.ticket.assignedTo))
+          .limit(1);
+        
+        assignedUser = assignedUserResult[0] || null;
+      }
+
       (ticket as any).responses = responses;
+      (ticket as any).assignedUser = assignedUser;
     }
 
     return tickets;
