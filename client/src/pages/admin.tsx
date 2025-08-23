@@ -43,7 +43,7 @@ export default function AdminPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("inventory");
+  const [activeTab, setActiveTab] = useState("support");
   const [dateFilter, setDateFilter] = useState("7"); // days
   const [typeFilter, setTypeFilter] = useState("all");
   const [productFilter, setProductFilter] = useState("");
