@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { Camera, Package, Plus, Minus, RotateCcw, Scan, AlertCircle, CheckCircle, ShoppingCart, Truck, Clock } from "lucide-react";
+import { Camera, Package, Plus, Minus, RotateCcw, Scan, AlertCircle, CheckCircle, ShoppingCart, Truck, Clock, AlertTriangle } from "lucide-react";
 import type { Product, Category, Order } from "@shared/schema";
 
 interface ScannedProduct extends Product {

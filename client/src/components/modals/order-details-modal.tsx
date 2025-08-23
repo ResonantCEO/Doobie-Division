@@ -99,7 +99,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       setScanningError("");
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera not supported on this device");
+        throw new Error("Camera not supported on this device. Please use manual SKU input instead.");
       }
 
       // Stop any existing stream first
@@ -108,54 +108,77 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         streamRef.current = null;
       }
 
-      console.log('Requesting camera access...');
-      
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+      // Check for permissions first
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
+        if (permissionStatus.state === 'denied') {
+          throw new Error("Camera permission denied. Please enable camera access in your browser settings and reload the page.");
         }
-      });
+      } catch (permError) {
+        console.warn('Permission check failed:', permError);
+        // Continue anyway as some browsers don't support permission query
+      }
 
-      console.log('Camera access granted, setting up video...');
+      // Try different camera configurations starting with basic
+      const constraints = [
+        { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
+        { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } },
+        { video: true }
+      ];
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-        setIsScanning(true);
+      let stream = null;
+      let lastError = null;
 
-        videoRef.current.onloadedmetadata = () => {
-          console.log('Video metadata loaded, starting QR detection...');
-          videoRef.current?.play().then(() => {
-            detectQRCode();
-          }).catch(console.error);
-        };
-
-        // Also try to play immediately
+      for (const constraint of constraints) {
         try {
-          await videoRef.current.play();
-        } catch (playError) {
-          console.warn('Auto-play failed:', playError);
+          stream = await navigator.mediaDevices.getUserMedia(constraint);
+          break;
+        } catch (err: any) {
+          lastError = err;
+          if (err.name === 'NotAllowedError' || err.message.includes('Permission denied')) {
+            throw new Error("Camera permission denied. Please click 'Allow' when prompted or enable camera access in your browser settings.");
+          }
         }
       }
+
+      if (!stream) {
+        throw lastError || new Error("Unable to access camera. Please try manual SKU input instead.");
+      }
+
+      streamRef.current = stream;
+      setIsScanning(true);
+      
+      // Simple video setup
+      setTimeout(() => {
+        const video = videoRef.current;
+        if (video && streamRef.current) {
+          video.srcObject = streamRef.current;
+          video.play().then(() => {
+            setTimeout(detectQRCode, 100);
+          }).catch(e => {
+            setScanningError("Failed to start video. Please try again.");
+            setIsScanning(false);
+          });
+        }
+      }, 100);
+
     } catch (error: any) {
       console.error('Camera access error:', error);
       let errorMessage = "Unable to access camera.";
-
+      
       if (error.name === 'NotAllowedError') {
-        errorMessage = "Camera permission denied. Please allow camera access and try again.";
+        errorMessage = "Camera permission denied. Please allow camera access in your browser settings and refresh the page.";
       } else if (error.name === 'NotFoundError') {
         errorMessage = "No camera found on this device.";
       } else if (error.name === 'NotReadableError') {
         errorMessage = "Camera is being used by another application.";
       } else if (error.name === 'OverconstrainedError') {
-        errorMessage = "Camera does not meet the required constraints.";
+        errorMessage = "Camera constraints not supported.";
       }
-
+      
       setScanningError(errorMessage);
       setIsScanning(false);
-
+      
       toast({
         title: "Camera Error",
         description: errorMessage,
