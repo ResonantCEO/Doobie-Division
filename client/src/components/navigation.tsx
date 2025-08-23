@@ -83,7 +83,6 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
     { id: "analytics", path: "/dashboard/analytics", roles: ["admin", "manager"], label: "Analytics" },
     { id: "users", path: "/dashboard/users", roles: ["admin"], label: "User Management" },
     { id: "admin", path: "/dashboard/admin", roles: ["admin"], label: "Admin Settings" },
-    { id: "scanner", path: "/dashboard/scanner", roles: ["admin", "manager"], label: "Scanner" },
   ];
 
   const visibleTabs = tabs.filter(tab => !tab.roles || tab.roles.includes(user.role));
@@ -579,7 +578,6 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                            tab.label === "Storefront" ? "Shop" :
                            tab.label === "Order Management" ? "Orders" :
                            tab.label === "Admin Settings" ? "Admin" :
-                           tab.label === "Scanner" ? "Scan" :
                            tab.label}
                         </span>
                         {/* Desktop: Show full labels */}
