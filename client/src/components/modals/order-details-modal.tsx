@@ -282,10 +282,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-white" />
-                  <span className="text-sm text-white">Order Date</span>
+                  <Calendar className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Order Date</span>
                 </div>
-                <p className="text-sm">
+                <p className="text-sm text-gray-900 dark:text-gray-100">
                   {(displayOrder.createdAt || displayOrder.created_at)
                     ? format(new Date(displayOrder.createdAt || displayOrder.created_at), "MMM d, yyyy 'at' h:mm a")
                     : "Date not available"
@@ -294,8 +294,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
               </div>
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-white">Status</span>
-                </div>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Status</span>
+                </div></div_str>
                 {getStatusBadge(displayOrder.status)}
               </div>
             </div>
@@ -305,22 +305,22 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
             {/* Customer Information */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <User className="h-5 w-5 text-white" />
-                <h3 className="text-lg font-semibold text-white">Customer Information</h3>
+                <User className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Customer Information</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="font-medium text-white">{displayOrder.customerName || displayOrder.customer_name || "Not provided"}</p>
-                  <p className="text-white">{displayOrder.customerEmail || displayOrder.customer_email || "Not provided"}</p>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">{displayOrder.customerName || displayOrder.customer_name || "Not provided"}</p>
+                  <p className="text-gray-700 dark:text-gray-300">{displayOrder.customerEmail || displayOrder.customer_email || "Not provided"}</p>
                   {(displayOrder.customerPhone || displayOrder.customer_phone) && (
-                    <p className="text-white">{displayOrder.customerPhone || displayOrder.customer_phone}</p>
+                    <p className="text-gray-700 dark:text-gray-300">{displayOrder.customerPhone || displayOrder.customer_phone}</p>
                   )}
                 </div>
                 <div className="text-sm">
-                  <pre className="whitespace-pre-wrap text-white">{displayOrder.shippingAddress || displayOrder.shipping_address || "Not provided"}</pre>
+                  <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{displayOrder.shippingAddress || displayOrder.shipping_address || "Not provided"}</pre>
                 </div>
               </div>
-            </div>
+            </div></old_str>
 
             {/* Shipping Address */}
             {(displayOrder.shippingAddress || displayOrder.shipping_address) && (
@@ -328,13 +328,13 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                 <Separator />
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-white" />
-                    <h3 className="text-lg font-semibold text-white">Shipping Address</h3>
+                    <MapPin className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Shipping Address</h3>
                   </div>
                   <div className="text-sm">
-                    <pre className="whitespace-pre-wrap text-white">{displayOrder.shippingAddress || displayOrder.shipping_address}</pre>
+                    <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{displayOrder.shippingAddress || displayOrder.shipping_address}</pre>
                   </div>
-                </div>
+                </div></old_str>
               </>
             )}
 
@@ -342,7 +342,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
             <Separator />
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">Order Items</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Order Items</h3></old_str>
                 {scanningMode && (
                   <Button onClick={cancelScanning} variant="outline" size="sm">
                     <X className="h-4 w-4 mr-1" />
@@ -402,19 +402,19 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                       onClick={() => !item.fulfilled && canScan && handleItemClick(item.id, item)}
                     >
                       <div className="flex-1">
-                        <h4 className="font-medium text-sm text-white">{item.productName || item.product_name || "Unknown Product"}</h4>
-                        <p className="text-xs text-white">
+                        <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100">{item.productName || item.product_name || "Unknown Product"}</h4>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
                           SKU: {item.productSku || item.product_sku || "N/A"}
                         </p>
-                        <p className="text-xs text-white">
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
                           ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
                         </p>
                         {!item.fulfilled && canScan && (
-                          <p className="text-xs text-blue-400 mt-1">Click to scan and mark as packed</p>
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Click to scan and mark as packed</p>
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-sm text-white">${item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00"}</p>
+                        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">${item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00"}</p></old_str>
                         <div className="flex items-center space-x-2 mt-1">
                           {item.fulfilled ? (
                             <Badge variant="default" className="bg-green-600">
@@ -439,9 +439,9 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                 </div>
               ) : (
                 <div className="text-center py-4">
-                  <p className="text-white">No items found for this order</p>
-                  <p className="text-xs text-white mt-1">Items data: {JSON.stringify(displayOrder.items)}</p>
-                </div>
+                  <p className="text-gray-700 dark:text-gray-300">No items found for this order</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Items data: {JSON.stringify(displayOrder.items)}</p>
+                </div></old_str>
               )}
             </div>
 
@@ -449,16 +449,16 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
             <Separator />
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-white" />
-                <h3 className="text-lg font-semibold text-white">Order Summary</h3>
+                <CreditCard className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Order Summary</h3>
               </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-lg font-semibold text-white">
+                <div className="flex items-center justify-between text-lg font-semibold text-gray-900 dark:text-gray-100">
                   <span>Total Amount:</span>
                   <span>${displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00"}</span>
                 </div>
               </div>
-            </div>
+            </div></old_str>
 
             {/* Notes */}
             {displayOrder.notes && (
@@ -466,12 +466,12 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                 <Separator />
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-white">Notes</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Notes</h3>
                   </div>
-                  <div className="text-sm text-white bg-gray-700/50 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-600">
+                  <div className="text-sm text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-300 dark:border-gray-600">
                     <p className="whitespace-pre-wrap">{displayOrder.notes}</p>
                   </div>
-                </div>
+                </div></old_str>
               </>
             )}
           </div>
