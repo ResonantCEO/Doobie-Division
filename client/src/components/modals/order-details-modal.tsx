@@ -97,11 +97,20 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const startScanning = async () => {
     try {
       setScanningError("");
+      setIsScanning(false);
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Camera not supported on this device");
       }
 
+      // Stop any existing stream first
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+
+      console.log('Requesting camera access...');
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment',
@@ -110,14 +119,26 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         }
       });
 
+      console.log('Camera access granted, setting up video...');
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         setIsScanning(true);
 
         videoRef.current.onloadedmetadata = () => {
-          detectQRCode();
+          console.log('Video metadata loaded, starting QR detection...');
+          videoRef.current?.play().then(() => {
+            detectQRCode();
+          }).catch(console.error);
         };
+
+        // Also try to play immediately
+        try {
+          await videoRef.current.play();
+        } catch (playError) {
+          console.warn('Auto-play failed:', playError);
+        }
       }
     } catch (error: any) {
       console.error('Camera access error:', error);
@@ -127,6 +148,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         errorMessage = "Camera permission denied. Please allow camera access and try again.";
       } else if (error.name === 'NotFoundError') {
         errorMessage = "No camera found on this device.";
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = "Camera is being used by another application.";
+      } else if (error.name === 'OverconstrainedError') {
+        errorMessage = "Camera does not meet the required constraints.";
       }
 
       setScanningError(errorMessage);
@@ -221,9 +246,12 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
     setSelectedItemId(itemId);
     setScanningMode(true);
+    setScanningError("");
 
-    // Immediately start the camera
-    await startScanning();
+    // Add a small delay to ensure DOM is updated before starting camera
+    setTimeout(async () => {
+      await startScanning();
+    }, 100);
   };
 
   const cancelScanning = () => {
@@ -357,33 +385,91 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                 <Card className="border-blue-500">
                   <CardContent className="p-4">
                     <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <Scan className="h-5 w-5 text-blue-500" />
-                        <h4 className="font-medium">Scan Item to Fulfill Order</h4>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Scan className="h-5 w-5 text-blue-500" />
+                          <h4 className="font-medium">Scan Item to Fulfill Order</h4>
+                        </div>
+                        {!isScanning && !scanningError && (
+                          <Button onClick={startScanning} size="sm" variant="outline">
+                            <Camera className="h-4 w-4 mr-1" />
+                            Start Camera
+                          </Button>
+                        )}
                       </div>
 
                       {scanningError && (
                         <Alert variant="destructive">
                           <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>{scanningError}</AlertDescription>
+                          <AlertDescription>
+                            {scanningError}
+                            <Button 
+                              onClick={startScanning} 
+                              size="sm" 
+                              variant="outline" 
+                              className="ml-2"
+                            >
+                              Try Again
+                            </Button>
+                          </AlertDescription>
                         </Alert>
                       )}
 
-                      <div className="relative">
-                        <video
-                          ref={videoRef}
-                          autoPlay
-                          playsInline
-                          muted
-                          className="w-full max-w-sm mx-auto rounded-lg border-2 border-blue-500"
-                        />
-                        <canvas ref={canvasRef} className="hidden" />
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="border-2 border-white border-dashed w-32 h-32 rounded-lg animate-pulse">
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Scan className="h-6 w-6 text-white animate-spin" />
+                      {isScanning ? (
+                        <div className="relative">
+                          <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="w-full max-w-sm mx-auto rounded-lg border-2 border-blue-500"
+                          />
+                          <canvas ref={canvasRef} className="hidden" />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="border-2 border-white border-dashed w-32 h-32 rounded-lg animate-pulse">
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Scan className="h-6 w-6 text-white animate-spin" />
+                              </div>
                             </div>
                           </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <Camera className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                          <p>Camera not active. Click "Start Camera" to begin scanning.</p>
+                        </div>
+                      )}
+
+                      {/* Manual SKU input as fallback */}
+                      <div className="border-t pt-4">
+                        <p className="text-sm text-gray-600 mb-2">Or manually confirm SKU:</p>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Enter SKU manually"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                const input = e.target as HTMLInputElement;
+                                if (input.value.trim()) {
+                                  handleQRCodeDetected(input.value.trim());
+                                  input.value = '';
+                                }
+                              }
+                            }}
+                          />
+                          <Button 
+                            size="sm"
+                            onClick={(e) => {
+                              const input = (e.target as HTMLElement).parentElement?.querySelector('input') as HTMLInputElement;
+                              if (input?.value.trim()) {
+                                handleQRCodeDetected(input.value.trim());
+                                input.value = '';
+                              }
+                            }}
+                          >
+                            Confirm
+                          </Button>
                         </div>
                       </div>
                     </div>
