@@ -162,6 +162,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
           setIsOrderDetailsOpen(false);
           setSelectedOrder(null);
         }}
+        userRole={user?.role}
       />
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
