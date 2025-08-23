@@ -295,7 +295,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600 dark:text-gray-300">Status</span>
-                </div></div_str>
+                </div>
                 {getStatusBadge(displayOrder.status)}
               </div>
             </div>
