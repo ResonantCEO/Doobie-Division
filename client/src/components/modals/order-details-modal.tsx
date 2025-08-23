@@ -61,32 +61,33 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     }
   }, [orderDetails, order]);
 
-  // Update order item status mutation
-  const updateItemStatusMutation = useMutation({
-    mutationFn: async ({ orderId, productId }: { orderId: number; productId: number }) => {
-      const response = await fetch(`/api/orders/${orderId}/pack-item`, {
+  // Fulfill order item mutation (reduces physical inventory)
+  const fulfillItemMutation = useMutation({
+    mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ productId })
+        body: JSON.stringify({ productId, quantity })
       });
-      if (!response.ok) throw new Error('Failed to update item status');
+      if (!response.ok) throw new Error('Failed to fulfill item');
       return response.json();
     },
     onSuccess: () => {
       toast({
-        title: "Item Packed",
-        description: "Order item status updated to packed",
+        title: "Item Fulfilled",
+        description: "Order item fulfilled and inventory updated",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       setScanningMode(false);
       setSelectedItemId(null);
       stopScanning();
     },
     onError: (error: any) => {
       toast({
-        title: "Update Failed",
-        description: error.message || "Failed to update item status",
+        title: "Fulfillment Failed",
+        description: error.message || "Failed to fulfill item",
         variant: "destructive",
       });
     }
@@ -201,9 +202,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
     // Check if scanned SKU matches the selected item's SKU
     if (selectedItem.productSku === scannedSku) {
-      updateItemStatusMutation.mutate({
+      fulfillItemMutation.mutate({
         orderId: fullOrder.id,
-        productId: selectedItem.productId!
+        productId: selectedItem.productId!,
+        quantity: selectedItem.quantity
       });
     } else {
       toast({
@@ -357,7 +359,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                     <div className="space-y-4">
                       <div className="flex items-center gap-2">
                         <Scan className="h-5 w-5 text-blue-500" />
-                        <h4 className="font-medium">Scan Item to Mark as Packed</h4>
+                        <h4 className="font-medium">Scan Item to Fulfill Order</h4>
                       </div>
 
                       {scanningError && (
@@ -410,7 +412,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                           ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
                         </p>
                         {!item.fulfilled && canScan && (
-                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Click to scan and mark as packed</p>
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Click to scan and fulfill item</p>
                         )}
                       </div>
                       <div className="text-right">
@@ -419,12 +421,12 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                           {item.fulfilled ? (
                             <Badge variant="default" className="bg-green-600">
                               <CheckCircle className="h-3 w-3 mr-1" />
-                              Packed
+                              Fulfilled
                             </Badge>
                           ) : canScan ? (
                             <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                               <Scan className="h-3 w-3 mr-1" />
-                              Click to scan and mark as packed
+                              Click to scan and fulfill
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="bg-orange-100 text-orange-800">
