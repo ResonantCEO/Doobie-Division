@@ -97,7 +97,6 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const startScanning = async () => {
     try {
       setScanningError("");
-      setIsScanning(false);
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Camera not supported on this device");
