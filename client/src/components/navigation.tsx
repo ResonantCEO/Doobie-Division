@@ -125,7 +125,8 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
       case 'users':
         return notifications.filter(n =>
           n.type === 'user_registration' ||
-          n.type === 'user_approved'
+          n.type === 'user_approved' ||
+          n.type === 'user_approval'
         );
       case 'support':
         return notifications.filter(n =>
