@@ -308,15 +308,15 @@ export default function AdminPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="inventory">Inventory Logs</TabsTrigger>
+          <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="support">Support Tickets</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="inventory">
+        <TabsContent value="logs">
           {/* Inventory Changes Section */}
           <Card>
         <CardHeader>
-          <CardTitle>Product Inventory Changes</CardTitle>
+          <CardTitle>Logs</CardTitle>
           <p className="text-sm text-gray-600">
             Track all stock adjustments, additions, and removals made to products
           </p>
