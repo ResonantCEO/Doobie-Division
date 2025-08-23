@@ -320,7 +320,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                   <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{displayOrder.shippingAddress || displayOrder.shipping_address || "Not provided"}</pre>
                 </div>
               </div>
-            </div></old_str>
+            </div>
 
             {/* Shipping Address */}
             {(displayOrder.shippingAddress || displayOrder.shipping_address) && (
@@ -334,7 +334,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                   <div className="text-sm">
                     <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{displayOrder.shippingAddress || displayOrder.shipping_address}</pre>
                   </div>
-                </div></old_str>
+                </div>
               </>
             )}
 
@@ -342,7 +342,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
             <Separator />
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Order Items</h3></old_str>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Order Items</h3>
                 {scanningMode && (
                   <Button onClick={cancelScanning} variant="outline" size="sm">
                     <X className="h-4 w-4 mr-1" />
@@ -414,7 +414,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">${item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00"}</p></old_str>
+                        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">${item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00"}</p>
                         <div className="flex items-center space-x-2 mt-1">
                           {item.fulfilled ? (
                             <Badge variant="default" className="bg-green-600">
@@ -441,7 +441,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                 <div className="text-center py-4">
                   <p className="text-gray-700 dark:text-gray-300">No items found for this order</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Items data: {JSON.stringify(displayOrder.items)}</p>
-                </div></old_str>
+                </div>
               )}
             </div>
 
@@ -458,7 +458,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                   <span>${displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00"}</span>
                 </div>
               </div>
-            </div></old_str>
+            </div>
 
             {/* Notes */}
             {displayOrder.notes && (
@@ -471,7 +471,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                   <div className="text-sm text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-300 dark:border-gray-600">
                     <p className="whitespace-pre-wrap">{displayOrder.notes}</p>
                   </div>
-                </div></old_str>
+                </div>
               </>
             )}
           </div>
