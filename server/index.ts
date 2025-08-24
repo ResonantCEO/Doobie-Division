@@ -39,7 +39,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = process.env.PORT || 5000;
+const port = parseInt(process.env.PORT || '5000', 10);
+
+// Add basic health check endpoint before other middleware
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Security headers
 app.use((req, res, next) => {
@@ -48,14 +57,19 @@ app.use((req, res, next) => {
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-  // CORS headers
+  // CORS headers with fallback for undefined FRONTEND_URL
+  const frontendUrl = process.env.FRONTEND_URL;
   const allowedOrigins = process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL] 
+    ? (frontendUrl ? [frontendUrl] : []) // Only include if defined
     : ['http://localhost:5000', 'http://0.0.0.0:5000'];
 
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
+  // Add validation to prevent setting undefined values in headers
+  if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (process.env.NODE_ENV === 'production' && frontendUrl && !origin) {
+    // In production, if no origin header but we have a frontend URL, allow it
+    res.setHeader('Access-Control-Allow-Origin', frontendUrl);
   }
 
   res.setHeader('Access-Control-Allow-Credentials', 'true');
