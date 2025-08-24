@@ -34,6 +34,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [resetPasswordData, setResetPasswordData] = useState({
+    email: "",
     token: "",
     password: "",
     confirmPassword: ""
@@ -75,7 +76,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
   });
 
   const resetPasswordMutation = useMutation({
-    mutationFn: async (data: { token: string; password: string }) => {
+    mutationFn: async (data: { email: string; token: string; password: string }) => {
       const response = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -95,7 +96,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
         description: "Your password has been updated. You can now sign in.",
       });
       setActiveTab("login");
-      setResetPasswordData({ token: "", password: "", confirmPassword: "" });
+      setResetPasswordData({ email: "", token: "", password: "", confirmPassword: "" });
     },
     onError: (error: any) => {
       toast({
@@ -242,6 +243,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
       return;
     }
     resetPasswordMutation.mutate({
+      email: resetPasswordData.email,
       token: resetPasswordData.token,
       password: resetPasswordData.password,
     });
@@ -589,13 +591,24 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                 <h3 className="text-lg font-medium mb-4">Have a reset token?</h3>
                 <form onSubmit={handleResetPassword} className="space-y-4">
                   <div className="space-y-2">
+                    <Label htmlFor="resetEmail">Email Address</Label>
+                    <Input
+                      id="resetEmail"
+                      type="email"
+                      value={resetPasswordData.email}
+                      onChange={(e) => setResetPasswordData({ ...resetPasswordData, email: e.target.value })}
+                      placeholder="Enter your email address"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="resetToken">Reset Token</Label>
                     <Input
                       id="resetToken"
                       type="text"
                       value={resetPasswordData.token}
                       onChange={(e) => setResetPasswordData({ ...resetPasswordData, token: e.target.value })}
-                      placeholder="Enter reset token from email"
+                      placeholder="Enter reset token from support"
                       required
                     />
                   </div>

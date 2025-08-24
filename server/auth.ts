@@ -365,10 +365,10 @@ Please manually send this reset URL to the user via their preferred communicatio
   // Reset password with token
   app.post("/api/auth/reset-password", async (req, res) => {
     try {
-      const { token, password } = req.body;
+      const { email, token, password } = req.body;
 
-      if (!token || !password) {
-        return res.status(400).json({ message: "Token and password are required" });
+      if (!email || !token || !password) {
+        return res.status(400).json({ message: "Email, token and password are required" });
       }
 
       if (password.length < 6) {
@@ -385,6 +385,12 @@ Please manually send this reset URL to the user via their preferred communicatio
       const user = await storage.getUser(resetData.userId);
       if (!user || user.status !== "active") {
         return res.status(400).json({ message: "Invalid reset token" });
+      }
+
+      // Verify email matches the user associated with the token
+      const normalizedEmail = email.toLowerCase();
+      if (user.email.toLowerCase() !== normalizedEmail) {
+        return res.status(400).json({ message: "Email does not match the user associated with this reset token" });
       }
 
       // Hash new password
