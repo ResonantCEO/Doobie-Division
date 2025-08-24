@@ -1,7 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { setupVite, log } from "./vite";
 import path from "path";
+import { fileURLToPath } from "url";
 import { checkDatabaseConnection } from "./db";
 
 // Simple rate limiting store
@@ -33,6 +34,31 @@ const rateLimit = (maxRequests: number, windowMs: number) => {
     next();
   };
 };
+
+// ES module compatible static file serving
+function customServeStatic(app: express.Express) {
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const clientDistPath = path.resolve(currentDir, "..", "client", "dist");
+
+  console.log("Serving static files from:", clientDistPath);
+
+  app.use(express.static(clientDistPath));
+
+  // Catch-all handler for client-side routing - but exclude API routes
+  app.get("*", (req, res) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith("/api/")) {
+      return res.status(404).json({ message: "API endpoint not found" });
+    }
+
+    try {
+      res.sendFile(path.join(clientDistPath, "index.html"));
+    } catch (error) {
+      console.error("Error serving index.html:", error);
+      res.status(500).send("Internal Server Error");
+    }
+  });
+}
 
 
 const app = express();
@@ -146,8 +172,7 @@ app.use((req, res, next) => {
 
   // In production, serve static files
   if (process.env.NODE_ENV === "production") {
-    const { serveStatic } = await import("./vite");
-    serveStatic(app);
+    customServeStatic(app);
   } else {
     // In development, setup Vite middleware
     const { setupVite } = await import("./vite");
