@@ -42,7 +42,7 @@ const app = express();
 const port = parseInt(process.env.PORT || '5000', 10);
 
 // Add basic health check endpoint before other middleware
-app.get('/', (req, res) => {
+app.get('/api/status', (req, res) => {
   res.json({ 
     status: 'ok', 
     message: 'Server is running',
