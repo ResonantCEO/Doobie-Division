@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
+import { sendEmail, createPasswordResetEmail } from "./email";
 import type { Express, RequestHandler } from "express";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -316,14 +317,38 @@ export async function setupAuth(app: Express) {
         { ipAddress: req.ip, userAgent: req.get('User-Agent') }
       );
 
+      // Create support ticket for password reset request
+      const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
+      
+      await storage.createSupportTicket({
+        customerName: `${user.firstName} ${user.lastName}`,
+        customerEmail: user.email,
+        customerPhone: user.address || 'Not provided', // Use address field or default
+        subject: `Password Reset Request - ${user.firstName} ${user.lastName}`,
+        message: `User ${user.firstName} ${user.lastName} (${user.email}) has requested a password reset.
+
+RESET TOKEN: ${resetToken}
+RESET URL: ${resetUrl}
+EXPIRES AT: ${resetTokenExpiry.toISOString()}
+
+Request Details:
+- IP Address: ${req.ip}
+- User Agent: ${req.get('User-Agent')}
+- User ID: ${user.id}
+
+Please manually send this reset URL to the user via their preferred communication method.`,
+        priority: 'medium'
+      });
+
       // In development, log the token to console for testing
       if (process.env.NODE_ENV === 'development') {
         console.log(`Password reset token for ${email}: ${resetToken}`);
-        console.log(`Reset URL: ${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`);
+        console.log(`Reset URL: ${resetUrl}`);
+        console.log(`Support ticket created for password reset`);
       }
 
       res.json({ 
-        message: "If the email exists, a reset link has been sent.",
+        message: "Your password reset request has been submitted to our support team. They will contact you shortly with reset instructions.",
         ...(process.env.NODE_ENV === 'development' && { resetToken }) // Include token in dev mode for testing
       });
     } catch (error) {
