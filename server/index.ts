@@ -180,3 +180,20 @@ app.use((req, res, next) => {
     console.log(`${formattedTime} [express] serving on port ${port}`);
   });
 })();
+.catch((error) => {
+  console.error("Failed to start application:", error);
+  process.exit(1);
+});
+
+// Global error handler
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+export { app };
