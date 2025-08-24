@@ -179,7 +179,7 @@ app.use((req, res, next) => {
 
     console.log(`${formattedTime} [express] serving on port ${port}`);
   });
-})();
+})()
 .catch((error) => {
   console.error("Failed to start application:", error);
   process.exit(1);
