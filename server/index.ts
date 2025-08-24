@@ -133,6 +133,16 @@ app.use((req, res, next) => {
 
   const server = await registerRoutes(app);
 
+  // In production, serve static files
+  if (process.env.NODE_ENV === "production") {
+    const { serveStatic } = await import("./vite");
+    serveStatic(app);
+  } else {
+    // In development, setup Vite middleware
+    const { setupVite } = await import("./vite");
+    await setupVite(app, server);
+  }
+
   // Cleanup expired password reset tokens every hour
   setInterval(async () => {
     try {
