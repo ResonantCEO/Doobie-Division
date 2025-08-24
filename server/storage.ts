@@ -455,7 +455,7 @@ export class DatabaseStorage implements IStorage {
 
     let finalQuery = query;
     if (conditions.length > 0) {
-      finalQuery = query.where(and(...conditions));
+      finalQuery = finalQuery.where(and(...conditions));
     }
 
     return await finalQuery.orderBy(desc(products.createdAt));
@@ -502,7 +502,7 @@ export class DatabaseStorage implements IStorage {
 
     const [newProduct] = await db
       .insert(products)
-      .values(processedProduct)
+      .values([processedProduct])
       .returning();
     return newProduct;
   }
@@ -651,6 +651,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: products.id,
         name: products.name,
+        company: products.company,
         description: products.description,
         price: products.price,
         sku: products.sku,
@@ -744,7 +745,7 @@ export class DatabaseStorage implements IStorage {
 
       let finalQuery = query;
       if (conditions.length > 0) {
-        finalQuery = query.where(and(...conditions));
+        finalQuery = finalQuery.where(and(...conditions));
       }
 
       const result = await finalQuery.orderBy(desc(orders.createdAt));
@@ -1784,7 +1785,7 @@ export class DatabaseStorage implements IStorage {
 
     let finalQuery = query;
     if (conditions.length > 0) {
-      finalQuery = query.where(and(...conditions));
+      finalQuery = finalQuery.where(and(...conditions));
     }
 
     return await finalQuery.orderBy(desc(inventoryLogs.createdAt));

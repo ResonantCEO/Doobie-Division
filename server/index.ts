@@ -38,7 +38,7 @@ const rateLimit = (maxRequests: number, windowMs: number) => {
 // ES module compatible static file serving
 function customServeStatic(app: express.Express) {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  const clientDistPath = path.resolve(currentDir, "..", "client", "dist");
+  const clientDistPath = path.resolve(currentDir, "..", "dist", "public");
 
   console.log("Serving static files from:", clientDistPath);
 
