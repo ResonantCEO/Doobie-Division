@@ -631,7 +631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'cancelled': 'Your order has been cancelled'
           };
 
-          const message = statusMessages[status] || `Your order status has been updated to ${status}`;
+          const message = statusMessages[status as keyof typeof statusMessages] || `Your order status has been updated to ${status}`;
 
           await storage.createNotification({
             userId: existingOrder.customerId,

@@ -107,6 +107,12 @@ export interface IStorage {
   updateSupportTicketStatus(id: number, status: string): Promise<any>;
   assignSupportTicket(id: number, assignedTo: string | null): Promise<any>;
   addSupportTicketResponse(ticketId: number, responseData: any): Promise<any>;
+
+  // Password reset operations
+  createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void>;
+  getPasswordResetToken(token: string): Promise<{ userId: string; expiresAt: Date } | undefined>;
+  deletePasswordResetToken(token: string): Promise<void>;
+  cleanupExpiredPasswordResetTokens(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -138,6 +144,12 @@ export class DatabaseStorage implements IStorage {
     lastName: string;
     password: string;
     idImageUrl?: string | null;
+    verificationPhotoUrl?: string | null;
+    address?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
     idVerificationStatus?: string;
     role: string;
     status: string;
@@ -193,6 +205,28 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
+  }
+
+  async createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void> {
+    await db.insert(passwordResetTokens).values({
+      userId,
+      token,
+      expiresAt,
+    });
+  }
+
+  async getPasswordResetToken(token: string): Promise<{ userId: string; expiresAt: Date } | undefined> {
+    const [result] = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token));
+    return result;
+  }
+
+  async deletePasswordResetToken(token: string): Promise<void> {
+    await db
+      .delete(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token));
   }
 
   async cleanupExpiredPasswordResetTokens(): Promise<void> {

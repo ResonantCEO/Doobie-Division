@@ -148,7 +148,7 @@ export async function setupAuth(app: Express) {
       // Create session for first user only
       const user = await storage.getUser(userId);
 
-      if (isFirstUser) {
+      if (isFirstUser && user) {
         (req.session as any).userId = userId;
         req.session.save(async (err) => {
           if (err) {
@@ -215,6 +215,9 @@ export async function setupAuth(app: Express) {
       }
 
       // Verify password
+      if (!user.password) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
       const isValidPassword = await bcrypt.compare(password, user.password);
       if (!isValidPassword) {
         return res.status(401).json({ message: "Invalid email or password" });
