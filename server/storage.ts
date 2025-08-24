@@ -8,6 +8,7 @@ import {
   notifications,
   supportTickets,
   supportTicketResponses,
+  passwordResetTokens,
   type User,
   type UpsertUser,
   type Category,
@@ -184,11 +185,20 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async updateUserPassword(id: string, hashedPassword: string): Promise<void> {
+  async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
     await db
       .update(users)
-      .set({ password: hashedPassword, updatedAt: new Date() })
-      .where(eq(users.id, id));
+      .set({
+        password: hashedPassword,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async cleanupExpiredPasswordResetTokens(): Promise<void> {
+    await db
+      .delete(passwordResetTokens)
+      .where(lt(passwordResetTokens.expiresAt, new Date()));
   }
 
   async getUserCount(): Promise<number> {
@@ -1490,11 +1500,11 @@ export class DatabaseStorage implements IStorage {
         type: 'new_support_ticket',
         title: 'New Support Ticket',
         message: `New support ticket from ${data.customerName}: ${data.subject}`,
-        data: { 
-          ticketId: ticket.id, 
-          customerName: data.customerName, 
+        data: {
+          ticketId: ticket.id,
+          customerName: data.customerName,
           subject: data.subject,
-          priority: data.priority 
+          priority: data.priority
         }
       });
     }
@@ -1530,7 +1540,7 @@ export class DatabaseStorage implements IStorage {
 
     // Process each ticket to add responses and assigned user
     const processedTickets = [];
-    
+
     for (const ticket of tickets) {
       try {
         // Get responses for this ticket
@@ -1565,7 +1575,7 @@ export class DatabaseStorage implements IStorage {
             .from(users)
             .where(eq(users.id, ticket.ticket.assignedTo))
             .limit(1);
-          
+
           assignedUser = assignedUserResult[0] || null;
         }
 

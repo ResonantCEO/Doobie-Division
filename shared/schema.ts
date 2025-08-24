@@ -10,6 +10,7 @@ import {
   decimal,
   boolean,
   uuid,
+  sql,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -162,9 +163,17 @@ export const supportTicketResponses = pgTable("support_ticket_responses", {
   id: serial("id").primaryKey(),
   ticketId: integer("ticket_id").references(() => supportTickets.id),
   message: text("message").notNull(),
-  type: varchar("type").notNull(), // internal_note, customer_response
+  type: varchar("type").notNull(), // 'customer', 'staff', 'system'
   createdBy: varchar("created_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at").default(sql`now()`),
+});
+
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  token: varchar("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").default(sql`now()`),
 });
 
 // Relations
