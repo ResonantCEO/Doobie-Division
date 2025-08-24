@@ -9,6 +9,9 @@ import fs from "fs";
 import { storage } from "./storage";
 
 const SALT_ROUNDS = 12;
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
 
 // Configure multer for file uploads with proper storage handling
 const idImagesDir = path.join(process.cwd(), 'uploads', 'id-images');
@@ -33,10 +36,18 @@ const multerStorage = multer.diskStorage({
     }
   },
   filename: function (req, file, cb) {
-    // Use cryptographically secure random filename
+    // Use cryptographically secure random filename with proper extension validation
     const randomBytes = crypto.randomBytes(32).toString('hex');
     const timestamp = Date.now();
-    cb(null, `${timestamp}-${randomBytes}`);
+    const extension = path.extname(file.originalname).toLowerCase();
+    
+    // Validate extension against whitelist
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    if (!allowedExtensions.includes(extension)) {
+      return cb(new Error('Invalid file extension'), '');
+    }
+    
+    cb(null, `${timestamp}-${randomBytes}${extension}`);
   }
 });
 
@@ -72,6 +83,7 @@ export function getSession() {
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      sameSite: 'strict',
       maxAge: SESSION_TTL,
     },
   });

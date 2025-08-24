@@ -149,6 +149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const categories = await storage.getCategories();
       res.json(categories);
     } catch (error) {
+      console.error('Error fetching categories:', error);
       res.status(500).json({ message: "Failed to fetch categories" });
     }
   });
@@ -336,13 +337,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { quantity, reason } = req.body;
 
       // Validate productId
-      if (isNaN(productId)) {
+      if (isNaN(productId) || productId <= 0) {
         return res.status(400).json({ message: "Invalid product ID" });
       }
 
-      // Validate quantity and reason
-      if (typeof quantity !== 'number' || !reason || typeof reason !== 'string') {
-        return res.status(400).json({ message: "Valid quantity and reason are required" });
+      // Validate quantity and reason with stricter checks
+      if (typeof quantity !== 'number' || Math.abs(quantity) > 10000) {
+        return res.status(400).json({ message: "Quantity must be a number and cannot exceed 10000" });
+      }
+      
+      if (!reason || typeof reason !== 'string' || reason.trim().length < 3 || reason.length > 200) {
+        return res.status(400).json({ message: "Reason must be between 3 and 200 characters" });
       }
 
 
@@ -1258,11 +1263,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('WebSocket client connected');
     wsConnections.add(ws);
 
-    // Set connection timeout
+    // Set connection timeout with cleanup
     const timeout = setTimeout(() => {
       if (ws.readyState === ws.OPEN) {
         ws.close(1000, 'Connection timeout');
       }
+      wsConnections.delete(ws);
     }, 30 * 60 * 1000); // 30 minutes
 
     ws.on('close', () => {

@@ -5,6 +5,36 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { checkDatabaseConnection } from "./db";
 
+// Simple rate limiting store
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+const rateLimit = (maxRequests: number, windowMs: number) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const clientIp = req.ip || 'unknown';
+    const now = Date.now();
+    const windowStart = now - windowMs;
+    
+    if (!rateLimitStore.has(clientIp)) {
+      rateLimitStore.set(clientIp, { count: 1, resetTime: now + windowMs });
+      return next();
+    }
+    
+    const clientData = rateLimitStore.get(clientIp)!;
+    
+    if (now > clientData.resetTime) {
+      rateLimitStore.set(clientIp, { count: 1, resetTime: now + windowMs });
+      return next();
+    }
+    
+    if (clientData.count >= maxRequests) {
+      return res.status(429).json({ message: 'Too many requests' });
+    }
+    
+    clientData.count++;
+    next();
+  };
+};
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -40,6 +70,10 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// Apply rate limiting to API routes
+app.use('/api/', rateLimit(100, 15 * 60 * 1000)); // 100 requests per 15 minutes
+app.use('/api/auth/', rateLimit(10, 15 * 60 * 1000)); // 10 auth requests per 15 minutes
 
 // Database connection middleware
 app.use(async (req, res, next) => {
