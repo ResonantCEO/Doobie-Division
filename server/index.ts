@@ -110,8 +110,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // Apply rate limiting to API routes
-app.use('/api/', rateLimit(100, 15 * 60 * 1000)); // 100 requests per 15 minutes
-app.use('/api/auth/', rateLimit(10, 15 * 60 * 1000)); // 10 auth requests per 15 minutes
+app.use('/api/', rateLimit(200, 15 * 60 * 1000)); // 200 requests per 15 minutes
+
+// More lenient rate limiting for auth endpoints since they're used frequently for status checks
+app.use('/api/auth/login', rateLimit(10, 5 * 60 * 1000)); // 10 login attempts per 5 minutes
+app.use('/api/auth/register', rateLimit(5, 15 * 60 * 1000)); // 5 registration attempts per 15 minutes  
+app.use('/api/auth/', rateLimit(100, 15 * 60 * 1000)); // 100 general auth requests per 15 minutes
 
 // Database connection middleware
 app.use(async (req, res, next) => {
