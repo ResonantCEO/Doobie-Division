@@ -302,8 +302,13 @@ export async function setupAuth(app: Express) {
         return res.json({ message: "If the email exists, a reset link has been sent." });
       }
 
-      // Generate secure reset token
-      const resetToken = crypto.randomBytes(32).toString('hex');
+      // Generate 6-character alphanumeric reset token
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let resetToken = '';
+      for (let i = 0; i < 6; i++) {
+        const randomIndex = crypto.randomInt(0, characters.length);
+        resetToken += characters[randomIndex];
+      }
       const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
 
       // Store reset token
