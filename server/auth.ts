@@ -33,9 +33,10 @@ const multerStorage = multer.diskStorage({
     }
   },
   filename: function (req, file, cb) {
-    // Use a hash-based filename (no extension to maintain security)
-    const hash = crypto.createHash('md5').update(file.originalname + Date.now()).digest('hex');
-    cb(null, hash);
+    // Use cryptographically secure random filename
+    const randomBytes = crypto.randomBytes(32).toString('hex');
+    const timestamp = Date.now();
+    cb(null, `${timestamp}-${randomBytes}`);
   }
 });
 
@@ -264,39 +265,12 @@ export async function setupAuth(app: Express) {
     });
   });
 
-  // Password reset endpoint
+  // Password reset endpoint - DISABLED FOR SECURITY
+  // TODO: Implement proper email verification flow
   app.post("/api/auth/reset-password", async (req, res) => {
-    try {
-      const { email, newPassword } = req.body;
-
-      if (!email || !newPassword) {
-        return res.status(400).json({ message: "Email and new password are required" });
-      }
-
-      if (newPassword.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
-      }
-
-      // Normalize email to lowercase for case-insensitive comparison
-      const normalizedEmail = email.toLowerCase();
-
-      // Get user by email
-      const user = await storage.getUserByEmail(normalizedEmail);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Hash new password
-      const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
-
-      // Update password in database
-      await storage.updateUserPassword(user.id, hashedPassword);
-
-      res.json({ message: "Password reset successful. You can now login with your new password." });
-    } catch (error) {
-      console.error("Password reset error:", error);
-      res.status(500).json({ message: "Password reset failed" });
-    }
+    return res.status(501).json({ 
+      message: "Password reset requires email verification. Please contact administrator." 
+    });
   });
 
   // Get current user endpoint

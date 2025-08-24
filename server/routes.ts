@@ -279,7 +279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error.message.includes('sku') && error.message.includes('unique')
       )) {
         return res.status(400).json({
-          message: "duplicate key value violates unique constraint \"products_sku_unique\""
+          message: "Product SKU already exists"
         });
       }
 
@@ -771,7 +771,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Daily analytics endpoints
-  app.get("/api/analytics/hourly-breakdown", isAuthenticated, async (req, res) => {
+  app.get("/api/analytics/hourly-breakdown", isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
       const today = new Date();
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -847,9 +847,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics endpoints
-  app.get('/api/analytics/metrics/:days', isAuthenticated, async (req, res) => {
+  app.get('/api/analytics/metrics/:days', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
-      const days = parseInt(req.params.days) || 30;
+      const daysParam = parseInt(req.params.days);
+      if (isNaN(daysParam) || daysParam < 1 || daysParam > 365) {
+        return res.status(400).json({ message: "Days parameter must be between 1 and 365" });
+      }
+      const days = daysParam;
       const metrics = await storage.getSalesMetrics(days);
       res.json(metrics);
     } catch (error) {
@@ -1251,19 +1255,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
   wss.on('connection', (ws) => {
-
+    console.log('WebSocket client connected');
     wsConnections.add(ws);
 
-    ws.on('close', () => {
+    // Set connection timeout
+    const timeout = setTimeout(() => {
+      if (ws.readyState === ws.OPEN) {
+        ws.close(1000, 'Connection timeout');
+      }
+    }, 30 * 60 * 1000); // 30 minutes
 
+    ws.on('close', () => {
+      console.log('WebSocket client disconnected');
+      clearTimeout(timeout);
       wsConnections.delete(ws);
     });
 
     ws.on('error', (error) => {
       console.error('WebSocket error:', error);
+      clearTimeout(timeout);
       wsConnections.delete(ws);
     });
+
+    ws.on('pong', () => {
+      // Reset timeout on pong
+      clearTimeout(timeout);
+    });
   });
+
+  // Ping clients periodically to detect dead connections
+  setInterval(() => {
+    wsConnections.forEach((ws) => {
+      if (ws.readyState === ws.OPEN) {
+        ws.ping();
+      } else {
+        wsConnections.delete(ws);
+      }
+    });
+  }, 30000); // Every 30 seconds
 
   return httpServer;
 }
