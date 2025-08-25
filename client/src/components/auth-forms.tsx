@@ -266,6 +266,26 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
 
       setSignupStep(2);
     } else if (signupStep === 2) {
+      // Validate address - must contain at least one number and one letter
+      if (!/\d/.test(registerData.address) || !/[a-zA-Z]/.test(registerData.address)) {
+        toast({
+          title: "Invalid address",
+          description: "Address must contain at least one number and one letter.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate postal code - must be exactly 5 digits
+      if (!/^\d{5}$/.test(registerData.postalCode)) {
+        toast({
+          title: "Invalid postal code",
+          description: "Postal code must be exactly 5 digits.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setSignupStep(3);
     } else if (signupStep === 3) {
       setSignupStep(4);
