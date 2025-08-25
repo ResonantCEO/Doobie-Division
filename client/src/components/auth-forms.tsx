@@ -17,7 +17,9 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({
     email: "",
+    confirmEmail: "",
     password: "",
+    confirmPassword: "",
     firstName: "",
     lastName: "",
     address: "",
@@ -43,6 +45,22 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const validatePassword = (password: string) => {
+    if (password.length < 8) {
+      return "Password must be at least 8 characters long";
+    }
+    if (!/[A-Z]/.test(password)) {
+      return "Password must contain at least one uppercase letter";
+    }
+    if (!/[a-z]/.test(password)) {
+      return "Password must contain at least one lowercase letter";
+    }
+    if (!/\d/.test(password)) {
+      return "Password must contain at least one number";
+    }
+    return null;
+  };
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async (email: string) => {
@@ -217,6 +235,35 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     if (signupStep === 1) {
+      // Validate step 1 fields
+      if (registerData.email !== registerData.confirmEmail) {
+        toast({
+          title: "Email mismatch",
+          description: "Email addresses do not match.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (registerData.password !== registerData.confirmPassword) {
+        toast({
+          title: "Password mismatch",
+          description: "Passwords do not match.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const passwordError = validatePassword(registerData.password);
+      if (passwordError) {
+        toast({
+          title: "Invalid password",
+          description: passwordError,
+          variant: "destructive",
+        });
+        return;
+      }
+
       setSignupStep(2);
     } else if (signupStep === 2) {
       setSignupStep(3);
@@ -375,6 +422,20 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="confirmEmail">Confirm Email</Label>
+                      <Input
+                        id="confirmEmail"
+                        type="email"
+                        value={registerData.confirmEmail}
+                        onChange={(e) => setRegisterData({ ...registerData, confirmEmail: e.target.value })}
+                        required
+                        className={registerData.confirmEmail && registerData.email !== registerData.confirmEmail ? "border-red-500" : ""}
+                      />
+                      {registerData.confirmEmail && registerData.email !== registerData.confirmEmail && (
+                        <p className="text-sm text-red-500">Email addresses do not match</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="registerPassword">Password</Label>
                       <div className="relative">
                         <Input
@@ -382,7 +443,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                           type={showRegisterPassword ? "text" : "password"}
                           value={registerData.password}
                           onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                          minLength={6}
+                          minLength={8}
                           required
                           className="pr-10"
                         />
@@ -400,7 +461,40 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                           )}
                         </Button>
                       </div>
-                      <p className="text-sm text-muted-foreground">Must be at least 6 characters</p>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p>Password must be at least 8 characters and contain:</p>
+                        <ul className="list-disc list-inside space-y-0.5 ml-2">
+                          <li className={registerData.password.length >= 8 ? "text-green-600" : ""}>
+                            At least 8 characters
+                          </li>
+                          <li className={/[A-Z]/.test(registerData.password) ? "text-green-600" : ""}>
+                            One uppercase letter
+                          </li>
+                          <li className={/[a-z]/.test(registerData.password) ? "text-green-600" : ""}>
+                            One lowercase letter
+                          </li>
+                          <li className={/\d/.test(registerData.password) ? "text-green-600" : ""}>
+                            One number
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Confirm Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="confirmPassword"
+                          type={showRegisterPassword ? "text" : "password"}
+                          value={registerData.confirmPassword}
+                          onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                          minLength={8}
+                          required
+                          className={registerData.confirmPassword && registerData.password !== registerData.confirmPassword ? "border-red-500" : ""}
+                        />
+                      </div>
+                      {registerData.confirmPassword && registerData.password !== registerData.confirmPassword && (
+                        <p className="text-sm text-red-500">Passwords do not match</p>
+                      )}
                     </div>
                     <Button type="submit" className="w-full">
                       Continue to Address Information

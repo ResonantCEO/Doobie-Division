@@ -41,13 +41,13 @@ const multerStorage = multer.diskStorage({
     const randomBytes = crypto.randomBytes(32).toString('hex');
     const timestamp = Date.now();
     const extension = path.extname(file.originalname).toLowerCase();
-    
+
     // Validate extension against whitelist
     const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
     if (!allowedExtensions.includes(extension)) {
       return cb(new Error('Invalid file extension'), '');
     }
-    
+
     cb(null, `${timestamp}-${randomBytes}${extension}`);
   }
 });
@@ -97,14 +97,33 @@ export async function setupAuth(app: Express) {
   // Register endpoint
   app.post("/api/auth/register", upload.fields([{ name: 'idImage', maxCount: 1 }, { name: 'verificationPhoto', maxCount: 1 }]), async (req, res) => {
     try {
-      const { email, password, firstName, lastName, address, city, state, postalCode, country } = req.body;
+      const { email, password, firstName, lastName, address, city, state, postalCode, country, confirmEmail, confirmPassword } = req.body;
 
-      if (!email || !password || !firstName || !lastName) {
+      if (!email || !password || !firstName || !lastName || !confirmEmail || !confirmPassword) {
         return res.status(400).json({ message: "All fields are required" });
       }
 
-      if (password.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      if (email !== confirmEmail) {
+        return res.status(400).json({ message: "Emails do not match" });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters long" });
+      }
+
+      // Validate password complexity
+      if (!/[A-Z]/.test(password)) {
+        return res.status(400).json({ message: "Password must contain at least one uppercase letter" });
+      }
+      if (!/[a-z]/.test(password)) {
+        return res.status(400).json({ message: "Password must contain at least one lowercase letter" });
+      }
+      if (!/\d/.test(password)) {
+        return res.status(400).json({ message: "Password must contain at least one number" });
+      }
+
+      if (password !== confirmPassword) {
+        return res.status(400).json({ message: "Passwords do not match" });
       }
 
       // Normalize email to lowercase for case-insensitive comparison
@@ -169,17 +188,17 @@ export async function setupAuth(app: Express) {
             console.error('Error logging login activity:', error);
           }
 
-          res.status(201).json({ 
-            user, 
-            message: "Welcome! You are the first user and have been granted administrator privileges." 
+          res.status(201).json({
+            user,
+            message: "Welcome! You are the first user and have been granted administrator privileges."
           });
         });
       } else {
         // Notification creation removed - user registration notifications are handled elsewhere
-        
-        res.status(201).json({ 
-          user: null, 
-          message: "Registration successful! Your account is pending approval by an administrator." 
+
+        res.status(201).json({
+          user: null,
+          message: "Registration successful! Your account is pending approval by an administrator."
         });
       }
     } catch (error) {
@@ -208,8 +227,8 @@ export async function setupAuth(app: Express) {
 
       if (user.status !== "active") {
         if (user.status === "pending") {
-          return res.status(401).json({ 
-            message: "Account is pending approval. Please wait for an administrator to activate your account." 
+          return res.status(401).json({
+            message: "Account is pending approval. Please wait for an administrator to activate your account."
           });
         }
         return res.status(401).json({ message: "Account is inactive" });
@@ -324,7 +343,7 @@ export async function setupAuth(app: Express) {
 
       // Create support ticket for password reset request
       const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
-      
+
       await storage.createSupportTicket({
         customerName: `${user.firstName} ${user.lastName}`,
         customerEmail: user.email,
@@ -352,7 +371,7 @@ Please manually send this reset URL to the user via their preferred communicatio
         console.log(`Support ticket created for password reset`);
       }
 
-      res.json({ 
+      res.json({
         message: "Your password reset request has been submitted to our support team. They will contact you shortly with reset instructions.",
         ...(process.env.NODE_ENV === 'development' && { resetToken }) // Include token in dev mode for testing
       });
@@ -365,14 +384,29 @@ Please manually send this reset URL to the user via their preferred communicatio
   // Reset password with token
   app.post("/api/auth/reset-password", async (req, res) => {
     try {
-      const { email, token, password } = req.body;
+      const { email, token, password, confirmPassword } = req.body;
 
-      if (!email || !token || !password) {
-        return res.status(400).json({ message: "Email, token and password are required" });
+      if (!email || !token || !password || !confirmPassword) {
+        return res.status(400).json({ message: "Email, token, password, and confirm password are required" });
       }
 
-      if (password.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      if (password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters long" });
+      }
+
+      // Validate password complexity
+      if (!/[A-Z]/.test(password)) {
+        return res.status(400).json({ message: "Password must contain at least one uppercase letter" });
+      }
+      if (!/[a-z]/.test(password)) {
+        return res.status(400).json({ message: "Password must contain at least one lowercase letter" });
+      }
+      if (!/\d/.test(password)) {
+        return res.status(400).json({ message: "Password must contain at least one number" });
+      }
+
+      if (password !== confirmPassword) {
+        return res.status(400).json({ message: "Passwords do not match" });
       }
 
       // Verify reset token
