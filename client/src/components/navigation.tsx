@@ -101,7 +101,12 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
     if (type === 'users') {
       return notifications.filter((n: any) => !n.isRead && (
         n.type === 'user_registration' ||
-        n.type === 'user_approved'
+        n.type === 'user_approved' ||
+        n.type === 'user_approval' ||
+        n.type === 'new_user_registration' ||
+        n.title === 'New User Registration' || // Fallback for title-based matching
+        n.message?.includes('registered') || // Fallback for message-based matching
+        n.message?.includes('approval')
       )).length;
     }
     // Specifically check for support ticket types
@@ -126,7 +131,10 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
           n.type === 'user_registration' ||
           n.type === 'user_approved' ||
           n.type === 'user_approval' ||
-          n.type === 'new_user_registration'
+          n.type === 'new_user_registration' ||
+          n.title === 'New User Registration' || // Fallback for title-based matching
+          n.message?.includes('registered') || // Fallback for message-based matching
+          n.message?.includes('approval')
         );
       case 'support':
         return notifications.filter(n =>
