@@ -146,6 +146,46 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
     }
   };
 
+  const handleNotificationClick = async (notification: any) => {
+    // Mark notification as read
+    if (!notification.isRead) {
+      try {
+        await fetch(`/api/notifications/${notification.id}/read`, { method: 'PATCH', credentials: 'include' });
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      } catch (error) {
+        console.error("Failed to mark notification as read:", error);
+        toast({
+          title: "Error",
+          description: "Could not mark notification as read.",
+          variant: "destructive",
+        });
+      }
+    }
+
+    // Navigate based on notification type
+    switch (notification.type) {
+      case 'new_order':
+      case 'order_status_update':
+      case 'order_assigned':
+        window.location.href = '/dashboard/orders';
+        break;
+      case 'user_registration':
+      case 'user_approved':
+      case 'user_approval':
+      case 'new_user_registration':
+        window.location.href = '/dashboard/users';
+        break;
+      case 'new_support_ticket':
+      case 'support_ticket_response':
+        window.location.href = '/dashboard/admin';
+        break;
+      default:
+        // For 'all' tab clicks or unhandled types, navigate to a general notifications page or a specific one if possible
+        window.location.href = '/dashboard/notifications'; // Assuming a general notifications page
+        break;
+    }
+  };
+
 
   return (
     <>
@@ -291,13 +331,14 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                 {getFilteredNotifications().map((notification: any) => (
                                   <div
                                     key={notification.id}
-                                    className={`p-2 rounded-md text-sm ${
+                                    className={`p-2 rounded-md text-sm cursor-pointer transition-colors hover:bg-accent ${
                                       notification.isRead
                                         ? "bg-background"
                                         : notification.type === 'new_support_ticket' || notification.type === 'support_ticket_response'
                                         ? "bg-red-50 dark:bg-red-950/20"
                                         : "bg-muted"
                                     }`}
+                                    onClick={() => handleNotificationClick(notification)}
                                   >
                                     <div className="font-medium">{notification.title}</div>
                                     <div className="text-muted-foreground text-xs">
@@ -494,13 +535,14 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                 {getFilteredNotifications().map((notification: any) => (
                                   <div
                                     key={notification.id}
-                                    className={`p-2 rounded-md text-sm ${
+                                    className={`p-2 rounded-md text-sm cursor-pointer transition-colors hover:bg-accent ${
                                       notification.isRead
                                         ? "bg-background"
                                         : notification.type === 'new_support_ticket' || notification.type === 'support_ticket_response'
                                         ? "bg-red-50 dark:bg-red-950/20"
                                         : "bg-muted"
                                     }`}
+                                    onClick={() => handleNotificationClick(notification)}
                                   >
                                     <div className="font-medium">{notification.title}</div>
                                     <div className="text-muted-foreground text-xs">
