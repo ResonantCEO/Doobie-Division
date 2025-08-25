@@ -122,14 +122,11 @@ export async function setupAuth(app: Express) {
   // Register endpoint
   app.post("/api/auth/register", upload.fields([{ name: 'idImage', maxCount: 1 }, { name: 'verificationPhoto', maxCount: 1 }]), async (req, res) => {
     try {
-      const { email, password, firstName, lastName, address, city, state, postalCode, country, confirmEmail, confirmPassword } = req.body;
+      const { email, password, firstName, lastName, address, city, state, postalCode, country } = req.body;
 
-      if (!email || !password || !firstName || !lastName || !confirmEmail || !confirmPassword) {
-        return res.status(400).json({ message: "All fields are required" });
-      }
-
-      if (email !== confirmEmail) {
-        return res.status(400).json({ message: "Emails do not match" });
+      // Only check for essential fields that are actually sent from frontend
+      if (!email || !password || !firstName || !lastName) {
+        return res.status(400).json({ message: "All required fields must be provided" });
       }
 
       if (password.length < 8) {
@@ -145,10 +142,6 @@ export async function setupAuth(app: Express) {
       }
       if (!/\d/.test(password)) {
         return res.status(400).json({ message: "Password must contain at least one number" });
-      }
-
-      if (password !== confirmPassword) {
-        return res.status(400).json({ message: "Passwords do not match" });
       }
 
       // Normalize email to lowercase for case-insensitive comparison
