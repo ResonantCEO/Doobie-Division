@@ -113,9 +113,9 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use('/api/', rateLimit(200, 15 * 60 * 1000)); // 200 requests per 15 minutes
 
 // More lenient rate limiting for auth endpoints since they're used frequently for status checks
-app.use('/api/auth/login', rateLimit(10, 5 * 60 * 1000)); // 10 login attempts per 5 minutes
-app.use('/api/auth/register', rateLimit(10, 15 * 60 * 1000)); // 10 registration attempts per 15 minutes  
-app.use('/api/auth/', rateLimit(200, 15 * 60 * 1000)); // 200 general auth requests per 15 minutes
+app.use('/api/auth/login', rateLimit(25, 5 * 60 * 1000)); // 25 login attempts per 5 minutes
+app.use('/api/auth/register', rateLimit(15, 15 * 60 * 1000)); // 15 registration attempts per 15 minutes  
+app.use('/api/auth/', rateLimit(300, 15 * 60 * 1000)); // 300 general auth requests per 15 minutes
 
 // Database connection middleware
 app.use(async (req, res, next) => {
