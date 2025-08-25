@@ -489,8 +489,21 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                           onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
                           minLength={8}
                           required
-                          className={registerData.confirmPassword && registerData.password !== registerData.confirmPassword ? "border-red-500" : ""}
+                          className={registerData.confirmPassword && registerData.password !== registerData.confirmPassword ? "border-red-500 pr-10" : "pr-10"}
                         />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                        >
+                          {showRegisterPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
                       </div>
                       {registerData.confirmPassword && registerData.password !== registerData.confirmPassword && (
                         <p className="text-sm text-red-500">Passwords do not match</p>
