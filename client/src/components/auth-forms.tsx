@@ -232,10 +232,37 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
     loginMutation.mutate(loginData);
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  // Email availability check mutation
+  const checkEmailMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message);
+      }
+
+      return response.json();
+    },
+  });
+
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (signupStep === 1) {
       // Validate step 1 fields
+      if (!registerData.firstName || !registerData.lastName || !registerData.email || !registerData.confirmEmail || !registerData.password || !registerData.confirmPassword) {
+        toast({
+          title: "Missing fields",
+          description: "All fields are required.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       if (registerData.email !== registerData.confirmEmail) {
         toast({
           title: "Email mismatch",
@@ -264,7 +291,18 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
         return;
       }
 
-      setSignupStep(2);
+      // Check if email is available
+      try {
+        await checkEmailMutation.mutateAsync(registerData.email.toLowerCase());
+        setSignupStep(2);
+      } catch (error: any) {
+        toast({
+          title: "Email unavailable",
+          description: error.message || "This email is already registered. Please use a different email or try logging in.",
+          variant: "destructive",
+        });
+        return;
+      }
     } else if (signupStep === 2) {
       // Validate address - must contain at least one number and one letter
       if (!/\d/.test(registerData.address) || !/[a-zA-Z]/.test(registerData.address)) {
@@ -529,8 +567,12 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                         <p className="text-sm text-red-500">Passwords do not match</p>
                       )}
                     </div>
-                    <Button type="submit" className="w-full">
-                      Continue to Address Information
+                    <Button 
+                      type="submit" 
+                      className="w-full"
+                      disabled={checkEmailMutation.isPending}
+                    >
+                      {checkEmailMutation.isPending ? "Checking email..." : "Continue to Address Information"}
                     </Button>
                   </>
                 ) : signupStep === 2 ? (

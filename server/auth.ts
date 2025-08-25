@@ -94,6 +94,31 @@ export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use(getSession());
 
+  // Email availability check endpoint
+  app.post("/api/auth/check-email", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Normalize email to lowercase for case-insensitive comparison
+      const normalizedEmail = email.toLowerCase();
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(normalizedEmail);
+      if (existingUser) {
+        return res.status(409).json({ message: "An account with this email already exists. Please use a different email or try logging in." });
+      }
+
+      res.json({ message: "Email is available" });
+    } catch (error) {
+      console.error("Email check error:", error);
+      res.status(500).json({ message: "Failed to check email availability" });
+    }
+  });
+
   // Register endpoint
   app.post("/api/auth/register", upload.fields([{ name: 'idImage', maxCount: 1 }, { name: 'verificationPhoto', maxCount: 1 }]), async (req, res) => {
     try {
@@ -132,7 +157,7 @@ export async function setupAuth(app: Express) {
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(normalizedEmail);
       if (existingUser) {
-        return res.status(409).json({ message: "User already exists with this email" });
+        return res.status(409).json({ message: "An account with this email already exists. Please use a different email or try logging in." });
       }
 
       // Hash password
