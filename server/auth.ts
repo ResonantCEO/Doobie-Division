@@ -160,11 +160,35 @@ export async function setupAuth(app: Express) {
       const existingUserCount = await storage.getUserCount();
       const isFirstUser = existingUserCount === 0;
 
+      // Handle file uploads and store URLs
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+      if (!files || !files.idImage || !files.verificationPhoto) {
+        return res.status(400).json({ message: "ID image and verification photo are required" });
+      }
+
+      const idImageFile = files.idImage[0];
+      const verificationPhotoFile = files.verificationPhoto[0];
+
+      // Generate secure filenames for object storage
+      const idImageExtension = path.extname(idImageFile.originalname).toLowerCase();
+      const verificationExtension = path.extname(verificationPhotoFile.originalname).toLowerCase();
+      const timestamp = Date.now();
+      const idImageFilename = `id-images/${timestamp}-${crypto.randomBytes(32).toString('hex')}${idImageExtension}`;
+      const verificationFilename = `verification-photos/${timestamp}-${crypto.randomBytes(32).toString('hex')}${verificationExtension}`;
+
+      // Upload files to Object Storage
+      // Ensure 'storage.uploadFile' can handle a buffer, which Multer provides.
+      await storage.uploadFile(idImageFilename, idImageFile.buffer);
+      await storage.uploadFile(verificationFilename, verificationPhotoFile.buffer);
+
+      // Get public URLs from Object Storage
+      const idImageUrl = await storage.getPublicUrl(idImageFilename);
+      const verificationPhotoUrl = await storage.getPublicUrl(verificationFilename);
+
+
       // Create user
       const userId = crypto.randomUUID();
-      const idImageUrl = req.files && (req.files as any)['idImage'] ? `/uploads/id-images/${(req.files as any)['idImage'][0].filename}` : null;
-      const verificationPhotoUrl = req.files && (req.files as any)['verificationPhoto'] ? `/uploads/verification-photos/${(req.files as any)['verificationPhoto'][0].filename}` : null;
-
       await storage.createUserWithPassword({
         id: userId,
         email: normalizedEmail,
