@@ -112,32 +112,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
-  // Serve files from Object Storage
-  app.get('/api/storage/*', async (req, res) => {
-    try {
-      const key = req.params[0];
-      const fileBuffer = await storage.downloadFile(key);
-      
-      // Determine content type based on file extension
-      const ext = path.extname(key).toLowerCase();
-      const contentTypes: { [key: string]: string } = {
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.png': 'image/png',
-        '.gif': 'image/gif',
-        '.webp': 'image/webp'
-      };
-      
-      const contentType = contentTypes[ext] || 'application/octet-stream';
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Cache-Control', 'public, max-age=31536000');
-      res.send(fileBuffer);
-    } catch (error) {
-      console.error('Error serving file from storage:', error);
-      res.status(404).send('File not found');
-    }
-  });
-
   // Image upload endpoint
   app.post('/api/upload/product-image', isAuthenticated, requireRole(['admin', 'manager', 'staff']), upload.single('image'), (req: any, res) => {
     try {
