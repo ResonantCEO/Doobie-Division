@@ -7,7 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Upload } from "lucide-react";
+import { ObjectUploader } from "@/components/ObjectUploader";
+import type { UploadResult } from "@uppy/core";
 
 interface AuthFormsProps {
   onSuccess?: () => void;
@@ -28,8 +30,8 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
     postalCode: "",
     country: "USA",
   });
-  const [idFile, setIdFile] = useState<File | null>(null);
-  const [verificationPhoto, setVerificationPhoto] = useState<File | null>(null);
+  const [idImageUrl, setIdImageUrl] = useState<string | null>(null);
+  const [verificationPhotoUrl, setVerificationPhotoUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("login"); // Added state for active tab
   const [signupStep, setSignupStep] = useState(1); // Track signup step (1-4)
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -165,29 +167,13 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
       state: string;
       postalCode: string;
       country: string;
-      idFile: File | null;
-      verificationPhoto: File | null;
+      idImageUrl: string | null;
+      verificationPhotoUrl: string | null;
     }) => {
-      const formData = new FormData();
-      formData.append("email", data.email);
-      formData.append("password", data.password);
-      formData.append("firstName", data.firstName);
-      formData.append("lastName", data.lastName);
-      formData.append("address", data.address);
-      formData.append("city", data.city);
-      formData.append("state", data.state);
-      formData.append("postalCode", data.postalCode);
-      formData.append("country", data.country);
-      if (data.idFile) {
-        formData.append("idImage", data.idFile);
-      }
-      if (data.verificationPhoto) {
-        formData.append("verificationPhoto", data.verificationPhoto);
-      }
-
       const response = await fetch("/api/auth/register", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
       });
 
       if (!response.ok) {
@@ -328,7 +314,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
     } else if (signupStep === 3) {
       setSignupStep(4);
     } else {
-      registerMutation.mutate({ ...registerData, idFile, verificationPhoto });
+      registerMutation.mutate({ ...registerData, idImageUrl, verificationPhotoUrl });
     }
   };
 
@@ -650,15 +636,47 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                       <p className="text-sm text-muted-foreground">Step 3 of 4 - Photo ID Verification</p>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="idUpload">Photo ID</Label>
-                      <Input
-                        id="idUpload"
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setIdFile(e.target.files?.[0] || null)}
-                        required
-                        key="id-upload"
-                      />
+                      <Label>Photo ID</Label>
+                      <ObjectUploader
+                        maxNumberOfFiles={1}
+                        maxFileSize={5 * 1024 * 1024}
+                        onGetUploadParameters={async (file: any) => {
+                          const response = await fetch('/api/objects/upload', {
+                            method: 'POST',
+                            credentials: 'include',
+                          });
+                          if (!response.ok) throw new Error('Failed to get upload URL');
+                          const { uploadURL, objectPath } = await response.json();
+                          // Store objectPath in file metadata for use in onComplete
+                          file.meta = { ...file.meta, objectPath };
+                          return { method: 'PUT' as const, url: uploadURL };
+                        }}
+                        onComplete={(result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+                          if (result.successful && result.successful.length > 0) {
+                            const file = result.successful[0];
+                            const objectPath = file.meta?.objectPath as string | undefined;
+                            if (objectPath) {
+                              setIdImageUrl(objectPath);
+                              toast({
+                                title: "ID uploaded",
+                                description: "Your ID photo has been uploaded successfully.",
+                              });
+                            } else {
+                              toast({
+                                title: "Upload error",
+                                description: "Failed to get object path from upload",
+                                variant: "destructive",
+                              });
+                            }
+                          }
+                        }}
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        {idImageUrl ? "Upload Different ID" : "Upload Photo ID"}
+                      </ObjectUploader>
+                      {idImageUrl && (
+                        <p className="text-sm text-green-600">✓ ID photo uploaded</p>
+                      )}
                       <p className="text-sm text-muted-foreground">Upload a clear photo of your government-issued ID</p>
                     </div>
                     <div className="flex gap-2">
@@ -670,7 +688,11 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                       >
                         Back
                       </Button>
-                      <Button type="submit" className="w-full">
+                      <Button 
+                        type="submit" 
+                        className="w-full"
+                        disabled={!idImageUrl}
+                      >
                         Continue to Verification Photo
                       </Button>
                     </div>
@@ -681,15 +703,47 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                       <p className="text-sm text-muted-foreground">Step 4 of 4 - Verification Photo</p>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="verificationUpload">Verification Photo</Label>
-                      <Input
-                        id="verificationUpload"
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setVerificationPhoto(e.target.files?.[0] || null)}
-                        required
-                        key="verification-upload"
-                      />
+                      <Label>Verification Photo</Label>
+                      <ObjectUploader
+                        maxNumberOfFiles={1}
+                        maxFileSize={5 * 1024 * 1024}
+                        onGetUploadParameters={async (file: any) => {
+                          const response = await fetch('/api/objects/upload', {
+                            method: 'POST',
+                            credentials: 'include',
+                          });
+                          if (!response.ok) throw new Error('Failed to get upload URL');
+                          const { uploadURL, objectPath } = await response.json();
+                          // Store objectPath in file metadata for use in onComplete
+                          file.meta = { ...file.meta, objectPath };
+                          return { method: 'PUT' as const, url: uploadURL };
+                        }}
+                        onComplete={(result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+                          if (result.successful && result.successful.length > 0) {
+                            const file = result.successful[0];
+                            const objectPath = file.meta?.objectPath as string | undefined;
+                            if (objectPath) {
+                              setVerificationPhotoUrl(objectPath);
+                              toast({
+                                title: "Verification photo uploaded",
+                                description: "Your verification photo has been uploaded successfully.",
+                              });
+                            } else {
+                              toast({
+                                title: "Upload error",
+                                description: "Failed to get object path from upload",
+                                variant: "destructive",
+                              });
+                            }
+                          }
+                        }}
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        {verificationPhotoUrl ? "Upload Different Photo" : "Upload Verification Photo"}
+                      </ObjectUploader>
+                      {verificationPhotoUrl && (
+                        <p className="text-sm text-green-600">✓ Verification photo uploaded</p>
+                      )}
                       <p className="text-sm text-muted-foreground">
                         Upload a photo of yourself holding a sign that says "Doobie Division!" 
                         Make sure your face and the sign are clearly visible.
@@ -707,7 +761,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                       <Button
                         type="submit"
                         className="w-full"
-                        disabled={registerMutation.isPending}
+                        disabled={registerMutation.isPending || !verificationPhotoUrl}
                       >
                         {registerMutation.isPending ? "Creating account..." : "Create Account"}
                       </Button>

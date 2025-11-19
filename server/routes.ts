@@ -14,6 +14,8 @@ import { z } from "zod";
 import { db } from "./db";
 import { orders, products, orderItems, users, supportTickets, notifications } from "@shared/schema";
 import { eq, sql, desc, and, gte, lt, inArray } from "drizzle-orm";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { ObjectPermission } from "./objectAcl";
 
 // WebSocket connection store
 const wsConnections = new Set<WebSocket>();
@@ -111,6 +113,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth middleware
   await setupAuth(app);
+
+  // Object Storage routes - Reference: blueprint:javascript_object_storage
+  
+  // Endpoint to get presigned upload URL for object storage
+  // Note: No authentication required for registration photo uploads
+  app.post("/api/objects/upload", async (req: any, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const { uploadURL, objectPath } = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL, objectPath });
+    } catch (error) {
+      console.error("Error generating upload URL:", error);
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
+  // Endpoint to serve private objects with ACL check
+  app.get("/objects/:objectPath(*)", isAuthenticated, async (req: any, res) => {
+    const userId = (req.session as any).userId;
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(
+        req.path,
+      );
+      const canAccess = await objectStorageService.canAccessObjectEntity({
+        objectFile,
+        userId: userId,
+        requestedPermission: ObjectPermission.READ,
+      });
+      if (!canAccess) {
+        return res.sendStatus(401);
+      }
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error checking object access:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  // Endpoint to update user ID image with ACL policy
+  app.put("/api/users/:userId/id-image", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = (req.session as any).userId;
+      const targetUserId = req.params.userId;
+      
+      // Users can only update their own photos, or admins can update any
+      const currentUser = await storage.getUser(currentUserId);
+      if (currentUserId !== targetUserId && currentUser?.role !== 'admin') {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      if (!req.body.idImageURL) {
+        return res.status(400).json({ error: "idImageURL is required" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        req.body.idImageURL,
+        {
+          owner: targetUserId,
+          visibility: "private", // ID images should be private
+        },
+      );
+
+      // Update user's idImageUrl in database
+      await storage.updateUser(targetUserId, { idImageUrl: objectPath });
+
+      res.status(200).json({ objectPath });
+    } catch (error) {
+      console.error("Error setting ID image:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Endpoint to update user verification photo with ACL policy
+  app.put("/api/users/:userId/verification-photo", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = (req.session as any).userId;
+      const targetUserId = req.params.userId;
+      
+      // Users can only update their own photos, or admins can update any
+      const currentUser = await storage.getUser(currentUserId);
+      if (currentUserId !== targetUserId && currentUser?.role !== 'admin') {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      if (!req.body.verificationPhotoURL) {
+        return res.status(400).json({ error: "verificationPhotoURL is required" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        req.body.verificationPhotoURL,
+        {
+          owner: targetUserId,
+          visibility: "private", // Verification photos should be private
+        },
+      );
+
+      // Update user's verificationPhotoUrl in database
+      await storage.updateUser(targetUserId, { verificationPhotoUrl: objectPath });
+
+      res.status(200).json({ objectPath });
+    } catch (error) {
+      console.error("Error setting verification photo:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
 
   // Image upload endpoint
   app.post('/api/upload/product-image', isAuthenticated, requireRole(['admin', 'manager', 'staff']), upload.single('image'), (req: any, res) => {

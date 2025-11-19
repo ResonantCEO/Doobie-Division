@@ -4,67 +4,11 @@ import { sendEmail, createPasswordResetEmail } from "./email";
 import type { Express, RequestHandler } from "express";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
 import { storage } from "./storage";
 
 const SALT_ROUNDS = 12;
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
-
-// Configure multer for file uploads with proper storage handling
-const idImagesDir = path.join(process.cwd(), 'uploads', 'id-images');
-const verificationPhotosDir = path.join(process.cwd(), 'uploads', 'verification-photos');
-
-// Ensure both directories exist
-if (!fs.existsSync(idImagesDir)) {
-  fs.mkdirSync(idImagesDir, { recursive: true });
-}
-if (!fs.existsSync(verificationPhotosDir)) {
-  fs.mkdirSync(verificationPhotosDir, { recursive: true });
-}
-
-const multerStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    if (file.fieldname === 'idImage') {
-      cb(null, idImagesDir);
-    } else if (file.fieldname === 'verificationPhoto') {
-      cb(null, verificationPhotosDir);
-    } else {
-      cb(new Error('Unknown field name'), '');
-    }
-  },
-  filename: function (req, file, cb) {
-    // Use cryptographically secure random filename with proper extension validation
-    const randomBytes = crypto.randomBytes(32).toString('hex');
-    const timestamp = Date.now();
-    const extension = path.extname(file.originalname).toLowerCase();
-
-    // Validate extension against whitelist
-    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-    if (!allowedExtensions.includes(extension)) {
-      return cb(new Error('Invalid file extension'), '');
-    }
-
-    cb(null, `${timestamp}-${randomBytes}${extension}`);
-  }
-});
-
-const upload = multer({
-  storage: multerStorage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed'));
-    }
-  }
-});
 const SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
 
 export function getSession() {
@@ -120,13 +64,22 @@ export async function setupAuth(app: Express) {
   });
 
   // Register endpoint
-  app.post("/api/auth/register", upload.fields([{ name: 'idImage', maxCount: 1 }, { name: 'verificationPhoto', maxCount: 1 }]), async (req, res) => {
+  app.post("/api/auth/register", async (req, res) => {
     try {
-      const { email, password, firstName, lastName, address, city, state, postalCode, country } = req.body;
+      const { email, password, firstName, lastName, address, city, state, postalCode, country, idImageUrl, verificationPhotoUrl } = req.body;
 
       // Only check for essential fields that are actually sent from frontend
       if (!email || !password || !firstName || !lastName) {
         return res.status(400).json({ message: "All required fields must be provided" });
+      }
+
+      // Validate photo uploads are provided and in correct format
+      if (!idImageUrl || !verificationPhotoUrl) {
+        return res.status(400).json({ message: "Photo ID and verification photo are required" });
+      }
+
+      if (!idImageUrl.startsWith('/objects/') || !verificationPhotoUrl.startsWith('/objects/')) {
+        return res.status(400).json({ message: "Invalid photo format" });
       }
 
       if (password.length < 8) {
@@ -162,8 +115,42 @@ export async function setupAuth(app: Express) {
 
       // Create user
       const userId = crypto.randomUUID();
-      const idImageUrl = req.files && (req.files as any)['idImage'] ? `/uploads/id-images/${(req.files as any)['idImage'][0].filename}` : null;
-      const verificationPhotoUrl = req.files && (req.files as any)['verificationPhoto'] ? `/uploads/verification-photos/${(req.files as any)['verificationPhoto'][0].filename}` : null;
+      
+      // Process object storage URLs and set ACL policies
+      let processedIdImageUrl = idImageUrl;
+      let processedVerificationPhotoUrl = verificationPhotoUrl;
+      
+      if (idImageUrl) {
+        try {
+          const { ObjectStorageService } = await import("./objectStorage");
+          const objectStorageService = new ObjectStorageService();
+          processedIdImageUrl = await objectStorageService.trySetObjectEntityAclPolicy(
+            idImageUrl,
+            {
+              owner: userId,
+              visibility: "private",
+            }
+          );
+        } catch (error) {
+          console.error("Error setting ID image ACL:", error);
+        }
+      }
+      
+      if (verificationPhotoUrl) {
+        try {
+          const { ObjectStorageService } = await import("./objectStorage");
+          const objectStorageService = new ObjectStorageService();
+          processedVerificationPhotoUrl = await objectStorageService.trySetObjectEntityAclPolicy(
+            verificationPhotoUrl,
+            {
+              owner: userId,
+              visibility: "private",
+            }
+          );
+        } catch (error) {
+          console.error("Error setting verification photo ACL:", error);
+        }
+      }
 
       await storage.createUserWithPassword({
         id: userId,
@@ -171,14 +158,14 @@ export async function setupAuth(app: Express) {
         firstName,
         lastName,
         password: hashedPassword,
-        idImageUrl,
-        verificationPhotoUrl,
+        idImageUrl: processedIdImageUrl,
+        verificationPhotoUrl: processedVerificationPhotoUrl,
         address,
         city,
         state,
         postalCode,
         country: country || 'USA',
-        idVerificationStatus: isFirstUser ? "verified" : (idImageUrl ? "pending" : "not_provided"),
+        idVerificationStatus: isFirstUser ? "verified" : (processedIdImageUrl ? "pending" : "not_provided"),
         role: isFirstUser ? "admin" : "customer",
         status: isFirstUser ? "active" : "pending"
       });
