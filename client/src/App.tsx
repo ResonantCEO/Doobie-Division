@@ -24,18 +24,26 @@ import SupportPage from "@/pages/support";
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
+      {!isAuthenticated ? (
+        <>
+          <Route path="/" component={Landing} />
+          <Route path="/storefront" component={StorefrontPage} />
+          <Route component={Landing} />
+        </>
       ) : (
         <>
           <Route path="/" component={Dashboard} />
           <Route path="/dashboard/:tab?" component={Dashboard} />
-          <Route path="/customer-orders" component={CustomerOrdersWrapper} />
-        </>
-      )}
-      <Route path="/dashboard/*" component={Dashboard} />
           <Route path="/storefront" component={StorefrontPage} />
           <Route path="/inventory" component={InventoryPage} />
           <Route path="/orders" component={OrdersPage} />
@@ -45,8 +53,11 @@ function Router() {
           <Route path="/profile" component={ProfilePage} />
           <Route path="/wireframe" component={WireframePage} />
           <Route path="/support" component={SupportPage} />
-        <Route path="/404" component={NotFound} />
-        <Route component={NotFound} />
+          <Route path="/customer-orders" component={CustomerOrdersWrapper} />
+          <Route path="/404" component={NotFound} />
+          <Route component={NotFound} />
+        </>
+      )}
     </Switch>
   );
 }
