@@ -46,9 +46,9 @@ function customServeStatic(app: express.Express) {
 
   // Catch-all handler for client-side routing - but exclude API routes
   app.get("*", (req, res) => {
-    // Don't serve index.html for API routes
-    if (req.path.startsWith("/api/")) {
-      return res.status(404).json({ message: "API endpoint not found" });
+    // Don't serve index.html for API routes or other special paths
+    if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/") || req.path.startsWith("/objects/")) {
+      return res.status(404).json({ message: "Resource not found" });
     }
 
     try {
