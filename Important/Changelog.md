@@ -117,6 +117,38 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.1.3] - 2025-01-25
+
+### Added
+- **Real-time Analytics Query System** - Enhanced analytics endpoints with hourly sales breakdowns, daily top products tracking, and comprehensive order metrics ([routes.ts](server/routes.ts))
+- **Advanced Inventory Logging** - Comprehensive inventory change tracking with multi-parameter filtering support for time periods, change types, and product search ([storage.ts](server/storage.ts))
+- **Support Ticket Management System** - Complete support ticket tracking with status and priority filtering, detailed customer information, and response handling ([admin.tsx](client/src/pages/admin.tsx))
+- **Enhanced Sales Metrics** - Advanced revenue analytics including net profit calculations, sales growth rate tracking, return rate monitoring, and abandoned cart analysis ([storage.ts](server/storage.ts))
+- **Hourly Sales Breakdown** - Detailed 24-hour sales tracking with hourly order counts and revenue aggregation for real-time business insights ([routes.ts](server/routes.ts))
+- **Daily Top Products Dashboard** - Dynamic product performance ranking showing top 10 products by revenue with quantity sold and sales metrics ([routes.ts](server/routes.ts))
+
+### Changed
+- **Optimized Analytics Queries** - Improved database query performance for hourly breakdowns with proper time-based grouping and status filtering
+- **Enhanced Admin Dashboard** - Upgraded admin interface with comprehensive tabs for inventory logs and support ticket management with advanced filtering
+- **Improved Metrics Calculation** - Refined profit margin calculations, growth rate tracking, and return rate analytics for more accurate business intelligence
+- **User Activity Logging** - Enhanced profile update tracking with detailed field change logging and user attribution ([storage.ts](server/storage.ts))
+
+### Fixed
+- **Query Performance Issues** - Resolved slow query performance in inventory logs with optimized joins and proper indexing
+- **Analytics Time Filtering** - Corrected date range calculations for accurate period-based metrics and sales tracking
+- **Support Ticket Loading** - Fixed credential handling and error responses for support ticket queries
+
+### Technical Improvements
+- **SQL Query Optimization** - Enhanced database queries with proper CAST operations for numeric aggregations and accurate financial calculations
+- **Time-based Data Aggregation** - Implemented sophisticated hour extraction and grouping for detailed temporal analytics
+- **Multi-parameter Filtering** - Built flexible filtering system supporting simultaneous filters across multiple dimensions (time, type, product)
+- **Revenue Calculation Engine** - Developed accurate revenue tracking with proper order status filtering (shipped, processing, pending, completed)
+- **Chart Data Formatting** - Structured hourly data output with consistent time formatting and default value handling for gaps in data
+- **Product Performance Tracking** - Created comprehensive product analytics joining order items with products and orders for accurate sales attribution
+- **User Activity Audit Trail** - Enhanced logging system tracking profile modifications with detailed field-level change documentation
+
+---
+
 ## [Unreleased]
 
 ### Added
