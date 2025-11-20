@@ -117,6 +117,41 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.1.4] - 2025-11-19
+
+### Added
+- **Replit Object Storage Integration** - Implemented comprehensive object storage system using Google Cloud Storage via Replit's object storage service for secure, scalable file management ([objectStorage.ts](server/objectStorage.ts))
+- **Object Access Control Layer** - Built ACL policy management system with user-based permissions supporting read/write access control and ownership validation ([objectAcl.ts](server/objectAcl.ts))
+- **Presigned Upload URLs** - Secure direct-to-GCS upload flow with presigned URL generation eliminating server-side file handling for better performance and security ([routes.ts](server/routes.ts))
+- **Private Object Serving** - Protected object endpoint with authentication and ACL verification ensuring users can only access authorized private files ([routes.ts](server/routes.ts))
+- **Object Uploader Component** - Uppy-based file upload interface with real-time progress tracking, drag-and-drop support, and automatic object path normalization ([ObjectUploader.tsx](client/src/components/ObjectUploader.tsx))
+- **Verification Photo Storage** - Secure storage system for ID verification images and verification photos during user registration with private bucket isolation
+- **Object Path Normalization** - Intelligent path conversion from full GCS URLs to normalized `/objects/<uuid>` format for consistent internal referencing
+
+### Changed
+- **Photo Upload Flow** - Migrated from multer-based server uploads to direct client-to-GCS uploads via presigned URLs reducing server load and improving upload performance
+- **File Persistence** - Replaced temporary file storage with persistent object storage ensuring data survival across deployments and environment changes
+- **Access Control** - Enhanced security model from basic file system permissions to sophisticated ACL-based access control with ownership tracking
+
+### Technical Improvements
+- **Bucket Management** - Implemented automatic default bucket configuration with environment variable support for PUBLIC_OBJECT_SEARCH_PATHS and PRIVATE_OBJECT_DIR
+- **Credential Handling** - Integrated Replit sidecar authentication for seamless GCS credential management using external account tokens
+- **Object Entity System** - Developed normalized object path structure (`/objects/<uuid>`) mapping to private bucket paths (`/<bucket>/.private/<uuid>`)
+- **Streaming Downloads** - Efficient file serving with direct stream piping from GCS to HTTP response with proper content-type and cache headers
+- **Error Handling** - Custom ObjectNotFoundError exception class for graceful handling of missing objects with appropriate HTTP status codes
+- **Multi-path Search** - Public object resolution across multiple search paths enabling flexible asset organization and retrieval
+- **Upload Security** - 15-minute TTL on presigned upload URLs preventing unauthorized long-term upload access
+- **Cache Control** - Intelligent cache headers with public/private distinction and configurable TTL (default 3600s) for optimal performance
+- **Type Safety** - Comprehensive TypeScript interfaces for object storage operations including ObjectAclPolicy, ObjectPermission, and ObjectAccessGroup
+
+### Security
+- **Private Object Isolation** - Strict separation of private user files in dedicated bucket directory preventing cross-user access
+- **Authentication Gating** - Required authentication for all private object access with session-based user ID verification
+- **Permission Verification** - Pre-download ACL checks ensuring users have appropriate read/write permissions before object access
+- **Upload Authorization** - Secure presigned URL generation limiting upload capabilities to authenticated sessions with time-bound validity
+
+---
+
 ## [Unreleased]
 
 ### Added
