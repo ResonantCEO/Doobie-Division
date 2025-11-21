@@ -14,9 +14,7 @@ import InventoryPage from "@/pages/inventory";
 import OrdersPage from "@/pages/orders";
 import AnalyticsPage from "@/pages/analytics";
 import UsersPage from "@/pages/users";
-import DashboardPage from "@/pages/dashboard";
 import ProfilePage from "@/pages/profile";
-import NotFoundPage from "@/pages/not-found";
 import ScannerPage from "./pages/scanner";
 import CustomerOrdersWrapper from "@/pages/customer-orders-wrapper";
 import SupportPage from "@/pages/support";
@@ -38,7 +36,7 @@ function Router() {
         <>
           <Route path="/" component={Landing} />
           <Route path="/storefront" component={StorefrontPage} />
-          <Route component={Landing} />
+          <Route path="/:rest*" component={NotFound} />
         </>
       ) : (
         <>
@@ -54,8 +52,7 @@ function Router() {
           <Route path="/wireframe" component={WireframePage} />
           <Route path="/support" component={SupportPage} />
           <Route path="/customer-orders" component={CustomerOrdersWrapper} />
-          <Route path="/404" component={NotFound} />
-          <Route component={NotFound} />
+          <Route path="/:rest*" component={NotFound} />
         </>
       )}
     </Switch>
