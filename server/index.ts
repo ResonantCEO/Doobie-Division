@@ -51,7 +51,6 @@ function customServeStatic(app: express.Express) {
       return res.status(404).json({ message: "Resource not found" });
     }
 
-    // For all other routes, serve index.html to allow client-side routing
     try {
       res.sendFile(path.join(clientDistPath, "index.html"));
     } catch (error) {
