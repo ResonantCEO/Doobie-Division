@@ -638,6 +638,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                     <div className="space-y-2">
                       <Label>Photo ID</Label>
                       <ObjectUploader
+                        uploaderId="id-photo-uploader"
                         maxNumberOfFiles={1}
                         maxFileSize={5 * 1024 * 1024}
                         onGetUploadParameters={async (file: any) => {
@@ -709,15 +710,18 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                     <div className="space-y-2">
                       <Label>Verification Photo</Label>
                       <ObjectUploader
+                        uploaderId="verification-photo-uploader"
                         maxNumberOfFiles={1}
                         maxFileSize={5 * 1024 * 1024}
                         onGetUploadParameters={async (file: any) => {
+                          console.log('Verification photo - getting upload parameters for file:', file?.name);
                           const response = await fetch('/api/objects/upload', {
                             method: 'POST',
                             credentials: 'include',
                           });
                           if (!response.ok) throw new Error('Failed to get upload URL');
                           const { uploadURL, objectPath } = await response.json();
+                          console.log('Verification photo - received objectPath:', objectPath);
                           // Store objectPath in a way that Uppy preserves it
                           file.meta.objectPath = objectPath;
                           return { method: 'PUT' as const, url: uploadURL };

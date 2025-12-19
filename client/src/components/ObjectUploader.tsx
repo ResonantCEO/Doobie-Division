@@ -1,7 +1,7 @@
 // Object uploader component for Replit Object Storage
 // Reference: blueprint:javascript_object_storage
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
 import Uppy from "@uppy/core";
 import DashboardModal from "@uppy/react/dashboard-modal";
@@ -16,7 +16,7 @@ import "@uppy/dashboard/css/style.css";
 interface ObjectUploaderProps {
   maxNumberOfFiles?: number;
   maxFileSize?: number;
-  onGetUploadParameters: () => Promise<{
+  onGetUploadParameters: (file: any) => Promise<{
     method: "PUT";
     url: string;
   }>;
@@ -25,6 +25,7 @@ interface ObjectUploaderProps {
   ) => void;
   buttonClassName?: string;
   children: ReactNode;
+  uploaderId?: string;
 }
 
 /**
@@ -54,6 +55,7 @@ interface ObjectUploaderProps {
  *   policies.
  * @param props.buttonClassName - Optional CSS class name for the button
  * @param props.children - Content to be rendered inside the button
+ * @param props.uploaderId - Optional unique identifier for this uploader instance
  */
 export function ObjectUploader({
   maxNumberOfFiles = 1,
@@ -62,10 +64,27 @@ export function ObjectUploader({
   onComplete,
   buttonClassName,
   children,
+  uploaderId,
 }: ObjectUploaderProps) {
   const [showModal, setShowModal] = useState(false);
-  const [uppy] = useState(() =>
-    new Uppy({
+  
+  // Use refs to always have access to the latest callbacks
+  const onGetUploadParametersRef = useRef(onGetUploadParameters);
+  const onCompleteRef = useRef(onComplete);
+  
+  // Update refs when callbacks change
+  useEffect(() => {
+    onGetUploadParametersRef.current = onGetUploadParameters;
+  }, [onGetUploadParameters]);
+  
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+  
+  // Create Uppy instance with stable callbacks that use refs
+  const uppy = useMemo(() => {
+    const instance = new Uppy({
+      id: uploaderId || `uppy-${Math.random().toString(36).substr(2, 9)}`,
       restrictions: {
         maxNumberOfFiles,
         maxFileSize,
@@ -75,13 +94,38 @@ export function ObjectUploader({
     })
       .use(AwsS3, {
         shouldUseMultipart: false,
-        getUploadParameters: onGetUploadParameters,
-      })
-      .on("complete", (result) => {
-        onComplete?.(result);
-        setShowModal(false);
-      })
-  );
+        getUploadParameters: (file: any) => onGetUploadParametersRef.current(file),
+      });
+    
+    return instance;
+  }, [uploaderId, maxNumberOfFiles, maxFileSize]);
+  
+  // Set up complete handler separately to use refs
+  useEffect(() => {
+    const handleComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+      onCompleteRef.current?.(result);
+      setShowModal(false);
+    };
+    
+    uppy.on("complete", handleComplete);
+    
+    return () => {
+      uppy.off("complete", handleComplete);
+    };
+  }, [uppy]);
+  
+  // Clean up Uppy instance on unmount
+  useEffect(() => {
+    return () => {
+      uppy.cancelAll();
+    };
+  }, [uppy]);
+  
+  // Clear files when modal closes
+  const handleCloseModal = () => {
+    uppy.cancelAll();
+    setShowModal(false);
+  };
 
   return (
     <div>
@@ -97,7 +141,7 @@ export function ObjectUploader({
       <DashboardModal
         uppy={uppy}
         open={showModal}
-        onRequestClose={() => setShowModal(false)}
+        onRequestClose={handleCloseModal}
         proudlyDisplayPoweredByUppy={false}
       />
     </div>
