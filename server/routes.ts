@@ -137,7 +137,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const objectFile = await objectStorageService.getObjectEntityFile(
         req.path,
       );
-      const canAccess = await objectStorageService.canAccessObjectEntity({
+      
+      // Check if user is admin - admins can view all verification photos
+      const currentUser = await storage.getUser(userId);
+      const isAdmin = currentUser?.role === 'admin';
+      
+      const canAccess = isAdmin || await objectStorageService.canAccessObjectEntity({
         objectFile,
         userId: userId,
         requestedPermission: ObjectPermission.READ,
