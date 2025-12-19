@@ -652,22 +652,23 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                           return { method: 'PUT' as const, url: uploadURL };
                         }}
                         onComplete={(result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-                          console.log('Upload complete result:', result);
+                          console.log('ID photo upload complete result:', result);
                           if (result.successful && result.successful.length > 0) {
                             const file = result.successful[0];
-                            console.log('File meta:', file.meta);
+                            console.log('ID photo file meta:', file.meta);
                             const objectPath = file.meta.objectPath as string;
                             if (objectPath) {
+                              console.log('Setting ID image URL to:', objectPath);
                               setIdImageUrl(objectPath);
                               toast({
                                 title: "ID uploaded",
                                 description: "Your ID photo has been uploaded successfully.",
                               });
                             } else {
-                              console.error('No objectPath in file meta:', file.meta);
+                              console.error('No objectPath in ID photo file meta:', file.meta);
                               toast({
                                 title: "Upload error",
-                                description: "Failed to get object path from upload",
+                                description: "Failed to get object path from ID photo upload",
                                 variant: "destructive",
                               });
                             }
@@ -722,22 +723,23 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                           return { method: 'PUT' as const, url: uploadURL };
                         }}
                         onComplete={(result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-                          console.log('Upload complete result:', result);
+                          console.log('Verification photo upload complete result:', result);
                           if (result.successful && result.successful.length > 0) {
                             const file = result.successful[0];
-                            console.log('File meta:', file.meta);
+                            console.log('Verification photo file meta:', file.meta);
                             const objectPath = file.meta.objectPath as string;
                             if (objectPath) {
+                              console.log('Setting verification photo URL to:', objectPath);
                               setVerificationPhotoUrl(objectPath);
                               toast({
                                 title: "Verification photo uploaded",
                                 description: "Your verification photo has been uploaded successfully.",
                               });
                             } else {
-                              console.error('No objectPath in file meta:', file.meta);
+                              console.error('No objectPath in verification photo file meta:', file.meta);
                               toast({
                                 title: "Upload error",
-                                description: "Failed to get object path from upload",
+                                description: "Failed to get object path from verification photo upload",
                                 variant: "destructive",
                               });
                             }
@@ -768,6 +770,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                         type="submit"
                         className="w-full"
                         disabled={registerMutation.isPending || !verificationPhotoUrl}
+                        onClick={() => console.log('Create Account clicked. verificationPhotoUrl:', verificationPhotoUrl)}
                       >
                         {registerMutation.isPending ? "Creating account..." : "Create Account"}
                       </Button>
