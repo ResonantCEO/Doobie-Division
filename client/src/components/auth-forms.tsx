@@ -647,14 +647,16 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                           });
                           if (!response.ok) throw new Error('Failed to get upload URL');
                           const { uploadURL, objectPath } = await response.json();
-                          // Store objectPath in file metadata for use in onComplete
-                          file.meta = { ...file.meta, objectPath };
+                          // Store objectPath in a way that Uppy preserves it
+                          file.meta.objectPath = objectPath;
                           return { method: 'PUT' as const, url: uploadURL };
                         }}
                         onComplete={(result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+                          console.log('Upload complete result:', result);
                           if (result.successful && result.successful.length > 0) {
                             const file = result.successful[0];
-                            const objectPath = file.meta?.objectPath as string | undefined;
+                            console.log('File meta:', file.meta);
+                            const objectPath = file.meta.objectPath as string;
                             if (objectPath) {
                               setIdImageUrl(objectPath);
                               toast({
@@ -662,6 +664,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                                 description: "Your ID photo has been uploaded successfully.",
                               });
                             } else {
+                              console.error('No objectPath in file meta:', file.meta);
                               toast({
                                 title: "Upload error",
                                 description: "Failed to get object path from upload",
@@ -714,14 +717,16 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                           });
                           if (!response.ok) throw new Error('Failed to get upload URL');
                           const { uploadURL, objectPath } = await response.json();
-                          // Store objectPath in file metadata for use in onComplete
-                          file.meta = { ...file.meta, objectPath };
+                          // Store objectPath in a way that Uppy preserves it
+                          file.meta.objectPath = objectPath;
                           return { method: 'PUT' as const, url: uploadURL };
                         }}
                         onComplete={(result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+                          console.log('Upload complete result:', result);
                           if (result.successful && result.successful.length > 0) {
                             const file = result.successful[0];
-                            const objectPath = file.meta?.objectPath as string | undefined;
+                            console.log('File meta:', file.meta);
+                            const objectPath = file.meta.objectPath as string;
                             if (objectPath) {
                               setVerificationPhotoUrl(objectPath);
                               toast({
@@ -729,6 +734,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                                 description: "Your verification photo has been uploaded successfully.",
                               });
                             } else {
+                              console.error('No objectPath in file meta:', file.meta);
                               toast({
                                 title: "Upload error",
                                 description: "Failed to get object path from upload",
