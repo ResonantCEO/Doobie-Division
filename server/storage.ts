@@ -901,35 +901,32 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Insufficient physical inventory");
     }
 
-    // Update product stock, physical inventory and mark order item as fulfilled
-    await db.transaction(async (tx) => {
-      // Update product stock and physical inventory
-      await tx
-        .update(products)
-        .set({
-          stock: newStock,
-          physicalInventory: newPhysicalInventory,
-          updatedAt: new Date()
-        })
-        .where(eq(products.id, productId));
+    // Update product stock and physical inventory
+    await db
+      .update(products)
+      .set({
+        stock: newStock,
+        physicalInventory: newPhysicalInventory,
+        updatedAt: new Date()
+      })
+      .where(eq(products.id, productId));
 
-      // Mark order item as fulfilled
-      await tx
-        .update(orderItems)
-        .set({ fulfilled: true })
-        .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
+    // Mark order item as fulfilled
+    await db
+      .update(orderItems)
+      .set({ fulfilled: true })
+      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
 
-      // Log the stock change
-      await tx.insert(inventoryLogs).values({
-        productId,
-        userId,
-        type: 'stock_out',
-        quantity: -quantity,
-        previousStock: currentStock,
-        newStock: newStock,
-        reason: `Order fulfillment - Order #${orderId} (Stock and physical inventory reduced)`,
-        createdAt: new Date()
-      });
+    // Log the stock change
+    await db.insert(inventoryLogs).values({
+      productId,
+      userId,
+      type: 'stock_out',
+      quantity: -quantity,
+      previousStock: currentStock,
+      newStock: newStock,
+      reason: `Order fulfillment - Order #${orderId} (Stock and physical inventory reduced)`,
+      createdAt: new Date()
     });
   }
 
