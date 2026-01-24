@@ -889,24 +889,17 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Product not found");
     }
 
-    const currentStock = product[0].stock;
     const currentPhysicalInventory = product[0].physicalInventory || 0;
-    const newStock = currentStock - quantity;
     const newPhysicalInventory = currentPhysicalInventory - quantity;
-
-    if (newStock < 0) {
-      throw new Error("Insufficient stock");
-    }
 
     if (newPhysicalInventory < 0) {
       throw new Error("Insufficient physical inventory");
     }
 
-    // Update product stock and physical inventory
+    // Update only physical inventory (stock is reduced when order is placed, not when fulfilled)
     await db
       .update(products)
       .set({
-        stock: newStock,
         physicalInventory: newPhysicalInventory,
         updatedAt: new Date()
       })
@@ -918,15 +911,15 @@ export class DatabaseStorage implements IStorage {
       .set({ fulfilled: true })
       .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
 
-    // Log the stock change
+    // Log the physical inventory change
     await db.insert(inventoryLogs).values({
       productId,
       userId,
-      type: 'stock_out',
+      type: 'physical_out',
       quantity: -quantity,
-      previousStock: currentStock,
-      newStock: newStock,
-      reason: `Order fulfillment - Order #${orderId} (Stock and physical inventory reduced)`,
+      previousStock: currentPhysicalInventory,
+      newStock: newPhysicalInventory,
+      reason: `Order fulfillment - Order #${orderId} (Physical inventory reduced)`,
       createdAt: new Date()
     });
   }
@@ -953,16 +946,13 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Order item is not fulfilled");
     }
 
-    const currentStock = product[0].stock;
     const currentPhysicalInventory = product[0].physicalInventory || 0;
-    const newStock = currentStock + quantity;
     const newPhysicalInventory = currentPhysicalInventory + quantity;
 
-    // Update product stock and physical inventory (add back)
+    // Update only physical inventory (add back)
     await db
       .update(products)
       .set({
-        stock: newStock,
         physicalInventory: newPhysicalInventory,
         updatedAt: new Date()
       })
@@ -974,15 +964,15 @@ export class DatabaseStorage implements IStorage {
       .set({ fulfilled: false })
       .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
 
-    // Log the stock change
+    // Log the physical inventory change
     await db.insert(inventoryLogs).values({
       productId,
       userId,
-      type: 'stock_in',
+      type: 'physical_in',
       quantity: quantity,
-      previousStock: currentStock,
-      newStock: newStock,
-      reason: `Order unfulfillment - Order #${orderId} (Stock and physical inventory restored)`,
+      previousStock: currentPhysicalInventory,
+      newStock: newPhysicalInventory,
+      reason: `Order unfulfillment - Order #${orderId} (Physical inventory restored)`,
       createdAt: new Date()
     });
   }
