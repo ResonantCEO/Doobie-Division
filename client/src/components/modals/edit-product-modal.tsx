@@ -32,6 +32,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
+import { Lock } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
 
 interface CategoryWithChildren extends Category {
@@ -60,6 +62,11 @@ const formSchema = z.object({
   pricePerOunce: z.string().optional(),
   discountPercentage: z.string().nullable().optional(),
   isActive: z.boolean(),
+  purchasePrice: z.string().optional(),
+  purchasePriceMethod: z.enum(["units", "weight"]).default("units"),
+  purchasePricePerGram: z.string().optional(),
+  purchasePricePerOunce: z.string().optional(),
+  adminNotes: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -86,8 +93,11 @@ const renderCategoryOptions = (categories: CategoryWithChildren[], level = 0): J
 export default function EditProductModal({ open, onOpenChange, product, categories }: EditProductModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const isAdmin = user?.role === "admin";
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -106,6 +116,11 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       pricePerOunce: product.pricePerOunce || "",
       discountPercentage: product.discountPercentage || "0",
       isActive: product.isActive,
+      purchasePrice: (product as any).purchasePrice || "",
+      purchasePriceMethod: ((product as any).purchasePriceMethod as "units" | "weight") || "units",
+      purchasePricePerGram: (product as any).purchasePricePerGram || "",
+      purchasePricePerOunce: (product as any).purchasePricePerOunce || "",
+      adminNotes: (product as any).adminNotes || "",
     },
   });
 
@@ -128,6 +143,11 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         pricePerOunce: product.pricePerOunce || "",
         discountPercentage: product.discountPercentage || "0",
         isActive: product.isActive,
+        purchasePrice: (product as any).purchasePrice || "",
+        purchasePriceMethod: ((product as any).purchasePriceMethod as "units" | "weight") || "units",
+        purchasePricePerGram: (product as any).purchasePricePerGram || "",
+        purchasePricePerOunce: (product as any).purchasePricePerOunce || "",
+        adminNotes: (product as any).adminNotes || "",
       });
       setImagePreview(product.imageUrl || null);
     }
@@ -165,6 +185,11 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         pricePerGram: data.sellingMethod === "weight" && data.pricePerGram ? data.pricePerGram : null,
         pricePerOunce: data.sellingMethod === "weight" && data.pricePerOunce ? data.pricePerOunce : null,
         discountPercentage: data.discountPercentage || null,
+        purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice).toFixed(2) : null,
+        purchasePriceMethod: data.purchasePriceMethod || "units",
+        purchasePricePerGram: data.purchasePricePerGram ? parseFloat(data.purchasePricePerGram).toFixed(4) : null,
+        purchasePricePerOunce: data.purchasePricePerOunce ? parseFloat(data.purchasePricePerOunce).toFixed(2) : null,
+        adminNotes: data.adminNotes || null,
       };
 
       await apiRequest("PUT", `/api/products/${product.id}`, productData);
@@ -500,6 +525,120 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                 )}
               />
             </div>
+
+            {isAdmin && (
+              <div className="border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 rounded-lg p-4 space-y-4">
+                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                  <Lock className="h-4 w-4" />
+                  <span className="font-medium text-sm">Admin Notes (Internal Use Only)</span>
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="purchasePriceMethod"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Purchase Price Method</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select pricing method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="units">Per Unit</SelectItem>
+                            <SelectItem value="weight">By Weight</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {form.watch("purchasePriceMethod") === "units" ? (
+                  <FormField
+                    control={form.control}
+                    name="purchasePrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Purchase Price per Unit ($)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          The cost you paid per unit to acquire this product
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="purchasePricePerGram"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Purchase Price per Gram ($)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              step="0.0001" 
+                              placeholder="0.0000" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="purchasePricePerOunce"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Purchase Price per Ounce ($)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              step="0.01" 
+                              placeholder="0.00" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+
+                <FormField
+                  control={form.control}
+                  name="adminNotes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Internal Notes</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Add notes about this product for company use (supplier info, storage instructions, etc.)" 
+                          {...field} 
+                          value={field.value || ""} 
+                          rows={3}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
 
             <div className="flex justify-end space-x-2 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
