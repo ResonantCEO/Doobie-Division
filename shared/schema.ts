@@ -83,6 +83,8 @@ export const products = pgTable("products", {
   pricePerGram: decimal("price_per_gram", { precision: 10, scale: 4 }),
   pricePerOunce: decimal("price_per_ounce", { precision: 10, scale: 2 }),
   discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default("0"), // discount percentage (0-100)
+  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }), // admin only - cost price
+  adminNotes: text("admin_notes"), // admin only - internal company notes
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -297,6 +299,8 @@ export const insertProductSchema = createInsertSchema(products).omit({
   description: z.string().nullable().optional(),
   discountPercentage: z.string().nullable().optional(),
   physicalInventory: z.number().optional(),
+  purchasePrice: z.string().nullable().optional(),
+  adminNotes: z.string().nullable().optional(),
 });
 
 export const insertOrderSchema = createInsertSchema(orders).omit({

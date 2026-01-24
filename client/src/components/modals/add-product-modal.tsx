@@ -19,8 +19,9 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { insertProductSchema } from "@shared/schema";
 import { z } from "zod";
-import { Upload, X } from "lucide-react";
+import { Upload, X, Lock } from "lucide-react";
 import type { Category } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 
 const formSchema = z.object({
   name: z.string().min(1, "Product name is required"),
@@ -38,6 +39,8 @@ const formSchema = z.object({
   pricePerOunce: z.string().optional(),
   discountPercentage: z.string().nullable().optional(),
   isActive: z.boolean().default(true),
+  purchasePrice: z.string().optional(),
+  adminNotes: z.string().optional(),
 }).refine((data) => {
   if (data.sellingMethod === "weight") {
     return data.pricePerGram || data.pricePerOunce;
@@ -79,9 +82,12 @@ const renderCategoryOptions = (categories: CategoryWithChildren[], level = 0): J
 export default function AddProductModal({ open, onOpenChange, categories }: AddProductModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isDuplicateSku, setIsDuplicateSku] = useState(false);
+
+  const isAdmin = user?.role === "admin";
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -100,6 +106,8 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       pricePerGram: "",
       pricePerOunce: "",
       isActive: true,
+      purchasePrice: "",
+      adminNotes: "",
     },
   });
 
@@ -172,7 +180,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         company: data.company || null,
         description: data.description || null,
         sku: data.sku,
-        categoryId: data.categoryId ? parseInt(data.categoryId) : null,
+        categoryId: data.categoryId || null,
         price: data.sellingMethod === "units" && data.price ? parseFloat(data.price).toFixed(2) : null,
         stock: parseInt(data.stock),
         minStockThreshold: parseInt(data.minStockThreshold),
@@ -183,6 +191,8 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         discountPercentage: data.discountPercentage ? parseFloat(data.discountPercentage).toFixed(2) : null,
         isActive: data.isActive,
         imageUrl,
+        purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice).toFixed(2) : null,
+        adminNotes: data.adminNotes || null,
       };
       await apiRequest("POST", "/api/products", payload);
     },
@@ -556,6 +566,56 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                 </div>
               )}
             </div>
+
+            {isAdmin && (
+              <div className="border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 rounded-lg p-4 space-y-4">
+                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                  <Lock className="h-4 w-4" />
+                  <span className="font-medium text-sm">Admin Notes (Internal Use Only)</span>
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="purchasePrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Purchase Price ($)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="0.00" 
+                          {...field} 
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">
+                        The cost you paid to acquire this product
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="adminNotes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Internal Notes</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Add notes about this product for company use (supplier info, storage instructions, etc.)" 
+                          {...field} 
+                          value={field.value || ""} 
+                          rows={3}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
 
             <div className="flex justify-end space-x-2 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
