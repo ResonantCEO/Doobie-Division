@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   DropdownMenu, 
@@ -13,8 +14,8 @@ import {
 import OrderDetailsModal from "@/components/modals/order-details-modal";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { apiRequest } from "@/lib/queryClient";
-import { Eye, Edit, MessageSquare, MoreHorizontal, Package2, ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Eye, Edit, MessageSquare, MoreHorizontal, Package2, ChevronDown, ChevronRight, ChevronUp, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import type { Order, User, OrderItem, Product } from "@shared/schema";
 
@@ -27,9 +28,55 @@ interface OrderTableProps {
 type OrderWithItems = Order & { items: (OrderItem & { product: Product | null })[] };
 
 function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number }) {
+  const { toast } = useToast();
+  const [fulfillingItems, setFulfillingItems] = useState<Set<number>>(new Set());
+  
   const { data: orderWithItems, isLoading } = useQuery<OrderWithItems>({
     queryKey: ['/api/orders', orderId],
   });
+
+  const fulfillItemMutation = useMutation({
+    mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ productId, quantity })
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to fulfill item');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Item Fulfilled",
+        description: "Physical inventory has been adjusted",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders', orderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fulfill item",
+        variant: "destructive",
+      });
+    },
+    onSettled: (_, __, variables) => {
+      setFulfillingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(variables.productId);
+        return newSet;
+      });
+    }
+  });
+
+  const handleFulfillItem = (productId: number, quantity: number) => {
+    setFulfillingItems(prev => new Set(prev).add(productId));
+    fulfillItemMutation.mutate({ orderId, productId, quantity });
+  };
 
   if (isLoading) {
     return (
@@ -63,14 +110,31 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
             {orderWithItems.items.map((item) => (
               <div 
                 key={item.id} 
-                className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-md px-4 py-2 border border-gray-200 dark:border-gray-700"
+                className={`flex items-center justify-between bg-white dark:bg-gray-800 rounded-md px-4 py-2 border ${item.fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'}`}
               >
                 <div className="flex items-center gap-3">
-                  <Package2 className="h-4 w-4 text-gray-400" />
+                  {fulfillingItems.has(item.productId!) ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                  ) : (
+                    <Checkbox
+                      checked={item.fulfilled || false}
+                      disabled={item.fulfilled || false}
+                      onCheckedChange={() => {
+                        if (!item.fulfilled && item.productId) {
+                          handleFulfillItem(item.productId, item.quantity);
+                        }
+                      }}
+                      className="h-5 w-5"
+                      title={item.fulfilled ? "Item already fulfilled" : "Click to fulfill and adjust inventory"}
+                    />
+                  )}
                   <div>
-                    <span className="font-medium text-gray-900 dark:text-white">{item.productName}</span>
+                    <span className={`font-medium ${item.fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>{item.productName}</span>
                     {item.productSku && (
                       <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">SKU: {item.productSku}</span>
+                    )}
+                    {item.fulfilled && (
+                      <span className="ml-2 text-xs text-green-600 dark:text-green-400 font-medium">(Fulfilled)</span>
                     )}
                   </div>
                 </div>
@@ -95,9 +159,55 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
 }
 
 function MobileOrderItems({ orderId }: { orderId: number }) {
+  const { toast } = useToast();
+  const [fulfillingItems, setFulfillingItems] = useState<Set<number>>(new Set());
+  
   const { data: orderWithItems, isLoading } = useQuery<OrderWithItems>({
     queryKey: ['/api/orders', orderId],
   });
+
+  const fulfillItemMutation = useMutation({
+    mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ productId, quantity })
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to fulfill item');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Item Fulfilled",
+        description: "Physical inventory has been adjusted",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders', orderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fulfill item",
+        variant: "destructive",
+      });
+    },
+    onSettled: (_, __, variables) => {
+      setFulfillingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(variables.productId);
+        return newSet;
+      });
+    }
+  });
+
+  const handleFulfillItem = (productId: number, quantity: number) => {
+    setFulfillingItems(prev => new Set(prev).add(productId));
+    fulfillItemMutation.mutate({ orderId, productId, quantity });
+  };
 
   if (isLoading) {
     return (
@@ -124,15 +234,32 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       {orderWithItems.items.map((item) => (
         <div 
           key={item.id} 
-          className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-md px-3 py-2 border border-gray-200 dark:border-gray-700"
+          className={`flex items-center gap-3 bg-white dark:bg-gray-800 rounded-md px-3 py-2 border ${item.fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'}`}
         >
-          <div className="flex-1">
-            <div className="font-medium text-gray-900 dark:text-white text-sm">{item.productName}</div>
+          {fulfillingItems.has(item.productId!) ? (
+            <Loader2 className="h-5 w-5 animate-spin text-gray-400 flex-shrink-0" />
+          ) : (
+            <Checkbox
+              checked={item.fulfilled || false}
+              disabled={item.fulfilled || false}
+              onCheckedChange={() => {
+                if (!item.fulfilled && item.productId) {
+                  handleFulfillItem(item.productId, item.quantity);
+                }
+              }}
+              className="h-5 w-5 flex-shrink-0"
+            />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className={`font-medium text-sm ${item.fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
+              {item.productName}
+              {item.fulfilled && <span className="ml-1 text-xs">(Fulfilled)</span>}
+            </div>
             {item.productSku && (
               <div className="text-xs text-gray-500 dark:text-gray-400">SKU: {item.productSku}</div>
             )}
           </div>
-          <div className="text-right">
+          <div className="text-right flex-shrink-0">
             <div className="font-semibold text-gray-900 dark:text-white">x{item.quantity}</div>
             <div className="text-xs text-gray-600 dark:text-gray-400">${Number(item.subtotal).toFixed(2)}</div>
           </div>
