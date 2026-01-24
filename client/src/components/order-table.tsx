@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, Fragment } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +14,9 @@ import OrderDetailsModal from "@/components/modals/order-details-modal";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, Edit, MessageSquare, MoreHorizontal, Package2 } from "lucide-react";
+import { Eye, Edit, MessageSquare, MoreHorizontal, Package2, ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
-import type { Order, User } from "@shared/schema";
+import type { Order, User, OrderItem, Product } from "@shared/schema";
 
 interface OrderTableProps {
   orders: Order[];
@@ -24,11 +24,156 @@ interface OrderTableProps {
   staffUsers: User[]; // Array of staff users to populate the dropdown
 }
 
+type OrderWithItems = Order & { items: (OrderItem & { product: Product | null })[] };
+
+function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number }) {
+  const { data: orderWithItems, isLoading } = useQuery<OrderWithItems>({
+    queryKey: ['/api/orders', orderId],
+  });
+
+  if (isLoading) {
+    return (
+      <TableRow className="bg-gray-50 dark:bg-gray-900">
+        <TableCell colSpan={colSpan} className="py-3 px-6">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <div className="animate-spin h-4 w-4 border-2 border-gray-300 border-t-gray-600 rounded-full"></div>
+            Loading order items...
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  if (!orderWithItems?.items || orderWithItems.items.length === 0) {
+    return (
+      <TableRow className="bg-gray-50 dark:bg-gray-900">
+        <TableCell colSpan={colSpan} className="py-3 px-6 text-gray-500 dark:text-gray-400">
+          No items found for this order.
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  return (
+    <TableRow className="bg-gray-50 dark:bg-gray-900">
+      <TableCell colSpan={colSpan} className="py-3 px-6">
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Order Items:</div>
+          <div className="grid gap-2">
+            {orderWithItems.items.map((item) => (
+              <div 
+                key={item.id} 
+                className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-md px-4 py-2 border border-gray-200 dark:border-gray-700"
+              >
+                <div className="flex items-center gap-3">
+                  <Package2 className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <span className="font-medium text-gray-900 dark:text-white">{item.productName}</span>
+                    {item.productSku && (
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">SKU: {item.productSku}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    Qty: <span className="font-semibold text-gray-900 dark:text-white">{item.quantity}</span>
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    ${Number(item.productPrice).toFixed(2)} each
+                  </div>
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    ${Number(item.subtotal).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function MobileOrderItems({ orderId }: { orderId: number }) {
+  const { data: orderWithItems, isLoading } = useQuery<OrderWithItems>({
+    queryKey: ['/api/orders', orderId],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+          <div className="animate-spin h-4 w-4 border-2 border-gray-300 border-t-gray-600 rounded-full"></div>
+          Loading order items...
+        </div>
+      </div>
+    );
+  }
+
+  if (!orderWithItems?.items || orderWithItems.items.length === 0) {
+    return (
+      <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-gray-500 dark:text-gray-400">
+        No items found for this order.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-2">
+      <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Order Items:</div>
+      {orderWithItems.items.map((item) => (
+        <div 
+          key={item.id} 
+          className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-md px-3 py-2 border border-gray-200 dark:border-gray-700"
+        >
+          <div className="flex-1">
+            <div className="font-medium text-gray-900 dark:text-white text-sm">{item.productName}</div>
+            {item.productSku && (
+              <div className="text-xs text-gray-500 dark:text-gray-400">SKU: {item.productSku}</div>
+            )}
+          </div>
+          <div className="text-right">
+            <div className="font-semibold text-gray-900 dark:text-white">x{item.quantity}</div>
+            <div className="text-xs text-gray-600 dark:text-gray-400">${Number(item.subtotal).toFixed(2)}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function OrderTable({ orders, user, staffUsers }: OrderTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
+  const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
+
+  const allExpanded = useMemo(() => {
+    return orders.length > 0 && orders.every(order => expandedOrders.has(order.id));
+  }, [orders, expandedOrders]);
+
+  const toggleOrderExpanded = (orderId: number) => {
+    setExpandedOrders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(orderId)) {
+        newSet.delete(orderId);
+      } else {
+        newSet.add(orderId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleAllExpanded = () => {
+    if (allExpanded) {
+      setExpandedOrders(new Set());
+    } else {
+      setExpandedOrders(new Set(orders.map(o => o.id)));
+    }
+  };
+
+  const isOrderExpanded = (orderId: number) => expandedOrders.has(orderId);
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
@@ -171,18 +316,47 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
 
       {/* Mobile Card View */}
       <div className="md:hidden">
+        <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            onClick={toggleAllExpanded}
+          >
+            {allExpanded ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+            {allExpanded ? "Collapse All" : "Expand All"}
+          </Button>
+        </div>
         <div className="divide-y divide-gray-200 dark:divide-gray-700">
           {orders.map((order) => (
             <div key={order.id} className="p-4">
               <div className="space-y-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <button
-                      onClick={() => handleOrderClick(order.id)}
-                      className="font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 underline cursor-pointer"
-                    >
-                      {order.orderNumber}
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        onClick={() => toggleOrderExpanded(order.id)}
+                      >
+                        {isOrderExpanded(order.id) ? (
+                          <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        )}
+                      </Button>
+                      <button
+                        onClick={() => handleOrderClick(order.id)}
+                        className="font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 underline cursor-pointer"
+                      >
+                        {order.orderNumber}
+                      </button>
+                    </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       {format(new Date(order.createdAt!), "MMM d, yyyy")}
                     </div>
@@ -236,6 +410,10 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+
+                {isOrderExpanded(order.id) && (
+                  <MobileOrderItems orderId={order.id} />
+                )}
               </div>
             </div>
           ))}
@@ -247,7 +425,24 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
         <Table>
           <TableHeader>
             <TableRow className="border-gray-700">
-              <TableHead className="text-gray-300">Order #</TableHead>
+              <TableHead className="text-gray-300">
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 hover:bg-gray-700"
+                    onClick={toggleAllExpanded}
+                    title={allExpanded ? "Collapse all orders" : "Expand all orders"}
+                  >
+                    {allExpanded ? (
+                      <ChevronUp className="h-4 w-4 text-gray-300" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-300" />
+                    )}
+                  </Button>
+                  <span>Order #</span>
+                </div>
+              </TableHead>
               <TableHead className="text-gray-300">Customer</TableHead>
               <TableHead className="text-gray-300">Total</TableHead>
               <TableHead className="text-gray-300">Status</TableHead>
@@ -260,14 +455,30 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
           </TableHeader>
           <TableBody>
             {orders.map((order) => (
-              <TableRow key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+              <Fragment key={order.id}>
+              <TableRow className="hover:bg-gray-50 dark:hover:bg-gray-800">
                 <TableCell className="font-medium text-gray-900 dark:text-white">
-                  <button
-                    onClick={() => handleOrderClick(order.id)}
-                    className="hover:text-blue-600 dark:hover:text-blue-400 underline cursor-pointer"
-                  >
-                    {order.orderNumber}
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
+                      onClick={() => toggleOrderExpanded(order.id)}
+                      title={isOrderExpanded(order.id) ? "Collapse order items" : "Expand order items"}
+                    >
+                      {isOrderExpanded(order.id) ? (
+                        <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                      )}
+                    </Button>
+                    <button
+                      onClick={() => handleOrderClick(order.id)}
+                      className="hover:text-blue-600 dark:hover:text-blue-400 underline cursor-pointer"
+                    >
+                      {order.orderNumber}
+                    </button>
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="text-sm">
@@ -351,6 +562,13 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                   </div>
                 </TableCell>
               </TableRow>
+              {isOrderExpanded(order.id) && (
+                <OrderItemsRow 
+                  orderId={order.id} 
+                  colSpan={(user?.role === 'admin' || user?.role === 'manager') ? 7 : 6}
+                />
+              )}
+              </Fragment>
             ))}
           </TableBody>
         </Table>
