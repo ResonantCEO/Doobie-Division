@@ -40,6 +40,9 @@ const formSchema = z.object({
   discountPercentage: z.string().nullable().optional(),
   isActive: z.boolean().default(true),
   purchasePrice: z.string().optional(),
+  purchasePriceMethod: z.enum(["units", "weight"]).default("units"),
+  purchasePricePerGram: z.string().optional(),
+  purchasePricePerOunce: z.string().optional(),
   adminNotes: z.string().optional(),
 }).refine((data) => {
   if (data.sellingMethod === "weight") {
@@ -107,6 +110,9 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       pricePerOunce: "",
       isActive: true,
       purchasePrice: "",
+      purchasePriceMethod: "units",
+      purchasePricePerGram: "",
+      purchasePricePerOunce: "",
       adminNotes: "",
     },
   });
@@ -192,6 +198,9 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         isActive: data.isActive,
         imageUrl,
         purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice).toFixed(2) : null,
+        purchasePriceMethod: data.purchasePriceMethod || "units",
+        purchasePricePerGram: data.purchasePricePerGram ? parseFloat(data.purchasePricePerGram).toFixed(4) : null,
+        purchasePricePerOunce: data.purchasePricePerOunce ? parseFloat(data.purchasePricePerOunce).toFixed(2) : null,
         adminNotes: data.adminNotes || null,
       };
       await apiRequest("POST", "/api/products", payload);
@@ -576,25 +585,89 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                 
                 <FormField
                   control={form.control}
-                  name="purchasePrice"
+                  name="purchasePriceMethod"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Purchase Price ($)</FormLabel>
+                      <FormLabel>Purchase Price Method</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.01" 
-                          placeholder="0.00" 
-                          {...field} 
-                        />
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select pricing method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="units">Per Unit</SelectItem>
+                            <SelectItem value="weight">By Weight</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </FormControl>
-                      <p className="text-xs text-muted-foreground">
-                        The cost you paid to acquire this product
-                      </p>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                {form.watch("purchasePriceMethod") === "units" ? (
+                  <FormField
+                    control={form.control}
+                    name="purchasePrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Purchase Price per Unit ($)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          The cost you paid per unit to acquire this product
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="purchasePricePerGram"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Purchase Price per Gram ($)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              step="0.0001" 
+                              placeholder="0.0000" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="purchasePricePerOunce"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Purchase Price per Ounce ($)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              step="0.01" 
+                              placeholder="0.00" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
 
                 <FormField
                   control={form.control}

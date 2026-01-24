@@ -83,7 +83,10 @@ export const products = pgTable("products", {
   pricePerGram: decimal("price_per_gram", { precision: 10, scale: 4 }),
   pricePerOunce: decimal("price_per_ounce", { precision: 10, scale: 2 }),
   discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default("0"), // discount percentage (0-100)
-  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }), // admin only - cost price
+  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }), // admin only - cost price per unit
+  purchasePriceMethod: varchar("purchase_price_method").default("units"), // units or weight
+  purchasePricePerGram: decimal("purchase_price_per_gram", { precision: 10, scale: 4 }), // admin only - cost per gram
+  purchasePricePerOunce: decimal("purchase_price_per_ounce", { precision: 10, scale: 2 }), // admin only - cost per ounce
   adminNotes: text("admin_notes"), // admin only - internal company notes
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -300,6 +303,9 @@ export const insertProductSchema = createInsertSchema(products).omit({
   discountPercentage: z.string().nullable().optional(),
   physicalInventory: z.number().optional(),
   purchasePrice: z.string().nullable().optional(),
+  purchasePriceMethod: z.enum(["units", "weight"]).optional(),
+  purchasePricePerGram: z.string().nullable().optional(),
+  purchasePricePerOunce: z.string().nullable().optional(),
   adminNotes: z.string().nullable().optional(),
 });
 
