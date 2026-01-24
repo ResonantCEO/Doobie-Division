@@ -73,9 +73,52 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
     }
   });
 
+  const unfulfillItemMutation = useMutation({
+    mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/unfulfill-item`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ productId, quantity })
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to unfulfill item');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Item Unfulfilled",
+        description: "Inventory has been restored",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders', orderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to unfulfill item",
+        variant: "destructive",
+      });
+    },
+    onSettled: (_, __, variables) => {
+      setFulfillingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(variables.productId);
+        return newSet;
+      });
+    }
+  });
+
   const handleFulfillItem = (productId: number, quantity: number) => {
     setFulfillingItems(prev => new Set(prev).add(productId));
     fulfillItemMutation.mutate({ orderId, productId, quantity });
+  };
+
+  const handleUnfulfillItem = (productId: number, quantity: number) => {
+    setFulfillingItems(prev => new Set(prev).add(productId));
+    unfulfillItemMutation.mutate({ orderId, productId, quantity });
   };
 
   if (isLoading) {
@@ -118,14 +161,17 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                   ) : (
                     <Checkbox
                       checked={item.fulfilled || false}
-                      disabled={item.fulfilled || false}
-                      onCheckedChange={() => {
-                        if (!item.fulfilled && item.productId) {
-                          handleFulfillItem(item.productId, item.quantity);
+                      onCheckedChange={(checked) => {
+                        if (item.productId) {
+                          if (checked) {
+                            handleFulfillItem(item.productId, item.quantity);
+                          } else {
+                            handleUnfulfillItem(item.productId, item.quantity);
+                          }
                         }
                       }}
                       className="h-5 w-5"
-                      title={item.fulfilled ? "Item already fulfilled" : "Click to fulfill and adjust inventory"}
+                      title={item.fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory"}
                     />
                   )}
                   <div>
@@ -204,9 +250,52 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
     }
   });
 
+  const unfulfillItemMutation = useMutation({
+    mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/unfulfill-item`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ productId, quantity })
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to unfulfill item');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Item Unfulfilled",
+        description: "Inventory has been restored",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders', orderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to unfulfill item",
+        variant: "destructive",
+      });
+    },
+    onSettled: (_, __, variables) => {
+      setFulfillingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(variables.productId);
+        return newSet;
+      });
+    }
+  });
+
   const handleFulfillItem = (productId: number, quantity: number) => {
     setFulfillingItems(prev => new Set(prev).add(productId));
     fulfillItemMutation.mutate({ orderId, productId, quantity });
+  };
+
+  const handleUnfulfillItem = (productId: number, quantity: number) => {
+    setFulfillingItems(prev => new Set(prev).add(productId));
+    unfulfillItemMutation.mutate({ orderId, productId, quantity });
   };
 
   if (isLoading) {
@@ -241,13 +330,17 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
           ) : (
             <Checkbox
               checked={item.fulfilled || false}
-              disabled={item.fulfilled || false}
-              onCheckedChange={() => {
-                if (!item.fulfilled && item.productId) {
-                  handleFulfillItem(item.productId, item.quantity);
+              onCheckedChange={(checked) => {
+                if (item.productId) {
+                  if (checked) {
+                    handleFulfillItem(item.productId, item.quantity);
+                  } else {
+                    handleUnfulfillItem(item.productId, item.quantity);
+                  }
                 }
               }}
               className="h-5 w-5 flex-shrink-0"
+              title={item.fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory"}
             />
           )}
           <div className="flex-1 min-w-0">

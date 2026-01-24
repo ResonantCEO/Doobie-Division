@@ -893,6 +893,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Order item unfulfillment route (reverse inventory)
+  app.post('/api/orders/:id/unfulfill-item', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const { productId, quantity } = req.body;
+
+      if (!productId || !quantity || quantity <= 0) {
+        return res.status(400).json({ message: "Product ID and positive quantity are required" });
+      }
+
+      // Get the order and verify it exists
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Check if order is in a status that allows unfulfillment
+      if (!['pending', 'processing'].includes(order.status)) {
+        return res.status(400).json({ message: "Cannot unfulfill items for orders that are already packed, delivered, or cancelled" });
+      }
+
+      // Verify the product is part of this order
+      const orderItem = order.items?.find(item => item.productId === productId);
+      if (!orderItem) {
+        return res.status(400).json({ message: "Product is not part of this order" });
+      }
+
+      if (!orderItem.fulfilled) {
+        return res.status(400).json({ message: "This order item is not fulfilled" });
+      }
+
+      // Unfulfill the item (restore stock and mark as not fulfilled)
+      // Use the order item's actual quantity instead of client-supplied value for security
+      await storage.unfulfillOrderItem(orderId, productId, orderItem.quantity, req.currentUser.id);
+
+      res.status(200).json({ message: "Order item unfulfilled successfully" });
+    } catch (error) {
+      console.error('Order unfulfillment error:', error);
+      res.status(500).json({ message: "Failed to unfulfill order item" });
+    }
+  });
+
   // Daily analytics endpoints
   app.get("/api/analytics/hourly-breakdown", isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {

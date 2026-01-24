@@ -59,6 +59,7 @@ export interface IStorage {
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
   fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void>;
+  unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void>;
   markOrderItemAsPacked(orderId: number, productId: number, userId: string): Promise<{ success: boolean; allPacked: boolean }>;
   assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order>;
 
@@ -926,6 +927,62 @@ export class DatabaseStorage implements IStorage {
       previousStock: currentStock,
       newStock: newStock,
       reason: `Order fulfillment - Order #${orderId} (Stock and physical inventory reduced)`,
+      createdAt: new Date()
+    });
+  }
+
+  async unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void> {
+    // Get the product
+    const product = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+    if (product.length === 0) {
+      throw new Error("Product not found");
+    }
+
+    // Get the order item to verify it's fulfilled
+    const orderItem = await db
+      .select()
+      .from(orderItems)
+      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)))
+      .limit(1);
+
+    if (orderItem.length === 0) {
+      throw new Error("Order item not found");
+    }
+
+    if (!orderItem[0].fulfilled) {
+      throw new Error("Order item is not fulfilled");
+    }
+
+    const currentStock = product[0].stock;
+    const currentPhysicalInventory = product[0].physicalInventory || 0;
+    const newStock = currentStock + quantity;
+    const newPhysicalInventory = currentPhysicalInventory + quantity;
+
+    // Update product stock and physical inventory (add back)
+    await db
+      .update(products)
+      .set({
+        stock: newStock,
+        physicalInventory: newPhysicalInventory,
+        updatedAt: new Date()
+      })
+      .where(eq(products.id, productId));
+
+    // Mark order item as not fulfilled
+    await db
+      .update(orderItems)
+      .set({ fulfilled: false })
+      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
+
+    // Log the stock change
+    await db.insert(inventoryLogs).values({
+      productId,
+      userId,
+      type: 'stock_in',
+      quantity: quantity,
+      previousStock: currentStock,
+      newStock: newStock,
+      reason: `Order unfulfillment - Order #${orderId} (Stock and physical inventory restored)`,
       createdAt: new Date()
     });
   }
