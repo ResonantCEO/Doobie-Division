@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import type { InventoryLog, Product, User, SupportTicket } from "@shared/schema";
 
 interface InventoryLogWithDetails extends InventoryLog {
@@ -55,6 +55,8 @@ export default function AdminPage() {
   const [responseType, setResponseType] = useState("customer_response");
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [deleteTicketConfirmOpen, setDeleteTicketConfirmOpen] = useState(false);
+  const [ticketToDelete, setTicketToDelete] = useState<SupportTicketWithDetails | null>(null);
 
 
   // Redirect if not admin
@@ -143,6 +145,37 @@ export default function AdminPage() {
       toast({ title: "Failed to send response", variant: "destructive" });
     },
   });
+
+  const deleteTicketMutation = useMutation({
+    mutationFn: async (ticketId: number) => {
+      const response = await fetch(`/api/support/tickets/${ticketId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error('Failed to delete ticket');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
+      setDeleteTicketConfirmOpen(false);
+      setTicketToDelete(null);
+      toast({ title: "Support ticket deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete support ticket", variant: "destructive" });
+    },
+  });
+
+  const handleDeleteTicket = (item: SupportTicketWithDetails) => {
+    setTicketToDelete(item);
+    setDeleteTicketConfirmOpen(true);
+  };
+
+  const confirmDeleteTicket = () => {
+    if (ticketToDelete) {
+      deleteTicketMutation.mutate(ticketToDelete.ticket.id);
+    }
+  };
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -604,15 +637,26 @@ export default function AdminPage() {
                               </Select>
                             </TableCell>
                             <TableCell>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleTicketView(item)}
-                                className="text-xs"
-                              >
-                                <Eye className="h-3 w-3 mr-1" />
-                                View
-                              </Button>
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleTicketView(item)}
+                                  className="text-xs"
+                                >
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  View
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteTicket(item)}
+                                  className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Delete
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
@@ -625,6 +669,41 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Ticket Confirmation Dialog */}
+      <Dialog open={deleteTicketConfirmOpen} onOpenChange={setDeleteTicketConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Support Ticket</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Are you sure you want to permanently delete this support ticket from <strong>{ticketToDelete?.ticket.customerName || 'Unknown'}</strong>?
+            </p>
+            <p className="text-sm text-red-600 mt-2 font-medium">
+              This action cannot be undone. The ticket and all its responses will be permanently removed.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setDeleteTicketConfirmOpen(false);
+                setTicketToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteTicket}
+              disabled={deleteTicketMutation.isPending}
+            >
+              {deleteTicketMutation.isPending ? "Deleting..." : "Delete Ticket"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Ticket Review Modal */}
       <Dialog open={showTicketModal} onOpenChange={handleCloseTicketModal}>

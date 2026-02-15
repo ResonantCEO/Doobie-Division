@@ -1435,6 +1435,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/support/tickets/:id', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ticket ID" });
+      }
+      await storage.deleteSupportTicket(id);
+      res.json({ message: "Support ticket deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete support ticket:", error);
+      res.status(500).json({ message: "Failed to delete support ticket" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Setup WebSocket server

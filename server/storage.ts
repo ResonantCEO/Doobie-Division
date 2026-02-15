@@ -110,6 +110,7 @@ export interface IStorage {
   updateSupportTicketStatus(id: number, status: string): Promise<any>;
   assignSupportTicket(id: number, assignedTo: string | null): Promise<any>;
   addSupportTicketResponse(ticketId: number, responseData: any): Promise<any>;
+  deleteSupportTicket(id: number): Promise<void>;
 
   // Password reset operations
   createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void>;
@@ -1736,6 +1737,12 @@ export class DatabaseStorage implements IStorage {
     return response;
   }
 
+  async deleteSupportTicket(id: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(supportTicketResponses).where(eq(supportTicketResponses.ticketId, id));
+      await tx.delete(supportTickets).where(eq(supportTickets.id, id));
+    });
+  }
 
   async getStaffUsers(): Promise<User[]> {
     return db
