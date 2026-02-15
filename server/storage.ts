@@ -1,5 +1,6 @@
 import {
   users,
+  sessions,
   categories,
   products,
   orders,
@@ -96,6 +97,7 @@ export interface IStorage {
   updateUser(id: string, userData: any): Promise<User>;
   getStaffUsers(): Promise<User[]>;
   getUsersWithRole(role: string): Promise<User[]>;
+  deleteUser(id: string): Promise<void>;
 
   // User activity
   logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void>;
@@ -1755,6 +1757,46 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.role, role));
 
     return usersWithRole;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(supportTicketResponses).where(eq(supportTicketResponses.createdBy, id));
+      await tx.delete(supportTicketResponses).where(
+        inArray(
+          supportTicketResponses.ticketId,
+          tx.select({ id: supportTickets.id }).from(supportTickets).where(eq(supportTickets.userId, id))
+        )
+      );
+      await tx.delete(supportTicketResponses).where(
+        inArray(
+          supportTicketResponses.ticketId,
+          tx.select({ id: supportTickets.id }).from(supportTickets).where(eq(supportTickets.assignedTo, id))
+        )
+      );
+      await tx.delete(supportTickets).where(eq(supportTickets.assignedTo, id));
+      await tx.delete(supportTickets).where(eq(supportTickets.userId, id));
+      await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, id));
+      await tx.delete(notifications).where(eq(notifications.userId, id));
+      await tx.delete(inventoryLogs).where(eq(inventoryLogs.userId, id));
+
+      const userOrders = await tx.select({ id: orders.id }).from(orders).where(eq(orders.customerId, id));
+      if (userOrders.length > 0) {
+        const orderIds = userOrders.map(o => o.id);
+        await tx.delete(orderItems).where(inArray(orderItems.orderId, orderIds));
+        await tx.delete(orders).where(eq(orders.customerId, id));
+      }
+
+      await tx.update(orders).set({ assignedUserId: null }).where(eq(orders.assignedUserId, id));
+
+      await tx.delete(sessions).where(
+        sql`sess::jsonb->>'userId' = ${id}`
+      );
+
+      await tx.delete(users).where(eq(users.id, id));
+    });
+
+    invalidateCache('users');
   }
 
   async updateUser(id: string, userData: any): Promise<User> {

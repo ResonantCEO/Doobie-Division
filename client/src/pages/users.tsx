@@ -44,7 +44,8 @@ import {
   MoreHorizontal,
   Activity,
   Save,
-  ShoppingCart
+  ShoppingCart,
+  Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import type { User } from "@shared/schema";
@@ -62,6 +63,8 @@ export default function UsersPage() {
   const [editData, setEditData] = useState<any>({});
   const [suspendConfirmOpen, setSuspendConfirmOpen] = useState(false);
   const [userToSuspend, setUserToSuspend] = useState<User | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
 
   // Fetch users with stats
@@ -167,6 +170,50 @@ export default function UsersPage() {
       });
     },
   });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest("DELETE", `/api/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setDeleteConfirmOpen(false);
+      setUserToDelete(null);
+      toast({
+        title: "Success",
+        description: "User has been permanently deleted",
+      });
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteUser = (user: User) => {
+    setUserToDelete(user);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteUser = () => {
+    if (userToDelete) {
+      deleteUserMutation.mutate(userToDelete.id);
+    }
+  };
 
   const getUserStats = () => {
     const stats = {
@@ -615,6 +662,13 @@ export default function UsersPage() {
                                   Suspend User
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuItem 
+                                onClick={() => handleDeleteUser(user)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete User
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
@@ -798,6 +852,41 @@ export default function UsersPage() {
               disabled={updateStatusMutation.isPending}
             >
               {updateStatusMutation.isPending ? "Suspending..." : "Suspend User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete User</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Are you sure you want to permanently delete <strong>{userToDelete?.firstName} {userToDelete?.lastName}</strong> ({userToDelete?.email})?
+            </p>
+            <p className="text-sm text-red-600 mt-2 font-medium">
+              This action cannot be undone. All of this user's data including orders, support tickets, notifications, and activity will be permanently removed. Their email will be freed up for a new account.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                setUserToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteUser}
+              disabled={deleteUserMutation.isPending}
+            >
+              {deleteUserMutation.isPending ? "Deleting..." : "Delete User Permanently"}
             </Button>
           </DialogFooter>
         </DialogContent>
