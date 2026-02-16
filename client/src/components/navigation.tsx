@@ -402,11 +402,6 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
 
             {/* Second row: Icons */}
             <div className="flex justify-center items-center space-x-4 pb-3">
-              {/* Search */}
-              <Button variant="ghost" size="sm">
-                <Search className="h-5 w-5" />
-              </Button>
-
               {/* Cart */}
               <CartDrawer>
                 <Button variant="ghost" size="sm" className="relative">
