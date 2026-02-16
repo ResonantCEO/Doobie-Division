@@ -1738,10 +1738,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSupportTicket(id: number): Promise<void> {
-    await db.transaction(async (tx) => {
-      await tx.delete(supportTicketResponses).where(eq(supportTicketResponses.ticketId, id));
-      await tx.delete(supportTickets).where(eq(supportTickets.id, id));
-    });
+    await db.delete(supportTicketResponses).where(eq(supportTicketResponses.ticketId, id));
+    await db.delete(supportTickets).where(eq(supportTickets.id, id));
   }
 
   async getStaffUsers(): Promise<User[]> {
@@ -1767,41 +1765,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
-    await db.transaction(async (tx) => {
-      await tx.delete(supportTicketResponses).where(eq(supportTicketResponses.createdBy, id));
-      await tx.delete(supportTicketResponses).where(
-        inArray(
-          supportTicketResponses.ticketId,
-          tx.select({ id: supportTickets.id }).from(supportTickets).where(eq(supportTickets.userId, id))
-        )
-      );
-      await tx.delete(supportTicketResponses).where(
-        inArray(
-          supportTicketResponses.ticketId,
-          tx.select({ id: supportTickets.id }).from(supportTickets).where(eq(supportTickets.assignedTo, id))
-        )
-      );
-      await tx.delete(supportTickets).where(eq(supportTickets.assignedTo, id));
-      await tx.delete(supportTickets).where(eq(supportTickets.userId, id));
-      await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, id));
-      await tx.delete(notifications).where(eq(notifications.userId, id));
-      await tx.delete(inventoryLogs).where(eq(inventoryLogs.userId, id));
+    await db.delete(supportTicketResponses).where(eq(supportTicketResponses.createdBy, id));
 
-      const userOrders = await tx.select({ id: orders.id }).from(orders).where(eq(orders.customerId, id));
-      if (userOrders.length > 0) {
-        const orderIds = userOrders.map(o => o.id);
-        await tx.delete(orderItems).where(inArray(orderItems.orderId, orderIds));
-        await tx.delete(orders).where(eq(orders.customerId, id));
-      }
+    const userTickets = await db.select({ id: supportTickets.id }).from(supportTickets).where(eq(supportTickets.userId, id));
+    const assignedTickets = await db.select({ id: supportTickets.id }).from(supportTickets).where(eq(supportTickets.assignedTo, id));
 
-      await tx.update(orders).set({ assignedUserId: null }).where(eq(orders.assignedUserId, id));
+    const allTicketIds = [...new Set([...userTickets.map(t => t.id), ...assignedTickets.map(t => t.id)])];
+    if (allTicketIds.length > 0) {
+      await db.delete(supportTicketResponses).where(inArray(supportTicketResponses.ticketId, allTicketIds));
+    }
 
-      await tx.delete(sessions).where(
-        sql`sess::jsonb->>'userId' = ${id}`
-      );
+    await db.update(supportTickets).set({ assignedTo: null }).where(eq(supportTickets.assignedTo, id));
+    await db.delete(supportTickets).where(eq(supportTickets.userId, id));
 
-      await tx.delete(users).where(eq(users.id, id));
-    });
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, id));
+    await db.delete(notifications).where(eq(notifications.userId, id));
+    await db.delete(inventoryLogs).where(eq(inventoryLogs.userId, id));
+
+    const userOrders = await db.select({ id: orders.id }).from(orders).where(eq(orders.customerId, id));
+    if (userOrders.length > 0) {
+      const orderIds = userOrders.map(o => o.id);
+      await db.delete(orderItems).where(inArray(orderItems.orderId, orderIds));
+      await db.delete(orders).where(eq(orders.customerId, id));
+    }
+
+    await db.update(orders).set({ assignedUserId: null }).where(eq(orders.assignedUserId, id));
+
+    await db.delete(sessions).where(
+      sql`sess::jsonb->>'userId' = ${id}`
+    );
+
+    await db.delete(users).where(eq(users.id, id));
 
     invalidateCache('users');
   }
