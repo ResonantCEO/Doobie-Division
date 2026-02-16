@@ -64,7 +64,7 @@ export interface IStorage {
   markOrderItemAsPacked(orderId: number, productId: number, userId: string): Promise<{ success: boolean; allPacked: boolean }>;
   assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order>;
   deleteOrder(id: number): Promise<void>;
-  clearAllOrders(): Promise<number>;
+  clearAllOrders(statuses?: string[]): Promise<number>;
 
   // Analytics operations
   getSalesMetrics(days: number): Promise<{
@@ -1090,7 +1090,16 @@ export class DatabaseStorage implements IStorage {
     invalidateCache.analytics();
   }
 
-  async clearAllOrders(): Promise<number> {
+  async clearAllOrders(statuses?: string[]): Promise<number> {
+    if (statuses && statuses.length > 0) {
+      const matchingOrders = await db.select({ id: orders.id }).from(orders).where(inArray(orders.status, statuses));
+      if (matchingOrders.length === 0) return 0;
+      const orderIds = matchingOrders.map(o => o.id);
+      await db.delete(orderItems).where(inArray(orderItems.orderId, orderIds));
+      const deleted = await db.delete(orders).where(inArray(orders.id, orderIds)).returning();
+      invalidateCache.analytics();
+      return deleted.length;
+    }
     await db.delete(orderItems);
     const deleted = await db.delete(orders).returning();
     invalidateCache.analytics();

@@ -403,14 +403,32 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
     },
   });
 
+  const getStatusesForTab = (tab: OrderTab): string[] => {
+    switch (tab) {
+      case "packed": return ["packed"];
+      case "delivered": return ["delivered"];
+      case "cancelled": return ["cancelled"];
+      default: return [];
+    }
+  };
+
+  const getTabLabel = (tab: OrderTab): string => {
+    switch (tab) {
+      case "packed": return "Packed";
+      case "delivered": return "Delivered";
+      case "cancelled": return "Cancelled";
+      default: return "";
+    }
+  };
+
   const clearAllOrdersMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("DELETE", "/api/orders");
+    mutationFn: async (statuses: string[]) => {
+      await apiRequest("DELETE", `/api/orders?statuses=${statuses.join(',')}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/order-status-breakdown"] });
-      toast({ title: "All Orders Cleared", description: "All orders have been removed." });
+      toast({ title: "Orders Cleared", description: "The selected orders have been removed." });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -926,9 +944,9 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
       <AlertDialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear All Orders</AlertDialogTitle>
+            <AlertDialogTitle>Clear {getTabLabel(activeTab)} Orders</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete ALL orders? This action cannot be undone. Every order and its items will be permanently removed.
+              Are you sure you want to delete all {getTabLabel(activeTab).toLowerCase()} orders? This action cannot be undone. These orders and their items will be permanently removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -936,7 +954,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={() => {
-                clearAllOrdersMutation.mutate();
+                clearAllOrdersMutation.mutate(getStatusesForTab(activeTab));
                 setShowClearAllDialog(false);
               }}
             >
@@ -949,7 +967,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Orders</h3>
-        {(user?.role === 'admin' || user?.role === 'manager') && orders.length > 0 && (
+        {(user?.role === 'admin' || user?.role === 'manager') && activeTab !== "new" && filteredOrders.length > 0 && (
           <Button
             variant="outline"
             size="sm"
@@ -958,7 +976,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
             disabled={clearAllOrdersMutation.isPending}
           >
             <Trash2 className="h-4 w-4 mr-1.5" />
-            {clearAllOrdersMutation.isPending ? "Clearing..." : "Clear All Orders"}
+            {clearAllOrdersMutation.isPending ? "Clearing..." : `Clear ${getTabLabel(activeTab)} Orders`}
           </Button>
         )}
       </div>

@@ -812,7 +812,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/orders', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
-      const count = await storage.clearAllOrders();
+      const { statuses } = req.query;
+      const statusList = statuses ? (statuses as string).split(',').map(s => s.trim()) : undefined;
+      const count = await storage.clearAllOrders(statusList);
       res.json({ message: `${count} orders deleted successfully`, count });
     } catch (error) {
       res.status(500).json({ message: "Failed to clear orders" });
