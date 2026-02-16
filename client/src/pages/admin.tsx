@@ -356,7 +356,7 @@ export default function AdminPage() {
         </CardHeader>
         <CardContent>
           {/* Filters */}
-          <div className="flex gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
             <div className="flex-1">
               <label className="block text-sm font-medium mb-1">Time Period</label>
               <Select value={dateFilter} onValueChange={setDateFilter}>
@@ -398,128 +398,123 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Inventory Logs Table */}
+          {/* Inventory Logs */}
           {isLoading ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="h-12 bg-gray-200 rounded animate-pulse" />
               ))}
             </div>
+          ) : sortedLogs.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No inventory changes found for the selected filters
+            </div>
           ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('createdAt')}
-                        className="h-auto p-0 font-semibold hover:bg-transparent"
-                      >
-                        Date & Time
-                        {getSortIcon('createdAt')}
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('product')}
-                        className="h-auto p-0 font-semibold hover:bg-transparent"
-                      >
-                        Product
-                        {getSortIcon('product')}
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('sku')}
-                        className="h-auto p-0 font-semibold hover:bg-transparent"
-                      >
-                        SKU
-                        {getSortIcon('sku')}
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('type')}
-                        className="h-auto p-0 font-semibold hover:bg-transparent"
-                      >
-                        Type
-                        {getSortIcon('type')}
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('quantity')}
-                        className="h-auto p-0 font-semibold hover:bg-transparent"
-                      >
-                        Quantity
-                        {getSortIcon('quantity')}
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('previousStock')}
-                        className="h-auto p-0 font-semibold hover:bg-transparent"
-                      >
-                        Previous Stock
-                        {getSortIcon('previousStock')}
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('newStock')}
-                        className="h-auto p-0 font-semibold hover:bg-transparent"
-                      >
-                        New Stock
-                        {getSortIcon('newStock')}
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('changedBy')}
-                        className="h-auto p-0 font-semibold hover:bg-transparent"
-                      >
-                        Changed By
-                        {getSortIcon('changedBy')}
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('reason')}
-                        className="h-auto p-0 font-semibold hover:bg-transparent"
-                      >
-                        Reason
-                        {getSortIcon('reason')}
-                      </Button>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedLogs.length === 0 ? (
+            <>
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-3">
+                {sortedLogs.map((log) => (
+                  <div key={log.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {format(new Date(log.createdAt!), 'MMM dd, yyyy HH:mm')}
+                      </span>
+                      <Badge className={getTypeColor(log.type)}>
+                        {getTypeLabel(log.type)}
+                      </Badge>
+                    </div>
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      {log.product?.name || 'Unknown Product'}
+                    </div>
+                    {log.product?.sku && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">SKU: {log.product.sku}</div>
+                    )}
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">Quantity</span>
+                      <span className={`font-medium ${log.type === 'stock_out' ? 'text-red-600 dark:text-red-400' : log.type === 'stock_in' ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
+                        {log.type === 'stock_out' ? '-' : log.type === 'stock_in' ? '+' : '±'}{log.quantity}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">Stock</span>
+                      <span className="text-gray-900 dark:text-white">{log.previousStock} &rarr; {log.newStock}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">Changed By</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {log.user ? `${log.user.firstName} ${log.user.lastName}` : 'System'}
+                      </span>
+                    </div>
+                    {log.reason && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-100 dark:border-gray-700">
+                        {log.reason}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-                        No inventory changes found for the selected filters
-                      </TableCell>
+                      <TableHead>
+                        <Button variant="ghost" onClick={() => handleSort('createdAt')} className="h-auto p-0 font-semibold hover:bg-transparent">
+                          Date & Time {getSortIcon('createdAt')}
+                        </Button>
+                      </TableHead>
+                      <TableHead>
+                        <Button variant="ghost" onClick={() => handleSort('product')} className="h-auto p-0 font-semibold hover:bg-transparent">
+                          Product {getSortIcon('product')}
+                        </Button>
+                      </TableHead>
+                      <TableHead>
+                        <Button variant="ghost" onClick={() => handleSort('sku')} className="h-auto p-0 font-semibold hover:bg-transparent">
+                          SKU {getSortIcon('sku')}
+                        </Button>
+                      </TableHead>
+                      <TableHead>
+                        <Button variant="ghost" onClick={() => handleSort('type')} className="h-auto p-0 font-semibold hover:bg-transparent">
+                          Type {getSortIcon('type')}
+                        </Button>
+                      </TableHead>
+                      <TableHead>
+                        <Button variant="ghost" onClick={() => handleSort('quantity')} className="h-auto p-0 font-semibold hover:bg-transparent">
+                          Quantity {getSortIcon('quantity')}
+                        </Button>
+                      </TableHead>
+                      <TableHead>
+                        <Button variant="ghost" onClick={() => handleSort('previousStock')} className="h-auto p-0 font-semibold hover:bg-transparent">
+                          Previous Stock {getSortIcon('previousStock')}
+                        </Button>
+                      </TableHead>
+                      <TableHead>
+                        <Button variant="ghost" onClick={() => handleSort('newStock')} className="h-auto p-0 font-semibold hover:bg-transparent">
+                          New Stock {getSortIcon('newStock')}
+                        </Button>
+                      </TableHead>
+                      <TableHead>
+                        <Button variant="ghost" onClick={() => handleSort('changedBy')} className="h-auto p-0 font-semibold hover:bg-transparent">
+                          Changed By {getSortIcon('changedBy')}
+                        </Button>
+                      </TableHead>
+                      <TableHead>
+                        <Button variant="ghost" onClick={() => handleSort('reason')} className="h-auto p-0 font-semibold hover:bg-transparent">
+                          Reason {getSortIcon('reason')}
+                        </Button>
+                      </TableHead>
                     </TableRow>
-                  ) : (
-                    sortedLogs.map((log) => (
+                  </TableHeader>
+                  <TableBody>
+                    {sortedLogs.map((log) => (
                       <TableRow key={log.id}>
                         <TableCell className="font-medium">
                           {format(new Date(log.createdAt!), 'MMM dd, yyyy HH:mm')}
                         </TableCell>
                         <TableCell>
-                          <div>
-                            <div className="font-medium text-black dark:text-white">
-                              {log.product?.name || 'Unknown Product'}
-                            </div>
+                          <div className="font-medium text-black dark:text-white">
+                            {log.product?.name || 'Unknown Product'}
                           </div>
                         </TableCell>
                         <TableCell className="text-black dark:text-white">
@@ -544,11 +539,11 @@ export default function AdminPage() {
                           {log.reason || 'No reason provided'}
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -571,33 +566,100 @@ export default function AdminPage() {
               <div className="flex gap-4 mb-6">
               </div>
 
-              {/* Support Tickets Table */}
+              {/* Support Tickets */}
               {isLoadingTickets ? (
                 <div className="space-y-3">
                   {[...Array(5)].map((_, i) => (
                     <div key={i} className="h-12 bg-gray-200 rounded animate-pulse" />
                   ))}
                 </div>
+              ) : supportTickets.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No support tickets found for the selected filters
+                </div>
               ) : (
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date Created</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {supportTickets.length === 0 ? (
+                <>
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-3">
+                    {supportTickets.map((item) => (
+                      <div key={item.ticket.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="font-medium text-gray-900 dark:text-white">
+                              {item.ticket.customerName || (item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Anonymous')}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              {item.ticket.customerEmail || item.user?.email || 'No email'}
+                            </div>
+                            {item.ticket.customerPhone && (
+                              <div className="text-xs text-gray-400 mt-0.5">
+                                📞 {item.ticket.customerPhone}
+                              </div>
+                            )}
+                          </div>
+                          <Badge className={getStatusColor(item.ticket.status)}>
+                            {item.ticket.status === 'in_progress' ? 'In Progress' : item.ticket.status.charAt(0).toUpperCase() + item.ticket.status.slice(1)}
+                          </Badge>
+                        </div>
+                        {item.ticket.subject && (
+                          <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">{item.ticket.subject}</div>
+                        )}
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                          <Select
+                            value={item.ticket.status}
+                            onValueChange={(status) => handleUpdateTicketStatus(item.ticket.id, status)}
+                          >
+                            <SelectTrigger className="h-8 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="open">Open</SelectItem>
+                              <SelectItem value="in_progress">In Progress</SelectItem>
+                              <SelectItem value="resolved">Resolved</SelectItem>
+                              <SelectItem value="closed">Closed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleTicketView(item)}
+                              className="flex-1 text-xs"
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteTicket(item)}
+                              className="flex-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center py-8 text-gray-500">
-                            No support tickets found for the selected filters
-                          </TableCell>
+                          <TableHead>Date Created</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
                         </TableRow>
-                      ) : (
-                        supportTickets.map((item) => (
+                      </TableHeader>
+                      <TableBody>
+                        {supportTickets.map((item) => (
                           <TableRow key={item.ticket.id}>
                             <TableCell className="font-medium">
                               {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
@@ -659,11 +721,11 @@ export default function AdminPage() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
