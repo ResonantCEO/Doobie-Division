@@ -622,26 +622,15 @@ export default function AdminPage() {
                               <SelectItem value="closed">Closed</SelectItem>
                             </SelectContent>
                           </Select>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleTicketView(item)}
-                              className="flex-1 text-xs"
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              View
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteTicket(item)}
-                              className="flex-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              Delete
-                            </Button>
-                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteTicket(item)}
+                            className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
                         </div>
                       </div>
                     ))}
