@@ -15,7 +15,17 @@ import OrderDetailsModal from "@/components/modals/order-details-modal";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Eye, Edit, MessageSquare, MoreHorizontal, Package2, ChevronDown, ChevronRight, ChevronUp, Loader2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Eye, Edit, MessageSquare, MoreHorizontal, Package2, ChevronDown, ChevronRight, ChevronUp, Loader2, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import type { Order, User, OrderItem, Product } from "@shared/schema";
 
@@ -371,6 +381,46 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
   const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState<OrderTab>("new");
+  const [deleteOrderId, setDeleteOrderId] = useState<number | null>(null);
+  const [showClearAllDialog, setShowClearAllDialog] = useState(false);
+
+  const deleteOrderMutation = useMutation({
+    mutationFn: async (orderId: number) => {
+      await apiRequest("DELETE", `/api/orders/${orderId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/order-status-breakdown"] });
+      toast({ title: "Order Deleted", description: "The order has been removed." });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Unauthorized", description: "You are logged out. Logging in again...", variant: "destructive" });
+        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        return;
+      }
+      toast({ title: "Error", description: "Failed to delete order", variant: "destructive" });
+    },
+  });
+
+  const clearAllOrdersMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/orders");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/order-status-breakdown"] });
+      toast({ title: "All Orders Cleared", description: "All orders have been removed." });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Unauthorized", description: "You are logged out. Logging in again...", variant: "destructive" });
+        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        return;
+      }
+      toast({ title: "Error", description: "Failed to clear orders", variant: "destructive" });
+    },
+  });
 
   const filteredOrders = useMemo(() => {
     switch (activeTab) {
@@ -649,6 +699,15 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                           <MessageSquare className="h-4 w-4 mr-2" />
                           Contact Customer
                         </DropdownMenuItem>
+                        {(user?.role === 'admin' || user?.role === 'manager') && (
+                          <DropdownMenuItem
+                            className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                            onClick={() => setDeleteOrderId(order.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Order
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -799,6 +858,15 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                               <MessageSquare className="h-4 w-4 mr-2" />
                               Contact Customer
                             </DropdownMenuItem>
+                            {(user?.role === 'admin' || user?.role === 'manager') && (
+                              <DropdownMenuItem
+                                className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                                onClick={() => setDeleteOrderId(order.id)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Order
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -830,9 +898,69 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
         }}
         userRole={user?.role}
       />
+      <AlertDialog open={deleteOrderId !== null} onOpenChange={(open) => { if (!open) setDeleteOrderId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this order? This action cannot be undone. The order and all its items will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => {
+                if (deleteOrderId) {
+                  deleteOrderMutation.mutate(deleteOrderId);
+                  setDeleteOrderId(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear All Orders</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete ALL orders? This action cannot be undone. Every order and its items will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => {
+                clearAllOrdersMutation.mutate();
+                setShowClearAllDialog(false);
+              }}
+            >
+              Clear All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Orders</h3>
+        {(user?.role === 'admin' || user?.role === 'manager') && orders.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+            onClick={() => setShowClearAllDialog(true)}
+            disabled={clearAllOrdersMutation.isPending}
+          >
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            {clearAllOrdersMutation.isPending ? "Clearing..." : "Clear All Orders"}
+          </Button>
+        )}
       </div>
       
       <div className="w-full">

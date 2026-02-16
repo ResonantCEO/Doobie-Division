@@ -63,6 +63,8 @@ export interface IStorage {
   unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void>;
   markOrderItemAsPacked(orderId: number, productId: number, userId: string): Promise<{ success: boolean; allPacked: boolean }>;
   assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order>;
+  deleteOrder(id: number): Promise<void>;
+  clearAllOrders(): Promise<number>;
 
   // Analytics operations
   getSalesMetrics(days: number): Promise<{
@@ -1077,6 +1079,22 @@ export class DatabaseStorage implements IStorage {
     }
 
     return updatedOrder;
+  }
+
+  async deleteOrder(id: number): Promise<void> {
+    await db.delete(orderItems).where(eq(orderItems.orderId, id));
+    const deleted = await db.delete(orders).where(eq(orders.id, id)).returning();
+    if (deleted.length === 0) {
+      throw new Error("Order not found");
+    }
+    invalidateCache.analytics();
+  }
+
+  async clearAllOrders(): Promise<number> {
+    await db.delete(orderItems);
+    const deleted = await db.delete(orders).returning();
+    invalidateCache.analytics();
+    return deleted.length;
   }
 
   // Analytics operations

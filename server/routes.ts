@@ -797,6 +797,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/orders/:id', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteOrder(id);
+      res.json({ message: "Order deleted successfully" });
+    } catch (error: any) {
+      if (error.message === "Order not found") {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      res.status(500).json({ message: "Failed to delete order" });
+    }
+  });
+
+  app.delete('/api/orders', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const count = await storage.clearAllOrders();
+      res.json({ message: `${count} orders deleted successfully`, count });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to clear orders" });
+    }
+  });
+
   // Order item packing route (marks as packed without reducing physical inventory)
   app.post('/api/orders/:id/pack-item', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
