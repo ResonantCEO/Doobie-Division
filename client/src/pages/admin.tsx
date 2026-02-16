@@ -601,8 +601,8 @@ export default function AdminPage() {
                             {item.ticket.status === 'in_progress' ? 'In Progress' : item.ticket.status.charAt(0).toUpperCase() + item.ticket.status.slice(1)}
                           </Badge>
                         </div>
-                        {item.ticket.subject && (
-                          <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">{item.ticket.subject}</div>
+                        {item.ticket.message && (
+                          <div className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">{item.ticket.message}</div>
                         )}
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
