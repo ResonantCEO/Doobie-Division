@@ -1797,7 +1797,7 @@ export class DatabaseStorage implements IStorage {
 
     await db.delete(users).where(eq(users.id, id));
 
-    invalidateCache('users');
+    invalidateCache.analytics();
   }
 
   async updateUser(id: string, userData: any): Promise<User> {
