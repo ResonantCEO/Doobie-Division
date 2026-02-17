@@ -146,6 +146,21 @@ The application is designed to be deployed on Replit with integrated authenticat
 
 ## Recent Changes
 
+### February 17, 2026 - Analytics Data Accuracy & User Activity Tracking
+- **Fixed Analytics Data Reporting**: Replaced all hardcoded mock data in analytics pages with real database queries
+  - Created new API endpoints: `/api/analytics/inventory-metrics`, `/api/analytics/customer-metrics/:days`, `/api/analytics/operations-metrics/:days`
+  - Inventory metrics: stock turnover rate, inventory value, low/out of stock counts from real product data
+  - Customer metrics: retention rate, purchase frequency, lifetime value, monthly growth from order history
+  - Operations metrics: fulfillment time, rate, cost of goods sold from actual order data
+- **Fixed Net Profit Calculation**: Uses actual purchase prices from products table instead of hardcoded 30% margin
+  - Smart fallback: purchasePrice → purchasePricePerGram calculation → 70% assumed cost
+- **Standardized Order Status Filtering**: All analytics queries consistently include ['shipped', 'processing', 'pending', 'completed'] statuses
+- **Fixed URL Mismatch**: Frontend now correctly calls `/api/analytics/daily-new-users` matching the backend endpoint
+- **Fixed User Activity Tracking**: Created dedicated `user_activity_logs` database table
+  - Replaced misuse of `inventory_logs` table for user activity (which caused null productId records)
+  - Cleaned up 133 stale records from inventory_logs
+  - Activity view now combines: user activity logs, inventory logs (with products), and order history
+
 ### August 17, 2025 - Performance Optimizations
 - **Implemented Query Result Caching**: Added comprehensive caching layer using node-cache for expensive database operations
   - Created four specialized cache instances (query, categories, products, analytics) with different TTL settings
