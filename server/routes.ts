@@ -1159,6 +1159,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Inventory metrics
+  app.get('/api/analytics/inventory-metrics', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const metrics = await storage.getInventoryMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error('Inventory metrics error:', error);
+      res.status(500).json({ message: "Failed to fetch inventory metrics" });
+    }
+  });
+
+  // Customer metrics
+  app.get('/api/analytics/customer-metrics/:days?', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const days = parseInt(req.params.days || '90');
+      const metrics = await storage.getCustomerMetrics(days);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Customer metrics error:', error);
+      res.status(500).json({ message: "Failed to fetch customer metrics" });
+    }
+  });
+
+  // Operations metrics
+  app.get('/api/analytics/operations-metrics/:days?', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const days = parseInt(req.params.days || '30');
+      const metrics = await storage.getOperationsMetrics(days);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Operations metrics error:', error);
+      res.status(500).json({ message: "Failed to fetch operations metrics" });
+    }
+  });
+
   // Peak purchase times
   app.get('/api/analytics/peak-times/:days?', isAuthenticated, async (req, res) => {
     try {

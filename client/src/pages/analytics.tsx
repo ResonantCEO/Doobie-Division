@@ -131,9 +131,9 @@ export default function AnalyticsPage() {
 
   // Fetch new users registered today
   const { data: dailyNewUsersData, isLoading: dailyNewUsersLoading } = useQuery<{ newUsersToday: number }>({
-    queryKey: ["/api/analytics/new-users-today"],
+    queryKey: ["/api/analytics/daily-new-users"],
     queryFn: async () => {
-      const response = await fetch("/api/analytics/new-users-today", { credentials: "include" });
+      const response = await fetch("/api/analytics/daily-new-users", { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch new users today");
       return response.json();
     },
@@ -141,14 +141,6 @@ export default function AnalyticsPage() {
   });
 
 
-  const customerDataSample = [
-    { month: "Jan", new: 45, returning: 123, churn: 12 },
-    { month: "Feb", new: 52, returning: 134, churn: 8 },
-    { month: "Mar", new: 38, returning: 145, churn: 15 },
-    { month: "Apr", new: 63, returning: 156, churn: 9 },
-    { month: "May", new: 49, returning: 167, churn: 11 },
-    { month: "Jun", new: 71, returning: 178, churn: 7 },
-  ];
 
 
 
@@ -220,6 +212,50 @@ export default function AnalyticsPage() {
       return response.json();
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const { data: inventoryMetrics, isLoading: inventoryMetricsLoading } = useQuery<{
+    stockTurnoverRate: number;
+    inventoryValue: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+  }>({
+    queryKey: ["/api/analytics/inventory-metrics"],
+    queryFn: async () => {
+      const response = await fetch("/api/analytics/inventory-metrics", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch inventory metrics");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: customerMetrics, isLoading: customerMetricsLoading } = useQuery<{
+    retentionRate: number;
+    avgPurchaseFrequency: number;
+    customerLifetimeValue: number;
+    customerGrowth: { month: string; new: number; returning: number }[];
+  }>({
+    queryKey: ["/api/analytics/customer-metrics", days],
+    queryFn: async () => {
+      const response = await fetch(`/api/analytics/customer-metrics/${days}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch customer metrics");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: operationsMetrics, isLoading: operationsMetricsLoading } = useQuery<{
+    avgFulfillmentTime: number;
+    fulfillmentRate: number;
+    costOfGoodsSold: number;
+  }>({
+    queryKey: ["/api/analytics/operations-metrics", days],
+    queryFn: async () => {
+      const response = await fetch(`/api/analytics/operations-metrics/${days}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch operations metrics");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
   // Transform products data for inventory aging report
@@ -815,7 +851,7 @@ export default function AnalyticsPage() {
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Based on 30% profit margin
+                    Based on actual purchase costs
                   </p>
                 </CardContent>
               </Card>
@@ -997,10 +1033,10 @@ export default function AnalyticsPage() {
         <TabsContent value="customers" className="space-y-6">
           {/* Customer Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <MetricCard title="Customer Satisfaction Score" value="4.8/5" change="+0.2" icon={Star} color="blue" />
-            <MetricCard title="Customer Retention Rate" value="78.5%" change="+5.2%" icon={Heart} color="green" />
-            <MetricCard title="Average Purchase Frequency" value="2.3/month" change="+0.4" icon={RefreshCw} color="blue" />
-            <MetricCard title="Customer Lifetime Value" value="$1,250" change="+12.1%" icon={Award} color="purple" />
+            <MetricCard title="Total Customers" value={customerData?.totalCustomers || 0} change={`+${customerData?.newCustomersThisMonth || 0} this month`} icon={Users} color="blue" />
+            <MetricCard title="Customer Retention Rate" value={`${customerMetrics?.retentionRate?.toFixed(1) || "0.0"}%`} change="Repeat buyers" icon={Heart} color="green" />
+            <MetricCard title="Avg Purchase Frequency" value={`${customerMetrics?.avgPurchaseFrequency?.toFixed(1) || "0.0"}/period`} change={`Last ${days} days`} icon={RefreshCw} color="blue" />
+            <MetricCard title="Customer Lifetime Value" value={`$${customerMetrics?.customerLifetimeValue?.toFixed(2) || "0.00"}`} change={`Last ${days} days`} icon={Award} color="purple" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -1012,7 +1048,7 @@ export default function AnalyticsPage() {
               <CardContent className="p-4 sm:p-6">
                 <ChartContainer config={chartConfig} className="h-48 sm:h-64 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={customerDataSample} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                    <AreaChart data={customerMetrics?.customerGrowth || []} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" fontSize={12} />
                       <YAxis fontSize={12} />
@@ -1025,154 +1061,41 @@ export default function AnalyticsPage() {
               </CardContent>
             </Card>
 
-            {/* Demographics */}
             <Card>
               <CardHeader>
-                <CardTitle>Customer Demographics</CardTitle>
+                <CardTitle>Customer Overview</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm">Age 18-25</span>
-                      <span className="text-sm">23%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '23%' }}></div>
-                    </div>
+                  <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <span className="text-sm font-medium">Total Customers</span>
+                    <span className="text-sm font-semibold">{customerData?.totalCustomers || 0}</span>
                   </div>
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm">Age 26-35</span>
-                      <span className="text-sm">42%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                      <div className="bg-green-600 h-2 rounded-full" style={{ width: '42%' }}></div>
-                    </div>
+                  <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <span className="text-sm font-medium">New This Month</span>
+                    <span className="text-sm font-semibold">{customerData?.newCustomersThisMonth || 0}</span>
                   </div>
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm">Age 36-45</span>
-                      <span className="text-sm">25%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                      <div className="bg-purple-600 h-2 rounded-full" style={{ width: '25%' }}></div>
-                    </div>
+                  <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <span className="text-sm font-medium">Retention Rate</span>
+                    <span className="text-sm font-semibold">{customerMetrics?.retentionRate?.toFixed(1) || "0.0"}%</span>
                   </div>
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm">Age 45+</span>
-                      <span className="text-sm">10%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                      <div className="bg-orange-600 h-2 rounded-full" style={{ width: '10%' }}></div>
-                    </div>
+                  <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <span className="text-sm font-medium">Avg Purchase Frequency</span>
+                    <span className="text-sm font-semibold">{customerMetrics?.avgPurchaseFrequency?.toFixed(1) || "0.0"} orders</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Customer Behavior Insights */}
           <Card>
             <CardHeader>
-              <CardTitle>Customer Behavior Insights</CardTitle>
+              <CardTitle>Customer Insights</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Segment</TableHead>
-                      <TableHead>Avg Order Size</TableHead>
-                      <TableHead>Purchase Frequency</TableHead>
-                      <TableHead>Preferred Category</TableHead>
-                      <TableHead>Loyalty Score</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-purple-100 text-purple-600">VIP</AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">High-Value Customers</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>$145.60</TableCell>
-                      <TableCell>2.3x/month</TableCell>
-                      <TableCell>Premium Flower</TableCell>
-                      <TableCell>
-                        <Badge className="bg-green-100 text-green-800">Excellent</Badge>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-blue-100 text-blue-600">REG</AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">Regular Buyers</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>$89.40</TableCell>
-                      <TableCell>1.8x/month</TableCell>
-                      <TableCell>Edibles</TableCell>
-                      <TableCell>
-                        <Badge className="bg-blue-100 text-blue-800">Good</Badge>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-orange-100 text-orange-600">NEW</AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">New Customers</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>$67.20</TableCell>
-                      <TableCell>0.8x/month</TableCell>
-                      <TableCell>Vapes</TableCell>
-                      <TableCell>
-                        <Badge className="bg-yellow-100 text-yellow-800">Building</Badge>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-green-100 text-green-600">BUL</AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">Bulk Buyers</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>$198.50</TableCell>
-                      <TableCell>1.2x/month</TableCell>
-                      <TableCell>Pre-rolls</TableCell>
-                      <TableCell>
-                        <Badge className="bg-green-100 text-green-800">Strong</Badge>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-gray-100 text-gray-600">OCO</AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">Occasional Buyers</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>$45.80</TableCell>
-                      <TableCell>0.3x/month</TableCell>
-                      <TableCell>Concentrates</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-orange-600">Needs Attention</Badge>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+              <div className="text-center py-8">
+                <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500 dark:text-gray-400">Customer segmentation data will be available as more orders are placed</p>
               </div>
             </CardContent>
           </Card>
@@ -1183,10 +1106,10 @@ export default function AnalyticsPage() {
         <TabsContent value="inventory" className="space-y-6">
           {/* Inventory Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <MetricCard title="Stock Turnover Rate" value="3.2x" change="+0.4x" icon={RefreshCw} color="blue" />
-            <MetricCard title="Inventory Value" value="$45,280" change="+8.2%" icon={Package} color="green" />
-            <MetricCard title="Low Stock Items" value="12" change="-3" icon={AlertTriangle} color="orange" />
-            <MetricCard title="Out of Stock" value="3" change="-1" icon={Package} color="red" />
+            <MetricCard title="Stock Turnover Rate" value={`${inventoryMetrics?.stockTurnoverRate?.toFixed(1) || "0.0"}x`} change="30 day rate" icon={RefreshCw} color="blue" />
+            <MetricCard title="Inventory Value" value={`$${(inventoryMetrics?.inventoryValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} change="Current value" icon={Package} color="green" />
+            <MetricCard title="Low Stock Items" value={inventoryMetrics?.lowStockCount || 0} change="Needs attention" icon={AlertTriangle} color="orange" />
+            <MetricCard title="Out of Stock" value={inventoryMetrics?.outOfStockCount || 0} change="Urgent" icon={Package} color="red" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -1366,112 +1289,95 @@ export default function AnalyticsPage() {
         <TabsContent value="operations" className="space-y-6">
           {/* Operations Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <MetricCard title="Order Fulfillment Time" value="2.3 days" change="-0.5 days" icon={Clock} color="blue" />
-            <MetricCard title="Operational Efficiency" value="94.2%" change="+2.1%" icon={Zap} color="green" />
-            <MetricCard title="Cost of Goods Sold" value="$15,680" change="+5.2%" icon={DollarSign} color="orange" />
-            <MetricCard title="Cross-Sell Success" value="15.8%" change="+3.2%" icon={Target} color="purple" />
+            <MetricCard title="Order Fulfillment Time" value={`${operationsMetrics?.avgFulfillmentTime?.toFixed(1) || "0.0"} days`} change={`Last ${days} days`} icon={Clock} color="blue" />
+            <MetricCard title="Fulfillment Rate" value={`${operationsMetrics?.fulfillmentRate?.toFixed(1) || "0.0"}%`} change={`Last ${days} days`} icon={Zap} color="green" />
+            <MetricCard title="Cost of Goods Sold" value={`$${(operationsMetrics?.costOfGoodsSold || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} change={`Last ${days} days`} icon={DollarSign} color="orange" />
+            <MetricCard title="Avg Order Value" value={`$${salesMetrics?.averageOrderValue?.toFixed(2) || "0.00"}`} change={`Last ${days} days`} icon={Target} color="purple" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Order Processing Times */}
             <Card>
               <CardHeader>
-                <CardTitle>Order Processing Efficiency</CardTitle>
+                <CardTitle>Operations Summary</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[
-                    { stage: "Order Received", time: "0 min", status: "Complete" },
-                    { stage: "Payment Processing", time: "2 min", status: "Complete" },
-                    { stage: "Inventory Check", time: "5 min", status: "Complete" },
-                    { stage: "Packaging", time: "45 min", status: "In Progress" },
-                    { stage: "Quality Check", time: "15 min", status: "Pending" },
-                    { stage: "Shipping", time: "2-3 days", status: "Pending" }
-                  ].map((step, i) => (
+                  <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <span className="text-sm font-medium">Avg Fulfillment Time</span>
+                    <span className="text-sm font-semibold">{operationsMetrics?.avgFulfillmentTime?.toFixed(1) || "0.0"} days</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <span className="text-sm font-medium">Fulfillment Rate</span>
+                    <span className="text-sm font-semibold">{operationsMetrics?.fulfillmentRate?.toFixed(1) || "0.0"}%</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <span className="text-sm font-medium">Cost of Goods Sold</span>
+                    <span className="text-sm font-semibold">${(operationsMetrics?.costOfGoodsSold || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue by Category</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6">
+                {categoryData.length === 0 ? (
+                  <div className="h-48 sm:h-64 flex items-center justify-center">
+                    <div className="text-center">
+                      <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500 dark:text-gray-400">No category data available</p>
+                    </div>
+                  </div>
+                ) : (
+                  <ChartContainer config={chartConfig} className="h-48 sm:h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={categoryData.map((item, index) => {
+                            const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1', '#d084d0', '#87ceeb', '#dda0dd', '#98fb98', '#f0e68c'];
+                            return { ...item, fill: colors[index % colors.length] };
+                          })}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius="70%"
+                          dataKey="revenue"
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          fontSize={10}
+                        />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Order Status Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {orderBreakdown.length === 0 ? (
+                <div className="text-center py-8">
+                  <ShoppingCart className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500 dark:text-gray-400">No order data available</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {orderBreakdown.map((item, i) => (
                     <div key={i} className="flex justify-between items-center">
-                      <span className="text-sm font-medium">{step.stage}</span>
+                      <span className="text-sm font-medium capitalize">{item.status}</span>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm">{step.time}</span>
-                        <Badge variant={
-                          step.status === "Complete" ? "secondary" :
-                          step.status === "In Progress" ? "default" : "outline"
-                        }>
-                          {step.status}
-                        </Badge>
+                        <span className="text-sm">{item.count} orders</span>
+                        <Badge variant="outline">{totalCustomers > 0 ? ((item.count / totalCustomers) * 100).toFixed(0) : 0}%</Badge>
                       </div>
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Sales Attribution */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Sales Attribution Analysis</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6">
-                <ChartContainer config={chartConfig} className="h-48 sm:h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: "Direct Sales", value: 35, fill: "#8884d8" },
-                          { name: "Referrals", value: 25, fill: "#82ca9d" },
-                          { name: "Social Media", value: 20, fill: "#ffc658" },
-                          { name: "Email Marketing", value: 15, fill: "#ff7c7c" },
-                          { name: "Paid Ads", value: 5, fill: "#8dd1e1" }
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius="70%"
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        fontSize={10}
-                      />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Customer Feedback */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Customer Feedback & Satisfaction</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Overall Satisfaction</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex text-yellow-400">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className="h-4 w-4 fill-current" />
-                      ))}
-                    </div>
-                    <span className="text-sm font-medium">4.8/5</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Product Quality</span>
-                  <span className="text-sm font-medium">95%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Delivery Speed</span>
-                  <span className="text-sm font-medium">92%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Customer Service</span>
-                  <span className="text-sm font-medium">96%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Value for Money</span>
-                  <span className="text-sm font-medium">88%</span>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -138,6 +138,15 @@ export const inventoryLogs = pgTable("inventory_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const userActivityLogs = pgTable("user_activity_logs", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  action: varchar("action").notNull(),
+  details: text("details"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id),
@@ -243,6 +252,13 @@ export const inventoryLogsRelations = relations(inventoryLogs, ({ one }) => ({
   }),
 }));
 
+export const userActivityLogsRelations = relations(userActivityLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [userActivityLogs.userId],
+    references: [users.id],
+  }),
+}));
+
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, {
     fields: [notifications.userId],
@@ -331,6 +347,11 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
   productSku: z.string().optional(),
 });
 
+export const insertUserActivityLogSchema = createInsertSchema(userActivityLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).omit({
   id: true,
   createdAt: true,
@@ -370,6 +391,8 @@ export type Order = typeof orders.$inferSelect & {
 };
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;
+export type InsertUserActivityLog = z.infer<typeof insertUserActivityLogSchema>;
+export type UserActivityLog = typeof userActivityLogs.$inferSelect;
 export type InsertInventoryLog = z.infer<typeof insertInventoryLogSchema>;
 export type InventoryLog = typeof inventoryLogs.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;

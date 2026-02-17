@@ -6,6 +6,7 @@ import {
   orders,
   orderItems,
   inventoryLogs,
+  userActivityLogs,
   notifications,
   supportTickets,
   supportTicketResponses,
@@ -83,6 +84,23 @@ export interface IStorage {
     abandonedCartRate: number;
   }>;
   getPeakPurchaseTimes(days?: number): Promise<{ time: string; orders: number; percentage: number }[]>;
+  getInventoryMetrics(): Promise<{
+    stockTurnoverRate: number;
+    inventoryValue: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+  }>;
+  getCustomerMetrics(days: number): Promise<{
+    retentionRate: number;
+    avgPurchaseFrequency: number;
+    customerLifetimeValue: number;
+    customerGrowth: { month: string; new: number; returning: number }[];
+  }>;
+  getOperationsMetrics(days: number): Promise<{
+    avgFulfillmentTime: number;
+    fulfillmentRate: number;
+    costOfGoodsSold: number;
+  }>;
 
   // Notification operations
   getNotifications(userId?: string): Promise<Notification[]>;
@@ -1126,11 +1144,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             sql`${orders.createdAt} >= ${startDate}`,
-            or(
-              eq(orders.status, 'shipped'),
-              eq(orders.status, 'processing'),
-              eq(orders.status, 'pending')
-            )
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
           )
         );
 
@@ -1154,11 +1168,7 @@ export class DatabaseStorage implements IStorage {
         .innerJoin(products, eq(orderItems.productId, products.id))
         .innerJoin(orders, eq(orderItems.orderId, orders.id))
         .where(
-          or(
-            eq(orders.status, 'shipped'),
-            eq(orders.status, 'processing'),
-            eq(orders.status, 'pending')
-          )
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
         )
         .groupBy(products.id)
         .orderBy(desc(sql`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`))
@@ -1205,11 +1215,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             sql`${orders.createdAt} >= ${startDate}`,
-            or(
-              eq(orders.status, 'shipped'),
-              eq(orders.status, 'processing'),
-              eq(orders.status, 'pending')
-            )
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
           )
         )
         .groupBy(sql`DATE_TRUNC('day', ${orders.createdAt})`)
@@ -1237,11 +1243,7 @@ export class DatabaseStorage implements IStorage {
         .leftJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(orders, eq(orderItems.orderId, orders.id))
         .where(
-          or(
-            eq(orders.status, 'shipped'),
-            eq(orders.status, 'processing'),
-            eq(orders.status, 'pending')
-          )
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
         )
         .groupBy(sql`COALESCE(${categories.name}, 'Uncategorized')`);
 
@@ -1280,11 +1282,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           sql`${orders.createdAt} >= ${startDate}`,
-          or(
-            eq(orders.status, 'shipped'),
-            eq(orders.status, 'processing'),
-            eq(orders.status, 'pending')
-          )
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
         )
       );
 
@@ -1298,11 +1296,7 @@ export class DatabaseStorage implements IStorage {
         and(
           sql`${orders.createdAt} >= ${prevStartDate}`,
           sql`${orders.createdAt} < ${prevEndDate}`,
-          or(
-            eq(orders.status, 'shipped'),
-            eq(orders.status, 'processing'),
-            eq(orders.status, 'pending')
-          )
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
         )
       );
 
@@ -1324,17 +1318,42 @@ export class DatabaseStorage implements IStorage {
     const prevSales = Number(prevSalesResult[0]?.totalSales || 0);
     const cancelledOrders = Number(returnResult[0]?.cancelledOrders || 0);
 
-    // Calculate metrics
-    const netProfit = currentSales * 0.3; // Assuming 30% profit margin
+    // Calculate net profit using actual purchase prices from order items
+    const profitResult = await db
+      .select({
+        totalRevenue: sql<number>`COALESCE(SUM(CAST(${orderItems.subtotal} AS NUMERIC)), 0)`,
+        totalCost: sql<number>`COALESCE(SUM(
+          CASE
+            WHEN ${products.purchasePrice} IS NOT NULL THEN CAST(${products.purchasePrice} AS NUMERIC) * ${orderItems.quantity}
+            WHEN ${products.purchasePricePerGram} IS NOT NULL AND ${products.pricePerGram} IS NOT NULL THEN
+              CAST(${products.purchasePricePerGram} AS NUMERIC) * (CAST(${orderItems.subtotal} AS NUMERIC) / NULLIF(CAST(${products.pricePerGram} AS NUMERIC), 0))
+            ELSE CAST(${orderItems.subtotal} AS NUMERIC) * 0.7
+          END
+        ), 0)`,
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .leftJoin(products, eq(orderItems.productId, products.id))
+      .where(
+        and(
+          sql`${orders.createdAt} >= ${startDate}`,
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+        )
+      );
+
+    const totalRevenue = Number(profitResult[0]?.totalRevenue || 0);
+    const totalCost = Number(profitResult[0]?.totalCost || 0);
+    const netProfit = totalRevenue - totalCost;
+
     const salesGrowthRate = prevSales > 0 ? ((currentSales - prevSales) / prevSales) * 100 : 0;
-    const returnRate = currentOrders > 0 ? (cancelledOrders / currentOrders) * 100 : 0;
-    const abandonedCartRate = 25.5; // Mock data - would need cart tracking implementation
+    const totalAllOrders = currentOrders + cancelledOrders;
+    const returnRate = totalAllOrders > 0 ? (cancelledOrders / totalAllOrders) * 100 : 0;
 
     return {
       netProfit,
       salesGrowthRate,
       returnRate,
-      abandonedCartRate,
+      abandonedCartRate: 0,
     };
   }
 
@@ -1438,6 +1457,242 @@ export class DatabaseStorage implements IStorage {
       .slice(0, 6); // Take top 6 time ranges
 
     return peakTimes;
+  }
+
+  async getInventoryMetrics(): Promise<{
+    stockTurnoverRate: number;
+    inventoryValue: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+  }> {
+    const [inventoryStats] = await db
+      .select({
+        totalProducts: sql<number>`COUNT(*)`,
+        totalInventoryValue: sql<number>`COALESCE(SUM(
+          CASE
+            WHEN ${products.purchasePrice} IS NOT NULL THEN CAST(${products.purchasePrice} AS NUMERIC) * ${products.stock}
+            WHEN ${products.price} IS NOT NULL THEN CAST(${products.price} AS NUMERIC) * ${products.stock}
+            ELSE 0
+          END
+        ), 0)`,
+        lowStockCount: sql<number>`COUNT(CASE WHEN ${products.stock} <= ${products.minStockThreshold} AND ${products.stock} > 0 THEN 1 END)`,
+        outOfStockCount: sql<number>`COUNT(CASE WHEN ${products.stock} = 0 THEN 1 END)`,
+        totalStockUnits: sql<number>`COALESCE(SUM(${products.stock}), 0)`,
+      })
+      .from(products)
+      .where(eq(products.isActive, true));
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const [soldUnits] = await db
+      .select({
+        totalSold: sql<number>`COALESCE(SUM(${orderItems.quantity}), 0)`,
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(
+        and(
+          sql`${orders.createdAt} >= ${thirtyDaysAgo}`,
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+        )
+      );
+
+    const totalStock = Number(inventoryStats.totalStockUnits) || 1;
+    const totalSold = Number(soldUnits.totalSold) || 0;
+    const stockTurnoverRate = Math.round((totalSold / totalStock) * 10) / 10;
+
+    return {
+      stockTurnoverRate,
+      inventoryValue: Number(inventoryStats.totalInventoryValue),
+      lowStockCount: Number(inventoryStats.lowStockCount),
+      outOfStockCount: Number(inventoryStats.outOfStockCount),
+    };
+  }
+
+  async getCustomerMetrics(days: number): Promise<{
+    retentionRate: number;
+    avgPurchaseFrequency: number;
+    customerLifetimeValue: number;
+    customerGrowth: { month: string; new: number; returning: number }[];
+  }> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const [customerStats] = await db
+      .select({
+        totalCustomers: sql<number>`COUNT(DISTINCT ${orders.customerId})`,
+        totalOrders: sql<number>`COUNT(*)`,
+        totalRevenue: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
+      })
+      .from(orders)
+      .where(
+        and(
+          sql`${orders.createdAt} >= ${startDate}`,
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+        )
+      );
+
+    const totalCustomers = Number(customerStats.totalCustomers) || 1;
+    const totalOrders = Number(customerStats.totalOrders) || 0;
+    const totalRevenue = Number(customerStats.totalRevenue) || 0;
+
+    const avgPurchaseFrequency = Math.round((totalOrders / totalCustomers) * 10) / 10;
+    const customerLifetimeValue = Math.round((totalRevenue / totalCustomers) * 100) / 100;
+
+    const repeatCustomerResult = await db
+      .select({
+        repeatCount: sql<number>`COUNT(*)`,
+      })
+      .from(
+        db
+          .select({
+            customerId: orders.customerId,
+            orderCount: sql<number>`COUNT(*)`,
+          })
+          .from(orders)
+          .where(
+            and(
+              sql`${orders.createdAt} >= ${startDate}`,
+              inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+            )
+          )
+          .groupBy(orders.customerId)
+          .having(sql`COUNT(*) > 1`)
+          .as('repeat_customers')
+      );
+
+    const repeatCustomers = Number(repeatCustomerResult[0]?.repeatCount || 0);
+    const retentionRate = totalCustomers > 0 ? Math.round((repeatCustomers / totalCustomers) * 1000) / 10 : 0;
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const monthlyGrowth = await db
+      .select({
+        month: sql<string>`TO_CHAR(${users.createdAt}, 'Mon')`,
+        monthNum: sql<number>`EXTRACT(MONTH FROM ${users.createdAt})`,
+        yearNum: sql<number>`EXTRACT(YEAR FROM ${users.createdAt})`,
+        newUsers: sql<number>`COUNT(*)`,
+      })
+      .from(users)
+      .where(
+        and(
+          sql`${users.createdAt} >= ${sixMonthsAgo}`,
+          eq(users.role, 'customer')
+        )
+      )
+      .groupBy(
+        sql`TO_CHAR(${users.createdAt}, 'Mon')`,
+        sql`EXTRACT(MONTH FROM ${users.createdAt})`,
+        sql`EXTRACT(YEAR FROM ${users.createdAt})`
+      )
+      .orderBy(
+        sql`EXTRACT(YEAR FROM ${users.createdAt})`,
+        sql`EXTRACT(MONTH FROM ${users.createdAt})`
+      );
+
+    const monthlyOrders = await db
+      .select({
+        month: sql<string>`TO_CHAR(${orders.createdAt}, 'Mon')`,
+        monthNum: sql<number>`EXTRACT(MONTH FROM ${orders.createdAt})`,
+        yearNum: sql<number>`EXTRACT(YEAR FROM ${orders.createdAt})`,
+        returningCustomers: sql<number>`COUNT(DISTINCT ${orders.customerId})`,
+      })
+      .from(orders)
+      .where(
+        and(
+          sql`${orders.createdAt} >= ${sixMonthsAgo}`,
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+        )
+      )
+      .groupBy(
+        sql`TO_CHAR(${orders.createdAt}, 'Mon')`,
+        sql`EXTRACT(MONTH FROM ${orders.createdAt})`,
+        sql`EXTRACT(YEAR FROM ${orders.createdAt})`
+      )
+      .orderBy(
+        sql`EXTRACT(YEAR FROM ${orders.createdAt})`,
+        sql`EXTRACT(MONTH FROM ${orders.createdAt})`
+      );
+
+    const customerGrowth = monthlyGrowth.map(mg => {
+      const matchingOrder = monthlyOrders.find(
+        mo => Number(mo.monthNum) === Number(mg.monthNum) && Number(mo.yearNum) === Number(mg.yearNum)
+      );
+      return {
+        month: mg.month,
+        new: Number(mg.newUsers),
+        returning: Number(matchingOrder?.returningCustomers || 0),
+      };
+    });
+
+    return {
+      retentionRate,
+      avgPurchaseFrequency,
+      customerLifetimeValue,
+      customerGrowth,
+    };
+  }
+
+  async getOperationsMetrics(days: number): Promise<{
+    avgFulfillmentTime: number;
+    fulfillmentRate: number;
+    costOfGoodsSold: number;
+  }> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const [fulfillmentStats] = await db
+      .select({
+        totalOrders: sql<number>`COUNT(*)`,
+        fulfilledOrders: sql<number>`COUNT(CASE WHEN ${orders.status} IN ('shipped', 'completed') THEN 1 END)`,
+        avgFulfillmentHours: sql<number>`COALESCE(AVG(
+          CASE WHEN ${orders.status} IN ('shipped', 'completed') AND ${orders.updatedAt} IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (${orders.updatedAt} - ${orders.createdAt})) / 3600
+          END
+        ), 0)`,
+      })
+      .from(orders)
+      .where(
+        and(
+          sql`${orders.createdAt} >= ${startDate}`,
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+        )
+      );
+
+    const [cogsResult] = await db
+      .select({
+        totalCogs: sql<number>`COALESCE(SUM(
+          CASE
+            WHEN ${products.purchasePrice} IS NOT NULL THEN CAST(${products.purchasePrice} AS NUMERIC) * ${orderItems.quantity}
+            WHEN ${products.purchasePricePerGram} IS NOT NULL AND ${products.pricePerGram} IS NOT NULL THEN
+              CAST(${products.purchasePricePerGram} AS NUMERIC) * (CAST(${orderItems.subtotal} AS NUMERIC) / NULLIF(CAST(${products.pricePerGram} AS NUMERIC), 0))
+            ELSE CAST(${orderItems.subtotal} AS NUMERIC) * 0.7
+          END
+        ), 0)`,
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .leftJoin(products, eq(orderItems.productId, products.id))
+      .where(
+        and(
+          sql`${orders.createdAt} >= ${startDate}`,
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+        )
+      );
+
+    const totalOrders = Number(fulfillmentStats.totalOrders) || 1;
+    const fulfilledOrders = Number(fulfillmentStats.fulfilledOrders) || 0;
+    const avgFulfillmentHours = Number(fulfillmentStats.avgFulfillmentHours) || 0;
+    const avgFulfillmentDays = Math.round((avgFulfillmentHours / 24) * 10) / 10;
+    const fulfillmentRate = Math.round((fulfilledOrders / totalOrders) * 1000) / 10;
+
+    return {
+      avgFulfillmentTime: avgFulfillmentDays,
+      fulfillmentRate,
+      costOfGoodsSold: Number(cogsResult.totalCogs),
+    };
   }
 
   // Notification operations
@@ -1907,19 +2162,14 @@ export class DatabaseStorage implements IStorage {
 
   async logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void> {
     try {
-      // For now, we'll use the inventory_logs table to store user activity
-      // In a production system, you'd want a dedicated user_activity_logs table
-      await db.insert(inventoryLogs).values({
-        userId: userId,
-        type: 'user_activity',
-        quantity: 0,
-        previousStock: 0,
-        newStock: 0,
-        reason: action
+      await db.insert(userActivityLogs).values({
+        userId,
+        action,
+        details,
+        metadata: metadata ? metadata : null,
       });
     } catch (error) {
       console.error('Error logging user activity:', error);
-      // Don't throw here as this shouldn't break the main operation
     }
   }
 
@@ -1927,24 +2177,44 @@ export class DatabaseStorage implements IStorage {
     try {
       const { limit = 50, type } = options;
 
-      // Get inventory activity with proper null handling
+      const activityLogs = await db
+        .select({
+          id: userActivityLogs.id,
+          type: sql<string>`'user_activity'`,
+          action: userActivityLogs.action,
+          details: userActivityLogs.details,
+          timestamp: userActivityLogs.createdAt,
+          metadata: userActivityLogs.metadata,
+          productName: sql<string | null>`NULL`,
+          productSku: sql<string | null>`NULL`,
+        })
+        .from(userActivityLogs)
+        .where(eq(userActivityLogs.userId, userId))
+        .orderBy(desc(userActivityLogs.createdAt))
+        .limit(limit);
+
       const inventoryActivity = await db
         .select({
           id: inventoryLogs.id,
           type: inventoryLogs.type,
           action: inventoryLogs.reason,
-          details: inventoryLogs.quantity,
+          details: sql<string>`'Qty: ' || ${inventoryLogs.quantity}::text`,
           timestamp: inventoryLogs.createdAt,
+          metadata: sql<any>`NULL`,
           productName: sql<string | null>`${products.name}`,
           productSku: sql<string | null>`${products.sku}`,
         })
         .from(inventoryLogs)
         .leftJoin(products, eq(inventoryLogs.productId, products.id))
-        .where(eq(inventoryLogs.userId, userId))
+        .where(
+          and(
+            eq(inventoryLogs.userId, userId),
+            sql`${inventoryLogs.productId} IS NOT NULL`
+          )
+        )
         .orderBy(desc(inventoryLogs.createdAt))
         .limit(limit);
 
-      // Get order activity
       const orderActivity = await db
         .select({
           id: orders.id,
@@ -1959,6 +2229,7 @@ export class DatabaseStorage implements IStorage {
           END`,
           details: orders.total,
           timestamp: orders.createdAt,
+          metadata: sql<any>`NULL`,
           productName: sql<string | null>`NULL`,
           productSku: sql<string | null>`NULL`,
         })
@@ -1967,13 +2238,7 @@ export class DatabaseStorage implements IStorage {
         .orderBy(desc(orders.createdAt))
         .limit(limit);
 
-      // Combine and sort all activities with proper null handling
-      const allActivity = [...inventoryActivity, ...orderActivity]
-        .map(activity => ({
-          ...activity,
-          productName: activity.productName || null,
-          productSku: activity.productSku || null,
-        }))
+      const allActivity = [...activityLogs, ...inventoryActivity, ...orderActivity]
         .sort((a, b) => new Date(b.timestamp || '').getTime() - new Date(a.timestamp || '').getTime())
         .slice(0, limit);
 
