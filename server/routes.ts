@@ -1,10 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import express from "express";
 import path from "path";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
-import fs from "fs";
 import QRCode from "qrcode";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
@@ -14,7 +12,7 @@ import { z } from "zod";
 import { db } from "./db";
 import { orders, products, orderItems, users, supportTickets, notifications } from "@shared/schema";
 import { eq, sql, desc, and, gte, lt, inArray } from "drizzle-orm";
-import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 
 // WebSocket connection store
@@ -45,25 +43,9 @@ const requireRole = (roles: string[]) => {
   };
 };
 
-// Configure multer for image uploads
-const uploadDir = path.join(process.cwd(), 'uploads', 'product-images');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage_multer = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueId = uuidv4();
-    const extension = path.extname(file.originalname);
-    cb(null, `${uniqueId}${extension}`);
-  }
-});
-
+// Configure multer for image uploads (memory storage for Object Storage)
 const upload = multer({
-  storage: storage_multer,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
@@ -77,28 +59,9 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Static file serving for uploaded images
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-
-  // Configure multer for verification photo uploads
-  const verificationUploadDir = path.join(process.cwd(), 'uploads', 'verification-photos');
-  if (!fs.existsSync(verificationUploadDir)) {
-    fs.mkdirSync(verificationUploadDir, { recursive: true });
-  }
-
-  const verificationStorage = multer.diskStorage({
-    destination: function (req, file, cb) {
-      cb(null, verificationUploadDir);
-    },
-    filename: function (req, file, cb) {
-      const uniqueId = uuidv4();
-      const extension = path.extname(file.originalname);
-      cb(null, `${uniqueId}${extension}`);
-    }
-  });
 
   const verificationUpload = multer({
-    storage: verificationStorage,
+    storage: multer.memoryStorage(),
     limits: {
       fileSize: 5 * 1024 * 1024, // 5MB limit
     },
@@ -230,32 +193,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Image upload endpoint
-  app.post('/api/upload/product-image', isAuthenticated, requireRole(['admin', 'manager', 'staff']), upload.single('image'), (req: any, res) => {
+  // Image upload endpoint - stores in Object Storage for persistence across deployments
+  app.post('/api/upload/product-image', isAuthenticated, requireRole(['admin', 'manager', 'staff']), upload.single('image'), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No image file provided' });
       }
 
-      const imageUrl = `/uploads/product-images/${req.file.filename}`;
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const uniqueId = uuidv4();
+      const extension = path.extname(req.file.originalname) || '.jpg';
+      const objectName = `product-images/${uniqueId}${extension}`;
+      const fullPath = `${privateDir}/${objectName}`;
+
+      const parts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join('/');
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectKey);
+
+      await file.save(req.file.buffer, {
+        metadata: {
+          contentType: req.file.mimetype,
+        },
+      });
+
+      const imageUrl = `/api/product-images/${uniqueId}${extension}`;
       res.json({ imageUrl });
     } catch (error) {
+      console.error('Product image upload error:', error);
       res.status(500).json({ message: 'Failed to upload image' });
     }
   });
 
-  // Verification photo upload endpoint
-  app.post('/api/upload/verification-photo', verificationUpload.single('verificationPhoto'), (req: any, res) => {
+  // Serve product images from Object Storage
+  app.get('/api/product-images/:filename', async (req: any, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const fullPath = `${privateDir}/product-images/${req.params.filename}`;
+
+      const parts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join('/');
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectKey);
+
+      const [exists] = await file.exists();
+      if (!exists) {
+        return res.status(404).json({ message: 'Image not found' });
+      }
+
+      const [metadata] = await file.getMetadata();
+      res.set({
+        'Content-Type': metadata.contentType || 'image/jpeg',
+        'Cache-Control': 'public, max-age=86400',
+      });
+
+      const stream = file.createReadStream();
+      stream.on('error', (err) => {
+        console.error('Stream error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Error streaming image' });
+        }
+      });
+      stream.pipe(res);
+    } catch (error) {
+      console.error('Product image serve error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Error serving image' });
+      }
+    }
+  });
+
+  // Verification photo upload endpoint - stores in Object Storage
+  app.post('/api/upload/verification-photo', verificationUpload.single('verificationPhoto'), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No verification photo provided' });
       }
 
-      const imageUrl = `/uploads/verification-photos/${req.file.filename}`;
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const uniqueId = uuidv4();
+      const extension = path.extname(req.file.originalname) || '.jpg';
+      const objectName = `verification-photos/${uniqueId}${extension}`;
+      const fullPath = `${privateDir}/${objectName}`;
+
+      const parts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join('/');
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectKey);
+
+      await file.save(req.file.buffer, {
+        metadata: {
+          contentType: req.file.mimetype,
+        },
+      });
+
+      const imageUrl = `/api/verification-photos/${uniqueId}${extension}`;
       res.json({ imageUrl });
     } catch (error) {
       console.error('Verification photo upload error:', error);
       res.status(500).json({ message: 'Failed to upload verification photo' });
+    }
+  });
+
+  // Serve verification photos from Object Storage
+  app.get('/api/verification-photos/:filename', isAuthenticated, async (req: any, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const fullPath = `${privateDir}/verification-photos/${req.params.filename}`;
+
+      const parts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join('/');
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectKey);
+
+      const [exists] = await file.exists();
+      if (!exists) {
+        return res.status(404).json({ message: 'Photo not found' });
+      }
+
+      const [metadata] = await file.getMetadata();
+      res.set({
+        'Content-Type': metadata.contentType || 'image/jpeg',
+        'Cache-Control': 'private, max-age=3600',
+      });
+
+      const stream = file.createReadStream();
+      stream.on('error', (err) => {
+        console.error('Stream error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Error streaming photo' });
+        }
+      });
+      stream.pipe(res);
+    } catch (error) {
+      console.error('Verification photo serve error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Error serving photo' });
+      }
     }
   });
 
