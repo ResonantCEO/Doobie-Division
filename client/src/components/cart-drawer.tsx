@@ -198,6 +198,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           order: orderData,
           items: orderItems,
@@ -225,13 +226,21 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       } else {
         const errorData = await response.json();
         console.error("Order creation failed:", errorData);
-        setIsCheckingOut(false); // Reset checkout state on order failure
-        // Don't show toast, form validation will handle highlighting missing fields
+        setIsCheckingOut(false);
+        toast({
+          title: "Order Failed",
+          description: errorData?.message || "Failed to create order. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Order creation failed:', error);
-      setIsCheckingOut(false); // Reset checkout state on catch error
-      // Don't show toast, form validation will handle highlighting missing fields
+      setIsCheckingOut(false);
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
