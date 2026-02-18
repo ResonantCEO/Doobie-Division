@@ -1176,16 +1176,16 @@ export class DatabaseStorage implements IStorage {
           .returning()
       );
 
-      if (!updatedOrder) {
-        throw new Error("Order not found");
+      if (updatedOrder) {
+        return updatedOrder;
       }
 
-      return updatedOrder;
+      console.warn('[updateOrderStatus] Update returned empty, falling back to direct fetch');
     } catch (error: any) {
-      if (error?.message === "Order not found") {
-        throw error;
-      }
       console.warn('[updateOrderStatus] Retry failed, fetching order directly:', error?.message);
+    }
+
+    {
       const [order] = await retryQuery(() => db.select().from(orders).where(eq(orders.id, orderId)));
       if (!order) {
         throw new Error("Order not found");
