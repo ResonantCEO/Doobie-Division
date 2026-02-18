@@ -40,13 +40,22 @@ type OrderWithItems = Order & { items: (OrderItem & { product: Product | null })
 function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number }) {
   const { toast } = useToast();
   const [fulfillingItems, setFulfillingItems] = useState<Set<number>>(new Set());
+  const [localFulfilled, setLocalFulfilled] = useState<Record<number, boolean>>({});
   
   const { data: orderWithItems, isLoading } = useQuery<OrderWithItems>({
-    queryKey: ['/api/orders', orderId],
+    queryKey: ['/api/order-detail', orderId],
+    queryFn: async () => {
+      const res = await fetch(`/api/orders/${orderId}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch order');
+      return res.json();
+    },
+    staleTime: Infinity,
+    gcTime: Infinity,
   });
 
   const updateItemFulfilledCache = (productId: number, fulfilled: boolean) => {
-    queryClient.setQueryData<OrderWithItems>(['/api/orders', orderId], (old) => {
+    setLocalFulfilled(prev => ({ ...prev, [productId]: fulfilled }));
+    queryClient.setQueryData<OrderWithItems>(['/api/order-detail', orderId], (old) => {
       if (!old) return old;
       return {
         ...old,
@@ -55,6 +64,13 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
         ),
       };
     });
+  };
+
+  const isItemFulfilled = (item: OrderItem & { product: Product | null }) => {
+    if (item.productId && item.productId in localFulfilled) {
+      return localFulfilled[item.productId];
+    }
+    return item.fulfilled || false;
   };
 
   const fulfillItemMutation = useMutation({
@@ -72,8 +88,8 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       return response.json();
     },
     onMutate: async ({ productId }) => {
-      await queryClient.cancelQueries({ queryKey: ['/api/orders', orderId] });
-      const previousData = queryClient.getQueryData<OrderWithItems>(['/api/orders', orderId]);
+      await queryClient.cancelQueries({ queryKey: ['/api/order-detail', orderId] });
+      const previousData = queryClient.getQueryData<OrderWithItems>(['/api/order-detail', orderId]);
       updateItemFulfilledCache(productId, true);
       return { previousData };
     },
@@ -82,12 +98,14 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
         title: "Item Fulfilled",
         description: "Physical inventory has been adjusted",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/orders', orderId] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['/api/orders', orderId], context.previousData);
+        queryClient.setQueryData(['/api/order-detail', orderId], context.previousData);
+        if (_variables.productId) {
+          setLocalFulfilled(prev => ({ ...prev, [_variables.productId]: false }));
+        }
       }
       toast({
         title: "Error",
@@ -119,8 +137,8 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       return response.json();
     },
     onMutate: async ({ productId }) => {
-      await queryClient.cancelQueries({ queryKey: ['/api/orders', orderId] });
-      const previousData = queryClient.getQueryData<OrderWithItems>(['/api/orders', orderId]);
+      await queryClient.cancelQueries({ queryKey: ['/api/order-detail', orderId] });
+      const previousData = queryClient.getQueryData<OrderWithItems>(['/api/order-detail', orderId]);
       updateItemFulfilledCache(productId, false);
       return { previousData };
     },
@@ -129,12 +147,14 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
         title: "Item Unfulfilled",
         description: "Inventory has been restored",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/orders', orderId] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['/api/orders', orderId], context.previousData);
+        queryClient.setQueryData(['/api/order-detail', orderId], context.previousData);
+        if (_variables.productId) {
+          setLocalFulfilled(prev => ({ ...prev, [_variables.productId]: true }));
+        }
       }
       toast({
         title: "Error",
@@ -190,17 +210,19 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
         <div className="space-y-2">
           <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Order Items:</div>
           <div className="grid gap-2">
-            {orderWithItems.items.map((item) => (
+            {orderWithItems.items.map((item) => {
+              const fulfilled = isItemFulfilled(item);
+              return (
               <div 
                 key={item.id} 
-                className={`flex items-center justify-between bg-white dark:bg-gray-800 rounded-md px-4 py-2 border ${item.fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'}`}
+                className={`flex items-center justify-between bg-white dark:bg-gray-800 rounded-md px-4 py-2 border ${fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'}`}
               >
                 <div className="flex items-center gap-3">
                   {fulfillingItems.has(item.productId!) ? (
                     <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                   ) : (
                     <Checkbox
-                      checked={item.fulfilled || false}
+                      checked={fulfilled}
                       onCheckedChange={(checked) => {
                         if (item.productId) {
                           if (checked) {
@@ -211,15 +233,15 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                         }
                       }}
                       className="h-5 w-5"
-                      title={item.fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory"}
+                      title={fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory"}
                     />
                   )}
                   <div>
-                    <span className={`font-medium ${item.fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>{item.productName}</span>
+                    <span className={`font-medium ${fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>{item.productName}</span>
                     {item.productSku && (
                       <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">SKU: {item.productSku}</span>
                     )}
-                    {item.fulfilled && (
+                    {fulfilled && (
                       <span className="ml-2 text-xs text-green-600 dark:text-green-400 font-medium">(Fulfilled)</span>
                     )}
                   </div>
@@ -236,7 +258,8 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </TableCell>
@@ -247,13 +270,22 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
 function MobileOrderItems({ orderId }: { orderId: number }) {
   const { toast } = useToast();
   const [fulfillingItems, setFulfillingItems] = useState<Set<number>>(new Set());
+  const [localFulfilled, setLocalFulfilled] = useState<Record<number, boolean>>({});
   
   const { data: orderWithItems, isLoading } = useQuery<OrderWithItems>({
-    queryKey: ['/api/orders', orderId],
+    queryKey: ['/api/order-detail', orderId],
+    queryFn: async () => {
+      const res = await fetch(`/api/orders/${orderId}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch order');
+      return res.json();
+    },
+    staleTime: Infinity,
+    gcTime: Infinity,
   });
 
   const updateItemFulfilledCache = (productId: number, fulfilled: boolean) => {
-    queryClient.setQueryData<OrderWithItems>(['/api/orders', orderId], (old) => {
+    setLocalFulfilled(prev => ({ ...prev, [productId]: fulfilled }));
+    queryClient.setQueryData<OrderWithItems>(['/api/order-detail', orderId], (old) => {
       if (!old) return old;
       return {
         ...old,
@@ -262,6 +294,13 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
         ),
       };
     });
+  };
+
+  const isItemFulfilled = (item: OrderItem & { product: Product | null }) => {
+    if (item.productId && item.productId in localFulfilled) {
+      return localFulfilled[item.productId];
+    }
+    return item.fulfilled || false;
   };
 
   const fulfillItemMutation = useMutation({
@@ -279,8 +318,8 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       return response.json();
     },
     onMutate: async ({ productId }) => {
-      await queryClient.cancelQueries({ queryKey: ['/api/orders', orderId] });
-      const previousData = queryClient.getQueryData<OrderWithItems>(['/api/orders', orderId]);
+      await queryClient.cancelQueries({ queryKey: ['/api/order-detail', orderId] });
+      const previousData = queryClient.getQueryData<OrderWithItems>(['/api/order-detail', orderId]);
       updateItemFulfilledCache(productId, true);
       return { previousData };
     },
@@ -289,12 +328,14 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
         title: "Item Fulfilled",
         description: "Physical inventory has been adjusted",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/orders', orderId] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['/api/orders', orderId], context.previousData);
+        queryClient.setQueryData(['/api/order-detail', orderId], context.previousData);
+        if (_variables.productId) {
+          setLocalFulfilled(prev => ({ ...prev, [_variables.productId]: false }));
+        }
       }
       toast({
         title: "Error",
@@ -326,8 +367,8 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       return response.json();
     },
     onMutate: async ({ productId }) => {
-      await queryClient.cancelQueries({ queryKey: ['/api/orders', orderId] });
-      const previousData = queryClient.getQueryData<OrderWithItems>(['/api/orders', orderId]);
+      await queryClient.cancelQueries({ queryKey: ['/api/order-detail', orderId] });
+      const previousData = queryClient.getQueryData<OrderWithItems>(['/api/order-detail', orderId]);
       updateItemFulfilledCache(productId, false);
       return { previousData };
     },
@@ -336,12 +377,14 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
         title: "Item Unfulfilled",
         description: "Inventory has been restored",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/orders', orderId] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['/api/orders', orderId], context.previousData);
+        queryClient.setQueryData(['/api/order-detail', orderId], context.previousData);
+        if (_variables.productId) {
+          setLocalFulfilled(prev => ({ ...prev, [_variables.productId]: true }));
+        }
       }
       toast({
         title: "Error",
@@ -390,16 +433,18 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
   return (
     <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-2">
       <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Order Items:</div>
-      {orderWithItems.items.map((item) => (
+      {orderWithItems.items.map((item) => {
+        const fulfilled = isItemFulfilled(item);
+        return (
         <div 
           key={item.id} 
-          className={`flex items-center gap-3 bg-white dark:bg-gray-800 rounded-md px-3 py-2 border ${item.fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'}`}
+          className={`flex items-center gap-3 bg-white dark:bg-gray-800 rounded-md px-3 py-2 border ${fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'}`}
         >
           {fulfillingItems.has(item.productId!) ? (
             <Loader2 className="h-5 w-5 animate-spin text-gray-400 flex-shrink-0" />
           ) : (
             <Checkbox
-              checked={item.fulfilled || false}
+              checked={fulfilled}
               onCheckedChange={(checked) => {
                 if (item.productId) {
                   if (checked) {
@@ -410,13 +455,13 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
                 }
               }}
               className="h-5 w-5 flex-shrink-0"
-              title={item.fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory"}
+              title={fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory"}
             />
           )}
           <div className="flex-1 min-w-0">
-            <div className={`font-medium text-sm ${item.fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
+            <div className={`font-medium text-sm ${fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
               {item.productName}
-              {item.fulfilled && <span className="ml-1 text-xs">(Fulfilled)</span>}
+              {fulfilled && <span className="ml-1 text-xs">(Fulfilled)</span>}
             </div>
             {item.productSku && (
               <div className="text-xs text-gray-500 dark:text-gray-400">SKU: {item.productSku}</div>
@@ -427,7 +472,8 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
             <div className="text-xs text-gray-600 dark:text-gray-400">${Number(item.subtotal).toFixed(2)}</div>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
