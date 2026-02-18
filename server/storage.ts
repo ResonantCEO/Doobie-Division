@@ -161,6 +161,11 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private extractSizeFromProductName(productName: string): string | null {
+    const match = productName.match(/\(Size:\s*([^)]+)\)/);
+    return match ? match[1].trim() : null;
+  }
+
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -1134,6 +1139,11 @@ export class DatabaseStorage implements IStorage {
     for (const item of items) {
       try {
         await db.execute(sql`UPDATE products SET stock = stock - ${item.quantity}, updated_at = NOW() WHERE id = ${item.productId}`);
+
+        const sizeName = this.extractSizeFromProductName(item.productName);
+        if (sizeName) {
+          await db.execute(sql`UPDATE product_sizes SET quantity = quantity - ${item.quantity}, updated_at = NOW() WHERE product_id = ${item.productId} AND size = ${sizeName}`);
+        }
       } catch (stockErr) {
         console.warn('[createOrder] Stock update error:', stockErr);
       }
@@ -1188,10 +1198,23 @@ export class DatabaseStorage implements IStorage {
       .where(eq(products.id, productId));
 
     // Mark order item as fulfilled
+    const [fulfilledItem] = await db
+      .select()
+      .from(orderItems)
+      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)))
+      .limit(1);
+
     await db
       .update(orderItems)
       .set({ fulfilled: true })
       .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
+
+    if (fulfilledItem) {
+      const sizeName = this.extractSizeFromProductName(fulfilledItem.productName);
+      if (sizeName) {
+        await db.execute(sql`UPDATE product_sizes SET physical_quantity = physical_quantity - ${quantity}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`);
+      }
+    }
 
     // Log the physical inventory change
     await db.insert(inventoryLogs).values({
@@ -1240,11 +1263,25 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(products.id, productId));
 
+    // Get the order item to extract size info before marking as unfulfilled
+    const [unfulfillItem] = await db
+      .select()
+      .from(orderItems)
+      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)))
+      .limit(1);
+
     // Mark order item as not fulfilled
     await db
       .update(orderItems)
       .set({ fulfilled: false })
       .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
+
+    if (unfulfillItem) {
+      const sizeName = this.extractSizeFromProductName(unfulfillItem.productName);
+      if (sizeName) {
+        await db.execute(sql`UPDATE product_sizes SET physical_quantity = physical_quantity + ${quantity}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`);
+      }
+    }
 
     // Log the physical inventory change
     await db.insert(inventoryLogs).values({
