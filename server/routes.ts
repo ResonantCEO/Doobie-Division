@@ -455,13 +455,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      // Only return product if it's active (for storefront)
-      if (!product.isActive && !req.headers.authorization) {
-        return res.status(404).json({ message: "Product not found" });
-      }
+      
 
       res.json(product);
     } catch (error) {
+      console.error('[GET /api/products/:id] error:', error);
       res.status(500).json({ message: "Failed to fetch product" });
     }
   });

@@ -34,6 +34,24 @@ import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, 
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
+async function retryQuery<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      const isNeonParseError = error?.cause?.message?.includes("Cannot read properties of null") ||
+        error?.message?.includes("Cannot read properties of null");
+      if (isNeonParseError && attempt < retries) {
+        console.warn(`[retryQuery] Neon parse error, retrying (attempt ${attempt + 1}/${retries})...`);
+        await new Promise(r => setTimeout(r, 50 * (attempt + 1)));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error("retryQuery: exhausted retries");
+}
+
 export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
@@ -496,10 +514,9 @@ export class DatabaseStorage implements IStorage {
     try {
       const productIds = productsList.map(p => p.id);
       
-      const sizes = await db
-        .select()
-        .from(productSizes)
-        .where(inArray(productSizes.productId, productIds));
+      const sizes = await retryQuery(() =>
+        db.select().from(productSizes).where(inArray(productSizes.productId, productIds))
+      );
 
       // Group sizes by product ID
       const sizesByProductId = new Map<number, ProductSize[]>();
@@ -529,49 +546,90 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProduct(id: number): Promise<(Product & { category: Category | null; sizes?: ProductSize[] }) | undefined> {
-    const [product] = await db
-      .select({
-        id: products.id,
-        name: products.name,
-        company: products.company,
-        description: products.description,
-        price: products.price,
-        sku: products.sku,
-        categoryId: products.categoryId,
-        imageUrl: products.imageUrl,
-        stock: products.stock,
-        physicalInventory: products.physicalInventory,
-        minStockThreshold: products.minStockThreshold,
-        sellingMethod: products.sellingMethod,
-        weightUnit: products.weightUnit,
-        pricePerGram: products.pricePerGram,
-        pricePerOunce: products.pricePerOunce,
-        discountPercentage: products.discountPercentage,
-        isActive: products.isActive,
-        createdAt: products.createdAt,
-        updatedAt: products.updatedAt,
-        category: categories,
-      })
-      .from(products)
-      .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(eq(products.id, id));
+    let product: any;
+    try {
+      const rawResult = await retryQuery(() =>
+        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, discount_percentage, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
+      );
+      
+      const row = rawResult?.rows?.[0];
+      if (row) {
+        product = {
+          id: row.id,
+          name: row.name,
+          company: row.company || '',
+          description: row.description || '',
+          price: row.price,
+          sku: row.sku,
+          categoryId: row.category_id,
+          imageUrl: row.image_url,
+          stock: row.stock,
+          physicalInventory: row.physical_inventory,
+          minStockThreshold: row.min_stock_threshold,
+          sellingMethod: row.selling_method,
+          weightUnit: row.weight_unit,
+          pricePerGram: row.price_per_gram,
+          pricePerOunce: row.price_per_ounce,
+          discountPercentage: row.discount_percentage,
+          purchasePrice: row.purchase_price,
+          purchasePriceMethod: row.purchase_price_method,
+          purchasePricePerGram: row.purchase_price_per_gram,
+          purchasePricePerOunce: row.purchase_price_per_ounce,
+          adminNotes: row.admin_notes,
+          isActive: row.is_active === true || row.is_active === 't' || row.is_active === 'true',
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          category: null as Category | null,
+        };
+        
+        if (product.categoryId) {
+          try {
+            const catResult = await retryQuery(() =>
+              db.execute(sql`SELECT id, name, description, parent_id, is_active, sort_order, created_at FROM categories WHERE id = ${product.categoryId}`)
+            );
+            const catRow = catResult?.rows?.[0];
+            if (catRow) {
+              product.category = {
+                id: catRow.id,
+                name: catRow.name,
+                description: catRow.description,
+                parentId: catRow.parent_id,
+                isActive: catRow.is_active === true || catRow.is_active === 't' || catRow.is_active === 'true',
+                sortOrder: catRow.sort_order,
+                createdAt: catRow.created_at,
+              };
+            }
+          } catch (e) {
+            console.warn('[getProduct] Error fetching category:', e);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[getProduct] Error fetching product:', error);
+    }
     
     if (!product) return undefined;
 
-    // Fetch sizes for this product
     try {
-      const sizes = await db
-        .select()
-        .from(productSizes)
-        .where(eq(productSizes.productId, id));
-      
+      const sizesResult = await retryQuery(() =>
+        db.execute(sql`SELECT id, product_id, size, quantity, physical_quantity, created_at, updated_at FROM product_sizes WHERE product_id = ${id}`)
+      );
+      const sizes = (sizesResult?.rows || []).map((r: any) => ({
+        id: r.id,
+        productId: r.product_id,
+        size: r.size,
+        quantity: r.quantity,
+        physicalQuantity: r.physical_quantity,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      }));
       return {
         ...product,
         sizes: sizes.length > 0 ? sizes : undefined,
       };
     } catch (error) {
       console.error('[getProduct] Error fetching product sizes:', error);
-      return product;
+      return { ...product, sizes: [] };
     }
   }
 
