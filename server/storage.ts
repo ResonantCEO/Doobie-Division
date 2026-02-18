@@ -581,25 +581,36 @@ export class DatabaseStorage implements IStorage {
     // Ensure stock is a number
     const stockValue = typeof productData.stock === 'string' ? parseInt(productData.stock, 10) : (productData.stock || 0);
     
-    const toNumericOrNull = (val: any) => {
-      if (val === null || val === undefined || val === '') return null;
+    const toNumericStr = (val: any): string | undefined => {
+      if (val === null || val === undefined || val === '') return undefined;
       const num = typeof val === 'string' ? parseFloat(val) : val;
-      return isNaN(num) ? null : num;
+      return isNaN(num) ? undefined : String(num);
     };
 
-    const processedProduct = {
+    const processedProduct: Record<string, any> = {
       ...productDataWithoutSizes,
       stock: stockValue,
       price: productData.price || "0",
-      pricePerGram: toNumericOrNull(productData.pricePerGram),
-      pricePerOunce: toNumericOrNull(productData.pricePerOunce),
-      discountPercentage: toNumericOrNull(productData.discountPercentage),
-      purchasePrice: toNumericOrNull(productData.purchasePrice),
-      purchasePricePerGram: toNumericOrNull(productData.purchasePricePerGram),
-      purchasePricePerOunce: toNumericOrNull(productData.purchasePricePerOunce),
       physicalInventory: stockValue,
       updatedAt: new Date()
     };
+
+    const numericFields = ['pricePerGram', 'pricePerOunce', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'] as const;
+    for (const field of numericFields) {
+      const val = toNumericStr(productData[field]);
+      if (val !== undefined) {
+        processedProduct[field] = val;
+      } else {
+        delete processedProduct[field];
+      }
+    }
+
+    const stringFields = ['company', 'adminNotes'] as const;
+    for (const field of stringFields) {
+      if (processedProduct[field] === '') {
+        delete processedProduct[field];
+      }
+    }
 
     const [newProduct] = await db
       .insert(products)
@@ -624,23 +635,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateProduct(id: number, productData: Partial<InsertProduct>): Promise<Product> {
-    const toNumericOrNull = (val: any) => {
-      if (val === null || val === undefined || val === '') return null;
+    const toNumericStr = (val: any): string | undefined => {
+      if (val === null || val === undefined || val === '') return undefined;
       const num = typeof val === 'string' ? parseFloat(val) : val;
-      return isNaN(num) ? null : num;
+      return isNaN(num) ? undefined : String(num);
     };
 
-    const updateData = { ...productData };
+    const updateData: Record<string, any> = { ...productData };
     if (productData.stock !== undefined) {
       updateData.physicalInventory = productData.stock;
     }
 
-    if ('pricePerGram' in updateData) updateData.pricePerGram = toNumericOrNull(updateData.pricePerGram) as any;
-    if ('pricePerOunce' in updateData) updateData.pricePerOunce = toNumericOrNull(updateData.pricePerOunce) as any;
-    if ('discountPercentage' in updateData) updateData.discountPercentage = toNumericOrNull(updateData.discountPercentage) as any;
-    if ('purchasePrice' in updateData) updateData.purchasePrice = toNumericOrNull(updateData.purchasePrice) as any;
-    if ('purchasePricePerGram' in updateData) updateData.purchasePricePerGram = toNumericOrNull(updateData.purchasePricePerGram) as any;
-    if ('purchasePricePerOunce' in updateData) updateData.purchasePricePerOunce = toNumericOrNull(updateData.purchasePricePerOunce) as any;
+    const numericFields = ['pricePerGram', 'pricePerOunce', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
+    for (const field of numericFields) {
+      if (field in updateData) {
+        const val = toNumericStr(updateData[field]);
+        if (val !== undefined) {
+          updateData[field] = val;
+        } else {
+          updateData[field] = sql`NULL`;
+        }
+      }
+    }
 
     const [product] = await db.update(products)
       .set({
