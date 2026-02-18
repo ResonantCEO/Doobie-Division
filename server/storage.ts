@@ -581,12 +581,23 @@ export class DatabaseStorage implements IStorage {
     // Ensure stock is a number
     const stockValue = typeof productData.stock === 'string' ? parseInt(productData.stock, 10) : (productData.stock || 0);
     
+    const toNumericOrNull = (val: any) => {
+      if (val === null || val === undefined || val === '') return null;
+      const num = typeof val === 'string' ? parseFloat(val) : val;
+      return isNaN(num) ? null : num;
+    };
+
     const processedProduct = {
       ...productDataWithoutSizes,
       stock: stockValue,
-      pricePerGram: productData.pricePerGram ? (typeof productData.pricePerGram === 'string' ? parseFloat(productData.pricePerGram) : productData.pricePerGram) : null,
-      pricePerOunce: productData.pricePerOunce ? (typeof productData.pricePerOunce === 'string' ? parseFloat(productData.pricePerOunce) : productData.pricePerOunce) : null,
-      physicalInventory: stockValue, // Set physical inventory to match initial stock
+      price: productData.price || "0",
+      pricePerGram: toNumericOrNull(productData.pricePerGram),
+      pricePerOunce: toNumericOrNull(productData.pricePerOunce),
+      discountPercentage: toNumericOrNull(productData.discountPercentage),
+      purchasePrice: toNumericOrNull(productData.purchasePrice),
+      purchasePricePerGram: toNumericOrNull(productData.purchasePricePerGram),
+      purchasePricePerOunce: toNumericOrNull(productData.purchasePricePerOunce),
+      physicalInventory: stockValue,
       updatedAt: new Date()
     };
 
@@ -613,11 +624,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateProduct(id: number, productData: Partial<InsertProduct>): Promise<Product> {
-    // If stock is being updated, also update physical inventory to match
+    const toNumericOrNull = (val: any) => {
+      if (val === null || val === undefined || val === '') return null;
+      const num = typeof val === 'string' ? parseFloat(val) : val;
+      return isNaN(num) ? null : num;
+    };
+
     const updateData = { ...productData };
     if (productData.stock !== undefined) {
       updateData.physicalInventory = productData.stock;
     }
+
+    if ('pricePerGram' in updateData) updateData.pricePerGram = toNumericOrNull(updateData.pricePerGram) as any;
+    if ('pricePerOunce' in updateData) updateData.pricePerOunce = toNumericOrNull(updateData.pricePerOunce) as any;
+    if ('discountPercentage' in updateData) updateData.discountPercentage = toNumericOrNull(updateData.discountPercentage) as any;
+    if ('purchasePrice' in updateData) updateData.purchasePrice = toNumericOrNull(updateData.purchasePrice) as any;
+    if ('purchasePricePerGram' in updateData) updateData.purchasePricePerGram = toNumericOrNull(updateData.purchasePricePerGram) as any;
+    if ('purchasePricePerOunce' in updateData) updateData.purchasePricePerOunce = toNumericOrNull(updateData.purchasePricePerOunce) as any;
 
     const [product] = await db.update(products)
       .set({
