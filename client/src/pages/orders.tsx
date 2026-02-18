@@ -205,7 +205,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders Table */}
-      <OrderTable orders={orders} user={user} staffUsers={staffUsers} onViewOrderDetails={handleViewOrderDetails} />
+      <OrderTable orders={orders} user={user} staffUsers={staffUsers} />
 
       <OrderDetailsModal
         order={selectedOrder}

@@ -8,13 +8,8 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Configure connection with better error handling and retry logic
 const sql = neon(process.env.DATABASE_URL!, {
-  onNotice: (notice) => console.log("DB Notice:", notice),
-  onNotification: (notification) => console.log("DB Notification:", notification),
-  poolSize: 10,
-  connectionTimeoutMillis: 30000,
-  idleTimeoutMillis: 600000,
+  fetchOptions: { cache: 'no-store' },
 });
 
 export const db = drizzle(sql, { 

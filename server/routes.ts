@@ -801,11 +801,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Don't fail the order creation if notifications fail
       }
 
-      // Broadcast new order to all connected WebSocket clients
-      broadcastToClients({
-        type: 'new_order',
-        data: newOrder
-      });
+      try {
+        broadcastToClients({
+          type: 'new_order',
+          data: newOrder
+        });
+      } catch (broadcastError) {
+        console.error('Failed to broadcast new order:', broadcastError);
+      }
 
       res.status(201).json(newOrder);
     } catch (error) {
@@ -866,14 +869,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Broadcast order update to all connected WebSocket clients
-      broadcastToClients({
-        type: 'order_updated',
-        data: order
-      });
+      try {
+        broadcastToClients({
+          type: 'order_updated',
+          data: order
+        });
+      } catch (broadcastError) {
+        console.error('Failed to broadcast order update:', broadcastError);
+      }
 
       res.json(order);
     } catch (error) {
+      console.error('Failed to update order status:', error);
       res.status(500).json({ message: "Failed to update order status" });
     }
   });
@@ -903,6 +910,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error.message === "Order not found") {
         return res.status(404).json({ message: "Order not found" });
       }
+      console.error('Failed to delete order:', error);
       res.status(500).json({ message: "Failed to delete order" });
     }
   });
@@ -914,6 +922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const count = await storage.clearAllOrders(statusList);
       res.json({ message: `${count} orders deleted successfully`, count });
     } catch (error) {
+      console.error('Failed to clear orders:', error);
       res.status(500).json({ message: "Failed to clear orders" });
     }
   });
@@ -1308,8 +1317,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const notifications = await storage.getNotifications(req.currentUser.id);
       res.json(notifications);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch notifications" });
+    } catch (error: any) {
+      console.error('Failed to fetch notifications:', error?.message || error);
+      res.json([]);
     }
   });
 

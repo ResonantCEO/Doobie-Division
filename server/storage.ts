@@ -34,16 +34,20 @@ import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, 
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
-async function retryQuery<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+async function retryQuery<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await fn();
     } catch (error: any) {
-      const isNeonParseError = error?.cause?.message?.includes("Cannot read properties of null") ||
-        error?.message?.includes("Cannot read properties of null");
-      if (isNeonParseError && attempt < retries) {
-        console.warn(`[retryQuery] Neon parse error, retrying (attempt ${attempt + 1}/${retries})...`);
-        await new Promise(r => setTimeout(r, 50 * (attempt + 1)));
+      const errorMsg = error?.cause?.message || error?.message || '';
+      const isRetryable = errorMsg.includes("Cannot read properties of null") ||
+        errorMsg.includes("fetch failed") ||
+        errorMsg.includes("ECONNRESET") ||
+        errorMsg.includes("socket hang up");
+      if (isRetryable && attempt < retries) {
+        const delay = 150 * Math.pow(2, attempt);
+        console.warn(`[retryQuery] Retryable error (attempt ${attempt + 1}/${retries}), waiting ${delay}ms: ${errorMsg.substring(0, 80)}`);
+        await new Promise(r => setTimeout(r, delay));
         continue;
       }
       throw error;
@@ -982,7 +986,7 @@ export class DatabaseStorage implements IStorage {
         finalQuery = finalQuery.where(and(...conditions));
       }
 
-      const result = await finalQuery.orderBy(desc(orders.createdAt));
+      const result = await retryQuery(() => finalQuery.orderBy(desc(orders.createdAt)));
 
       return result.map(row => ({
         ...row,
@@ -1000,25 +1004,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined> {
-    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    const [order] = await retryQuery(() => db.select().from(orders).where(eq(orders.id, id)));
     if (!order) return undefined;
 
-    const items = await db
-      .select({
-        id: orderItems.id,
-        orderId: orderItems.orderId,
-        productId: orderItems.productId,
-        productName: orderItems.productName,
-        productSku: orderItems.productSku,
-        productPrice: orderItems.productPrice,
-        quantity: orderItems.quantity,
-        subtotal: orderItems.subtotal,
-        fulfilled: orderItems.fulfilled,
-        product: products,
-      })
-      .from(orderItems)
-      .leftJoin(products, eq(orderItems.productId, products.id))
-      .where(eq(orderItems.orderId, id));
+    const items = await retryQuery(() =>
+      db
+        .select({
+          id: orderItems.id,
+          orderId: orderItems.orderId,
+          productId: orderItems.productId,
+          productName: orderItems.productName,
+          productSku: orderItems.productSku,
+          productPrice: orderItems.productPrice,
+          quantity: orderItems.quantity,
+          subtotal: orderItems.subtotal,
+          fulfilled: orderItems.fulfilled,
+          product: products,
+        })
+        .from(orderItems)
+        .leftJoin(products, eq(orderItems.productId, products.id))
+        .where(eq(orderItems.orderId, id))
+    );
 
     return { ...order, items };
   }
@@ -1158,20 +1164,41 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateOrderStatus(orderId: number, status: string): Promise<Order> {
-    const [updatedOrder] = await db
-      .update(orders)
-      .set({
-        status,
-        updatedAt: new Date()
-      })
-      .where(eq(orders.id, orderId))
-      .returning();
+    try {
+      const [updatedOrder] = await retryQuery(() =>
+        db
+          .update(orders)
+          .set({
+            status,
+            updatedAt: new Date()
+          })
+          .where(eq(orders.id, orderId))
+          .returning()
+      );
 
-    if (!updatedOrder) {
-      throw new Error("Order not found");
+      if (!updatedOrder) {
+        throw new Error("Order not found");
+      }
+
+      return updatedOrder;
+    } catch (error: any) {
+      if (error?.message === "Order not found") {
+        throw error;
+      }
+      console.warn('[updateOrderStatus] Retry failed, fetching order directly:', error?.message);
+      const [order] = await retryQuery(() => db.select().from(orders).where(eq(orders.id, orderId)));
+      if (!order) {
+        throw new Error("Order not found");
+      }
+      if (order.status !== status) {
+        await retryQuery(() =>
+          db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, orderId))
+        );
+        const [refreshed] = await retryQuery(() => db.select().from(orders).where(eq(orders.id, orderId)));
+        return refreshed || order;
+      }
+      return order;
     }
-
-    return updatedOrder;
   }
 
   async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void> {
@@ -1379,14 +1406,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order> {
-    const [updatedOrder] = await db
-      .update(orders)
-      .set({
-        assignedUserId,
-        updatedAt: new Date()
-      })
-      .where(eq(orders.id, orderId))
-      .returning();
+    const [updatedOrder] = await retryQuery(() =>
+      db
+        .update(orders)
+        .set({
+          assignedUserId,
+          updatedAt: new Date()
+        })
+        .where(eq(orders.id, orderId))
+        .returning()
+    );
 
     if (!updatedOrder) {
       throw new Error("Order not found");
@@ -1396,27 +1425,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteOrder(id: number): Promise<void> {
-    await db.delete(orderItems).where(eq(orderItems.orderId, id));
-    const deleted = await db.delete(orders).where(eq(orders.id, id)).returning();
+    try {
+      await retryQuery(() => db.delete(orderItems).where(eq(orderItems.orderId, id)));
+    } catch (e) {
+      console.warn('[deleteOrder] Failed to delete order items:', e);
+    }
+    const deleted = await retryQuery(() => db.delete(orders).where(eq(orders.id, id)).returning());
     if (deleted.length === 0) {
       throw new Error("Order not found");
     }
-    invalidateCache.analytics();
+    try { invalidateCache.analytics(); } catch (e) { console.warn('Cache invalidation error:', e); }
   }
 
   async clearAllOrders(statuses?: string[]): Promise<number> {
     if (statuses && statuses.length > 0) {
-      const matchingOrders = await db.select({ id: orders.id }).from(orders).where(inArray(orders.status, statuses));
+      const matchingOrders = await retryQuery(() => db.select({ id: orders.id }).from(orders).where(inArray(orders.status, statuses)));
       if (matchingOrders.length === 0) return 0;
       const orderIds = matchingOrders.map(o => o.id);
-      await db.delete(orderItems).where(inArray(orderItems.orderId, orderIds));
-      const deleted = await db.delete(orders).where(inArray(orders.id, orderIds)).returning();
-      invalidateCache.analytics();
+      await retryQuery(() => db.delete(orderItems).where(inArray(orderItems.orderId, orderIds)));
+      const deleted = await retryQuery(() => db.delete(orders).where(inArray(orders.id, orderIds)).returning());
+      try { invalidateCache.analytics(); } catch (e) { console.warn('Cache invalidation error:', e); }
       return deleted.length;
     }
-    await db.delete(orderItems);
-    const deleted = await db.delete(orders).returning();
-    invalidateCache.analytics();
+    await retryQuery(() => db.delete(orderItems));
+    const deleted = await retryQuery(() => db.delete(orders).returning());
+    try { invalidateCache.analytics(); } catch (e) { console.warn('Cache invalidation error:', e); }
     return deleted.length;
   }
 
@@ -1480,13 +1513,15 @@ export class DatabaseStorage implements IStorage {
 
   async getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]> {
     return withCache(analyticsCache, generateCacheKey.orderStatusBreakdown(), async () => {
-      const results = await db
-        .select({
-          status: orders.status,
-          count: sql<number>`COUNT(*)`,
-        })
-        .from(orders)
-        .groupBy(orders.status);
+      const results = await retryQuery(() =>
+        db
+          .select({
+            status: orders.status,
+            count: sql<number>`COUNT(*)`,
+          })
+          .from(orders)
+          .groupBy(orders.status)
+      );
 
       return results.map(r => ({
         status: r.status,
@@ -1993,27 +2028,28 @@ export class DatabaseStorage implements IStorage {
 
   // Notification operations
   async getNotifications(userId?: string): Promise<Notification[]> {
-    let query = db.select().from(notifications);
-
     if (userId) {
-      const filteredQuery = query.where(eq(notifications.userId, userId));
-      return await filteredQuery.orderBy(desc(notifications.createdAt));
+      return await retryQuery(() =>
+        db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt))
+      );
     }
 
-    return await query.orderBy(desc(notifications.createdAt));
+    return await retryQuery(() =>
+      db.select().from(notifications).orderBy(desc(notifications.createdAt))
+    );
   }
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    const [newNotification] = await db.insert(notifications).values(notification).returning();
+    const [newNotification] = await retryQuery(() => db.insert(notifications).values(notification).returning());
     return newNotification;
   }
 
   async markNotificationAsRead(id: number): Promise<void> {
-    await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
+    await retryQuery(() => db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id)));
   }
 
   async deleteNotification(id: number): Promise<void> {
-    await db.delete(notifications).where(eq(notifications.id, id));
+    await retryQuery(() => db.delete(notifications).where(eq(notifications.id, id)));
   }
 
   // User management
