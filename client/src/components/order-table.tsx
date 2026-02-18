@@ -45,6 +45,18 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
     queryKey: ['/api/orders', orderId],
   });
 
+  const updateItemFulfilledCache = (productId: number, fulfilled: boolean) => {
+    queryClient.setQueryData<OrderWithItems>(['/api/orders', orderId], (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        items: old.items.map(item =>
+          item.productId === productId ? { ...item, fulfilled } : item
+        ),
+      };
+    });
+  };
+
   const fulfillItemMutation = useMutation({
     mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
       const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
@@ -59,6 +71,12 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       }
       return response.json();
     },
+    onMutate: async ({ productId }) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/orders', orderId] });
+      const previousData = queryClient.getQueryData<OrderWithItems>(['/api/orders', orderId]);
+      updateItemFulfilledCache(productId, true);
+      return { previousData };
+    },
     onSuccess: () => {
       toast({
         title: "Item Fulfilled",
@@ -67,7 +85,10 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       queryClient.invalidateQueries({ queryKey: ['/api/orders', orderId] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['/api/orders', orderId], context.previousData);
+      }
       toast({
         title: "Error",
         description: error.message || "Failed to fulfill item",
@@ -97,6 +118,12 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       }
       return response.json();
     },
+    onMutate: async ({ productId }) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/orders', orderId] });
+      const previousData = queryClient.getQueryData<OrderWithItems>(['/api/orders', orderId]);
+      updateItemFulfilledCache(productId, false);
+      return { previousData };
+    },
     onSuccess: () => {
       toast({
         title: "Item Unfulfilled",
@@ -105,7 +132,10 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       queryClient.invalidateQueries({ queryKey: ['/api/orders', orderId] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['/api/orders', orderId], context.previousData);
+      }
       toast({
         title: "Error",
         description: error.message || "Failed to unfulfill item",
@@ -222,6 +252,18 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
     queryKey: ['/api/orders', orderId],
   });
 
+  const updateItemFulfilledCache = (productId: number, fulfilled: boolean) => {
+    queryClient.setQueryData<OrderWithItems>(['/api/orders', orderId], (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        items: old.items.map(item =>
+          item.productId === productId ? { ...item, fulfilled } : item
+        ),
+      };
+    });
+  };
+
   const fulfillItemMutation = useMutation({
     mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
       const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
@@ -236,6 +278,12 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       }
       return response.json();
     },
+    onMutate: async ({ productId }) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/orders', orderId] });
+      const previousData = queryClient.getQueryData<OrderWithItems>(['/api/orders', orderId]);
+      updateItemFulfilledCache(productId, true);
+      return { previousData };
+    },
     onSuccess: () => {
       toast({
         title: "Item Fulfilled",
@@ -244,7 +292,10 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       queryClient.invalidateQueries({ queryKey: ['/api/orders', orderId] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['/api/orders', orderId], context.previousData);
+      }
       toast({
         title: "Error",
         description: error.message || "Failed to fulfill item",
@@ -274,6 +325,12 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       }
       return response.json();
     },
+    onMutate: async ({ productId }) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/orders', orderId] });
+      const previousData = queryClient.getQueryData<OrderWithItems>(['/api/orders', orderId]);
+      updateItemFulfilledCache(productId, false);
+      return { previousData };
+    },
     onSuccess: () => {
       toast({
         title: "Item Unfulfilled",
@@ -282,7 +339,10 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       queryClient.invalidateQueries({ queryKey: ['/api/orders', orderId] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['/api/orders', orderId], context.previousData);
+      }
       toast({
         title: "Error",
         description: error.message || "Failed to unfulfill item",
