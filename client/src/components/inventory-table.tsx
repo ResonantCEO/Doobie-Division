@@ -18,13 +18,13 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { MoreHorizontal, Edit, QrCode, TrendingUp, TrendingDown, Package, Eye, ArrowUpDown, ArrowUp, ArrowDown, Trash2, EyeOff } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import type { Product, Category, User } from "@shared/schema";
+import type { Product, Category, User, ProductSize } from "@shared/schema";
 
 type SortField = 'name' | 'sku' | 'category' | 'price' | 'stock' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 interface InventoryTableProps {
-  products: (Product & { category: Category | null })[];
+  products: (Product & { category: Category | null; sizes?: ProductSize[] })[];
   user: User | null | undefined;
   selectedProducts: number[];
   onSelectionChange: (productIds: number[]) => void;
@@ -111,6 +111,113 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
       return <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">Low Stock</Badge>;
     } else {
       return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">In Stock</Badge>;
+    }
+  };
+
+  const renderStockDisplay = (product: Product & { sizes?: ProductSize[] }) => {
+    const hasSizes = product.sizes && product.sizes.length > 0;
+    
+    if (hasSizes) {
+      // Show size breakdown
+      return (
+        <div className="flex flex-col space-y-1 min-w-[120px]">
+          <div className={`text-xs font-medium mb-1 ${
+            product.stock === 0 ? "text-red-600" : 
+            product.stock <= product.minStockThreshold ? "text-orange-600" : 
+            "text-gray-600 dark:text-gray-400"
+          }`}>
+            Total: {product.stock} units
+          </div>
+          <div className="space-y-0.5 border-t border-gray-200 dark:border-gray-700 pt-1">
+            {product.sizes!.map((size) => (
+              <div key={size.id} className="flex items-center justify-between text-xs">
+                <span className="text-gray-700 dark:text-gray-300 font-medium">{size.size}:</span>
+                <span className={`font-semibold ${
+                  size.quantity === 0 ? "text-red-600" : 
+                  size.quantity <= product.minStockThreshold ? "text-orange-600" : 
+                  "text-gray-900 dark:text-white"
+                }`}>
+                  {size.quantity}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    } else {
+      // Show regular stock display
+      return (
+        <span className={`font-medium text-sm ${
+          product.stock === 0 ? "text-red-600" : 
+          product.stock <= product.minStockThreshold ? "text-orange-600" : 
+          "text-gray-900 dark:text-white"
+        }`}>
+          {product.stock} units
+        </span>
+      );
+    }
+  };
+
+  const renderPhysicalDisplay = (product: Product & { sizes?: ProductSize[] }) => {
+    const hasSizes = product.sizes && product.sizes.length > 0;
+    const physicalTotal = product.physicalInventory || 0;
+    
+    if (hasSizes && product.sizes) {
+      // Use actual physicalQuantity per size from the database
+      const physicalPerSize = product.sizes.map(size => ({
+        size: size.size,
+        physical: size.physicalQuantity || 0,
+        stock: size.quantity || 0
+      }));
+      
+      // Calculate total physical from sizes (should match product.physicalInventory)
+      const calculatedPhysicalTotal = physicalPerSize.reduce((sum, item) => sum + item.physical, 0);
+      
+      return (
+        <div className="flex flex-col space-y-1 min-w-[120px]">
+          <div className={`text-xs font-medium mb-1 ${
+            physicalTotal === 0 ? "text-red-600" : 
+            physicalTotal !== product.stock ? "text-orange-600" : 
+            "text-gray-600 dark:text-gray-400"
+          }`}>
+            Total: {physicalTotal} units
+          </div>
+          {physicalTotal !== product.stock && (
+            <div className="text-xs text-orange-600 mb-1">
+              Variance: {physicalTotal - product.stock}
+            </div>
+          )}
+          <div className="space-y-0.5 border-t border-gray-200 dark:border-gray-700 pt-1">
+            {physicalPerSize.map((item, idx) => {
+              const sizeVariance = item.physical - item.stock;
+              return (
+                <div key={`${item.size}-${idx}`} className="flex items-center justify-between text-xs">
+                  <span className="text-gray-700 dark:text-gray-300 font-medium">{item.size}:</span>
+                  <span className={`font-semibold ${
+                    item.physical === 0 ? "text-red-600" : 
+                    sizeVariance !== 0 ? "text-orange-600" : 
+                    "text-gray-900 dark:text-white"
+                  }`}>
+                    {item.physical}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    } else {
+      // Show regular physical inventory display
+      return (
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900 dark:text-white">{physicalTotal} units</span>
+          {physicalTotal !== product.stock && (
+            <span className="text-xs text-orange-600">
+              Variance: {physicalTotal - product.stock}
+            </span>
+          )}
+        </div>
+      );
     }
   };
 
@@ -390,13 +497,8 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
 
                     <div className="flex items-center space-x-2">
                       <div className="text-right">
-                        <div className={`text-sm font-medium ${
-                          product.stock === 0 ? "text-red-600" : 
-                          product.stock <= product.minStockThreshold ? "text-orange-600" : 
-                          "text-gray-900 dark:text-white"
-                        }`}>
-                          {product.stock} units
-                        </div>
+                        {renderStockDisplay(product)}
+                        {(!product.sizes || product.sizes.length === 0) && (
                         <div className="w-16 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mt-1">
                           <div 
                             className={`h-1 rounded-full transition-all ${
@@ -409,6 +511,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                             }}
                           />
                         </div>
+                        )}
                       </div>
                       {getStatusBadge(product)}
                     </div>
@@ -418,15 +521,61 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
 
               {/* Physical Inventory Display */}
               <div className="mt-3 border-t border-gray-200 dark:border-gray-700 pt-3">
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>Stock: {product.stock} units</div>
-                  <div>Physical: {product.physicalInventory || 0} units</div>
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <div className="font-medium text-gray-700 dark:text-gray-300 mb-1">Stock:</div>
+                    {product.sizes && product.sizes.length > 0 ? (
+                      <div className="ml-2 space-y-0.5">
+                        <div>Total: {product.stock} units</div>
+                        {product.sizes.map((size) => (
+                          <div key={size.id} className="ml-2">
+                            {size.size}: {size.quantity}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="ml-2">{product.stock} units</div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-700 dark:text-gray-300 mb-1">Physical:</div>
+                    {product.sizes && product.sizes.length > 0 && product.stock > 0 ? (
+                      <div className="ml-2 space-y-0.5">
+                        <div>Total: {product.physicalInventory || 0} units</div>
+                        {(() => {
+                          const physicalTotal = product.physicalInventory || 0;
+                          const physicalPerSize = product.sizes.map(size => {
+                            const proportion = size.quantity / product.stock;
+                            return {
+                              size: size.size,
+                              physical: Math.round(physicalTotal * proportion)
+                            };
+                          });
+                          const calculatedTotal = physicalPerSize.reduce((sum, item) => sum + item.physical, 0);
+                          const difference = physicalTotal - calculatedTotal;
+                          if (difference !== 0 && physicalPerSize.length > 0) {
+                            const largestIndex = physicalPerSize.reduce((maxIdx, item, idx) => 
+                              item.physical > physicalPerSize[maxIdx].physical ? idx : maxIdx, 0
+                            );
+                            physicalPerSize[largestIndex].physical += difference;
+                          }
+                          return physicalPerSize.map((item, idx) => (
+                            <div key={`${item.size}-${idx}`} className="ml-2">
+                              {item.size}: {item.physical}
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="ml-2">{product.physicalInventory || 0} units</div>
+                    )}
                 </div>
                 {product.physicalInventory !== product.stock && (
-                  <div className="text-xs text-orange-600 mt-1">
+                    <div className="text-orange-600 mt-1">
                     Variance: {(product.physicalInventory || 0) - product.stock} units
                   </div>
                 )}
+                </div>
               </div>
             </div>
           ))}
@@ -616,13 +765,8 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                 <TableCell>
                   <div className="flex items-center space-x-2">
                     <div className="flex flex-col">
-                      <span className={`font-medium text-sm ${
-                        product.stock === 0 ? "text-red-600" : 
-                        product.stock <= product.minStockThreshold ? "text-orange-600" : 
-                        "text-gray-900 dark:text-white"
-                      }`}>
-                        {product.stock} units
-                      </span>
+                      {renderStockDisplay(product)}
+                      {(!product.sizes || product.sizes.length === 0) && (
                       <div className="w-16 h-1 bg-gray-200 rounded-full mt-1">
                         <div 
                           className={`h-1 rounded-full transition-all ${
@@ -635,6 +779,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                           }}
                         />
                       </div>
+                      )}
                     </div>
                     <Button
                       variant="ghost"
@@ -648,14 +793,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                   </div>
                 </TableCell>
                 <TableCell className="font-medium text-gray-900 dark:text-white">
-                  <div className="flex flex-col">
-                    <span>{product.physicalInventory || 0} units</span>
-                    {product.physicalInventory !== product.stock && (
-                      <span className="text-xs text-orange-600">
-                        Variance: {(product.physicalInventory || 0) - product.stock}
-                      </span>
-                    )}
-                  </div>
+                  {renderPhysicalDisplay(product)}
                 </TableCell>
                 <TableCell>{getStatusBadge(product)}</TableCell>
                 <TableCell className="text-right">

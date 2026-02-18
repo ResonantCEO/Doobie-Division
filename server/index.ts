@@ -5,24 +5,39 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { checkDatabaseConnection } from "./db";
 
-// Simple rate limiting store
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+// Separate rate limiting stores for different endpoint types to prevent cross-contamination
+const rateLimitStores = {
+  auth: new Map<string, { count: number; resetTime: number }>(),
+  upload: new Map<string, { count: number; resetTime: number }>(),
+  general: new Map<string, { count: number; resetTime: number }>(),
+};
 
-const rateLimit = (maxRequests: number, windowMs: number) => {
+// Cleanup expired entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const store of Object.values(rateLimitStores)) {
+    for (const [key, data] of store.entries()) {
+      if (now > data.resetTime) {
+        store.delete(key);
+      }
+    }
+  }
+}, 5 * 60 * 1000); // Clean up every 5 minutes
+
+const createRateLimit = (store: Map<string, { count: number; resetTime: number }>, maxRequests: number, windowMs: number) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const clientIp = req.ip || 'unknown';
     const now = Date.now();
-    const windowStart = now - windowMs;
 
-    if (!rateLimitStore.has(clientIp)) {
-      rateLimitStore.set(clientIp, { count: 1, resetTime: now + windowMs });
+    if (!store.has(clientIp)) {
+      store.set(clientIp, { count: 1, resetTime: now + windowMs });
       return next();
     }
 
-    const clientData = rateLimitStore.get(clientIp)!;
+    const clientData = store.get(clientIp)!;
 
     if (now > clientData.resetTime) {
-      rateLimitStore.set(clientIp, { count: 1, resetTime: now + windowMs });
+      store.set(clientIp, { count: 1, resetTime: now + windowMs });
       return next();
     }
 
@@ -110,13 +125,20 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
-// Apply rate limiting to API routes
-app.use('/api/', rateLimit(200, 15 * 60 * 1000)); // 200 requests per 15 minutes
+// Rate limiting - apply specific routes BEFORE general routes
+// This prevents double rate limiting and ensures proper isolation
 
-// More lenient rate limiting for auth endpoints since they're used frequently for status checks
-app.use('/api/auth/login', rateLimit(25, 5 * 60 * 1000)); // 25 login attempts per 5 minutes
-app.use('/api/auth/register', rateLimit(15, 15 * 60 * 1000)); // 15 registration attempts per 15 minutes  
-app.use('/api/auth/', rateLimit(300, 15 * 60 * 1000)); // 300 general auth requests per 15 minutes
+// Auth endpoints - separate store to prevent interference from uploads
+app.use('/api/auth/login', createRateLimit(rateLimitStores.auth, 50, 5 * 60 * 1000)); // 50 login attempts per 5 minutes
+app.use('/api/auth/register', createRateLimit(rateLimitStores.auth, 20, 15 * 60 * 1000)); // 20 registration attempts per 15 minutes
+app.use('/api/auth/', createRateLimit(rateLimitStores.auth, 300, 15 * 60 * 1000)); // 300 general auth requests per 15 minutes
+
+// Upload endpoints - separate store with higher limits for file operations
+app.use('/api/upload/', createRateLimit(rateLimitStores.upload, 100, 15 * 60 * 1000)); // 100 uploads per 15 minutes
+app.use('/api/objects/upload', createRateLimit(rateLimitStores.upload, 100, 15 * 60 * 1000)); // 100 object uploads per 15 minutes
+
+// General API routes - applied last to catch everything else
+app.use('/api/', createRateLimit(rateLimitStores.general, 500, 15 * 60 * 1000)); // 500 requests per 15 minutes
 
 // Database connection middleware
 app.use(async (req, res, next) => {

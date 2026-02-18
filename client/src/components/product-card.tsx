@@ -5,10 +5,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/cart-context";
 import { useState } from "react";
 import AddToCartModal from "./add-to-cart-modal";
-import type { Product, Category } from "@shared/schema";
+import type { Product, Category, ProductSize } from "@shared/schema";
 
 interface ProductCardProps {
-  product: Product & { category: Category | null };
+  product: Product & { category: Category | null; sizes?: ProductSize[] };
 }
 
 export default function ProductCard({ product }: ProductCardProps) {

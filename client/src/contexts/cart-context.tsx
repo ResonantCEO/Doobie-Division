@@ -5,6 +5,7 @@ import type { Product, Category } from "@shared/schema";
 interface CartItem {
   product: Product & { category: Category | null };
   quantity: number;
+  size?: string; // Optional size for products with sizes
 }
 
 interface CartState {
@@ -14,9 +15,9 @@ interface CartState {
 }
 
 type CartAction =
-  | { type: 'ADD_ITEM'; payload: Product & { category: Category | null } }
-  | { type: 'REMOVE_ITEM'; payload: number }
-  | { type: 'UPDATE_QUANTITY'; payload: { id: number; quantity: number } }
+  | { type: 'ADD_ITEM'; payload: { product: Product & { category: Category | null }; size?: string } }
+  | { type: 'REMOVE_ITEM'; payload: { id: number; size?: string } }
+  | { type: 'UPDATE_QUANTITY'; payload: { id: number; quantity: number; size?: string } }
   | { type: 'CLEAR_CART' }
   | { type: 'LOAD_CART'; payload: CartItem[] };
 
@@ -40,17 +41,30 @@ function getItemPrice(product: Product & { category: Category | null }): number 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case 'ADD_ITEM': {
-      const existingItem = state.items.find(item => item.product.id === action.payload.id);
+      // For items with sizes, treat each size as a separate cart item
+      const itemKey = action.payload.size 
+        ? `${action.payload.product.id}-${action.payload.size}`
+        : `${action.payload.product.id}`;
+      
+      const existingItem = state.items.find(item => {
+        const key = item.size ? `${item.product.id}-${item.size}` : `${item.product.id}`;
+        return key === itemKey;
+      });
       
       let newItems: CartItem[];
       if (existingItem) {
-        newItems = state.items.map(item =>
-          item.product.id === action.payload.id
+        newItems = state.items.map(item => {
+          const key = item.size ? `${item.product.id}-${item.size}` : `${item.product.id}`;
+          return key === itemKey
             ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
+            : item;
+        });
       } else {
-        newItems = [...state.items, { product: action.payload, quantity: 1 }];
+        newItems = [...state.items, { 
+          product: action.payload.product, 
+          quantity: 1,
+          size: action.payload.size 
+        }];
       }
       
       const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product) * item.quantity), 0);
@@ -60,7 +74,14 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     }
     
     case 'REMOVE_ITEM': {
-      const newItems = state.items.filter(item => item.product.id !== action.payload);
+      const itemKey = action.payload.size 
+        ? `${action.payload.id}-${action.payload.size}`
+        : `${action.payload.id}`;
+      
+      const newItems = state.items.filter(item => {
+        const key = item.size ? `${item.product.id}-${item.size}` : `${item.product.id}`;
+        return key !== itemKey;
+      });
       const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product) * item.quantity), 0);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
       
@@ -68,11 +89,16 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     }
     
     case 'UPDATE_QUANTITY': {
-      const newItems = state.items.map(item =>
-        item.product.id === action.payload.id
+      const itemKey = action.payload.size 
+        ? `${action.payload.id}-${action.payload.size}`
+        : `${action.payload.id}`;
+      
+      const newItems = state.items.map(item => {
+        const key = item.size ? `${item.product.id}-${item.size}` : `${item.product.id}`;
+        return key === itemKey
           ? { ...item, quantity: Math.max(0, action.payload.quantity) }
-          : item
-      ).filter(item => item.quantity > 0);
+          : item;
+      }).filter(item => item.quantity > 0);
       
       const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product) * item.quantity), 0);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -97,9 +123,9 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
 interface CartContextType {
   state: CartState;
-  addItem: (product: Product & { category: Category | null }) => void;
-  removeItem: (productId: number) => void;
-  updateQuantity: (productId: number, quantity: number) => void;
+  addItem: (product: Product & { category: Category | null }, size?: string) => void;
+  removeItem: (productId: number, size?: string) => void;
+  updateQuantity: (productId: number, quantity: number, size?: string) => void;
   clearCart: () => void;
 }
 
@@ -126,16 +152,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('cart', JSON.stringify(state.items));
   }, [state.items]);
 
-  const addItem = (product: Product & { category: Category | null }) => {
-    dispatch({ type: 'ADD_ITEM', payload: product });
+  const addItem = (product: Product & { category: Category | null }, size?: string) => {
+    dispatch({ type: 'ADD_ITEM', payload: { product, size } });
   };
 
-  const removeItem = (productId: number) => {
-    dispatch({ type: 'REMOVE_ITEM', payload: productId });
+  const removeItem = (productId: number, size?: string) => {
+    dispatch({ type: 'REMOVE_ITEM', payload: { id: productId, size } });
   };
 
-  const updateQuantity = (productId: number, quantity: number) => {
-    dispatch({ type: 'UPDATE_QUANTITY', payload: { id: productId, quantity } });
+  const updateQuantity = (productId: number, quantity: number, size?: string) => {
+    dispatch({ type: 'UPDATE_QUANTITY', payload: { id: productId, quantity, size } });
   };
 
   const clearCart = () => {

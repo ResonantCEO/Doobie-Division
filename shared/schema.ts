@@ -97,6 +97,18 @@ export const products = pgTable("products", {
   createdAtIdx: index("IDX_products_created_at").on(table.createdAt),
 }));
 
+export const productSizes = pgTable("product_sizes", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  size: varchar("size").notNull(), // e.g., "S", "M", "L", "XL", "Small", "Medium", etc.
+  quantity: integer("quantity").notNull().default(0),
+  physicalQuantity: integer("physical_quantity").notNull().default(0), // actual warehouse count per size
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  productIdIdx: index("IDX_product_sizes_product_id").on(table.productId),
+}));
+
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   orderNumber: varchar("order_number").notNull().unique(),
@@ -216,6 +228,14 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   }),
   orderItems: many(orderItems),
   inventoryLogs: many(inventoryLogs),
+  sizes: many(productSizes),
+}));
+
+export const productSizesRelations = relations(productSizes, ({ one }) => ({
+  product: one(products, {
+    fields: [productSizes.productId],
+    references: [products.id],
+  }),
 }));
 
 export const ordersRelations = relations(orders, ({ one, many }) => ({
@@ -317,12 +337,17 @@ export const insertProductSchema = createInsertSchema(products).omit({
   company: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   discountPercentage: z.string().nullable().optional(),
+  stock: z.number().int().min(0).optional().default(0),
   physicalInventory: z.number().optional(),
   purchasePrice: z.string().nullable().optional(),
   purchasePriceMethod: z.enum(["units", "weight"]).optional(),
   purchasePricePerGram: z.string().nullable().optional(),
   purchasePricePerOunce: z.string().nullable().optional(),
   adminNotes: z.string().nullable().optional(),
+  sizes: z.array(z.object({
+    size: z.string().min(1, "Size name is required"),
+    quantity: z.number().int().min(0, "Quantity must be 0 or greater"),
+  })).optional(),
 });
 
 export const insertOrderSchema = createInsertSchema(orders).omit({
@@ -380,6 +405,8 @@ export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Category = typeof categories.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
+export type ProductSize = typeof productSizes.$inferSelect;
+export type InsertProductSize = typeof productSizes.$inferInsert;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect & {
   assignedUser?: {

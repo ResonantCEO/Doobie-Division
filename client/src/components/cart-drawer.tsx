@@ -61,11 +61,11 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     }
   }, [showConfirmation, user]);
 
-  const handleQuantityChange = (productId: number, newQuantity: number) => {
+  const handleQuantityChange = (productId: number, newQuantity: number, size?: string) => {
     if (newQuantity < 1) {
-      removeItem(productId);
+      removeItem(productId, size);
     } else {
-      updateQuantity(productId, newQuantity);
+      updateQuantity(productId, newQuantity, size);
     }
   };
 
@@ -105,10 +105,20 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           const response = await fetch(`/api/products/${item.product.id}`);
           if (!response.ok) throw new Error('Failed to check stock');
           const product = await response.json();
+          
+          // Check stock per size if item has a size
+          let hasStock = false;
+          if (item.size && product.sizes && product.sizes.length > 0) {
+            const sizeData = product.sizes.find((s: any) => s.size === item.size);
+            hasStock = sizeData ? sizeData.quantity >= item.quantity : false;
+          } else {
+            hasStock = product.stock >= item.quantity;
+          }
+          
           return {
             item,
             product,
-            hasStock: product.stock >= item.quantity
+            hasStock
           };
         })
       );
@@ -169,12 +179,17 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           ? Number(item.product.pricePerGram) || 0
           : Number(item.product.price) || 0;
 
+        const productName = item.size 
+          ? `${item.product.name} (Size: ${item.size})`
+          : item.product.name;
+
         return {
           productId: item.product.id,
-          productName: item.product.name,
+          productName: productName,
           productPrice: itemPrice.toString(),
           quantity: item.quantity,
           subtotal: (itemPrice * item.quantity).toString(),
+          size: item.size, // Include size in order item
         };
       });
 
@@ -259,8 +274,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {state.items.map((item) => (
-                  <div key={item.product.id} className="flex items-start gap-4 p-4 border rounded-lg">
+                {state.items.map((item, index) => {
+                  const itemKey = item.size ? `${item.product.id}-${item.size}-${index}` : `${item.product.id}-${index}`;
+                  return (
+                  <div key={itemKey} className="flex items-start gap-4 p-4 border rounded-lg">
                     <img
                       src={item.product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=100&h=100&fit=crop"}
                       alt={item.product.name}
@@ -268,6 +285,9 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                     />
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-sm line-clamp-2">{item.product.name}</h4>
+                      {item.size && (
+                        <p className="text-xs font-semibold text-primary">Size: {item.size}</p>
+                      )}
                       {item.product.category && (
                         <p className="text-xs text-muted-foreground">{item.product.category.name}</p>
                       )}
@@ -294,7 +314,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           variant="outline"
                           size="sm"
                           className="h-8 w-8 p-0"
-                          onClick={() => handleQuantityChange(item.product.id, item.quantity - 1)}
+                          onClick={() => handleQuantityChange(item.product.id, item.quantity - 1, item.size)}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
@@ -302,15 +322,19 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           type="number"
                           min="1"
                           value={item.quantity}
-                          onChange={(e) => handleQuantityChange(item.product.id, parseInt(e.target.value) || 1)}
+                          onChange={(e) => handleQuantityChange(item.product.id, parseInt(e.target.value) || 1, item.size)}
                           className="h-8 w-16 text-center"
                         />
                         <Button
                           variant="outline"
                           size="sm"
                           className="h-8 w-8 p-0"
-                          disabled={item.quantity >= item.product.stock} // Disable if quantity reaches stock
-                          onClick={() => handleQuantityChange(item.product.id, item.quantity + 1)}
+                          disabled={
+                            item.size 
+                              ? (item.product as any).sizes?.find((s: any) => s.size === item.size)?.quantity <= item.quantity
+                              : item.quantity >= item.product.stock
+                          }
+                          onClick={() => handleQuantityChange(item.product.id, item.quantity + 1, item.size)}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
@@ -318,7 +342,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          onClick={() => removeItem(item.product.id)}
+                          onClick={() => removeItem(item.product.id, item.size)}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -333,7 +357,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                       </p>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -400,15 +425,22 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             <div className="bg-muted/50 p-4 rounded-lg">
               <h4 className="font-medium mb-2">Order Summary</h4>
               <div className="space-y-1 text-sm">
-                {state.items.map((item) => (
-                  <div key={item.product.id} className="flex justify-between">
-                    <span>{item.product.name} x {item.quantity}</span>
+                {state.items.map((item, index) => {
+                  const itemKey = item.size ? `${item.product.id}-${item.size}-${index}` : `${item.product.id}-${index}`;
+                  return (
+                  <div key={itemKey} className="flex justify-between">
+                    <span>
+                      {item.product.name}
+                      {item.size && <span className="text-xs text-muted-foreground"> (Size: {item.size})</span>}
+                      {' '}x {item.quantity}
+                    </span>
                     <span>${(item.product.sellingMethod === "weight"
                       ? (Number(item.product.pricePerGram) || 0) * item.quantity
                       : (Number(item.product.price) || 0) * item.quantity
                     ).toFixed(2)}</span>
                   </div>
-                ))}
+                  );
+                })}
                 <Separator className="my-2" />
                 <div className="flex justify-between font-medium">
                   <span>Total</span>

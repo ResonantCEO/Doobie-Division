@@ -16,7 +16,7 @@ import StockAdjustmentModal from "@/components/modals/stock-adjustment-modal";
 import CategoryManagementModal from "@/components/modals/category-management-modal";
 import BulkQRModal from "@/components/modals/bulk-qr-modal";
 import { Plus, QrCode, AlertTriangle, Settings } from "lucide-react";
-import type { Product, Category } from "@shared/schema";
+import type { Product, Category, ProductSize } from "@shared/schema";
 
 export default function InventoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -74,7 +74,7 @@ export default function InventoryPage() {
   });
 
   // Fetch products with filters
-  const { data: products = [], isLoading } = useQuery<(Product & { category: Category | null })[]>({
+  const { data: products = [], isLoading, error } = useQuery<(Product & { category: Category | null; sizes?: ProductSize[] })[]>({
     queryKey: ["/api/products", searchQuery, selectedCategory, stockFilter, categories],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -121,10 +121,23 @@ export default function InventoryPage() {
       const response = await fetch(`/api/products?${params.toString()}`, {
         credentials: 'include'
       });
-      if (!response.ok) throw new Error('Failed to fetch products');
-      return response.json();
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to fetch products:', errorData);
+        throw new Error(errorData.message || 'Failed to fetch products');
+      }
+      const data = await response.json();
+      // Ensure all products have sizes array (even if empty)
+      const normalizedProducts = Array.isArray(data) ? data.map((p: any) => ({
+        ...p,
+        sizes: p.sizes || []
+      })) : [];
+      return normalizedProducts;
     },
-    // Remove auto-refresh to stop the 30-second refreshing
+    // Ensure we re-fetch when the user revisits the page, even with global staleTime=Infinity
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   // Fetch low stock products for alerts
@@ -182,6 +195,12 @@ export default function InventoryPage() {
       </div>
     );
   }
+
+  if (error) {
+    console.error('Error fetching products:', error);
+  }
+
+  console.log('Rendering with products:', products.length);
 
   return (
     <div className="space-y-6">

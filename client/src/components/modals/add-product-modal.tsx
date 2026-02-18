@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -19,9 +19,10 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { insertProductSchema } from "@shared/schema";
 import { z } from "zod";
-import { Upload, X, Lock } from "lucide-react";
+import { Upload, X, Lock, Plus, Trash2 } from "lucide-react";
 import type { Category } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
+import { Switch } from "@/components/ui/switch";
 
 const formSchema = z.object({
   name: z.string().min(1, "Product name is required"),
@@ -31,7 +32,7 @@ const formSchema = z.object({
   categoryId: z.number().min(1, "Category is required"),
   imageUrl: z.string().optional(),
   price: z.string().optional(),
-  stock: z.string().min(1, "Stock is required"),
+  stock: z.string().optional(),
   minStockThreshold: z.string().min(1, "Minimum threshold is required"),
   sellingMethod: z.enum(["units", "weight"]).default("units"),
   weightUnit: z.enum(["grams", "ounces"]).default("grams"),
@@ -44,14 +45,40 @@ const formSchema = z.object({
   purchasePricePerGram: z.string().optional(),
   purchasePricePerOunce: z.string().optional(),
   adminNotes: z.string().optional(),
+  enableSizes: z.boolean().default(false),
+  sizes: z.array(z.object({
+    size: z.string().min(1, "Size name is required"),
+    quantity: z.string().min(1, "Quantity is required"),
+  })).optional(),
 }).refine((data) => {
   if (data.sellingMethod === "weight") {
     return data.pricePerGram || data.pricePerOunce;
+  }
+  if (data.enableSizes && data.sizes && data.sizes.length > 0) {
+    // If sizes are enabled, we don't need the regular price/stock fields
+    return true;
   }
   return data.price;
 }, {
   message: "Price is required based on selling method",
   path: ["price"],
+}).refine((data) => {
+  if (data.enableSizes && (!data.sizes || data.sizes.length === 0)) {
+    return false;
+  }
+  return true;
+}, {
+  message: "At least one size is required when sizes are enabled",
+  path: ["sizes"],
+}).refine((data) => {
+  // Stock is required if sizes are not enabled and selling method is units
+  if (data.sellingMethod === "units" && !data.enableSizes && !data.stock) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Stock is required when sizes are not enabled",
+  path: ["stock"],
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -114,8 +141,20 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       purchasePricePerGram: "",
       purchasePricePerOunce: "",
       adminNotes: "",
+      enableSizes: false,
+      sizes: [],
     },
   });
+
+  const sellingMethod = form.watch("sellingMethod");
+  const enableSizes = form.watch("enableSizes");
+
+  // Clear sizes when selling method changes to weight or when sizes are disabled
+  useEffect(() => {
+    if (sellingMethod === "weight" || !enableSizes) {
+      form.setValue("sizes", []);
+    }
+  }, [sellingMethod, enableSizes, form]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -181,14 +220,22 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         imageUrl = await uploadImage(selectedFile);
       }
 
+      // Calculate total stock if sizes are enabled
+      let totalStock = 0;
+      if (data.enableSizes && data.sizes && data.sizes.length > 0) {
+        totalStock = data.sizes.reduce((sum, size) => sum + parseInt(size.quantity || "0"), 0);
+      } else {
+        totalStock = parseInt(data.stock || "0");
+      }
+
       const payload = {
         name: data.name,
         company: data.company || null,
         description: data.description || null,
         sku: data.sku,
-        categoryId: data.categoryId || null,
+        categoryId: data.categoryId ? Number(data.categoryId) : null,
         price: data.sellingMethod === "units" && data.price ? parseFloat(data.price).toFixed(2) : null,
-        stock: parseInt(data.stock),
+        stock: totalStock, // Already a number from calculation
         minStockThreshold: parseInt(data.minStockThreshold),
         sellingMethod: data.sellingMethod,
         weightUnit: data.weightUnit,
@@ -196,14 +243,21 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         pricePerOunce: data.pricePerOunce ? parseFloat(data.pricePerOunce).toFixed(2) : null,
         discountPercentage: data.discountPercentage ? parseFloat(data.discountPercentage).toFixed(2) : null,
         isActive: data.isActive,
-        imageUrl,
+        imageUrl: imageUrl || null,
         purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice).toFixed(2) : null,
         purchasePriceMethod: data.purchasePriceMethod || "units",
         purchasePricePerGram: data.purchasePricePerGram ? parseFloat(data.purchasePricePerGram).toFixed(4) : null,
         purchasePricePerOunce: data.purchasePricePerOunce ? parseFloat(data.purchasePricePerOunce).toFixed(2) : null,
         adminNotes: data.adminNotes || null,
+        sizes: data.enableSizes && data.sizes && data.sizes.length > 0 ? data.sizes.map(size => ({
+          size: size.size,
+          quantity: parseInt(size.quantity || "0"),
+        })) : undefined,
       };
-      await apiRequest("POST", "/api/products", payload);
+      
+      console.log('[AddProductModal] Sending payload:', JSON.stringify(payload, null, 2));
+      const response = await apiRequest("POST", "/api/products", payload);
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
@@ -219,6 +273,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
     },
     onError: (error: any) => {
       console.error("Product creation error:", error);
+      console.error("Error response:", error?.response?.data);
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -234,13 +289,20 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       let errorMessage = "Failed to create product. Please check all fields.";
       if (error?.response?.data?.errors) {
         const validationErrors = error.response.data.errors;
-        errorMessage = `Validation errors: ${validationErrors.map((e: any) => e.message).join(", ")}`;
+        const errorDetails = validationErrors.map((e: any) => {
+          const path = e.path ? e.path.join('.') : '';
+          return `${path ? path + ': ' : ''}${e.message}`;
+        }).join(", ");
+        errorMessage = `Validation errors: ${errorDetails}`;
+        console.error("Validation errors:", validationErrors);
       } else if (error?.response?.data?.message) {
         errorMessage = error.response.data.message;
-        if (errorMessage.includes("duplicate key value violates unique constraint")) {
+        if (errorMessage.includes("duplicate key value violates unique constraint") || errorMessage.includes("SKU already exists")) {
           setIsDuplicateSku(true);
           errorMessage = "SKU already exists. Please enter a unique SKU.";
         }
+      } else if (error?.message) {
+        errorMessage = error.message;
       }
 
       toast({
@@ -283,10 +345,19 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       return;
     }
 
-    if (data.sellingMethod === "units" && !data.price) {
+    if (data.sellingMethod === "units" && !data.enableSizes && !data.price) {
       toast({
         title: "Validation Error", 
         description: "Please enter a price per unit",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (data.enableSizes && (!data.sizes || data.sizes.length === 0)) {
+      toast({
+        title: "Validation Error",
+        description: "Please add at least one size when sizes are enabled",
         variant: "destructive",
       });
       return;
@@ -420,35 +491,146 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
             />
 
             {form.watch("sellingMethod") === "units" ? (
-              <div className="grid grid-cols-2 gap-4">
+              <>
                 <FormField
                   control={form.control}
-                  name="price"
+                  name="enableSizes"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price per Unit ($)</FormLabel>
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">Enable Sizes</FormLabel>
+                        <div className="text-sm text-muted-foreground">
+                          Track inventory by size (e.g., S, M, L, XL)
+                        </div>
+                      </div>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
                       </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="stock"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Stock Quantity (units)</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                {form.watch("enableSizes") ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Sizes</FormLabel>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const currentSizes = form.getValues("sizes") || [];
+                          form.setValue("sizes", [
+                            ...currentSizes,
+                            { size: "", quantity: "0" },
+                          ]);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Size
+                      </Button>
+                    </div>
+
+                    {form.watch("sizes")?.map((_, index) => (
+                      <div key={index} className="flex gap-2 items-end">
+                        <FormField
+                          control={form.control}
+                          name={`sizes.${index}.size`}
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <FormLabel>Size Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g., S, M, L, XL" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`sizes.${index}.quantity`}
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <FormLabel>Quantity</FormLabel>
+                              <FormControl>
+                                <Input type="number" placeholder="0" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            const currentSizes = form.getValues("sizes") || [];
+                            form.setValue(
+                              "sizes",
+                              currentSizes.filter((_, i) => i !== index)
+                            );
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+
+                    {(!form.watch("sizes") || form.watch("sizes")?.length === 0) && (
+                      <p className="text-sm text-muted-foreground">
+                        Click "Add Size" to add size options for this product.
+                      </p>
+                    )}
+
+                    <FormField
+                      control={form.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price per Unit ($)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price per Unit ($)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="stock"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Stock Quantity (units)</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+              </>
             ) : (
               <>
                 <FormField
@@ -528,6 +710,11 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                   <FormControl>
                     <Input type="number" placeholder="5" {...field} />
                   </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    {form.watch("enableSizes") && form.watch("sellingMethod") === "units"
+                      ? "This threshold will apply to each size individually"
+                      : "Alert when stock falls below this number"}
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}

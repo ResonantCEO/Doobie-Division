@@ -3,6 +3,7 @@ import {
   sessions,
   categories,
   products,
+  productSizes,
   orders,
   orderItems,
   inventoryLogs,
@@ -17,6 +18,8 @@ import {
   type InsertCategory,
   type Product,
   type InsertProduct,
+  type ProductSize,
+  type InsertProductSize,
   type Order,
   type InsertOrder,
   type OrderItem,
@@ -47,8 +50,8 @@ export interface IStorage {
   deleteCategory(id: number): Promise<void>;
 
   // Product operations
-  getProducts(filters?: { categoryId?: number; categoryIds?: number[]; search?: string; status?: string; isActive?: boolean }): Promise<(Product & { category: Category | null })[]>;
-  getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined>;
+  getProducts(filters?: { categoryId?: number; categoryIds?: number[]; search?: string; status?: string; isActive?: boolean }): Promise<(Product & { category: Category | null; sizes?: ProductSize[] })[]>;
+  getProduct(id: number): Promise<(Product & { category: Category | null; sizes?: ProductSize[] }) | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
@@ -360,7 +363,7 @@ export class DatabaseStorage implements IStorage {
     search?: string;
     status?: string;
     isActive?: boolean;
-  }): Promise<(Product & { category: Category | null })[]> {
+  }): Promise<(Product & { category: Category | null; sizes?: ProductSize[] })[]> {
     let query = db
       .select({
         id: products.id,
@@ -482,10 +485,50 @@ export class DatabaseStorage implements IStorage {
       finalQuery = finalQuery.where(and(...conditions));
     }
 
-    return await finalQuery.orderBy(desc(products.createdAt));
+    const productsList = await finalQuery.orderBy(desc(products.createdAt));
+
+    // If no products, return empty array with proper type
+    if (productsList.length === 0) {
+      return [];
+    }
+
+    // Fetch sizes for all products (if any exist)
+    try {
+      const productIds = productsList.map(p => p.id);
+      
+      const sizes = await db
+        .select()
+        .from(productSizes)
+        .where(inArray(productSizes.productId, productIds));
+
+      // Group sizes by product ID
+      const sizesByProductId = new Map<number, ProductSize[]>();
+      for (const size of sizes) {
+        if (!sizesByProductId.has(size.productId)) {
+          sizesByProductId.set(size.productId, []);
+        }
+        sizesByProductId.get(size.productId)!.push(size);
+      }
+
+      // Attach sizes to each product (empty array if no sizes)
+      const result = productsList.map(product => ({
+        ...product,
+        sizes: sizesByProductId.get(product.id) || [],
+      }));
+      
+      return result;
+    } catch (error) {
+      // If there's an error fetching sizes, return products without sizes
+      console.error('[getProducts] Error fetching product sizes:', error);
+      const result = productsList.map(product => ({
+        ...product,
+        sizes: [] as ProductSize[],
+      }));
+      return result;
+    }
   }
 
-  async getProduct(id: number): Promise<(Product & { category: Category | null }) | undefined> {
+  async getProduct(id: number): Promise<(Product & { category: Category | null; sizes?: ProductSize[] }) | undefined> {
     const [product] = await db
       .select({
         id: products.id,
@@ -512,15 +555,38 @@ export class DatabaseStorage implements IStorage {
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(eq(products.id, id));
-    return product;
+    
+    if (!product) return undefined;
+
+    // Fetch sizes for this product
+    try {
+      const sizes = await db
+        .select()
+        .from(productSizes)
+        .where(eq(productSizes.productId, id));
+      
+      return {
+        ...product,
+        sizes: sizes.length > 0 ? sizes : undefined,
+      };
+    } catch (error) {
+      console.error('[getProduct] Error fetching product sizes:', error);
+      return product;
+    }
   }
 
   async createProduct(productData: InsertProduct): Promise<Product> {
+    const { sizes, ...productDataWithoutSizes } = productData;
+    
+    // Ensure stock is a number
+    const stockValue = typeof productData.stock === 'string' ? parseInt(productData.stock, 10) : (productData.stock || 0);
+    
     const processedProduct = {
-      ...productData,
+      ...productDataWithoutSizes,
+      stock: stockValue,
       pricePerGram: productData.pricePerGram ? (typeof productData.pricePerGram === 'string' ? parseFloat(productData.pricePerGram) : productData.pricePerGram) : null,
       pricePerOunce: productData.pricePerOunce ? (typeof productData.pricePerOunce === 'string' ? parseFloat(productData.pricePerOunce) : productData.pricePerOunce) : null,
-      physicalInventory: productData.stock || 0, // Set physical inventory to match initial stock
+      physicalInventory: stockValue, // Set physical inventory to match initial stock
       updatedAt: new Date()
     };
 
@@ -528,6 +594,21 @@ export class DatabaseStorage implements IStorage {
       .insert(products)
       .values([processedProduct])
       .returning();
+
+    // Create sizes if provided
+    if (sizes && sizes.length > 0) {
+      const sizeRecords: InsertProductSize[] = sizes.map(size => ({
+        productId: newProduct.id,
+        size: size.size,
+        quantity: size.quantity,
+        physicalQuantity: size.quantity, // Initialize physical quantity to match quantity
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+
+      await db.insert(productSizes).values(sizeRecords);
+    }
+
     return newProduct;
   }
 
@@ -554,53 +635,86 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProduct(id: number): Promise<void> {
-    // Check if product is referenced in any order items from pending or processing orders
-    const orderItemsInActiveOrders = await db
-      .select({ count: sql<number>`COUNT(*)` })
-      .from(orderItems)
-      .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .where(
-        and(
-          eq(orderItems.productId, id),
-          or(
-            eq(orders.status, 'pending'),
-            eq(orders.status, 'processing')
-          )
-        )
-      );
+    try {
+      // Try to get all order items for this product
+      const allOrderItems = await db
+        .select()
+        .from(orderItems)
+        .where(eq(orderItems.productId, id));
 
-    if (Number(orderItemsInActiveOrders[0].count) > 0) {
-      throw new Error("Cannot delete product. It is referenced in pending or processing orders.");
+      if (allOrderItems && allOrderItems.length > 0) {
+        // Get all order IDs
+        const orderIds = [...new Set(allOrderItems.map(item => item.orderId))];
+        
+        if (orderIds.length > 0) {
+          // Get order statuses
+          const orderStatuses = await db
+            .select({ id: orders.id, status: orders.status })
+            .from(orders)
+            .where(inArray(orders.id, orderIds));
+
+          // Check for active orders (pending or processing)
+          const activeOrderIds = orderStatuses
+            .filter(o => o.status === 'pending' || o.status === 'processing')
+            .map(o => o.id);
+
+          if (activeOrderIds.length > 0) {
+            throw new Error("Cannot delete product. It is referenced in pending or processing orders.");
+          }
+
+          // For order items in non-active orders, set product_id to null
+          const nonActiveOrderIds = orderStatuses
+            .filter(o => o.status === 'cancelled' || o.status === 'completed' || o.status === 'shipped')
+            .map(o => o.id);
+
+          if (nonActiveOrderIds.length > 0) {
+            const orderItemsToUpdate = allOrderItems
+              .filter(item => nonActiveOrderIds.includes(item.orderId))
+              .map(item => item.id);
+
+            if (orderItemsToUpdate.length > 0) {
+              await db
+                .update(orderItems)
+                .set({ productId: sql`NULL` })
+                .where(inArray(orderItems.id, orderItemsToUpdate));
+            }
+          }
+
+          // Handle orphaned order items (no matching order)
+          const validOrderIds = orderStatuses.map(o => o.id);
+          const orphanedOrderItems = allOrderItems
+            .filter(item => !validOrderIds.includes(item.orderId))
+            .map(item => item.id);
+
+          if (orphanedOrderItems.length > 0) {
+            await db
+              .update(orderItems)
+              .set({ productId: sql`NULL` })
+              .where(inArray(orderItems.id, orphanedOrderItems));
+          }
+        }
+      }
+    } catch (error) {
+      // If querying order items fails, try to set all order items to null and continue
+      // This handles cases where the database might have connection issues
+      console.warn('Error checking order items during product deletion, attempting to nullify:', error);
+      try {
+        await db
+          .update(orderItems)
+          .set({ productId: sql`NULL` })
+          .where(eq(orderItems.productId, id));
+      } catch (updateError) {
+        // If we can't update order items, we'll still try to delete the product
+        // The foreign key constraint will prevent deletion if there are active orders
+        console.warn('Could not update order items, proceeding with deletion:', updateError);
+      }
     }
-
-    // For order items in non-active orders (cancelled, completed, shipped),
-    // set product_id to null to preserve order history while allowing product deletion
-    await db
-      .update(orderItems)
-      .set({ productId: null })
-      .where(
-        and(
-          eq(orderItems.productId, id),
-          exists(
-            db
-              .select({ id: orders.id })
-              .from(orders)
-              .where(
-                and(
-                  eq(orders.id, orderItems.orderId),
-                  or(
-                    eq(orders.status, 'cancelled'),
-                    eq(orders.status, 'completed'),
-                    eq(orders.status, 'shipped')
-                  )
-                )
-              )
-          )
-        )
-      );
 
     // Delete related inventory logs
     await db.delete(inventoryLogs).where(eq(inventoryLogs.productId, id));
+
+    // Delete product sizes (must be done before deleting product due to foreign key)
+    await db.delete(productSizes).where(eq(productSizes.productId, id));
 
     // Now delete the product
     await db.delete(products).where(eq(products.id, id));
