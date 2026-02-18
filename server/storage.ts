@@ -612,23 +612,47 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    const [newProduct] = await db
-      .insert(products)
-      .values([processedProduct])
-      .returning();
+    let newProduct: Product | undefined;
+    try {
+      const result = await db
+        .insert(products)
+        .values([processedProduct])
+        .returning();
+      newProduct = result?.[0];
+    } catch (insertError: any) {
+      if (insertError?.cause?.severity === 'ERROR') {
+        throw insertError;
+      }
+      console.warn('Insert returning() parse issue, fetching by SKU:', insertError);
+    }
 
-    // Create sizes if provided
+    if (!newProduct) {
+      const found = await db
+        .select()
+        .from(products)
+        .where(eq(products.sku, String(processedProduct.sku || productData.sku)));
+      newProduct = found?.[found.length - 1];
+    }
+
+    if (!newProduct) {
+      throw new Error("Product was created but could not be retrieved");
+    }
+
     if (sizes && sizes.length > 0) {
       const sizeRecords: InsertProductSize[] = sizes.map(size => ({
-        productId: newProduct.id,
+        productId: newProduct!.id,
         size: size.size,
         quantity: size.quantity,
-        physicalQuantity: size.quantity, // Initialize physical quantity to match quantity
+        physicalQuantity: size.quantity,
         createdAt: new Date(),
         updatedAt: new Date(),
       }));
 
-      await db.insert(productSizes).values(sizeRecords);
+      try {
+        await db.insert(productSizes).values(sizeRecords);
+      } catch (sizeError) {
+        console.warn('Error creating product sizes:', sizeError);
+      }
     }
 
     return newProduct;
