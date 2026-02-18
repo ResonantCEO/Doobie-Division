@@ -134,13 +134,45 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, initialState);
 
-  // Load cart from localStorage on mount
+  // Load cart from localStorage on mount and validate against current stock
   useEffect(() => {
     const savedCart = localStorage.getItem('cart');
     if (savedCart) {
       try {
         const cartItems = JSON.parse(savedCart);
-        dispatch({ type: 'LOAD_CART', payload: cartItems });
+        
+        const validateCart = async () => {
+          try {
+            const validatedItems: CartItem[] = [];
+            for (const item of cartItems) {
+              const response = await fetch(`/api/products/${item.product.id}`);
+              if (!response.ok) continue;
+              const freshProduct = await response.json();
+              
+              if (item.size && freshProduct.sizes && freshProduct.sizes.length > 0) {
+                const sizeData = freshProduct.sizes.find((s: any) => s.size === item.size);
+                if (sizeData && sizeData.quantity > 0) {
+                  validatedItems.push({
+                    ...item,
+                    product: freshProduct,
+                    quantity: Math.min(item.quantity, sizeData.quantity),
+                  });
+                }
+              } else if (freshProduct.stock > 0) {
+                validatedItems.push({
+                  ...item,
+                  product: freshProduct,
+                  quantity: Math.min(item.quantity, freshProduct.stock),
+                });
+              }
+            }
+            dispatch({ type: 'LOAD_CART', payload: validatedItems });
+          } catch {
+            dispatch({ type: 'LOAD_CART', payload: cartItems });
+          }
+        };
+        
+        validateCart();
       } catch (error) {
         console.error('Error loading cart from localStorage:', error);
       }

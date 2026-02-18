@@ -61,10 +61,28 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     }
   }, [showConfirmation, user]);
 
-  const handleQuantityChange = (productId: number, newQuantity: number, size?: string) => {
+  const handleQuantityChange = (productId: number, newQuantity: number, size?: string, item?: typeof state.items[0]) => {
     if (newQuantity < 1) {
       removeItem(productId, size);
     } else {
+      if (item && size && (item.product as any).sizes) {
+        const sizeData = (item.product as any).sizes.find((s: any) => s.size === size);
+        if (sizeData && newQuantity > sizeData.quantity) {
+          toast({
+            title: "Stock Limit",
+            description: `Only ${sizeData.quantity} units available for size ${size}.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      } else if (item && newQuantity > item.product.stock) {
+        toast({
+          title: "Stock Limit",
+          description: `Only ${item.product.stock} units available.`,
+          variant: "destructive",
+        });
+        return;
+      }
       updateQuantity(productId, newQuantity, size);
     }
   };
@@ -323,7 +341,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           variant="outline"
                           size="sm"
                           className="h-8 w-8 p-0"
-                          onClick={() => handleQuantityChange(item.product.id, item.quantity - 1, item.size)}
+                          onClick={() => handleQuantityChange(item.product.id, item.quantity - 1, item.size, item)}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
@@ -331,7 +349,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           type="number"
                           min="1"
                           value={item.quantity}
-                          onChange={(e) => handleQuantityChange(item.product.id, parseInt(e.target.value) || 1, item.size)}
+                          onChange={(e) => handleQuantityChange(item.product.id, parseInt(e.target.value) || 1, item.size, item)}
                           className="h-8 w-16 text-center"
                         />
                         <Button
@@ -343,7 +361,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                               ? (item.product as any).sizes?.find((s: any) => s.size === item.size)?.quantity <= item.quantity
                               : item.quantity >= item.product.stock
                           }
-                          onClick={() => handleQuantityChange(item.product.id, item.quantity + 1, item.size)}
+                          onClick={() => handleQuantityChange(item.product.id, item.quantity + 1, item.size, item)}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>

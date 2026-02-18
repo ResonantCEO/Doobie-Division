@@ -38,6 +38,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
 
   const isWeightBased = product.sellingMethod === "weight";
   const hasSizes = product.sizes && product.sizes.length > 0;
+  const allSizesOutOfStock = hasSizes && product.sizes!.every(s => s.quantity <= 0);
   const maxStock = product.stock;
 
   // Initialize size quantities when product changes
@@ -256,11 +257,19 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
             <div className="space-y-3">
               <Label>Select Sizes</Label>
               <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-                {product.sizes!.map((size) => (
-                  <div key={size.id} className="flex items-center justify-between">
-                    <div className="flex-1">
+                {product.sizes!.map((size) => {
+                  const isOutOfStock = size.quantity <= 0;
+                  return (
+                  <div key={size.id} className={`flex items-center justify-between ${isOutOfStock ? 'opacity-50' : ''}`}>
+                    <div className="flex-1 flex items-center gap-2">
                       <Label className="text-sm font-medium">{size.size}</Label>
+                      {isOutOfStock ? (
+                        <span className="text-xs font-semibold text-red-500">Out of Stock</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">({size.quantity} available)</span>
+                      )}
                     </div>
+                    {!isOutOfStock && (
                     <div className="flex items-center space-x-2">
                       <Button
                         variant="outline"
@@ -273,7 +282,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                             [size.size]: Math.max(0, current - 1)
                           });
                         }}
-                        disabled={(sizeQuantities[size.size] || 0) <= 0 || size.quantity === 0}
+                        disabled={(sizeQuantities[size.size] || 0) <= 0}
                       >
                         <Minus className="h-3 w-3" />
                       </Button>
@@ -291,13 +300,15 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                             [size.size]: Math.min(size.quantity, current + 1)
                           });
                         }}
-                        disabled={(sizeQuantities[size.size] || 0) >= size.quantity || size.quantity === 0}
+                        disabled={(sizeQuantities[size.size] || 0) >= size.quantity}
                       >
                         <Plus className="h-3 w-3" />
                       </Button>
                     </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <p className="text-xs text-muted-foreground">
                 Total: {Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0)} items
@@ -393,15 +404,16 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
           <Button 
             onClick={handleAddToCart} 
             disabled={
-              hasSizes 
+              allSizesOutOfStock ||
+              (hasSizes 
                 ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
                 : ((isWeightBased ? weight : quantity) <= 0 || 
                    (isWeightBased ? weight : quantity) > maxStock ||
-                   maxStock === 0)
+                   maxStock === 0))
             }
           >
             <ShoppingCart className="h-4 w-4 mr-2" />
-            {maxStock === 0 
+            {(maxStock === 0 || allSizesOutOfStock)
               ? "Out of Stock" 
               : hasSizes
                 ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0

@@ -21,21 +21,25 @@ export default function ProductCard({ product }: ProductCardProps) {
     setIsFlipped(!isFlipped);
   };
 
+  const hasSizes = product.sizes && product.sizes.length > 0;
+  const allSizesOutOfStock = hasSizes && product.sizes!.every(s => s.quantity <= 0);
+  const isOutOfStock = product.stock === 0 || allSizesOutOfStock;
+
   const handleAddToCart = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card flip when clicking button
-    if (product.stock === 0) return;
+    e.stopPropagation();
+    if (isOutOfStock) return;
 
     setShowAddToCartModal(true);
   };
 
   const getStockStatus = () => {
-    if (product.stock === 0) {
+    if (isOutOfStock) {
       return { label: "Out of Stock", variant: "destructive" as const };
     }
     if (product.stock <= product.minStockThreshold) {
       return { label: `Low Stock (${product.stock})`, variant: "secondary" as const };
     }
-    return null; // Don't show badge for in-stock items
+    return null;
   };
 
   const stockStatus = getStockStatus();
@@ -145,16 +149,16 @@ export default function ProductCard({ product }: ProductCardProps) {
 
               <Button
                 onClick={handleAddToCart}
-                disabled={product.stock === 0}
+                disabled={isOutOfStock}
                 size="sm"
                 className={`w-full font-semibold py-2 sm:py-3 text-xs sm:text-sm transition-all duration-300 ${
-                  product.stock === 0
+                  isOutOfStock
                     ? "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed border-gray-200 dark:border-gray-700"
                     : "bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                 }`}
-                variant={product.stock === 0 ? "secondary" : "default"}
+                variant={isOutOfStock ? "secondary" : "default"}
               >
-                {product.stock === 0 ? "Out of Stock" : "Add to Cart"}
+                {isOutOfStock ? "Out of Stock" : "Add to Cart"}
               </Button>
             </div>
           </CardContent>
