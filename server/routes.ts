@@ -522,10 +522,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
 
-      // Check if product exists first
-      const product = await storage.getProduct(id);
-      if (!product) {
-        return res.status(404).json({ message: "Product not found" });
+      if (isNaN(id) || id <= 0) {
+        return res.status(400).json({ message: "Invalid product ID" });
       }
 
       await storage.deleteProduct(id);
@@ -533,10 +531,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Delete product error:', error);
 
-      // Check for foreign key constraint errors
-      if (error instanceof Error && error.message.includes('foreign key')) {
+      if (error instanceof Error && error.message.includes('not found')) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      if (error instanceof Error && (error.message.includes('foreign key') || error.message.includes('pending or processing'))) {
         return res.status(409).json({
-          message: "Cannot delete product. It may be referenced in orders or other records."
+          message: error.message
         });
       }
 

@@ -635,88 +635,58 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProduct(id: number): Promise<void> {
-    try {
-      // Try to get all order items for this product
-      const allOrderItems = await db
-        .select()
-        .from(orderItems)
-        .where(eq(orderItems.productId, id));
+    const existsResult = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.id, id));
 
-      if (allOrderItems && allOrderItems.length > 0) {
-        // Get all order IDs
-        const orderIds = [...new Set(allOrderItems.map(item => item.orderId))];
-        
-        if (orderIds.length > 0) {
-          // Get order statuses
-          const orderStatuses = await db
-            .select({ id: orders.id, status: orders.status })
-            .from(orders)
-            .where(inArray(orders.id, orderIds));
-
-          // Check for active orders (pending or processing)
-          const activeOrderIds = orderStatuses
-            .filter(o => o.status === 'pending' || o.status === 'processing')
-            .map(o => o.id);
-
-          if (activeOrderIds.length > 0) {
-            throw new Error("Cannot delete product. It is referenced in pending or processing orders.");
-          }
-
-          // For order items in non-active orders, set product_id to null
-          const nonActiveOrderIds = orderStatuses
-            .filter(o => o.status === 'cancelled' || o.status === 'completed' || o.status === 'shipped')
-            .map(o => o.id);
-
-          if (nonActiveOrderIds.length > 0) {
-            const orderItemsToUpdate = allOrderItems
-              .filter(item => nonActiveOrderIds.includes(item.orderId))
-              .map(item => item.id);
-
-            if (orderItemsToUpdate.length > 0) {
-              await db
-                .update(orderItems)
-                .set({ productId: sql`NULL` })
-                .where(inArray(orderItems.id, orderItemsToUpdate));
-            }
-          }
-
-          // Handle orphaned order items (no matching order)
-          const validOrderIds = orderStatuses.map(o => o.id);
-          const orphanedOrderItems = allOrderItems
-            .filter(item => !validOrderIds.includes(item.orderId))
-            .map(item => item.id);
-
-          if (orphanedOrderItems.length > 0) {
-            await db
-              .update(orderItems)
-              .set({ productId: sql`NULL` })
-              .where(inArray(orderItems.id, orphanedOrderItems));
-          }
-        }
-      }
-    } catch (error) {
-      // If querying order items fails, try to set all order items to null and continue
-      // This handles cases where the database might have connection issues
-      console.warn('Error checking order items during product deletion, attempting to nullify:', error);
-      try {
-        await db
-          .update(orderItems)
-          .set({ productId: sql`NULL` })
-          .where(eq(orderItems.productId, id));
-      } catch (updateError) {
-        // If we can't update order items, we'll still try to delete the product
-        // The foreign key constraint will prevent deletion if there are active orders
-        console.warn('Could not update order items, proceeding with deletion:', updateError);
-      }
+    if (!existsResult || existsResult.length === 0) {
+      throw new Error("Product not found");
     }
 
-    // Delete related inventory logs
-    await db.delete(inventoryLogs).where(eq(inventoryLogs.productId, id));
+    try {
+      const activeOrderCount = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(orderItems)
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .where(
+          and(
+            eq(orderItems.productId, id),
+            or(eq(orders.status, 'pending'), eq(orders.status, 'processing'))
+          )
+        );
 
-    // Delete product sizes (must be done before deleting product due to foreign key)
-    await db.delete(productSizes).where(eq(productSizes.productId, id));
+      if (activeOrderCount && activeOrderCount[0] && Number(activeOrderCount[0].count) > 0) {
+        throw new Error("Cannot delete product. It is referenced in pending or processing orders.");
+      }
+    } catch (error: any) {
+      if (error?.message?.includes('pending or processing')) {
+        throw error;
+      }
+      console.warn('Error checking active orders, proceeding with deletion:', error);
+    }
 
-    // Now delete the product
+    try {
+      await db
+        .update(orderItems)
+        .set({ productId: sql`NULL` })
+        .where(eq(orderItems.productId, id));
+    } catch (error) {
+      console.warn('Could not nullify order item references, proceeding:', error);
+    }
+
+    try {
+      await db.delete(inventoryLogs).where(eq(inventoryLogs.productId, id));
+    } catch (error) {
+      console.warn('Could not delete inventory logs, proceeding:', error);
+    }
+
+    try {
+      await db.delete(productSizes).where(eq(productSizes.productId, id));
+    } catch (error) {
+      console.warn('Could not delete product sizes, proceeding:', error);
+    }
+
     await db.delete(products).where(eq(products.id, id));
   }
 
