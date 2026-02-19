@@ -540,124 +540,6 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                   )}
                 />
 
-                {form.watch("enableSizes") ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <FormLabel>Sizes</FormLabel>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const currentSizes = form.getValues("sizes") || [];
-                          form.setValue("sizes", [
-                            ...currentSizes,
-                            { size: "", quantity: "0" },
-                          ]);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Size
-                      </Button>
-                    </div>
-
-                    {form.watch("sizes")?.map((_, index) => (
-                      <div key={index} className="flex gap-2 items-end">
-                        <FormField
-                          control={form.control}
-                          name={`sizes.${index}.size`}
-                          render={({ field }) => (
-                            <FormItem className="flex-1">
-                              <FormLabel>Size Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="e.g., S, M, L, XL" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name={`sizes.${index}.quantity`}
-                          render={({ field }) => (
-                            <FormItem className="flex-1">
-                              <FormLabel>Quantity</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="0" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            const currentSizes = form.getValues("sizes") || [];
-                            form.setValue(
-                              "sizes",
-                              currentSizes.filter((_, i) => i !== index)
-                            );
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    ))}
-
-                    {(!form.watch("sizes") || form.watch("sizes")?.length === 0) && (
-                      <p className="text-sm text-muted-foreground">
-                        Click "Add Size" to add size options for this product.
-                      </p>
-                    )}
-
-                    <FormField
-                      control={form.control}
-                      name="price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Price per Unit ($)</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Price per Unit ($)</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="stock"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Stock Quantity (units)</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                )}
-
                 <FormField
                   control={form.control}
                   name="enableFlavors"
@@ -750,6 +632,51 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                         Click "Add Flavor" to add flavor options for this product.
                       </p>
                     )}
+                  </div>
+                )}
+
+                {(form.watch("enableSizes") || form.watch("enableFlavors")) ? (
+                  <FormField
+                    control={form.control}
+                    name="price"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Price per Unit ($)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price per Unit ($)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="stock"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Stock Quantity (units)</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 )}
               </>
