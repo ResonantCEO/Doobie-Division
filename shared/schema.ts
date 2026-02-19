@@ -109,18 +109,6 @@ export const productSizes = pgTable("product_sizes", {
   productIdIdx: index("IDX_product_sizes_product_id").on(table.productId),
 }));
 
-export const productFlavors = pgTable("product_flavors", {
-  id: serial("id").primaryKey(),
-  productId: integer("product_id").references(() => products.id).notNull(),
-  flavor: varchar("flavor").notNull(),
-  quantity: integer("quantity").notNull().default(0),
-  physicalQuantity: integer("physical_quantity").notNull().default(0),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-}, (table) => ({
-  productIdIdx: index("IDX_product_flavors_product_id").on(table.productId),
-}));
-
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   orderNumber: varchar("order_number").notNull().unique(),
@@ -241,19 +229,11 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   orderItems: many(orderItems),
   inventoryLogs: many(inventoryLogs),
   sizes: many(productSizes),
-  flavors: many(productFlavors),
 }));
 
 export const productSizesRelations = relations(productSizes, ({ one }) => ({
   product: one(products, {
     fields: [productSizes.productId],
-    references: [products.id],
-  }),
-}));
-
-export const productFlavorsRelations = relations(productFlavors, ({ one }) => ({
-  product: one(products, {
-    fields: [productFlavors.productId],
     references: [products.id],
   }),
 }));
@@ -368,10 +348,6 @@ export const insertProductSchema = createInsertSchema(products).omit({
     size: z.string().min(1, "Size name is required"),
     quantity: z.number().int().min(0, "Quantity must be 0 or greater"),
   })).optional(),
-  flavors: z.array(z.object({
-    flavor: z.string().min(1, "Flavor name is required"),
-    quantity: z.number().int().min(0, "Quantity must be 0 or greater"),
-  })).optional(),
 });
 
 export const insertOrderSchema = createInsertSchema(orders).omit({
@@ -431,8 +407,6 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 export type ProductSize = typeof productSizes.$inferSelect;
 export type InsertProductSize = typeof productSizes.$inferInsert;
-export type ProductFlavor = typeof productFlavors.$inferSelect;
-export type InsertProductFlavor = typeof productFlavors.$inferInsert;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect & {
   assignedUser?: {

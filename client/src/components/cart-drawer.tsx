@@ -61,9 +61,9 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     }
   }, [showConfirmation, user]);
 
-  const handleQuantityChange = (productId: number, newQuantity: number, size?: string, flavor?: string, item?: typeof state.items[0]) => {
+  const handleQuantityChange = (productId: number, newQuantity: number, size?: string, item?: typeof state.items[0]) => {
     if (newQuantity < 1) {
-      removeItem(productId, size, flavor);
+      removeItem(productId, size);
     } else {
       if (item && size && (item.product as any).sizes) {
         const sizeData = (item.product as any).sizes.find((s: any) => s.size === size);
@@ -71,16 +71,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           toast({
             title: "Stock Limit",
             description: `Only ${sizeData.quantity} units available for size ${size}.`,
-            variant: "destructive",
-          });
-          return;
-        }
-      } else if (item && flavor && (item.product as any).flavors) {
-        const flavorData = (item.product as any).flavors.find((f: any) => f.flavor === flavor);
-        if (flavorData && newQuantity > flavorData.quantity) {
-          toast({
-            title: "Stock Limit",
-            description: `Only ${flavorData.quantity} units available for flavor ${flavor}.`,
             variant: "destructive",
           });
           return;
@@ -93,7 +83,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         });
         return;
       }
-      updateQuantity(productId, newQuantity, size, flavor);
+      updateQuantity(productId, newQuantity, size);
     }
   };
 
@@ -207,9 +197,9 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           ? Number(item.product.pricePerGram) || 0
           : Number(item.product.price) || 0;
 
-        let productName = item.product.name;
-        if (item.size) productName += ` (Size: ${item.size})`;
-        if (item.flavor) productName += ` (Flavor: ${item.flavor})`;
+        const productName = item.size 
+          ? `${item.product.name} (Size: ${item.size})`
+          : item.product.name;
 
         return {
           productId: item.product.id,
@@ -217,7 +207,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           productPrice: itemPrice.toString(),
           quantity: item.quantity,
           subtotal: (itemPrice * item.quantity).toString(),
-          size: item.size,
+          size: item.size, // Include size in order item
         };
       });
 
@@ -325,9 +315,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                       {item.size && (
                         <p className="text-xs font-semibold text-primary">Size: {item.size}</p>
                       )}
-                      {item.flavor && (
-                        <p className="text-xs font-semibold text-primary">Flavor: {item.flavor}</p>
-                      )}
                       {item.product.category && (
                         <p className="text-xs text-muted-foreground">{item.product.category.name}</p>
                       )}
@@ -354,7 +341,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           variant="outline"
                           size="sm"
                           className="h-8 w-8 p-0"
-                          onClick={() => handleQuantityChange(item.product.id, item.quantity - 1, item.size, item.flavor, item)}
+                          onClick={() => handleQuantityChange(item.product.id, item.quantity - 1, item.size, item)}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
@@ -362,7 +349,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           type="number"
                           min="1"
                           value={item.quantity}
-                          onChange={(e) => handleQuantityChange(item.product.id, parseInt(e.target.value) || 1, item.size, item.flavor, item)}
+                          onChange={(e) => handleQuantityChange(item.product.id, parseInt(e.target.value) || 1, item.size, item)}
                           className="h-8 w-16 text-center"
                         />
                         <Button
@@ -372,11 +359,9 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           disabled={
                             item.size 
                               ? (item.product as any).sizes?.find((s: any) => s.size === item.size)?.quantity <= item.quantity
-                              : item.flavor
-                                ? (item.product as any).flavors?.find((f: any) => f.flavor === item.flavor)?.quantity <= item.quantity
-                                : item.quantity >= item.product.stock
+                              : item.quantity >= item.product.stock
                           }
-                          onClick={() => handleQuantityChange(item.product.id, item.quantity + 1, item.size, item.flavor, item)}
+                          onClick={() => handleQuantityChange(item.product.id, item.quantity + 1, item.size, item)}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
@@ -384,7 +369,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          onClick={() => removeItem(item.product.id, item.size, item.flavor)}
+                          onClick={() => removeItem(item.product.id, item.size)}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -474,7 +459,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                     <span>
                       {item.product.name}
                       {item.size && <span className="text-xs text-muted-foreground"> (Size: {item.size})</span>}
-                      {item.flavor && <span className="text-xs text-muted-foreground"> (Flavor: {item.flavor})</span>}
                       {' '}x {item.quantity}
                     </span>
                     <span>${(item.product.sellingMethod === "weight"

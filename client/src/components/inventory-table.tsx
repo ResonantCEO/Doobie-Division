@@ -18,13 +18,13 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { MoreHorizontal, Edit, QrCode, TrendingUp, TrendingDown, Package, Eye, ArrowUpDown, ArrowUp, ArrowDown, Trash2, EyeOff } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import type { Product, Category, User, ProductSize, ProductFlavor } from "@shared/schema";
+import type { Product, Category, User, ProductSize } from "@shared/schema";
 
 type SortField = 'name' | 'sku' | 'category' | 'price' | 'stock' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 interface InventoryTableProps {
-  products: (Product & { category: Category | null; sizes?: ProductSize[]; flavors?: ProductFlavor[] })[];
+  products: (Product & { category: Category | null; sizes?: ProductSize[] })[];
   user: User | null | undefined;
   selectedProducts: number[];
   onSelectionChange: (productIds: number[]) => void;
@@ -114,11 +114,11 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
     }
   };
 
-  const renderStockDisplay = (product: Product & { sizes?: ProductSize[]; flavors?: ProductFlavor[] }) => {
+  const renderStockDisplay = (product: Product & { sizes?: ProductSize[] }) => {
     const hasSizes = product.sizes && product.sizes.length > 0;
-    const hasFlavors = product.flavors && product.flavors.length > 0;
     
     if (hasSizes) {
+      // Show size breakdown
       return (
         <div className="flex flex-col space-y-1 min-w-[120px]">
           <div className={`text-xs font-medium mb-1 ${
@@ -144,33 +144,8 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
           </div>
         </div>
       );
-    } else if (hasFlavors) {
-      return (
-        <div className="flex flex-col space-y-1 min-w-[120px]">
-          <div className={`text-xs font-medium mb-1 ${
-            product.stock === 0 ? "text-red-600" : 
-            product.stock <= product.minStockThreshold ? "text-orange-600" : 
-            "text-gray-600 dark:text-gray-400"
-          }`}>
-            Total: {product.stock} units
-          </div>
-          <div className="space-y-0.5 border-t border-gray-200 dark:border-gray-700 pt-1">
-            {product.flavors!.map((flavor) => (
-              <div key={flavor.id} className="flex items-center justify-between text-xs">
-                <span className="text-gray-700 dark:text-gray-300 font-medium">{flavor.flavor}:</span>
-                <span className={`font-semibold ${
-                  flavor.quantity === 0 ? "text-red-600" : 
-                  flavor.quantity <= product.minStockThreshold ? "text-orange-600" : 
-                  "text-gray-900 dark:text-white"
-                }`}>
-                  {flavor.quantity}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
     } else {
+      // Show regular stock display
       return (
         <span className={`font-medium text-sm ${
           product.stock === 0 ? "text-red-600" : 
@@ -183,17 +158,20 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
     }
   };
 
-  const renderPhysicalDisplay = (product: Product & { sizes?: ProductSize[]; flavors?: ProductFlavor[] }) => {
+  const renderPhysicalDisplay = (product: Product & { sizes?: ProductSize[] }) => {
     const hasSizes = product.sizes && product.sizes.length > 0;
-    const hasFlavors = product.flavors && product.flavors.length > 0;
     const physicalTotal = product.physicalInventory || 0;
     
     if (hasSizes && product.sizes) {
+      // Use actual physicalQuantity per size from the database
       const physicalPerSize = product.sizes.map(size => ({
         size: size.size,
         physical: size.physicalQuantity || 0,
         stock: size.quantity || 0
       }));
+      
+      // Calculate total physical from sizes (should match product.physicalInventory)
+      const calculatedPhysicalTotal = physicalPerSize.reduce((sum, item) => sum + item.physical, 0);
       
       return (
         <div className="flex flex-col space-y-1 min-w-[120px]">
@@ -228,47 +206,8 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
           </div>
         </div>
       );
-    } else if (hasFlavors && product.flavors) {
-      const physicalPerFlavor = product.flavors.map(flavor => ({
-        flavor: flavor.flavor,
-        physical: flavor.physicalQuantity || 0,
-        stock: flavor.quantity || 0
-      }));
-      
-      return (
-        <div className="flex flex-col space-y-1 min-w-[120px]">
-          <div className={`text-xs font-medium mb-1 ${
-            physicalTotal === 0 ? "text-red-600" : 
-            physicalTotal !== product.stock ? "text-orange-600" : 
-            "text-gray-600 dark:text-gray-400"
-          }`}>
-            Total: {physicalTotal} units
-          </div>
-          {physicalTotal !== product.stock && (
-            <div className="text-xs text-orange-600 mb-1">
-              Variance: {physicalTotal - product.stock}
-            </div>
-          )}
-          <div className="space-y-0.5 border-t border-gray-200 dark:border-gray-700 pt-1">
-            {physicalPerFlavor.map((item, idx) => {
-              const flavorVariance = item.physical - item.stock;
-              return (
-                <div key={`${item.flavor}-${idx}`} className="flex items-center justify-between text-xs">
-                  <span className="text-gray-700 dark:text-gray-300 font-medium">{item.flavor}:</span>
-                  <span className={`font-semibold ${
-                    item.physical === 0 ? "text-red-600" : 
-                    flavorVariance !== 0 ? "text-orange-600" : 
-                    "text-gray-900 dark:text-white"
-                  }`}>
-                    {item.physical}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
     } else {
+      // Show regular physical inventory display
       return (
         <div className="flex flex-col">
           <span className="font-medium text-gray-900 dark:text-white">{physicalTotal} units</span>

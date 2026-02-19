@@ -5,8 +5,7 @@ import type { Product, Category } from "@shared/schema";
 interface CartItem {
   product: Product & { category: Category | null };
   quantity: number;
-  size?: string;
-  flavor?: string;
+  size?: string; // Optional size for products with sizes
 }
 
 interface CartState {
@@ -16,9 +15,9 @@ interface CartState {
 }
 
 type CartAction =
-  | { type: 'ADD_ITEM'; payload: { product: Product & { category: Category | null }; size?: string; flavor?: string } }
-  | { type: 'REMOVE_ITEM'; payload: { id: number; size?: string; flavor?: string } }
-  | { type: 'UPDATE_QUANTITY'; payload: { id: number; quantity: number; size?: string; flavor?: string } }
+  | { type: 'ADD_ITEM'; payload: { product: Product & { category: Category | null }; size?: string } }
+  | { type: 'REMOVE_ITEM'; payload: { id: number; size?: string } }
+  | { type: 'UPDATE_QUANTITY'; payload: { id: number; quantity: number; size?: string } }
   | { type: 'CLEAR_CART' }
   | { type: 'LOAD_CART'; payload: CartItem[] };
 
@@ -42,22 +41,21 @@ function getItemPrice(product: Product & { category: Category | null }): number 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case 'ADD_ITEM': {
-      const getItemKey = (id: number, size?: string, flavor?: string) => {
-        let key = `${id}`;
-        if (size) key += `-s:${size}`;
-        if (flavor) key += `-f:${flavor}`;
-        return key;
-      };
-      const itemKey = getItemKey(action.payload.product.id, action.payload.size, action.payload.flavor);
+      // For items with sizes, treat each size as a separate cart item
+      const itemKey = action.payload.size 
+        ? `${action.payload.product.id}-${action.payload.size}`
+        : `${action.payload.product.id}`;
       
       const existingItem = state.items.find(item => {
-        return getItemKey(item.product.id, item.size, item.flavor) === itemKey;
+        const key = item.size ? `${item.product.id}-${item.size}` : `${item.product.id}`;
+        return key === itemKey;
       });
       
       let newItems: CartItem[];
       if (existingItem) {
         newItems = state.items.map(item => {
-          return getItemKey(item.product.id, item.size, item.flavor) === itemKey
+          const key = item.size ? `${item.product.id}-${item.size}` : `${item.product.id}`;
+          return key === itemKey
             ? { ...item, quantity: item.quantity + 1 }
             : item;
         });
@@ -65,8 +63,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         newItems = [...state.items, { 
           product: action.payload.product, 
           quantity: 1,
-          size: action.payload.size,
-          flavor: action.payload.flavor,
+          size: action.payload.size 
         }];
       }
       
@@ -77,16 +74,13 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     }
     
     case 'REMOVE_ITEM': {
-      const getRemoveKey = (id: number, size?: string, flavor?: string) => {
-        let key = `${id}`;
-        if (size) key += `-s:${size}`;
-        if (flavor) key += `-f:${flavor}`;
-        return key;
-      };
-      const itemKey = getRemoveKey(action.payload.id, action.payload.size, action.payload.flavor);
+      const itemKey = action.payload.size 
+        ? `${action.payload.id}-${action.payload.size}`
+        : `${action.payload.id}`;
       
       const newItems = state.items.filter(item => {
-        return getRemoveKey(item.product.id, item.size, item.flavor) !== itemKey;
+        const key = item.size ? `${item.product.id}-${item.size}` : `${item.product.id}`;
+        return key !== itemKey;
       });
       const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product) * item.quantity), 0);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -95,16 +89,13 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     }
     
     case 'UPDATE_QUANTITY': {
-      const getUpdateKey = (id: number, size?: string, flavor?: string) => {
-        let key = `${id}`;
-        if (size) key += `-s:${size}`;
-        if (flavor) key += `-f:${flavor}`;
-        return key;
-      };
-      const itemKey = getUpdateKey(action.payload.id, action.payload.size, action.payload.flavor);
+      const itemKey = action.payload.size 
+        ? `${action.payload.id}-${action.payload.size}`
+        : `${action.payload.id}`;
       
       const newItems = state.items.map(item => {
-        return getUpdateKey(item.product.id, item.size, item.flavor) === itemKey
+        const key = item.size ? `${item.product.id}-${item.size}` : `${item.product.id}`;
+        return key === itemKey
           ? { ...item, quantity: Math.max(0, action.payload.quantity) }
           : item;
       }).filter(item => item.quantity > 0);
@@ -132,9 +123,9 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
 interface CartContextType {
   state: CartState;
-  addItem: (product: Product & { category: Category | null }, size?: string, flavor?: string) => void;
-  removeItem: (productId: number, size?: string, flavor?: string) => void;
-  updateQuantity: (productId: number, quantity: number, size?: string, flavor?: string) => void;
+  addItem: (product: Product & { category: Category | null }, size?: string) => void;
+  removeItem: (productId: number, size?: string) => void;
+  updateQuantity: (productId: number, quantity: number, size?: string) => void;
   clearCart: () => void;
 }
 
@@ -167,15 +158,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                     quantity: Math.min(item.quantity, sizeData.quantity),
                   });
                 }
-              } else if (item.flavor && freshProduct.flavors && freshProduct.flavors.length > 0) {
-                const flavorData = freshProduct.flavors.find((f: any) => f.flavor === item.flavor);
-                if (flavorData && flavorData.quantity > 0) {
-                  validatedItems.push({
-                    ...item,
-                    product: freshProduct,
-                    quantity: Math.min(item.quantity, flavorData.quantity),
-                  });
-                }
               } else if (freshProduct.stock > 0) {
                 validatedItems.push({
                   ...item,
@@ -202,16 +184,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('cart', JSON.stringify(state.items));
   }, [state.items]);
 
-  const addItem = (product: Product & { category: Category | null }, size?: string, flavor?: string) => {
-    dispatch({ type: 'ADD_ITEM', payload: { product, size, flavor } });
+  const addItem = (product: Product & { category: Category | null }, size?: string) => {
+    dispatch({ type: 'ADD_ITEM', payload: { product, size } });
   };
 
-  const removeItem = (productId: number, size?: string, flavor?: string) => {
-    dispatch({ type: 'REMOVE_ITEM', payload: { id: productId, size, flavor } });
+  const removeItem = (productId: number, size?: string) => {
+    dispatch({ type: 'REMOVE_ITEM', payload: { id: productId, size } });
   };
 
-  const updateQuantity = (productId: number, quantity: number, size?: string, flavor?: string) => {
-    dispatch({ type: 'UPDATE_QUANTITY', payload: { id: productId, quantity, size, flavor } });
+  const updateQuantity = (productId: number, quantity: number, size?: string) => {
+    dispatch({ type: 'UPDATE_QUANTITY', payload: { id: productId, quantity, size } });
   };
 
   const clearCart = () => {

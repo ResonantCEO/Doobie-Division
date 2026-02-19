@@ -13,12 +13,12 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/cart-context";
 import { ShoppingCart, Minus, Plus } from "lucide-react";
-import type { Product, Category, ProductSize, ProductFlavor } from "@shared/schema";
+import type { Product, Category, ProductSize } from "@shared/schema";
 
 interface AddToCartModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  product: (Product & { category: Category | null; sizes?: ProductSize[]; flavors?: ProductFlavor[] }) | null;
+  product: (Product & { category: Category | null; sizes?: ProductSize[] }) | null;
 }
 
 // Helper function to format price, assuming it exists in your project
@@ -31,7 +31,6 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
   const [quantity, setQuantity] = useState(1);
   const [weight, setWeight] = useState(1);
   const [sizeQuantities, setSizeQuantities] = useState<Record<string, number>>({});
-  const [flavorQuantities, setFlavorQuantities] = useState<Record<string, number>>({});
   const { toast } = useToast();
   const { addItem } = useCart();
 
@@ -39,11 +38,10 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
 
   const isWeightBased = product.sellingMethod === "weight";
   const hasSizes = product.sizes && product.sizes.length > 0;
-  const hasFlavors = product.flavors && product.flavors.length > 0;
   const allSizesOutOfStock = hasSizes && product.sizes!.every(s => s.quantity <= 0);
-  const allFlavorsOutOfStock = hasFlavors && product.flavors!.every(f => f.quantity <= 0);
   const maxStock = product.stock;
 
+  // Initialize size quantities when product changes
   useEffect(() => {
     if (hasSizes && product.sizes) {
       const initial: Record<string, number> = {};
@@ -54,59 +52,11 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
     }
   }, [product?.id, hasSizes]);
 
-  useEffect(() => {
-    if (hasFlavors && product.flavors) {
-      const initial: Record<string, number> = {};
-      product.flavors.forEach(flavor => {
-        initial[flavor.flavor] = 0;
-      });
-      setFlavorQuantities(initial);
-    }
-  }, [product?.id, hasFlavors]);
-
   const handleAddToCart = () => {
     if (!product) return;
 
-    if (hasFlavors) {
-      const totalFlavorQuantity = Object.values(flavorQuantities).reduce((sum, qty) => sum + qty, 0);
-      
-      if (totalFlavorQuantity <= 0) {
-        toast({
-          title: "Invalid Quantity",
-          description: "Please select at least one item to add to cart.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (product.flavors) {
-        for (const flavor of product.flavors) {
-          const requestedQty = flavorQuantities[flavor.flavor] || 0;
-          if (requestedQty > flavor.quantity) {
-            toast({
-              title: "Insufficient Stock",
-              description: `Only ${flavor.quantity} units available in flavor ${flavor.flavor}.`,
-              variant: "destructive",
-            });
-            return;
-          }
-        }
-      }
-
-      if (product.flavors) {
-        for (const flavor of product.flavors) {
-          const qty = flavorQuantities[flavor.flavor] || 0;
-          for (let i = 0; i < qty; i++) {
-            addItem(product, undefined, flavor.flavor);
-          }
-        }
-      }
-
-      toast({
-        title: "Added to Cart",
-        description: `${totalFlavorQuantity} ${totalFlavorQuantity === 1 ? 'item' : 'items'} of ${product.name} added to your cart.`,
-      });
-    } else if (hasSizes) {
+    if (hasSizes) {
+      // Validate size quantities
       const totalSizeQuantity = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
       
       if (totalSizeQuantity <= 0) {
@@ -118,6 +68,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
         return;
       }
 
+      // Check stock availability for each size
       if (product.sizes) {
         for (const size of product.sizes) {
           const requestedQty = sizeQuantities[size.size] || 0;
@@ -132,6 +83,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
         }
       }
 
+      // Add items with size information
       if (product.sizes) {
         for (const size of product.sizes) {
           const qty = sizeQuantities[size.size] || 0;
@@ -177,17 +129,15 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
       });
     }
 
+    // Reset and close modal
     setQuantity(1);
     setWeight(1);
     if (hasSizes && product.sizes) {
       const reset: Record<string, number> = {};
-      product.sizes.forEach(size => { reset[size.size] = 0; });
+      product.sizes.forEach(size => {
+        reset[size.size] = 0;
+      });
       setSizeQuantities(reset);
-    }
-    if (hasFlavors && product.flavors) {
-      const reset: Record<string, number> = {};
-      product.flavors.forEach(flavor => { reset[flavor.flavor] = 0; });
-      setFlavorQuantities(reset);
     }
     onOpenChange(false);
   };
@@ -195,9 +145,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
   const getPrice = () => {
     let totalQuantity = 0;
     
-    if (hasFlavors) {
-      totalQuantity = Object.values(flavorQuantities).reduce((sum, qty) => sum + qty, 0);
-    } else if (hasSizes) {
+    if (hasSizes) {
       totalQuantity = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
     } else if (isWeightBased) {
       totalQuantity = weight;
@@ -229,9 +177,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
   const getOriginalPrice = () => {
     let totalQuantity = 0;
     
-    if (hasFlavors) {
-      totalQuantity = Object.values(flavorQuantities).reduce((sum, qty) => sum + qty, 0);
-    } else if (hasSizes) {
+    if (hasSizes) {
       totalQuantity = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
     } else if (isWeightBased) {
       totalQuantity = weight;
@@ -250,19 +196,17 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
 
   const hasDiscount = product.discountPercentage && parseFloat(product.discountPercentage) > 0;
 
+  // Reset when modal closes
   useEffect(() => {
     if (!open) {
       setQuantity(1);
       setWeight(1);
       if (product?.sizes && product.sizes.length > 0) {
         const reset: Record<string, number> = {};
-        product.sizes.forEach(size => { reset[size.size] = 0; });
+        product.sizes.forEach(size => {
+          reset[size.size] = 0;
+        });
         setSizeQuantities(reset);
-      }
-      if (product?.flavors && product.flavors.length > 0) {
-        const reset: Record<string, number> = {};
-        product.flavors.forEach(flavor => { reset[flavor.flavor] = 0; });
-        setFlavorQuantities(reset);
       }
     }
   }, [open, product?.id]);
@@ -308,69 +252,8 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
             </div>
           </div>
 
-          {/* Flavor Selection */}
-          {hasFlavors ? (
-            <div className="space-y-3">
-              <Label>Select Flavors</Label>
-              <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-                {product.flavors!.map((flavor) => {
-                  const isOutOfStock = flavor.quantity <= 0;
-                  return (
-                  <div key={flavor.id} className={`flex items-center justify-between ${isOutOfStock ? 'opacity-50' : ''}`}>
-                    <div className="flex-1 flex items-center gap-2">
-                      <Label className="text-sm font-medium">{flavor.flavor}</Label>
-                      {isOutOfStock ? (
-                        <span className="text-xs font-semibold text-red-500">Out of Stock</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">({flavor.quantity} available)</span>
-                      )}
-                    </div>
-                    {!isOutOfStock && (
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => {
-                          const current = flavorQuantities[flavor.flavor] || 0;
-                          setFlavorQuantities({
-                            ...flavorQuantities,
-                            [flavor.flavor]: Math.max(0, current - 1)
-                          });
-                        }}
-                        disabled={(flavorQuantities[flavor.flavor] || 0) <= 0}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="text-sm font-semibold w-8 text-center">
-                        {flavorQuantities[flavor.flavor] || 0}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => {
-                          const current = flavorQuantities[flavor.flavor] || 0;
-                          setFlavorQuantities({
-                            ...flavorQuantities,
-                            [flavor.flavor]: Math.min(flavor.quantity, current + 1)
-                          });
-                        }}
-                        disabled={(flavorQuantities[flavor.flavor] || 0) >= flavor.quantity}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    )}
-                  </div>
-                  );
-                })}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Total: {Object.values(flavorQuantities).reduce((sum, qty) => sum + qty, 0)} items
-              </p>
-            </div>
-          ) : hasSizes ? (
+          {/* Size Selection or Quantity/Weight Input */}
+          {hasSizes ? (
             <div className="space-y-3">
               <Label>Select Sizes</Label>
               <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
@@ -521,31 +404,24 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
           <Button 
             onClick={handleAddToCart} 
             disabled={
-              allFlavorsOutOfStock ||
               allSizesOutOfStock ||
-              (hasFlavors
-                ? Object.values(flavorQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
-                : hasSizes 
-                  ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
-                  : ((isWeightBased ? weight : quantity) <= 0 || 
-                     (isWeightBased ? weight : quantity) > maxStock ||
-                     maxStock === 0))
+              (hasSizes 
+                ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
+                : ((isWeightBased ? weight : quantity) <= 0 || 
+                   (isWeightBased ? weight : quantity) > maxStock ||
+                   maxStock === 0))
             }
           >
             <ShoppingCart className="h-4 w-4 mr-2" />
-            {(maxStock === 0 || allSizesOutOfStock || allFlavorsOutOfStock)
+            {(maxStock === 0 || allSizesOutOfStock)
               ? "Out of Stock" 
-              : hasFlavors
-                ? Object.values(flavorQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
+              : hasSizes
+                ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
                   ? "Select Items"
                   : "Add to Cart"
-                : hasSizes
-                  ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
-                    ? "Select Items"
-                    : "Add to Cart"
-                  : (isWeightBased ? weight : quantity) > maxStock 
-                    ? "Insufficient Stock"
-                    : `Add to Cart`
+                : (isWeightBased ? weight : quantity) > maxStock 
+                  ? "Insufficient Stock"
+                  : `Add to Cart`
             }
           </Button>
         </DialogFooter>
