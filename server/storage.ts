@@ -536,21 +536,20 @@ export class DatabaseStorage implements IStorage {
       );
       let flavors: ProductFlavor[] = [];
       try {
-        const placeholders = productIds.map((_, i) => `$${i + 1}`).join(', ');
-        const flavorsResult = await retryQuery(() =>
-          db.execute(sql.raw(`SELECT id, product_id, flavor, quantity, physical_quantity, created_at, updated_at FROM product_flavors WHERE product_id IN (${productIds.join(', ')})`))
-        );
-        flavors = (flavorsResult?.rows || []).map((r: any) => ({
-          id: r.id,
-          productId: r.product_id,
-          flavor: r.flavor,
-          quantity: r.quantity,
-          physicalQuantity: r.physical_quantity,
-          createdAt: r.created_at,
-          updatedAt: r.updated_at,
-        }));
+        const flavorsResult = await db.execute(sql.raw(`SELECT id, product_id, flavor, quantity, physical_quantity, created_at, updated_at FROM product_flavors WHERE product_id IN (${productIds.join(', ')})`));
+        if (flavorsResult?.rows) {
+          flavors = flavorsResult.rows.map((r: any) => ({
+            id: r.id,
+            productId: r.product_id,
+            flavor: r.flavor,
+            quantity: r.quantity,
+            physicalQuantity: r.physical_quantity,
+            createdAt: r.created_at,
+            updatedAt: r.updated_at,
+          }));
+        }
       } catch (e) {
-        console.log('[getProducts] Flavors query returned empty or errored, using empty array');
+        // Neon HTTP driver returns null for empty result sets on this table
       }
 
       const sizesByProductId = new Map<number, ProductSize[]>();
@@ -658,11 +657,9 @@ export class DatabaseStorage implements IStorage {
       );
       let flavorsResult: any = { rows: [] };
       try {
-        flavorsResult = await retryQuery(() =>
-          db.execute(sql`SELECT id, product_id, flavor, quantity, physical_quantity, created_at, updated_at FROM product_flavors WHERE product_id = ${id}`)
-        );
+        flavorsResult = await db.execute(sql.raw(`SELECT id, product_id, flavor, quantity, physical_quantity, created_at, updated_at FROM product_flavors WHERE product_id = ${id}`));
       } catch (e) {
-        console.log('[getProduct] Flavors query returned empty or errored, using empty array');
+        // Neon HTTP driver returns null for empty result sets
       }
       const sizes = (sizesResult?.rows || []).map((r: any) => ({
         id: r.id,

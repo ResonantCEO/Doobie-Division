@@ -167,6 +167,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                     quantity: Math.min(item.quantity, sizeData.quantity),
                   });
                 }
+              } else if (item.flavor && freshProduct.flavors && freshProduct.flavors.length > 0) {
+                const flavorData = freshProduct.flavors.find((f: any) => f.flavor === item.flavor);
+                if (flavorData && flavorData.quantity > 0) {
+                  validatedItems.push({
+                    ...item,
+                    product: freshProduct,
+                    quantity: Math.min(item.quantity, flavorData.quantity),
+                  });
+                }
               } else if (freshProduct.stock > 0) {
                 validatedItems.push({
                   ...item,
