@@ -50,6 +50,11 @@ const formSchema = z.object({
     size: z.string().min(1, "Size name is required"),
     quantity: z.string().min(1, "Quantity is required"),
   })).optional(),
+  enableFlavors: z.boolean().default(false),
+  flavors: z.array(z.object({
+    flavor: z.string().min(1, "Flavor name is required"),
+    quantity: z.string().min(1, "Quantity is required"),
+  })).optional(),
 }).refine((data) => {
   if (data.sellingMethod === "weight") {
     return data.pricePerGram || data.pricePerOunce;
@@ -143,18 +148,26 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       adminNotes: "",
       enableSizes: false,
       sizes: [],
+      enableFlavors: false,
+      flavors: [],
     },
   });
 
   const sellingMethod = form.watch("sellingMethod");
   const enableSizes = form.watch("enableSizes");
+  const enableFlavors = form.watch("enableFlavors");
 
-  // Clear sizes when selling method changes to weight or when sizes are disabled
   useEffect(() => {
     if (sellingMethod === "weight" || !enableSizes) {
       form.setValue("sizes", []);
     }
   }, [sellingMethod, enableSizes, form]);
+
+  useEffect(() => {
+    if (sellingMethod === "weight" || !enableFlavors) {
+      form.setValue("flavors", []);
+    }
+  }, [sellingMethod, enableFlavors, form]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -220,10 +233,11 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         imageUrl = await uploadImage(selectedFile);
       }
 
-      // Calculate total stock if sizes are enabled
       let totalStock = 0;
       if (data.enableSizes && data.sizes && data.sizes.length > 0) {
         totalStock = data.sizes.reduce((sum, size) => sum + parseInt(size.quantity || "0"), 0);
+      } else if (data.enableFlavors && data.flavors && data.flavors.length > 0) {
+        totalStock = data.flavors.reduce((sum, f) => sum + parseInt(f.quantity || "0"), 0);
       } else {
         totalStock = parseInt(data.stock || "0");
       }
@@ -252,6 +266,10 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         sizes: data.enableSizes && data.sizes && data.sizes.length > 0 ? data.sizes.map(size => ({
           size: size.size,
           quantity: parseInt(size.quantity || "0"),
+        })) : undefined,
+        flavors: data.enableFlavors && data.flavors && data.flavors.length > 0 ? data.flavors.map(f => ({
+          flavor: f.flavor,
+          quantity: parseInt(f.quantity || "0"),
         })) : undefined,
       };
       
@@ -358,6 +376,15 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       toast({
         title: "Validation Error",
         description: "Please add at least one size when sizes are enabled",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (data.enableFlavors && (!data.flavors || data.flavors.length === 0)) {
+      toast({
+        title: "Validation Error",
+        description: "Please add at least one flavor when flavors are enabled",
         variant: "destructive",
       });
       return;
@@ -628,6 +655,101 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                         </FormItem>
                       )}
                     />
+                  </div>
+                )}
+
+                <FormField
+                  control={form.control}
+                  name="enableFlavors"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">Enable Flavors</FormLabel>
+                        <div className="text-sm text-muted-foreground">
+                          Track inventory by flavor variant
+                        </div>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {form.watch("enableFlavors") && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Flavors</FormLabel>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const currentFlavors = form.getValues("flavors") || [];
+                          form.setValue("flavors", [
+                            ...currentFlavors,
+                            { flavor: "", quantity: "0" },
+                          ]);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Flavor
+                      </Button>
+                    </div>
+
+                    {form.watch("flavors")?.map((_, index) => (
+                      <div key={index} className="flex gap-2 items-end">
+                        <FormField
+                          control={form.control}
+                          name={`flavors.${index}.flavor`}
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <FormLabel>Flavor Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g., Strawberry, Mango" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`flavors.${index}.quantity`}
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <FormLabel>Quantity</FormLabel>
+                              <FormControl>
+                                <Input type="number" placeholder="0" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            const currentFlavors = form.getValues("flavors") || [];
+                            form.setValue(
+                              "flavors",
+                              currentFlavors.filter((_, i) => i !== index)
+                            );
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+
+                    {(!form.watch("flavors") || form.watch("flavors")?.length === 0) && (
+                      <p className="text-sm text-muted-foreground">
+                        Click "Add Flavor" to add flavor options for this product.
+                      </p>
+                    )}
                   </div>
                 )}
               </>

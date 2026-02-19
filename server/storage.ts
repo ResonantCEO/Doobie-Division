@@ -531,14 +531,27 @@ export class DatabaseStorage implements IStorage {
     try {
       const productIds = productsList.map(p => p.id);
       
-      const [sizes, flavors] = await Promise.all([
-        retryQuery(() =>
-          db.select().from(productSizes).where(inArray(productSizes.productId, productIds))
-        ),
-        retryQuery(() =>
-          db.select().from(productFlavors).where(inArray(productFlavors.productId, productIds))
-        ),
-      ]);
+      const sizes = await retryQuery(() =>
+        db.select().from(productSizes).where(inArray(productSizes.productId, productIds))
+      );
+      let flavors: ProductFlavor[] = [];
+      try {
+        const placeholders = productIds.map((_, i) => `$${i + 1}`).join(', ');
+        const flavorsResult = await retryQuery(() =>
+          db.execute(sql.raw(`SELECT id, product_id, flavor, quantity, physical_quantity, created_at, updated_at FROM product_flavors WHERE product_id IN (${productIds.join(', ')})`))
+        );
+        flavors = (flavorsResult?.rows || []).map((r: any) => ({
+          id: r.id,
+          productId: r.product_id,
+          flavor: r.flavor,
+          quantity: r.quantity,
+          physicalQuantity: r.physical_quantity,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        }));
+      } catch (e) {
+        console.log('[getProducts] Flavors query returned empty or errored, using empty array');
+      }
 
       const sizesByProductId = new Map<number, ProductSize[]>();
       for (const size of sizes) {
@@ -640,14 +653,17 @@ export class DatabaseStorage implements IStorage {
     if (!product) return undefined;
 
     try {
-      const [sizesResult, flavorsResult] = await Promise.all([
-        retryQuery(() =>
-          db.execute(sql`SELECT id, product_id, size, quantity, physical_quantity, created_at, updated_at FROM product_sizes WHERE product_id = ${id}`)
-        ),
-        retryQuery(() =>
+      const sizesResult = await retryQuery(() =>
+        db.execute(sql`SELECT id, product_id, size, quantity, physical_quantity, created_at, updated_at FROM product_sizes WHERE product_id = ${id}`)
+      );
+      let flavorsResult: any = { rows: [] };
+      try {
+        flavorsResult = await retryQuery(() =>
           db.execute(sql`SELECT id, product_id, flavor, quantity, physical_quantity, created_at, updated_at FROM product_flavors WHERE product_id = ${id}`)
-        ),
-      ]);
+        );
+      } catch (e) {
+        console.log('[getProduct] Flavors query returned empty or errored, using empty array');
+      }
       const sizes = (sizesResult?.rows || []).map((r: any) => ({
         id: r.id,
         productId: r.product_id,
@@ -657,7 +673,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       }));
-      const flavors = (flavorsResult?.rows || []).map((r: any) => ({
+      const flavors = ((flavorsResult?.rows) || []).map((r: any) => ({
         id: r.id,
         productId: r.product_id,
         flavor: r.flavor,
@@ -867,6 +883,12 @@ export class DatabaseStorage implements IStorage {
       await db.delete(productSizes).where(eq(productSizes.productId, id));
     } catch (error) {
       console.warn('Could not delete product sizes, proceeding:', error);
+    }
+
+    try {
+      await db.delete(productFlavors).where(eq(productFlavors.productId, id));
+    } catch (error) {
+      console.warn('Could not delete product flavors, proceeding:', error);
     }
 
     await db.delete(products).where(eq(products.id, id));
@@ -1202,6 +1224,11 @@ export class DatabaseStorage implements IStorage {
         if (sizeName) {
           await db.execute(sql`UPDATE product_sizes SET quantity = quantity - ${item.quantity}, updated_at = NOW() WHERE product_id = ${item.productId} AND size = ${sizeName}`);
         }
+
+        const flavorName = this.extractFlavorFromProductName(item.productName);
+        if (flavorName) {
+          await db.execute(sql`UPDATE product_flavors SET quantity = quantity - ${item.quantity}, updated_at = NOW() WHERE product_id = ${item.productId} AND flavor = ${flavorName}`);
+        }
       } catch (stockErr) {
         console.warn('[createOrder] Stock update error:', stockErr);
       }
@@ -1293,6 +1320,10 @@ export class DatabaseStorage implements IStorage {
       if (sizeName) {
         await db.execute(sql`UPDATE product_sizes SET physical_quantity = physical_quantity - ${quantity}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`);
       }
+      const flavorName = this.extractFlavorFromProductName(fulfilledItem.productName);
+      if (flavorName) {
+        await db.execute(sql`UPDATE product_flavors SET physical_quantity = physical_quantity - ${quantity}, updated_at = NOW() WHERE product_id = ${productId} AND flavor = ${flavorName}`);
+      }
     }
 
     // Log the physical inventory change
@@ -1359,6 +1390,10 @@ export class DatabaseStorage implements IStorage {
       const sizeName = this.extractSizeFromProductName(unfulfillItem.productName);
       if (sizeName) {
         await db.execute(sql`UPDATE product_sizes SET physical_quantity = physical_quantity + ${quantity}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`);
+      }
+      const flavorName = this.extractFlavorFromProductName(unfulfillItem.productName);
+      if (flavorName) {
+        await db.execute(sql`UPDATE product_flavors SET physical_quantity = physical_quantity + ${quantity}, updated_at = NOW() WHERE product_id = ${productId} AND flavor = ${flavorName}`);
       }
     }
 

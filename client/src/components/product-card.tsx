@@ -5,10 +5,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/cart-context";
 import { useState } from "react";
 import AddToCartModal from "./add-to-cart-modal";
-import type { Product, Category, ProductSize } from "@shared/schema";
+import type { Product, Category, ProductSize, ProductFlavor } from "@shared/schema";
 
 interface ProductCardProps {
-  product: Product & { category: Category | null; sizes?: ProductSize[] };
+  product: Product & { category: Category | null; sizes?: ProductSize[]; flavors?: ProductFlavor[] };
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
@@ -22,8 +22,10 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   const hasSizes = product.sizes && product.sizes.length > 0;
+  const hasFlavors = product.flavors && product.flavors.length > 0;
   const allSizesOutOfStock = hasSizes && product.sizes!.every(s => s.quantity <= 0);
-  const isOutOfStock = product.stock === 0 || allSizesOutOfStock;
+  const allFlavorsOutOfStock = hasFlavors && product.flavors!.every(f => f.quantity <= 0);
+  const isOutOfStock = product.stock === 0 || allSizesOutOfStock || allFlavorsOutOfStock;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
