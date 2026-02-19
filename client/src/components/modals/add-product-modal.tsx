@@ -498,9 +498,9 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
-                        <FormLabel className="text-base">Enable Sizes</FormLabel>
+                        <FormLabel className="text-base">Product Options</FormLabel>
                         <div className="text-sm text-muted-foreground">
-                          Track inventory by size (e.g., S, M, L, XL)
+                          Track size or flavor options
                         </div>
                       </div>
                       <FormControl>
@@ -516,7 +516,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                 {form.watch("enableSizes") ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <FormLabel>Sizes</FormLabel>
+                      <FormLabel>Options</FormLabel>
                       <Button
                         type="button"
                         variant="outline"
@@ -530,7 +530,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                         }}
                       >
                         <Plus className="h-4 w-4 mr-2" />
-                        Add Size
+                        Add Option
                       </Button>
                     </div>
 
@@ -541,9 +541,9 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                           name={`sizes.${index}.size`}
                           render={({ field }) => (
                             <FormItem className="flex-1">
-                              <FormLabel>Size Name</FormLabel>
+                              <FormLabel>Option Name</FormLabel>
                               <FormControl>
-                                <Input placeholder="e.g., S, M, L, XL" {...field} />
+                                <Input placeholder="e.g., S, M, L or Vanilla, Chocolate" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -581,7 +581,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
 
                     {(!form.watch("sizes") || form.watch("sizes")?.length === 0) && (
                       <p className="text-sm text-muted-foreground">
-                        Click "Add Size" to add size options for this product.
+                        Click "Add Option" to add product options for this product.
                       </p>
                     )}
 
