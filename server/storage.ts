@@ -4,6 +4,7 @@ import {
   categories,
   products,
   productSizes,
+  productFlavors,
   orders,
   orderItems,
   inventoryLogs,
@@ -20,6 +21,8 @@ import {
   type InsertProduct,
   type ProductSize,
   type InsertProductSize,
+  type ProductFlavor,
+  type InsertProductFlavor,
   type Order,
   type InsertOrder,
   type OrderItem,
@@ -72,8 +75,8 @@ export interface IStorage {
   deleteCategory(id: number): Promise<void>;
 
   // Product operations
-  getProducts(filters?: { categoryId?: number; categoryIds?: number[]; search?: string; status?: string; isActive?: boolean }): Promise<(Product & { category: Category | null; sizes?: ProductSize[] })[]>;
-  getProduct(id: number): Promise<(Product & { category: Category | null; sizes?: ProductSize[] }) | undefined>;
+  getProducts(filters?: { categoryId?: number; categoryIds?: number[]; search?: string; status?: string; isActive?: boolean }): Promise<(Product & { category: Category | null; sizes?: ProductSize[]; flavors?: ProductFlavor[] })[]>;
+  getProduct(id: number): Promise<(Product & { category: Category | null; sizes?: ProductSize[]; flavors?: ProductFlavor[] }) | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
@@ -167,6 +170,11 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   private extractSizeFromProductName(productName: string): string | null {
     const match = productName.match(/\(Size:\s*([^)]+)\)/);
+    return match ? match[1].trim() : null;
+  }
+
+  private extractFlavorFromProductName(productName: string): string | null {
+    const match = productName.match(/\(Flavor:\s*([^)]+)\)/);
     return match ? match[1].trim() : null;
   }
 
@@ -390,7 +398,7 @@ export class DatabaseStorage implements IStorage {
     search?: string;
     status?: string;
     isActive?: boolean;
-  }): Promise<(Product & { category: Category | null; sizes?: ProductSize[] })[]> {
+  }): Promise<(Product & { category: Category | null; sizes?: ProductSize[]; flavors?: ProductFlavor[] })[]> {
     let query = db
       .select({
         id: products.id,
@@ -519,15 +527,19 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
 
-    // Fetch sizes for all products (if any exist)
+    // Fetch sizes and flavors for all products (if any exist)
     try {
       const productIds = productsList.map(p => p.id);
       
-      const sizes = await retryQuery(() =>
-        db.select().from(productSizes).where(inArray(productSizes.productId, productIds))
-      );
+      const [sizes, flavors] = await Promise.all([
+        retryQuery(() =>
+          db.select().from(productSizes).where(inArray(productSizes.productId, productIds))
+        ),
+        retryQuery(() =>
+          db.select().from(productFlavors).where(inArray(productFlavors.productId, productIds))
+        ),
+      ]);
 
-      // Group sizes by product ID
       const sizesByProductId = new Map<number, ProductSize[]>();
       for (const size of sizes) {
         if (!sizesByProductId.has(size.productId)) {
@@ -536,19 +548,27 @@ export class DatabaseStorage implements IStorage {
         sizesByProductId.get(size.productId)!.push(size);
       }
 
-      // Attach sizes to each product (empty array if no sizes)
+      const flavorsByProductId = new Map<number, ProductFlavor[]>();
+      for (const flavor of flavors) {
+        if (!flavorsByProductId.has(flavor.productId)) {
+          flavorsByProductId.set(flavor.productId, []);
+        }
+        flavorsByProductId.get(flavor.productId)!.push(flavor);
+      }
+
       const result = productsList.map(product => ({
         ...product,
         sizes: sizesByProductId.get(product.id) || [],
+        flavors: flavorsByProductId.get(product.id) || [],
       }));
       
       return result;
     } catch (error) {
-      // If there's an error fetching sizes, return products without sizes
-      console.error('[getProducts] Error fetching product sizes:', error);
+      console.error('[getProducts] Error fetching product sizes/flavors:', error);
       const result = productsList.map(product => ({
         ...product,
         sizes: [] as ProductSize[],
+        flavors: [] as ProductFlavor[],
       }));
       return result;
     }
@@ -620,9 +640,14 @@ export class DatabaseStorage implements IStorage {
     if (!product) return undefined;
 
     try {
-      const sizesResult = await retryQuery(() =>
-        db.execute(sql`SELECT id, product_id, size, quantity, physical_quantity, created_at, updated_at FROM product_sizes WHERE product_id = ${id}`)
-      );
+      const [sizesResult, flavorsResult] = await Promise.all([
+        retryQuery(() =>
+          db.execute(sql`SELECT id, product_id, size, quantity, physical_quantity, created_at, updated_at FROM product_sizes WHERE product_id = ${id}`)
+        ),
+        retryQuery(() =>
+          db.execute(sql`SELECT id, product_id, flavor, quantity, physical_quantity, created_at, updated_at FROM product_flavors WHERE product_id = ${id}`)
+        ),
+      ]);
       const sizes = (sizesResult?.rows || []).map((r: any) => ({
         id: r.id,
         productId: r.product_id,
@@ -632,18 +657,28 @@ export class DatabaseStorage implements IStorage {
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       }));
+      const flavors = (flavorsResult?.rows || []).map((r: any) => ({
+        id: r.id,
+        productId: r.product_id,
+        flavor: r.flavor,
+        quantity: r.quantity,
+        physicalQuantity: r.physical_quantity,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      }));
       return {
         ...product,
         sizes: sizes.length > 0 ? sizes : undefined,
+        flavors: flavors.length > 0 ? flavors : undefined,
       };
     } catch (error) {
-      console.error('[getProduct] Error fetching product sizes:', error);
-      return { ...product, sizes: [] };
+      console.error('[getProduct] Error fetching product sizes/flavors:', error);
+      return { ...product, sizes: [], flavors: [] };
     }
   }
 
   async createProduct(productData: InsertProduct): Promise<Product> {
-    const { sizes, ...productDataWithoutSizes } = productData;
+    const { sizes, flavors, ...productDataWithoutExtras } = productData;
     
     // Ensure stock is a number
     const stockValue = typeof productData.stock === 'string' ? parseInt(productData.stock, 10) : (productData.stock || 0);
@@ -655,7 +690,7 @@ export class DatabaseStorage implements IStorage {
     };
 
     const processedProduct: Record<string, any> = {
-      ...productDataWithoutSizes,
+      ...productDataWithoutExtras,
       stock: stockValue,
       price: productData.price || "0",
       physicalInventory: stockValue,
@@ -719,6 +754,23 @@ export class DatabaseStorage implements IStorage {
         await db.insert(productSizes).values(sizeRecords);
       } catch (sizeError) {
         console.warn('Error creating product sizes:', sizeError);
+      }
+    }
+
+    if (flavors && flavors.length > 0) {
+      const flavorRecords: InsertProductFlavor[] = flavors.map(f => ({
+        productId: newProduct!.id,
+        flavor: f.flavor,
+        quantity: f.quantity,
+        physicalQuantity: f.quantity,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+
+      try {
+        await db.insert(productFlavors).values(flavorRecords);
+      } catch (flavorError) {
+        console.warn('Error creating product flavors:', flavorError);
       }
     }
 
