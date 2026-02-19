@@ -34,8 +34,8 @@ interface InventoryTableProps {
 export default function InventoryTable({ products, user, selectedProducts, onSelectionChange, categories = [] }: InventoryTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [adjustingStockProduct, setAdjustingStockProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<(Product & { category: Category | null; sizes?: ProductSize[] }) | null>(null);
+  const [adjustingStockProduct, setAdjustingStockProduct] = useState<(Product & { sizes?: ProductSize[] }) | null>(null);
   const [qrCodeProduct, setQrCodeProduct] = useState<Product | null>(null);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
