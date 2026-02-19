@@ -33,8 +33,9 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { Lock } from "lucide-react";
-import type { Product, Category } from "@shared/schema";
+import { Lock, Plus, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import type { Product, Category, ProductSize } from "@shared/schema";
 
 interface CategoryWithChildren extends Category {
   children?: CategoryWithChildren[];
@@ -43,7 +44,7 @@ interface CategoryWithChildren extends Category {
 interface EditProductModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  product: Product & { category: Category | null };
+  product: Product & { category: Category | null; sizes?: ProductSize[] };
   categories: CategoryWithChildren[];
 }
 
@@ -67,6 +68,11 @@ const formSchema = z.object({
   purchasePricePerGram: z.string().optional(),
   purchasePricePerOunce: z.string().optional(),
   adminNotes: z.string().optional(),
+  enableSizes: z.boolean().default(false),
+  sizes: z.array(z.object({
+    size: z.string().min(1, "Size name is required"),
+    quantity: z.string().min(1, "Quantity is required"),
+  })).optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -99,6 +105,8 @@ export default function EditProductModal({ open, onOpenChange, product, categori
 
   const isAdmin = user?.role === "admin";
 
+  const hasSizes = !!(product.sizes && product.sizes.length > 0);
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -121,13 +129,17 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       purchasePricePerGram: (product as any).purchasePricePerGram || "",
       purchasePricePerOunce: (product as any).purchasePricePerOunce || "",
       adminNotes: (product as any).adminNotes || "",
+      enableSizes: hasSizes,
+      sizes: hasSizes ? product.sizes!.map(s => ({ size: s.size, quantity: s.quantity.toString() })) : [],
     },
   });
 
   const sellingMethod = form.watch("sellingMethod");
+  const enableSizes = form.watch("enableSizes");
 
   useEffect(() => {
     if (product && open) {
+      const productHasSizes = !!(product.sizes && product.sizes.length > 0);
       form.reset({
         name: product.name,
         company: (product as any).company || "",
@@ -148,6 +160,8 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         purchasePricePerGram: (product as any).purchasePricePerGram || "",
         purchasePricePerOunce: (product as any).purchasePricePerOunce || "",
         adminNotes: (product as any).adminNotes || "",
+        enableSizes: productHasSizes,
+        sizes: productHasSizes ? product.sizes!.map(s => ({ size: s.size, quantity: s.quantity.toString() })) : [],
       });
       setImagePreview(product.imageUrl || null);
     }
@@ -175,11 +189,16 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         imageUrl = uploadResult.imageUrl;
       }
 
-      const productData = {
+      let totalStock = parseInt(data.stock);
+      if (data.enableSizes && data.sizes && data.sizes.length > 0) {
+        totalStock = data.sizes.reduce((sum: number, s: { quantity: string }) => sum + parseInt(s.quantity || "0"), 0);
+      }
+
+      const productData: any = {
         ...data,
         imageUrl,
         categoryId: data.categoryId ? parseInt(data.categoryId) : null,
-        stock: parseInt(data.stock),
+        stock: totalStock,
         minStockThreshold: parseInt(data.minStockThreshold),
         price: data.sellingMethod === "units" && data.price ? data.price : null,
         pricePerGram: data.sellingMethod === "weight" && data.pricePerGram ? data.pricePerGram : null,
@@ -190,7 +209,11 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         purchasePricePerGram: data.purchasePricePerGram ? parseFloat(data.purchasePricePerGram).toFixed(4) : null,
         purchasePricePerOunce: data.purchasePricePerOunce ? parseFloat(data.purchasePricePerOunce).toFixed(2) : null,
         adminNotes: data.adminNotes || null,
+        sizes: data.enableSizes && data.sizes && data.sizes.length > 0
+          ? data.sizes.map(s => ({ size: s.size, quantity: parseInt(s.quantity || "0") }))
+          : [],
       };
+      delete productData.enableSizes;
 
       await apiRequest("PUT", `/api/products/${product.id}`, productData);
     },
@@ -496,13 +519,108 @@ export default function EditProductModal({ open, onOpenChange, product, categori
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            {sellingMethod === "units" && (
+              <FormField
+                control={form.control}
+                name="enableSizes"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Product Options</FormLabel>
+                      <div className="text-sm text-muted-foreground">
+                        Track size or flavor options
+                      </div>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {sellingMethod === "units" && enableSizes ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <FormLabel>Options</FormLabel>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentSizes = form.getValues("sizes") || [];
+                      form.setValue("sizes", [
+                        ...currentSizes,
+                        { size: "", quantity: "0" },
+                      ]);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Option
+                  </Button>
+                </div>
+
+                {form.watch("sizes")?.map((_, index) => (
+                  <div key={index} className="flex gap-2 items-end">
+                    <FormField
+                      control={form.control}
+                      name={`sizes.${index}.size`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Option Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., S, M, L" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`sizes.${index}.quantity`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Quantity</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        const currentSizes = form.getValues("sizes") || [];
+                        form.setValue(
+                          "sizes",
+                          currentSizes.filter((_, i) => i !== index)
+                        );
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+
+                {(!form.watch("sizes") || form.watch("sizes")?.length === 0) && (
+                  <p className="text-sm text-muted-foreground">
+                    Click "Add Option" to add product options.
+                  </p>
+                )}
+              </div>
+            ) : (
               <FormField
                 control={form.control}
                 name="stock"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Stock Quantity ({form.watch("weightUnit")})</FormLabel>
+                    <FormLabel>Stock Quantity</FormLabel>
                     <FormControl>
                       <Input type="number" step="1" placeholder="0" {...field} />
                     </FormControl>
@@ -510,21 +628,21 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                   </FormItem>
                 )}
               />
+            )}
 
-              <FormField
-                control={form.control}
-                name="minStockThreshold"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Min Stock Threshold</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="1" placeholder="5" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="minStockThreshold"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Min Stock Threshold</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="1" placeholder="5" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {isAdmin && (
               <div className="border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 rounded-lg p-4 space-y-4">

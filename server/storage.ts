@@ -77,7 +77,7 @@ export interface IStorage {
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
-  adjustStock(productId: number, quantity: number, userId: string, reason: string): Promise<void>;
+  adjustStock(productId: number, quantity: number, userId: string, reason: string, sizeName?: string): Promise<void>;
   getLowStockProducts(): Promise<Product[]>;
 
   // Order operations
@@ -726,15 +726,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateProduct(id: number, productData: Partial<InsertProduct>): Promise<Product> {
+    const { sizes, ...dataWithoutSizes } = productData as any;
+
     const toNumericStr = (val: any): string | undefined => {
       if (val === null || val === undefined || val === '') return undefined;
       const num = typeof val === 'string' ? parseFloat(val) : val;
       return isNaN(num) ? undefined : String(num);
     };
 
-    const updateData: Record<string, any> = { ...productData };
-    if (productData.stock !== undefined) {
-      updateData.physicalInventory = productData.stock;
+    const updateData: Record<string, any> = { ...dataWithoutSizes };
+    delete updateData.enableSizes;
+
+    if (dataWithoutSizes.stock !== undefined) {
+      updateData.physicalInventory = dataWithoutSizes.stock;
     }
 
     const numericFields = ['pricePerGram', 'pricePerOunce', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
@@ -759,6 +763,31 @@ export class DatabaseStorage implements IStorage {
 
     if (!product) {
       throw new Error("Product not found");
+    }
+
+    if (sizes !== undefined) {
+      try {
+        await db.delete(productSizes).where(eq(productSizes.productId, id));
+      } catch (e) {
+        console.warn('Could not delete old product sizes:', e);
+      }
+
+      if (sizes && sizes.length > 0) {
+        const sizeRecords: InsertProductSize[] = sizes.map((size: any) => ({
+          productId: id,
+          size: size.size,
+          quantity: size.quantity,
+          physicalQuantity: size.quantity,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+
+        try {
+          await db.insert(productSizes).values(sizeRecords);
+        } catch (sizeError) {
+          console.warn('Error creating product sizes:', sizeError);
+        }
+      }
     }
 
     return product;
@@ -820,8 +849,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(products).where(eq(products.id, id));
   }
 
-  async adjustStock(productId: number, quantity: number, userId: string, reason: string): Promise<void> {
-    // Validate inputs
+  async adjustStock(productId: number, quantity: number, userId: string, reason: string, sizeName?: string): Promise<void> {
     if (!productId || typeof productId !== 'number') {
       throw new Error("Invalid product ID");
     }
@@ -832,7 +860,6 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Reason is required");
     }
 
-    // Get the product directly from the products table
     const [product] = await db
       .select()
       .from(products)
@@ -842,44 +869,86 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Product not found");
     }
 
-    const newStock = product.stock + quantity;
-    if (newStock < 0) {
-      throw new Error("Insufficient stock");
-    }
+    if (sizeName) {
+      const sizeRows = await db.select().from(productSizes)
+        .where(and(eq(productSizes.productId, productId), eq(productSizes.size, sizeName)));
 
-    // Update product stock and physical inventory
-    await db.update(products)
-      .set({
-        stock: newStock,
-        physicalInventory: newStock, // Update physical inventory to match new stock
-        updatedAt: new Date()
-      })
-      .where(eq(products.id, productId));
+      if (!sizeRows || sizeRows.length === 0) {
+        throw new Error(`Size "${sizeName}" not found for this product`);
+      }
 
-    // Log the inventory change
-    await db.insert(inventoryLogs).values({
-      productId,
-      type: quantity > 0 ? 'stock_in' : 'stock_out',
-      quantity: Math.abs(quantity),
-      previousStock: product.stock,
-      newStock,
-      reason,
-      userId
-    });
+      const sizeRow = sizeRows[0];
+      const newSizeQty = sizeRow.quantity + quantity;
+      if (newSizeQty < 0) {
+        throw new Error("Insufficient stock for this size");
+      }
 
-    // Check if product needs low stock notification
-    if (newStock <= product.minStockThreshold && product.stock > product.minStockThreshold) {
-      // Get all admin users for notification
-      const adminUsers = await this.getUsersWithRole('admin');
+      await db.update(productSizes)
+        .set({ quantity: newSizeQty, physicalQuantity: newSizeQty, updatedAt: new Date() })
+        .where(and(eq(productSizes.productId, productId), eq(productSizes.size, sizeName)));
 
-      for (const admin of adminUsers) {
-        await this.createNotification({
-          userId: admin.id,
-          type: 'low_stock',
-          title: 'Low Stock Alert',
-          message: `${product.name} is running low on stock (${newStock} remaining)`,
-          data: { productId, currentStock: newStock, threshold: product.minStockThreshold },
-        });
+      const newTotalStock = product.stock + quantity;
+      await db.update(products)
+        .set({ stock: newTotalStock, physicalInventory: newTotalStock, updatedAt: new Date() })
+        .where(eq(products.id, productId));
+
+      await db.insert(inventoryLogs).values({
+        productId,
+        type: quantity > 0 ? 'stock_in' : 'stock_out',
+        quantity: Math.abs(quantity),
+        previousStock: product.stock,
+        newStock: newTotalStock,
+        reason: `[${sizeName}] ${reason}`,
+        userId
+      });
+
+      if (newTotalStock <= product.minStockThreshold && product.stock > product.minStockThreshold) {
+        const adminUsers = await this.getUsersWithRole('admin');
+        for (const admin of adminUsers) {
+          await this.createNotification({
+            userId: admin.id,
+            type: 'low_stock',
+            title: 'Low Stock Alert',
+            message: `${product.name} is running low on stock (${newTotalStock} remaining)`,
+            data: { productId, currentStock: newTotalStock, threshold: product.minStockThreshold },
+          });
+        }
+      }
+    } else {
+      const newStock = product.stock + quantity;
+      if (newStock < 0) {
+        throw new Error("Insufficient stock");
+      }
+
+      await db.update(products)
+        .set({
+          stock: newStock,
+          physicalInventory: newStock,
+          updatedAt: new Date()
+        })
+        .where(eq(products.id, productId));
+
+      await db.insert(inventoryLogs).values({
+        productId,
+        type: quantity > 0 ? 'stock_in' : 'stock_out',
+        quantity: Math.abs(quantity),
+        previousStock: product.stock,
+        newStock,
+        reason,
+        userId
+      });
+
+      if (newStock <= product.minStockThreshold && product.stock > product.minStockThreshold) {
+        const adminUsers = await this.getUsersWithRole('admin');
+        for (const admin of adminUsers) {
+          await this.createNotification({
+            userId: admin.id,
+            type: 'low_stock',
+            title: 'Low Stock Alert',
+            message: `${product.name} is running low on stock (${newStock} remaining)`,
+            data: { productId, currentStock: newStock, threshold: product.minStockThreshold },
+          });
+        }
       }
     }
   }

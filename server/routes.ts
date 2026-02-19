@@ -549,14 +549,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/products/:id/adjust-stock', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
       const productId = parseInt(req.params.id);
-      const { quantity, reason } = req.body;
+      const { quantity, reason, sizeName } = req.body;
 
-      // Validate productId
       if (isNaN(productId) || productId <= 0) {
         return res.status(400).json({ message: "Invalid product ID" });
       }
 
-      // Validate quantity and reason with stricter checks
       if (typeof quantity !== 'number' || Math.abs(quantity) > 10000) {
         return res.status(400).json({ message: "Quantity must be a number and cannot exceed 10000" });
       }
@@ -565,9 +563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Reason must be between 3 and 200 characters" });
       }
 
-
-
-      await storage.adjustStock(productId, quantity, req.currentUser.id, reason);
+      await storage.adjustStock(productId, quantity, req.currentUser.id, reason, sizeName || undefined);
       res.status(200).json({ message: "Stock adjusted successfully" });
     } catch (error) {
       console.error("Stock adjustment error:", error);
