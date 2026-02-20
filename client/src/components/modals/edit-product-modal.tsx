@@ -517,30 +517,28 @@ export default function EditProductModal({ open, onOpenChange, product, categori
               )}
             />
 
-            {sellingMethod === "units" && (
-              <FormField
-                control={form.control}
-                name="enableSizes"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Product Options</FormLabel>
-                      <div className="text-sm text-muted-foreground">
-                        Track size or flavor options
-                      </div>
+            <FormField
+              control={form.control}
+              name="enableSizes"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Product Options</FormLabel>
+                    <div className="text-sm text-muted-foreground">
+                      Track size or flavor options
                     </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            )}
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
 
-            {sellingMethod === "units" && enableSizes ? (
+            {enableSizes ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <FormLabel>Options</FormLabel>
