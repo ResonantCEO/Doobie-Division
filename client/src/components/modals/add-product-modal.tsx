@@ -663,7 +663,19 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                       <FormItem>
                         <FormLabel>Price per Gram ($)</FormLabel>
                         <FormControl>
-                          <Input type="text" inputMode="decimal" placeholder="0.0000" {...field} />
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={field.value || ""}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^0-9]/g, "");
+                              field.onChange(val);
+                            }}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -677,7 +689,19 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                       <FormItem>
                         <FormLabel>Price per Ounce ($)</FormLabel>
                         <FormControl>
-                          <Input type="text" inputMode="decimal" placeholder="0.00" {...field} />
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={field.value || ""}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^0-9]/g, "");
+                              field.onChange(val);
+                            }}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
