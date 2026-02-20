@@ -446,7 +446,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                     <FormItem>
                       <FormLabel>Price per Gram</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                        <Input type="text" inputMode="decimal" placeholder="0.00" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -460,7 +460,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                     <FormItem>
                       <FormLabel>Price per Ounce</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                        <Input type="text" inputMode="decimal" placeholder="0.00" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

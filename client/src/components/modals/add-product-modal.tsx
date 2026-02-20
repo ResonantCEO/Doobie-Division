@@ -663,7 +663,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                       <FormItem>
                         <FormLabel>Price per Gram ($)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.0001" placeholder="0.0000" {...field} />
+                          <Input type="text" inputMode="decimal" placeholder="0.0000" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -677,7 +677,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                       <FormItem>
                         <FormLabel>Price per Ounce ($)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                          <Input type="text" inputMode="decimal" placeholder="0.00" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
