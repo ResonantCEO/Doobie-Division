@@ -420,6 +420,80 @@ export default function EditProductModal({ open, onOpenChange, product, categori
               )}
             />
 
+            {enableSizes && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <FormLabel>Options</FormLabel>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentSizes = form.getValues("sizes") || [];
+                      form.setValue("sizes", [
+                        ...currentSizes,
+                        { size: "", quantity: "0" },
+                      ]);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Option
+                  </Button>
+                </div>
+
+                {form.watch("sizes")?.map((_, index) => (
+                  <div key={index} className="flex gap-2 items-end">
+                    <FormField
+                      control={form.control}
+                      name={`sizes.${index}.size`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Option Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., S, M, L" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`sizes.${index}.quantity`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Quantity</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        const currentSizes = form.getValues("sizes") || [];
+                        form.setValue(
+                          "sizes",
+                          currentSizes.filter((_, i) => i !== index)
+                        );
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+
+                {(!form.watch("sizes") || form.watch("sizes")?.length === 0) && (
+                  <p className="text-sm text-muted-foreground">
+                    Click "Add Option" to add product options.
+                  </p>
+                )}
+              </div>
+            )}
+
             {sellingMethod === "units" && (
               <FormField
                 control={form.control}
@@ -538,79 +612,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
               )}
             />
 
-            {enableSizes ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <FormLabel>Options</FormLabel>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const currentSizes = form.getValues("sizes") || [];
-                      form.setValue("sizes", [
-                        ...currentSizes,
-                        { size: "", quantity: "0" },
-                      ]);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Option
-                  </Button>
-                </div>
-
-                {form.watch("sizes")?.map((_, index) => (
-                  <div key={index} className="flex gap-2 items-end">
-                    <FormField
-                      control={form.control}
-                      name={`sizes.${index}.size`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel>Option Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., S, M, L" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`sizes.${index}.quantity`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel>Quantity</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        const currentSizes = form.getValues("sizes") || [];
-                        form.setValue(
-                          "sizes",
-                          currentSizes.filter((_, i) => i !== index)
-                        );
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                ))}
-
-                {(!form.watch("sizes") || form.watch("sizes")?.length === 0) && (
-                  <p className="text-sm text-muted-foreground">
-                    Click "Add Option" to add product options.
-                  </p>
-                )}
-              </div>
-            ) : (
+            {!enableSizes && (
               <FormField
                 control={form.control}
                 name="stock"

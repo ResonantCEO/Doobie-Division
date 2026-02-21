@@ -654,57 +654,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="weightUnit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Weight Unit</FormLabel>
-                      <FormControl>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select weight unit" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="grams">Grams</SelectItem>
-                            <SelectItem value="ounces">Ounces</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none">Price per Gram ($)</label>
-                    <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
-                      placeholder="0"
-                      value={form.watch("pricePerGram") || ""}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, "");
-                        form.setValue("pricePerGram", val);
-                      }}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none">Price per Ounce ($)</label>
-                    <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
-                      placeholder="0"
-                      value={form.watch("pricePerOunce") || ""}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, "");
-                        form.setValue("pricePerOunce", val);
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {form.watch("enableSizes") ? (
+                {form.watch("enableSizes") && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <FormLabel>Options</FormLabel>
@@ -776,7 +726,59 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                       </p>
                     )}
                   </div>
-                ) : (
+                )}
+
+                <FormField
+                  control={form.control}
+                  name="weightUnit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Weight Unit</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select weight unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="grams">Grams</SelectItem>
+                            <SelectItem value="ounces">Ounces</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Price per Gram ($)</label>
+                    <input
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+                      placeholder="0"
+                      value={form.watch("pricePerGram") || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, "");
+                        form.setValue("pricePerGram", val);
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Price per Ounce ($)</label>
+                    <input
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+                      placeholder="0"
+                      value={form.watch("pricePerOunce") || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, "");
+                        form.setValue("pricePerOunce", val);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {!form.watch("enableSizes") && (
                   <FormField
                     control={form.control}
                     name="stock"
