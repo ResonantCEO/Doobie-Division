@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,8 +6,73 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductCard from "@/components/product-card";
-import { Search } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
+
+function ScrollableProductRow({ products, onCategoryFilter }: { products: (Product & { category: Category | null })[], onCategoryFilter?: (id: number) => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener('scroll', checkScroll);
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => { el.removeEventListener('scroll', checkScroll); ro.disconnect(); };
+  }, [checkScroll, products]);
+
+  const scroll = (direction: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const amount = el.clientWidth * 0.75;
+    el.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="relative group">
+      {canScrollLeft && (
+        <button
+          onClick={() => scroll('left')}
+          className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 shadow-lg transition-opacity opacity-0 group-hover:opacity-100"
+          aria-label="Scroll left"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+      )}
+      <div ref={scrollRef} className="flex space-x-8 overflow-x-auto pb-4 scrollbar-hide">
+        <div className="flex space-x-8" style={{ minWidth: 'max-content' }}>
+          {products.map((product, index) => (
+            <div key={product.id} className={`flex-shrink-0 w-64 sm:w-72 my-6 ${index === 0 ? 'ml-6' : ''}`}>
+              <ProductCard product={product} />
+            </div>
+          ))}
+        </div>
+      </div>
+      {canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 shadow-lg transition-opacity opacity-0 group-hover:opacity-100"
+          aria-label="Scroll right"
+        >
+          <ChevronRight className="w-6 h-6" />
+        </button>
+      )}
+      {canScrollRight && (
+        <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-white dark:from-gray-900 to-transparent pointer-events-none"></div>
+      )}
+    </div>
+  );
+}
 
 export default function StorefrontPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -429,29 +494,13 @@ export default function StorefrontPage() {
                         </span>
                       </div>
 
-                      {/* Horizontal Scrolling Product Container */}
-                      <div className="relative">
-                        {subcategoryProducts.length > 0 ? (
-                          <div className="flex space-x-8 overflow-x-auto px-4 pt-6 pb-12 scrollbar-hide" style={{ scrollbarGutter: 'stable' }}>
-                            <div className="flex space-x-8" style={{ minWidth: 'max-content' }}>
-                              {subcategoryProducts.map((product, index) => (
-                                <div key={product.id} className={`flex-shrink-0 w-64 sm:w-72 mb-4 my-6 ${index === 0 ? 'ml-6' : ''}`}>
-                                  <ProductCard product={product} />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <p>No products available in this category</p>
-                          </div>
-                        )}
-
-                        {/* Scroll indicators */}
-                        {subcategoryProducts.length > 0 && (
-                          <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-white dark:from-gray-900 to-transparent pointer-events-none"></div>
-                        )}
-                      </div>
+                      {subcategoryProducts.length > 0 ? (
+                        <ScrollableProductRow products={subcategoryProducts} />
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <p>No products available in this category</p>
+                        </div>
+                      )}
                     </div>
                   );
                 });
@@ -530,21 +579,7 @@ export default function StorefrontPage() {
                     </h3>
                   </div>
 
-                  {/* Horizontal Scrolling Product Container */}
-                  <div className="relative">
-                    <div className="flex space-x-8 overflow-x-auto pb-4 scrollbar-hide">
-                      <div className="flex space-x-8" style={{ minWidth: 'max-content' }}>
-                        {categoryProducts.map((product, index) => (
-                          <div key={product.id} className={`flex-shrink-0 w-64 sm:w-72 my-6 ${index === 0 ? 'ml-6' : ''}`}>
-                            <ProductCard product={product} />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Scroll indicators */}
-                    <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-white dark:from-gray-900 to-transparent pointer-events-none"></div>
-                  </div>
+                  <ScrollableProductRow products={categoryProducts} />
                 </div>
               );
             }).filter(Boolean);
