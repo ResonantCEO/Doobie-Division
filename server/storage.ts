@@ -2511,26 +2511,29 @@ export class DatabaseStorage implements IStorage {
     if (userData.minPurchaseExempt !== undefined) updateFields.minPurchaseExempt = userData.minPurchaseExempt;
     if (userData.minPurchaseOverride !== undefined) updateFields.minPurchaseOverride = userData.minPurchaseOverride !== null && userData.minPurchaseOverride !== "" ? String(userData.minPurchaseOverride) : null;
 
-    const [user] = await db
-      .update(users)
-      .set(updateFields)
-      .where(eq(users.id, id))
-      .returning();
+    const result = await retryQuery(async () => {
+      const [row] = await db
+        .update(users)
+        .set(updateFields)
+        .where(eq(users.id, id))
+        .returning();
+      return row;
+    });
 
-    if (!user) {
+    if (!result) {
       throw new Error("User not found");
     }
 
-    // Log the profile update
-    const updatedFields = Object.keys(userData).join(', ');
-    await this.logUserActivity(
+    // Log the profile update (non-blocking, don't let it fail the update)
+    const updatedFieldNames = Object.keys(userData).join(', ');
+    this.logUserActivity(
       id,
       'Profile Updated',
-      `User profile updated: ${updatedFields}`,
+      `User profile updated: ${updatedFieldNames}`,
       { updatedFields: userData }
-    );
+    ).catch(err => console.error('Activity log error:', err));
 
-    return user;
+    return result;
   }
 
   async getInventoryLogs(filters?: { days?: number; type?: string; product?: string }): Promise<any[]> {

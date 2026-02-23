@@ -1486,7 +1486,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const user = await storage.updateUser(id, userData);
         res.json(user);
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error updating user:', error);
       res.status(500).json({ message: "Failed to update user" });
     }
   });
