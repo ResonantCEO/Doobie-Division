@@ -148,6 +148,17 @@ The application is designed to be deployed on Replit with integrated authenticat
 
 ## Recent Changes
 
+### February 23, 2026 - City-Based Purchase Limits System
+- **New Feature: City Purchase Limits**: Admins can set minimum order amounts per city
+  - `city_purchase_limits` table with city name, minimum amount, and active status
+  - Full CRUD management via Admin Dashboard "Purchase Limits" tab
+  - User-level overrides: `minPurchaseExempt` (boolean) and `minPurchaseOverride` (custom minimum) fields on users table
+  - User edit modal includes purchase limit override controls
+  - Client-side AND server-side enforcement during checkout
+  - Server-side validation in `/api/orders` POST route prevents bypass
+  - `/api/check-purchase-limit` endpoint for pre-checkout validation
+- **Impact**: Admins can enforce minimum order amounts for specific cities, with per-user exemptions and overrides
+
 ### February 17, 2026 - Fixed Image Persistence in Production
 - **Fixed Product Images Disappearing**: Migrated image uploads from local filesystem (ephemeral) to Replit Object Storage (persistent)
   - Product images: multer memory storage → GCS at `{PRIVATE_OBJECT_DIR}/product-images/`, served via `/api/product-images/:filename`
