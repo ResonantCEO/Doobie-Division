@@ -442,39 +442,25 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (filters?.categoryIds) {
-      // Get all relevant category IDs including parent and all descendant categories recursively
-      const allCategoryIds = [...filters.categoryIds];
+      const allCats = await db
+        .select({ id: categories.id, parentId: categories.parentId })
+        .from(categories)
+        .where(eq(categories.isActive, true));
 
-      // Recursive function to get all descendants
-      const getAllDescendants = async (parentId: number): Promise<number[]> => {
-        const directChildren = await db
-          .select({ id: categories.id })
-          .from(categories)
-          .where(and(eq(categories.parentId, parentId), eq(categories.isActive, true)));
-
-        let descendants: number[] = [];
-        for (const child of directChildren) {
-          descendants.push(child.id);
-          // Recursively get children of children
-          const grandchildren = await getAllDescendants(child.id);
-          descendants = descendants.concat(grandchildren);
-        }
-
-        return descendants;
-      };
-
-      // Get descendants for each requested category
-      for (const categoryId of filters.categoryIds) {
-        const descendants = await getAllDescendants(categoryId);
-        for (const descendantId of descendants) {
-          if (!allCategoryIds.includes(descendantId)) {
-            allCategoryIds.push(descendantId);
+      const allCategoryIds = new Set(filters.categoryIds);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const cat of allCats) {
+          if (cat.parentId && allCategoryIds.has(cat.parentId) && !allCategoryIds.has(cat.id)) {
+            allCategoryIds.add(cat.id);
+            changed = true;
           }
         }
       }
 
-      if (allCategoryIds.length > 0) {
-        conditions.push(inArray(products.categoryId, allCategoryIds));
+      if (allCategoryIds.size > 0) {
+        conditions.push(inArray(products.categoryId, Array.from(allCategoryIds)));
       }
     } else if (filters?.categoryId) {
       // Single category with subcategories optimization
