@@ -1489,14 +1489,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteOrder(id: number): Promise<void> {
+    const existing = await retryQuery(() => db.select({ id: orders.id }).from(orders).where(eq(orders.id, id)));
+    if (existing.length === 0) {
+      throw new Error("Order not found");
+    }
     try {
       await retryQuery(() => db.delete(orderItems).where(eq(orderItems.orderId, id)));
     } catch (e) {
       console.warn('[deleteOrder] Failed to delete order items:', e);
     }
-    const deleted = await retryQuery(() => db.delete(orders).where(eq(orders.id, id)).returning());
-    if (deleted.length === 0) {
-      throw new Error("Order not found");
+    try {
+      await retryQuery(() => db.delete(orders).where(eq(orders.id, id)));
+    } catch (e) {
+      console.warn('[deleteOrder] Failed to delete order:', e);
     }
     try { invalidateCache.analytics(); } catch (e) { console.warn('Cache invalidation error:', e); }
   }
