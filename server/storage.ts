@@ -2509,7 +2509,15 @@ export class DatabaseStorage implements IStorage {
     if (userData.postalCode !== undefined) updateFields.postalCode = userData.postalCode;
     if (userData.country !== undefined) updateFields.country = userData.country;
     if (userData.minPurchaseExempt !== undefined) updateFields.minPurchaseExempt = userData.minPurchaseExempt;
-    if (userData.minPurchaseOverride !== undefined) updateFields.minPurchaseOverride = userData.minPurchaseOverride !== null && userData.minPurchaseOverride !== "" ? String(userData.minPurchaseOverride) : null;
+    if (userData.minPurchaseOverride !== undefined) {
+      const val = userData.minPurchaseOverride;
+      if (val === null || val === "" || val === undefined) {
+        updateFields.minPurchaseOverride = null;
+      } else {
+        const parsed = parseFloat(String(val));
+        updateFields.minPurchaseOverride = isNaN(parsed) ? null : String(parsed);
+      }
+    }
 
     // Read existing user first
     const [existingUser] = await retryQuery(async () => {
