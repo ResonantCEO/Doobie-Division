@@ -2661,38 +2661,38 @@ export class DatabaseStorage implements IStorage {
 
   // City purchase limits
   async getCityPurchaseLimits(): Promise<any[]> {
-    return db.select().from(cityPurchaseLimits).orderBy(cityPurchaseLimits.cityName);
+    return retryQuery(() => db.select().from(cityPurchaseLimits).orderBy(cityPurchaseLimits.cityName));
   }
 
   async getCityPurchaseLimit(id: number): Promise<any | undefined> {
-    const [limit] = await db.select().from(cityPurchaseLimits).where(eq(cityPurchaseLimits.id, id));
-    return limit;
+    const results = await retryQuery(() => db.select().from(cityPurchaseLimits).where(eq(cityPurchaseLimits.id, id)));
+    return results[0];
   }
 
   async getCityPurchaseLimitByCity(cityName: string): Promise<any | undefined> {
-    const [limit] = await db.select().from(cityPurchaseLimits)
+    const results = await retryQuery(() => db.select().from(cityPurchaseLimits)
       .where(and(
         ilike(cityPurchaseLimits.cityName, cityName),
         eq(cityPurchaseLimits.isActive, true)
-      ));
-    return limit;
+      )));
+    return results[0];
   }
 
   async createCityPurchaseLimit(data: any): Promise<any> {
-    const [limit] = await db.insert(cityPurchaseLimits).values(data).returning();
-    return limit;
+    const results = await retryQuery(() => db.insert(cityPurchaseLimits).values(data).returning());
+    return results[0];
   }
 
   async updateCityPurchaseLimit(id: number, data: any): Promise<any> {
-    const [limit] = await db.update(cityPurchaseLimits)
+    const results = await retryQuery(() => db.update(cityPurchaseLimits)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(cityPurchaseLimits.id, id))
-      .returning();
-    return limit;
+      .returning());
+    return results[0];
   }
 
   async deleteCityPurchaseLimit(id: number): Promise<void> {
-    await db.delete(cityPurchaseLimits).where(eq(cityPurchaseLimits.id, id));
+    await retryQuery(() => db.delete(cityPurchaseLimits).where(eq(cityPurchaseLimits.id, id)));
   }
 }
 
