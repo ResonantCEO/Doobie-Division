@@ -144,7 +144,6 @@ export default function AdminPage() {
         if (!old) return [updatedLimit];
         return old.map(l => l.id === updatedLimit.id ? updatedLimit : l);
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/city-purchase-limits"] });
       setEditingLimit(null);
       setLimitForm({ cityName: "", minimumAmount: "" });
       toast({ title: "City purchase limit updated successfully" });
