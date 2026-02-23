@@ -2684,10 +2684,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCityPurchaseLimit(id: number, data: any): Promise<any> {
+    const existing = await this.getCityPurchaseLimit(id);
+    if (!existing) return undefined;
+    const updatedAt = new Date();
     await retryQuery(() => db.update(cityPurchaseLimits)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, updatedAt })
       .where(eq(cityPurchaseLimits.id, id)));
-    return this.getCityPurchaseLimit(id);
+    return { ...existing, ...data, updatedAt };
   }
 
   async deleteCityPurchaseLimit(id: number): Promise<void> {
