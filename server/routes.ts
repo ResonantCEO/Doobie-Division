@@ -1702,6 +1702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!limit) {
         return res.status(404).json({ message: "City purchase limit not found" });
       }
+      console.log('[PUT city-purchase-limits] Returning:', JSON.stringify(limit));
       res.json(limit);
     } catch (error) {
       if (error instanceof z.ZodError) {

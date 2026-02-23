@@ -139,7 +139,11 @@ export default function AdminPage() {
       if (!response.ok) throw new Error(result.message || "Failed to update");
       return result;
     },
-    onSuccess: () => {
+    onSuccess: (updatedLimit) => {
+      queryClient.setQueryData(["/api/city-purchase-limits"], (old: CityPurchaseLimit[] | undefined) => {
+        if (!old) return [updatedLimit];
+        return old.map(l => l.id === updatedLimit.id ? updatedLimit : l);
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/city-purchase-limits"] });
       setEditingLimit(null);
       setLimitForm({ cityName: "", minimumAmount: "" });
