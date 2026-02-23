@@ -108,11 +108,12 @@ export default function AdminPage() {
         credentials: "include",
         body: JSON.stringify(data),
       });
+      const text = await response.text();
+      const result = text ? JSON.parse(text) : {};
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || "Failed to create");
+        throw new Error(result.message || "Failed to create");
       }
-      return response.json();
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/city-purchase-limits"] });
@@ -133,8 +134,10 @@ export default function AdminPage() {
         credentials: "include",
         body: JSON.stringify(data),
       });
-      if (!response.ok) throw new Error("Failed to update");
-      return response.json();
+      const text = await response.text();
+      const result = text ? JSON.parse(text) : {};
+      if (!response.ok) throw new Error(result.message || "Failed to update");
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/city-purchase-limits"] });
@@ -153,8 +156,10 @@ export default function AdminPage() {
         method: "DELETE",
         credentials: "include",
       });
-      if (!response.ok) throw new Error("Failed to delete");
-      return response.json();
+      const text = await response.text();
+      const result = text ? JSON.parse(text) : {};
+      if (!response.ok) throw new Error(result.message || "Failed to delete");
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/city-purchase-limits"] });
