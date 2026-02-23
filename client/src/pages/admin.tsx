@@ -94,7 +94,7 @@ export default function AdminPage() {
   const { data: cityLimits = [], isLoading: isLoadingLimits } = useQuery<CityPurchaseLimit[]>({
     queryKey: ["/api/city-purchase-limits"],
     queryFn: async () => {
-      const response = await fetch("/api/city-purchase-limits", { credentials: "include" });
+      const response = await fetch("/api/city-purchase-limits", { credentials: "include", cache: "no-store" });
       if (!response.ok) throw new Error("Failed to fetch city purchase limits");
       return response.json();
     },

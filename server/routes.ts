@@ -1660,6 +1660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/city-purchase-limits', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {
       const limits = await storage.getCityPurchaseLimits();
+      res.set('Cache-Control', 'no-store');
       res.json(limits);
     } catch (error) {
       console.error('Error fetching city purchase limits:', error);
