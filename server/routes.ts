@@ -1688,7 +1688,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/city-purchase-limits/:id', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const data = insertCityPurchaseLimitSchema.partial().parse(req.body);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID" });
+      }
+      const updateSchema = z.object({
+        cityName: z.string().min(1).optional(),
+        minimumAmount: z.string().or(z.number()).transform(val => String(val)).optional(),
+        isActive: z.boolean().optional(),
+      });
+      const data = updateSchema.parse(req.body);
       const limit = await storage.updateCityPurchaseLimit(id, data);
       if (!limit) {
         return res.status(404).json({ message: "City purchase limit not found" });
