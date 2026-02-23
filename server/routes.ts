@@ -7,7 +7,7 @@ import QRCode from "qrcode";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
-import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema, insertSupportTicketSchema } from "@shared/schema";
+import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema, insertSupportTicketSchema, insertCityPurchaseLimitSchema } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
 import { orders, products, orderItems, users, supportTickets, notifications } from "@shared/schema";
@@ -741,9 +741,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { order, items } = req.body;
 
-
-
       const orderData = insertOrderSchema.parse(order);
+
+      // Server-side purchase limit enforcement
+      if (orderData.shippingAddress) {
+        const addressParts = orderData.shippingAddress.split(",").map((s: string) => s.trim());
+        const city = addressParts.length >= 2 ? addressParts[1] : "";
+        if (city) {
+          let allowed = true;
+          let minimumAmount: number | null = null;
+
+          // Check user-level overrides first
+          if (orderData.customerId) {
+            const user = await storage.getUser(orderData.customerId);
+            if (user) {
+              if (user.minPurchaseExempt) {
+                allowed = true;
+              } else if (user.minPurchaseOverride) {
+                minimumAmount = parseFloat(user.minPurchaseOverride);
+                allowed = parseFloat(orderData.total || "0") >= minimumAmount;
+              } else {
+                const cityLimit = await storage.getCityPurchaseLimitByCity(city);
+                if (cityLimit) {
+                  minimumAmount = parseFloat(cityLimit.minimumAmount);
+                  allowed = parseFloat(orderData.total || "0") >= minimumAmount;
+                }
+              }
+            } else {
+              const cityLimit = await storage.getCityPurchaseLimitByCity(city);
+              if (cityLimit) {
+                minimumAmount = parseFloat(cityLimit.minimumAmount);
+                allowed = parseFloat(orderData.total || "0") >= minimumAmount;
+              }
+            }
+          } else {
+            const cityLimit = await storage.getCityPurchaseLimitByCity(city);
+            if (cityLimit) {
+              minimumAmount = parseFloat(cityLimit.minimumAmount);
+              allowed = parseFloat(orderData.total || "0") >= minimumAmount;
+            }
+          }
+
+          if (!allowed && minimumAmount !== null) {
+            return res.status(400).json({
+              message: `Orders shipping to ${city} require a minimum of $${minimumAmount.toFixed(2)}. Your order total is $${parseFloat(orderData.total || "0").toFixed(2)}.`,
+            });
+          }
+        }
+      }
 
       // Validate stock availability and enrich items with product SKU data
       const enrichedItems = [];
@@ -1608,6 +1653,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to delete support ticket:", error);
       res.status(500).json({ message: "Failed to delete support ticket" });
+    }
+  });
+
+  // City Purchase Limits routes
+  app.get('/api/city-purchase-limits', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const limits = await storage.getCityPurchaseLimits();
+      res.json(limits);
+    } catch (error) {
+      console.error('Error fetching city purchase limits:', error);
+      res.status(500).json({ message: "Failed to fetch city purchase limits" });
+    }
+  });
+
+  app.post('/api/city-purchase-limits', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const data = insertCityPurchaseLimitSchema.parse(req.body);
+      const limit = await storage.createCityPurchaseLimit(data);
+      res.status(201).json(limit);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      const anyError: any = error;
+      if (anyError?.code === "23505" || anyError?.cause?.code === "23505") {
+        return res.status(400).json({ message: "A purchase limit for this city already exists" });
+      }
+      console.error('Error creating city purchase limit:', error);
+      res.status(500).json({ message: "Failed to create city purchase limit" });
+    }
+  });
+
+  app.put('/api/city-purchase-limits/:id', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const data = insertCityPurchaseLimitSchema.partial().parse(req.body);
+      const limit = await storage.updateCityPurchaseLimit(id, data);
+      if (!limit) {
+        return res.status(404).json({ message: "City purchase limit not found" });
+      }
+      res.json(limit);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error('Error updating city purchase limit:', error);
+      res.status(500).json({ message: "Failed to update city purchase limit" });
+    }
+  });
+
+  app.delete('/api/city-purchase-limits/:id', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteCityPurchaseLimit(id);
+      res.json({ message: "City purchase limit deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting city purchase limit:', error);
+      res.status(500).json({ message: "Failed to delete city purchase limit" });
+    }
+  });
+
+  // Check minimum purchase requirement for a city/user combo
+  app.post('/api/check-purchase-limit', async (req, res) => {
+    try {
+      const { city, total, userId } = req.body;
+
+      if (!city) {
+        return res.json({ allowed: true, minimumAmount: null });
+      }
+
+      // Check if user is exempt or has an override
+      if (userId) {
+        const user = await storage.getUser(userId);
+        if (user) {
+          if (user.minPurchaseExempt) {
+            return res.json({ allowed: true, minimumAmount: null, exempt: true });
+          }
+          if (user.minPurchaseOverride) {
+            const overrideAmount = parseFloat(user.minPurchaseOverride);
+            const orderTotal = parseFloat(total);
+            return res.json({
+              allowed: orderTotal >= overrideAmount,
+              minimumAmount: overrideAmount,
+              isUserOverride: true,
+            });
+          }
+        }
+      }
+
+      // Check city-based limit
+      const cityLimit = await storage.getCityPurchaseLimitByCity(city.trim());
+      if (!cityLimit) {
+        return res.json({ allowed: true, minimumAmount: null });
+      }
+
+      const minimumAmount = parseFloat(cityLimit.minimumAmount);
+      const orderTotal = parseFloat(total);
+
+      res.json({
+        allowed: orderTotal >= minimumAmount,
+        minimumAmount,
+        cityName: cityLimit.cityName,
+      });
+    } catch (error) {
+      console.error('Error checking purchase limit:', error);
+      res.json({ allowed: true, minimumAmount: null });
     }
   });
 

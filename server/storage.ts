@@ -12,6 +12,7 @@ import {
   supportTickets,
   supportTicketResponses,
   passwordResetTokens,
+  cityPurchaseLimits,
   type User,
   type UpsertUser,
   type Category,
@@ -162,6 +163,14 @@ export interface IStorage {
   getPasswordResetToken(token: string): Promise<{ userId: string; expiresAt: Date } | undefined>;
   deletePasswordResetToken(token: string): Promise<void>;
   cleanupExpiredPasswordResetTokens(): Promise<void>;
+
+  // City purchase limits
+  getCityPurchaseLimits(): Promise<any[]>;
+  getCityPurchaseLimit(id: number): Promise<any | undefined>;
+  getCityPurchaseLimitByCity(cityName: string): Promise<any | undefined>;
+  createCityPurchaseLimit(data: any): Promise<any>;
+  updateCityPurchaseLimit(id: number, data: any): Promise<any>;
+  deleteCityPurchaseLimit(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2648,6 +2657,42 @@ export class DatabaseStorage implements IStorage {
       console.error('Error fetching user activity:', error);
       return [];
     }
+  }
+
+  // City purchase limits
+  async getCityPurchaseLimits(): Promise<any[]> {
+    return db.select().from(cityPurchaseLimits).orderBy(cityPurchaseLimits.cityName);
+  }
+
+  async getCityPurchaseLimit(id: number): Promise<any | undefined> {
+    const [limit] = await db.select().from(cityPurchaseLimits).where(eq(cityPurchaseLimits.id, id));
+    return limit;
+  }
+
+  async getCityPurchaseLimitByCity(cityName: string): Promise<any | undefined> {
+    const [limit] = await db.select().from(cityPurchaseLimits)
+      .where(and(
+        ilike(cityPurchaseLimits.cityName, cityName),
+        eq(cityPurchaseLimits.isActive, true)
+      ));
+    return limit;
+  }
+
+  async createCityPurchaseLimit(data: any): Promise<any> {
+    const [limit] = await db.insert(cityPurchaseLimits).values(data).returning();
+    return limit;
+  }
+
+  async updateCityPurchaseLimit(id: number, data: any): Promise<any> {
+    const [limit] = await db.update(cityPurchaseLimits)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(cityPurchaseLimits.id, id))
+      .returning();
+    return limit;
+  }
+
+  async deleteCityPurchaseLimit(id: number): Promise<void> {
+    await db.delete(cityPurchaseLimits).where(eq(cityPurchaseLimits.id, id));
   }
 }
 

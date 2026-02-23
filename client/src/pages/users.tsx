@@ -298,6 +298,8 @@ export default function UsersPage() {
       city: user.city,
       state: user.state,
       postalCode: user.postalCode,
+      minPurchaseExempt: user.minPurchaseExempt || false,
+      minPurchaseOverride: user.minPurchaseOverride || "",
     });
     setEditModalOpen(true);
   };
@@ -356,6 +358,8 @@ export default function UsersPage() {
       city: editData.city,
       state: editData.state,
       postalCode: editData.postalCode,
+      minPurchaseExempt: editData.minPurchaseExempt,
+      minPurchaseOverride: editData.minPurchaseOverride || null,
     };
 
     updateUserMutation.mutate({ userId: editingUser.id, userData });
@@ -807,6 +811,40 @@ export default function UsersPage() {
                     onChange={(e) => setEditData({ ...editData, postalCode: e.target.value })}
                   />
                 </div>
+              </div>
+
+              {/* Purchase Limit Overrides */}
+              <div className="border-t pt-4 mt-4">
+                <h4 className="text-sm font-semibold mb-3">Purchase Limit Overrides</h4>
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="checkbox"
+                    id="minPurchaseExempt"
+                    checked={editData.minPurchaseExempt || false}
+                    onChange={(e) => setEditData({ ...editData, minPurchaseExempt: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <Label htmlFor="minPurchaseExempt" className="text-sm">
+                    Exempt from minimum purchase requirements
+                  </Label>
+                </div>
+                {!editData.minPurchaseExempt && (
+                  <div>
+                    <Label htmlFor="minPurchaseOverride">Custom Minimum Order Amount ($)</Label>
+                    <Input
+                      id="minPurchaseOverride"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Leave empty to use city default"
+                      value={editData.minPurchaseOverride || ""}
+                      onChange={(e) => setEditData({ ...editData, minPurchaseOverride: e.target.value })}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      If set, this overrides the city-based minimum for this user.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>

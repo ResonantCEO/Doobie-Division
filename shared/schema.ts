@@ -47,6 +47,8 @@ export const users = pgTable("users", {
   state: varchar("state"),
   postalCode: varchar("postal_code"),
   country: varchar("country").default("Canada"),
+  minPurchaseExempt: boolean("min_purchase_exempt").notNull().default(false),
+  minPurchaseOverride: decimal("min_purchase_override", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -200,6 +202,15 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   token: varchar("token").notNull().unique(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").default(sql`now()`),
+});
+
+export const cityPurchaseLimits = pgTable("city_purchase_limits", {
+  id: serial("id").primaryKey(),
+  cityName: varchar("city_name").notNull().unique(),
+  minimumAmount: decimal("minimum_amount", { precision: 10, scale: 2 }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Relations
@@ -398,6 +409,16 @@ export const insertSupportTicketResponseSchema = createInsertSchema(supportTicke
   createdAt: true,
 });
 
+export const insertCityPurchaseLimitSchema = createInsertSchema(cityPurchaseLimits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  cityName: z.string().min(1, "City name is required"),
+  minimumAmount: z.string().or(z.number()).transform(val => String(val)),
+  isActive: z.boolean().optional(),
+});
+
 // Types
 export type UpsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -428,3 +449,5 @@ export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
 export type SupportTicket = typeof supportTickets.$inferSelect;
 export type InsertSupportTicketResponse = z.infer<typeof insertSupportTicketResponseSchema>;
 export type SupportTicketResponse = typeof supportTicketResponses.$inferSelect;
+export type InsertCityPurchaseLimit = z.infer<typeof insertCityPurchaseLimitSchema>;
+export type CityPurchaseLimit = typeof cityPurchaseLimits.$inferSelect;

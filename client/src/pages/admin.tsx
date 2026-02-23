@@ -12,8 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
-import type { InventoryLog, Product, User, SupportTicket } from "@shared/schema";
+import { Label } from "@/components/ui/label";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil } from "lucide-react";
+import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit } from "@shared/schema";
 
 interface InventoryLogWithDetails extends InventoryLog {
   product: Product | null;
@@ -57,6 +58,11 @@ export default function AdminPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [deleteTicketConfirmOpen, setDeleteTicketConfirmOpen] = useState(false);
   const [ticketToDelete, setTicketToDelete] = useState<SupportTicketWithDetails | null>(null);
+  const [showAddLimitModal, setShowAddLimitModal] = useState(false);
+  const [editingLimit, setEditingLimit] = useState<CityPurchaseLimit | null>(null);
+  const [limitForm, setLimitForm] = useState({ cityName: "", minimumAmount: "" });
+  const [deleteLimitConfirmOpen, setDeleteLimitConfirmOpen] = useState(false);
+  const [limitToDelete, setLimitToDelete] = useState<CityPurchaseLimit | null>(null);
 
 
   // Redirect if not admin
@@ -83,6 +89,82 @@ export default function AdminPage() {
       if (!response.ok) throw new Error('Failed to fetch inventory logs');
       return response.json();
     }
+  });
+
+  const { data: cityLimits = [], isLoading: isLoadingLimits } = useQuery<CityPurchaseLimit[]>({
+    queryKey: ["/api/city-purchase-limits"],
+    queryFn: async () => {
+      const response = await fetch("/api/city-purchase-limits", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch city purchase limits");
+      return response.json();
+    },
+  });
+
+  const createLimitMutation = useMutation({
+    mutationFn: async (data: { cityName: string; minimumAmount: string }) => {
+      const response = await fetch("/api/city-purchase-limits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to create");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/city-purchase-limits"] });
+      setShowAddLimitModal(false);
+      setLimitForm({ cityName: "", minimumAmount: "" });
+      toast({ title: "City purchase limit created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: error.message || "Failed to create city purchase limit", variant: "destructive" });
+    },
+  });
+
+  const updateLimitMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const response = await fetch(`/api/city-purchase-limits/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to update");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/city-purchase-limits"] });
+      setEditingLimit(null);
+      setLimitForm({ cityName: "", minimumAmount: "" });
+      toast({ title: "City purchase limit updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update city purchase limit", variant: "destructive" });
+    },
+  });
+
+  const deleteLimitMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/city-purchase-limits/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to delete");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/city-purchase-limits"] });
+      setDeleteLimitConfirmOpen(false);
+      setLimitToDelete(null);
+      toast({ title: "City purchase limit deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete city purchase limit", variant: "destructive" });
+    },
   });
 
   const { data: supportTickets = [], isLoading: isLoadingTickets } = useQuery<SupportTicketWithDetails[]>({
@@ -340,9 +422,10 @@ export default function AdminPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="support">Support Tickets</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
+          <TabsTrigger value="purchase-limits">Purchase Limits</TabsTrigger>
         </TabsList>
 
         <TabsContent value="logs">
@@ -719,7 +802,196 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="purchase-limits">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  City Purchase Limits
+                </CardTitle>
+                <p className="text-sm text-gray-600 mt-1">
+                  Set minimum order amounts for specific cities. Users shipping to these cities must meet the minimum purchase amount.
+                </p>
+              </div>
+              <Button onClick={() => {
+                setLimitForm({ cityName: "", minimumAmount: "" });
+                setEditingLimit(null);
+                setShowAddLimitModal(true);
+              }}>
+                <Plus className="h-4 w-4 mr-2" /> Add City Limit
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {isLoadingLimits ? (
+                <p className="text-center text-gray-500 py-4">Loading...</p>
+              ) : cityLimits.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">No city purchase limits configured yet. Add one to get started.</p>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-800">
+                      <tr>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">City</th>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Minimum Amount</th>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Status</th>
+                        <th className="text-right px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y dark:divide-gray-700">
+                      {cityLimits.map((limit: CityPurchaseLimit) => (
+                        <tr key={limit.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <td className="px-4 py-3 text-sm font-medium">{limit.cityName}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className="flex items-center gap-1">
+                              <DollarSign className="h-3 w-3" />
+                              {parseFloat(limit.minimumAmount).toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <Badge variant={limit.isActive ? "default" : "secondary"}>
+                              {limit.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  updateLimitMutation.mutate({
+                                    id: limit.id,
+                                    data: { isActive: !limit.isActive },
+                                  });
+                                }}
+                              >
+                                {limit.isActive ? "Disable" : "Enable"}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingLimit(limit);
+                                  setLimitForm({
+                                    cityName: limit.cityName,
+                                    minimumAmount: limit.minimumAmount,
+                                  });
+                                  setShowAddLimitModal(true);
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                  setLimitToDelete(limit);
+                                  setDeleteLimitConfirmOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Add/Edit City Purchase Limit Dialog */}
+      <Dialog open={showAddLimitModal} onOpenChange={(open) => {
+        setShowAddLimitModal(open);
+        if (!open) {
+          setEditingLimit(null);
+          setLimitForm({ cityName: "", minimumAmount: "" });
+        }
+      }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{editingLimit ? "Edit" : "Add"} City Purchase Limit</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>City Name</Label>
+              <Input
+                placeholder="Enter city name"
+                value={limitForm.cityName}
+                onChange={(e) => setLimitForm({ ...limitForm, cityName: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Minimum Order Amount ($)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={limitForm.minimumAmount}
+                onChange={(e) => setLimitForm({ ...limitForm, minimumAmount: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowAddLimitModal(false);
+              setEditingLimit(null);
+              setLimitForm({ cityName: "", minimumAmount: "" });
+            }}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!limitForm.cityName || !limitForm.minimumAmount || createLimitMutation.isPending || updateLimitMutation.isPending}
+              onClick={() => {
+                if (editingLimit) {
+                  updateLimitMutation.mutate({
+                    id: editingLimit.id,
+                    data: {
+                      cityName: limitForm.cityName,
+                      minimumAmount: limitForm.minimumAmount,
+                    },
+                  });
+                } else {
+                  createLimitMutation.mutate({
+                    cityName: limitForm.cityName,
+                    minimumAmount: limitForm.minimumAmount,
+                  });
+                }
+              }}
+            >
+              {(createLimitMutation.isPending || updateLimitMutation.isPending) ? "Saving..." : editingLimit ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Limit Confirmation Dialog */}
+      <Dialog open={deleteLimitConfirmOpen} onOpenChange={setDeleteLimitConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete City Purchase Limit</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Are you sure you want to delete the purchase limit for <strong>{limitToDelete?.cityName}</strong>? This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteLimitConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => {
+              if (limitToDelete) deleteLimitMutation.mutate(limitToDelete.id);
+            }} disabled={deleteLimitMutation.isPending}>
+              {deleteLimitMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Ticket Confirmation Dialog */}
       <Dialog open={deleteTicketConfirmOpen} onOpenChange={setDeleteTicketConfirmOpen}>

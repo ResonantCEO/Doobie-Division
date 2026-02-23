@@ -187,6 +187,43 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       return;
     }
 
+    setIsCheckingOut(true);
+
+    try {
+      // Check purchase limit for city
+      if (city.trim()) {
+        const limitCheck = await fetch('/api/check-purchase-limit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            city: city.trim(),
+            total: state.total.toString(),
+            userId: user?.id,
+          }),
+        });
+        const limitResult = await limitCheck.json();
+        if (!limitResult.allowed) {
+          toast({
+            title: "Minimum Order Not Met",
+            description: `Orders shipping to ${limitResult.cityName || city} require a minimum of $${limitResult.minimumAmount?.toFixed(2)}. Your current total is $${state.total.toFixed(2)}.`,
+            variant: "destructive",
+          });
+          setIsCheckingOut(false);
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Purchase limit check failed:', error);
+      toast({
+        title: "Error",
+        description: "Could not verify purchase limit requirements. Please try again.",
+        variant: "destructive",
+      });
+      setIsCheckingOut(false);
+      return;
+    }
+
     const shippingAddress = [street, city, shippingState, zipCode].filter(Boolean).join(", ");
 
     try {
