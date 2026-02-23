@@ -9,7 +9,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema, insertSupportTicketSchema, insertCityPurchaseLimitSchema } from "@shared/schema";
 import { z } from "zod";
-import { db } from "./db";
+import { db, sql as rawSql } from "./db";
 import { orders, products, orderItems, users, supportTickets, notifications } from "@shared/schema";
 import { eq, sql, desc, and, gte, lt, inArray } from "drizzle-orm";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
@@ -751,14 +751,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let allowed = true;
           let minimumAmount: number | null = null;
 
-          // Check user-level overrides first
           if (orderData.customerId) {
-            const user = await storage.getUser(orderData.customerId);
-            if (user) {
-              if (user.minPurchaseExempt) {
+            const userRows = await rawSql`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = ${orderData.customerId}`;
+            if (userRows && userRows.length > 0) {
+              const userRow = userRows[0];
+              const isExempt = userRow.exempt_text === 'true' || userRow.exempt_text === 't';
+              if (isExempt) {
                 allowed = true;
-              } else if (user.minPurchaseOverride) {
-                minimumAmount = parseFloat(user.minPurchaseOverride);
+              } else if (userRow.min_purchase_override !== null && userRow.min_purchase_override !== undefined) {
+                minimumAmount = parseFloat(String(userRow.min_purchase_override));
                 allowed = parseFloat(orderData.total || "0") >= minimumAmount;
               } else {
                 const cityLimit = await storage.getCityPurchaseLimitByCity(city);
@@ -1729,31 +1730,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/check-purchase-limit', async (req, res) => {
     try {
       const { city, total, userId } = req.body;
+      console.log('[check-purchase-limit] Request:', { city, total, userId });
 
       if (!city) {
         return res.json({ allowed: true, minimumAmount: null });
       }
 
-      // Check if user is exempt or has an override
       if (userId) {
-        const user = await storage.getUser(userId);
-        if (user) {
-          if (user.minPurchaseExempt) {
+        const userRows = await rawSql`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = ${userId}`;
+        console.log('[check-purchase-limit] Raw SQL user result:', JSON.stringify(userRows));
+        if (userRows && userRows.length > 0) {
+          const userRow = userRows[0];
+          const isExempt = userRow.exempt_text === 'true' || userRow.exempt_text === 't';
+          console.log('[check-purchase-limit] isExempt:', isExempt, 'raw value:', userRow.exempt_text);
+          if (isExempt) {
             return res.json({ allowed: true, minimumAmount: null, exempt: true });
           }
-          if (user.minPurchaseOverride) {
-            const overrideAmount = parseFloat(user.minPurchaseOverride);
-            const orderTotal = parseFloat(total);
-            return res.json({
-              allowed: orderTotal >= overrideAmount,
-              minimumAmount: overrideAmount,
-              isUserOverride: true,
-            });
+          if (userRow.min_purchase_override !== null && userRow.min_purchase_override !== undefined) {
+            const overrideAmount = parseFloat(String(userRow.min_purchase_override));
+            if (!isNaN(overrideAmount)) {
+              const orderTotal = parseFloat(total);
+              return res.json({
+                allowed: orderTotal >= overrideAmount,
+                minimumAmount: overrideAmount,
+                isUserOverride: true,
+              });
+            }
           }
         }
       }
 
-      // Check city-based limit
       const cityLimit = await storage.getCityPurchaseLimitByCity(city.trim());
       if (!cityLimit) {
         return res.json({ allowed: true, minimumAmount: null });
