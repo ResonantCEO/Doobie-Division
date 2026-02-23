@@ -2150,6 +2150,8 @@ export class DatabaseStorage implements IStorage {
         state: users.state,
         postalCode: users.postalCode,
         country: users.country,
+        minPurchaseExempt: users.minPurchaseExempt,
+        minPurchaseOverride: users.minPurchaseOverride,
         createdAt: users.createdAt,
         updatedAt: users.updatedAt,
         orderCount: sql<number>`COUNT(${orders.id})`,
@@ -2176,6 +2178,8 @@ export class DatabaseStorage implements IStorage {
       state: r.state,
       postalCode: r.postalCode,
       country: r.country,
+      minPurchaseExempt: r.minPurchaseExempt,
+      minPurchaseOverride: r.minPurchaseOverride,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
       orderCount: Number(r.orderCount),
@@ -2493,16 +2497,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: string, userData: any): Promise<User> {
+    const updateFields: any = { updatedAt: new Date() };
+    if (userData.firstName !== undefined) updateFields.firstName = userData.firstName;
+    if (userData.lastName !== undefined) updateFields.lastName = userData.lastName;
+    if (userData.email !== undefined) updateFields.email = userData.email;
+    if (userData.role !== undefined) updateFields.role = userData.role;
+    if (userData.status !== undefined) updateFields.status = userData.status;
+    if (userData.address !== undefined) updateFields.address = userData.address;
+    if (userData.city !== undefined) updateFields.city = userData.city;
+    if (userData.state !== undefined) updateFields.state = userData.state;
+    if (userData.postalCode !== undefined) updateFields.postalCode = userData.postalCode;
+    if (userData.country !== undefined) updateFields.country = userData.country;
+    if (userData.minPurchaseExempt !== undefined) updateFields.minPurchaseExempt = userData.minPurchaseExempt;
+    if (userData.minPurchaseOverride !== undefined) updateFields.minPurchaseOverride = userData.minPurchaseOverride !== null && userData.minPurchaseOverride !== "" ? String(userData.minPurchaseOverride) : null;
+
     const [user] = await db
       .update(users)
-      .set({
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        email: userData.email,
-        role: userData.role,
-        status: userData.status,
-        updatedAt: new Date()
-      })
+      .set(updateFields)
       .where(eq(users.id, id))
       .returning();
 
