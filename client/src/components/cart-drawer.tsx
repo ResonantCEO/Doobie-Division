@@ -40,7 +40,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const [shippingForm, setShippingForm] = useState({
     customerName: "",
     customerPhone: "",
-    shippingAddress: "",
+    street: "",
+    city: "",
+    state: "",
+    zipCode: "",
     notes: "",
   });
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
@@ -49,14 +52,14 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   useEffect(() => {
     if (showConfirmation && user) {
       const fullName = `${user.firstName} ${user.lastName}`;
-      const address = [user.address, user.city, user.state, user.postalCode, user.country]
-        .filter(Boolean)
-        .join(", ");
 
       setShippingForm(prev => ({
         ...prev,
         customerName: fullName,
-        shippingAddress: address,
+        street: user.address || "",
+        city: user.city || "",
+        state: user.state || "",
+        zipCode: user.postalCode || "",
       }));
     }
   }, [showConfirmation, user]);
@@ -96,8 +99,17 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     if (!shippingForm.customerPhone.trim()) {
       errors.customerPhone = "Phone number is required";
     }
-    if (!shippingForm.shippingAddress.trim()) {
-      errors.shippingAddress = "Shipping address is required";
+    if (!shippingForm.street.trim()) {
+      errors.street = "Street address is required";
+    }
+    if (!shippingForm.city.trim()) {
+      errors.city = "City is required";
+    }
+    if (!shippingForm.state.trim()) {
+      errors.state = "State is required";
+    }
+    if (!shippingForm.zipCode.trim()) {
+      errors.zipCode = "Zip code is required";
     }
 
     setFormErrors(errors);
@@ -169,11 +181,13 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
 
   const handleConfirmOrder = async () => {
-    const { customerName, customerPhone, shippingAddress } = shippingForm;
+    const { customerName, customerPhone, street, city, state: shippingState, zipCode } = shippingForm;
 
     if (!validateForm()) {
       return;
     }
+
+    const shippingAddress = [street, city, shippingState, zipCode].filter(Boolean).join(", ");
 
     try {
       // Generate order number
@@ -231,7 +245,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         setShippingForm({
           customerName: "",
           customerPhone: "",
-          shippingAddress: "",
+          street: "",
+          city: "",
+          state: "",
+          zipCode: "",
           notes: "",
         });
         setFormErrors({}); // Clear form errors on successful order
@@ -520,24 +537,85 @@ export default function CartDrawer({ children }: CartDrawerProps) {
               </div>
 
               <div>
-                <Label htmlFor="shippingAddress">Shipping Address *</Label>
-                <Textarea
-                  id="shippingAddress"
-                  value={shippingForm.shippingAddress}
+                <Label htmlFor="street">Street Address *</Label>
+                <Input
+                  id="street"
+                  value={shippingForm.street}
                   onChange={(e) => {
-                    setShippingForm(prev => ({ ...prev, shippingAddress: e.target.value }));
-                    if (formErrors.shippingAddress) {
-                      setFormErrors(prev => ({ ...prev, shippingAddress: "" }));
+                    setShippingForm(prev => ({ ...prev, street: e.target.value }));
+                    if (formErrors.street) {
+                      setFormErrors(prev => ({ ...prev, street: "" }));
                     }
                   }}
-                  placeholder="Enter your complete shipping address including street, city, province, and postal code"
-                  rows={3}
-                  className={formErrors.shippingAddress ? "border-red-500 focus:border-red-500" : ""}
+                  placeholder="123 Main St, Apt 4"
+                  className={formErrors.street ? "border-red-500 focus:border-red-500" : ""}
                   required
                 />
-                {formErrors.shippingAddress && (
-                  <p className="text-sm text-red-500 mt-1">{formErrors.shippingAddress}</p>
+                {formErrors.street && (
+                  <p className="text-sm text-red-500 mt-1">{formErrors.street}</p>
                 )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label htmlFor="city">City *</Label>
+                  <Input
+                    id="city"
+                    value={shippingForm.city}
+                    onChange={(e) => {
+                      setShippingForm(prev => ({ ...prev, city: e.target.value }));
+                      if (formErrors.city) {
+                        setFormErrors(prev => ({ ...prev, city: "" }));
+                      }
+                    }}
+                    placeholder="City"
+                    className={formErrors.city ? "border-red-500 focus:border-red-500" : ""}
+                    required
+                  />
+                  {formErrors.city && (
+                    <p className="text-sm text-red-500 mt-1">{formErrors.city}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="state">State *</Label>
+                  <Input
+                    id="state"
+                    value={shippingForm.state}
+                    onChange={(e) => {
+                      setShippingForm(prev => ({ ...prev, state: e.target.value }));
+                      if (formErrors.state) {
+                        setFormErrors(prev => ({ ...prev, state: "" }));
+                      }
+                    }}
+                    placeholder="State"
+                    className={formErrors.state ? "border-red-500 focus:border-red-500" : ""}
+                    required
+                  />
+                  {formErrors.state && (
+                    <p className="text-sm text-red-500 mt-1">{formErrors.state}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="zipCode">Zip Code *</Label>
+                  <Input
+                    id="zipCode"
+                    value={shippingForm.zipCode}
+                    onChange={(e) => {
+                      setShippingForm(prev => ({ ...prev, zipCode: e.target.value }));
+                      if (formErrors.zipCode) {
+                        setFormErrors(prev => ({ ...prev, zipCode: "" }));
+                      }
+                    }}
+                    placeholder="12345"
+                    className={formErrors.zipCode ? "border-red-500 focus:border-red-500" : ""}
+                    required
+                  />
+                  {formErrors.zipCode && (
+                    <p className="text-sm text-red-500 mt-1">{formErrors.zipCode}</p>
+                  )}
+                </div>
               </div>
 
               <div>
