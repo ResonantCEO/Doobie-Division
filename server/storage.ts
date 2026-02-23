@@ -2511,18 +2511,26 @@ export class DatabaseStorage implements IStorage {
     if (userData.minPurchaseExempt !== undefined) updateFields.minPurchaseExempt = userData.minPurchaseExempt;
     if (userData.minPurchaseOverride !== undefined) updateFields.minPurchaseOverride = userData.minPurchaseOverride !== null && userData.minPurchaseOverride !== "" ? String(userData.minPurchaseOverride) : null;
 
-    const result = await retryQuery(async () => {
-      const [row] = await db
-        .update(users)
-        .set(updateFields)
-        .where(eq(users.id, id))
-        .returning();
-      return row;
+    // Read existing user first
+    const [existingUser] = await retryQuery(async () => {
+      return await db.select().from(users).where(eq(users.id, id));
     });
 
-    if (!result) {
+    if (!existingUser) {
       throw new Error("User not found");
     }
+
+    // Perform update without RETURNING to avoid Neon driver stale read issues
+    await retryQuery(async () => {
+      await db
+        .update(users)
+        .set(updateFields)
+        .where(eq(users.id, id));
+      return true;
+    });
+
+    // Merge changes manually to construct correct response
+    const result = { ...existingUser, ...updateFields };
 
     // Log the profile update (non-blocking, don't let it fail the update)
     const updatedFieldNames = Object.keys(userData).join(', ');
