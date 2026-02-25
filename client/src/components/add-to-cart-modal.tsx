@@ -213,7 +213,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[400px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
@@ -224,7 +224,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
           {/* Product Info */}
           <div className="flex gap-3 p-3 border rounded-lg bg-muted/50">
             <img
