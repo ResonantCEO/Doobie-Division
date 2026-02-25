@@ -513,10 +513,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const product = await storage.updateProduct(id, productData);
       res.json(product);
     } catch (error) {
+      console.error('[PUT /api/products/:id] Error:', error);
       if (error instanceof z.ZodError) {
+        console.error('[PUT /api/products/:id] Validation errors:', error.errors);
         return res.status(400).json({ message: "Invalid product data", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update product" });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[PUT /api/products/:id] Update error:', errorMessage);
+      res.status(500).json({ message: "Failed to update product", error: errorMessage });
     }
   });
 

@@ -777,23 +777,55 @@ export class DatabaseStorage implements IStorage {
       if (field in updateData) {
         const val = toNumericStr(updateData[field]);
         if (val !== undefined) {
-          updateData[field] = val;
+          // For discountPercentage, ensure it's a valid number string (can be "0")
+          if (field === 'discountPercentage') {
+            const numVal = parseFloat(val);
+            if (isNaN(numVal) || numVal < 0) {
+              updateData[field] = "0";
+            } else {
+              updateData[field] = val;
+            }
+          } else {
+            updateData[field] = val;
+          }
         } else {
-          updateData[field] = sql`NULL`;
+          // For discountPercentage, set to "0" to match the default when empty
+          if (field === 'discountPercentage') {
+            updateData[field] = "0";
+          } else {
+            // For other nullable numeric fields, delete the field to keep existing value
+            // This prevents trying to set null which might cause issues
+            delete updateData[field];
+          }
         }
       }
     }
+    
+    console.log('[updateProduct] updateData after numeric field processing:', JSON.stringify(updateData, null, 2));
 
     console.log('[updateProduct] Attempting to update product with imageUrls:', updateData.imageUrls ? `present (${typeof updateData.imageUrls})` : 'missing');
     console.log('[updateProduct] imageUrls value:', updateData.imageUrls);
     
-    const [product] = await db.update(products)
-      .set({
-        ...updateData,
-        updatedAt: new Date()
-      })
-      .where(eq(products.id, id))
-      .returning();
+    let product;
+    try {
+      [product] = await db.update(products)
+        .set({
+          ...updateData,
+          updatedAt: new Date()
+        })
+        .where(eq(products.id, id))
+        .returning();
+    } catch (dbError: any) {
+      console.error('[updateProduct] Database update error:', dbError);
+      console.error('[updateProduct] Error details:', {
+        message: dbError?.message,
+        code: dbError?.code,
+        detail: dbError?.detail,
+        constraint: dbError?.constraint,
+        updateData: JSON.stringify(updateData, null, 2)
+      });
+      throw new Error(`Database update failed: ${dbError?.message || String(dbError)}`);
+    }
     console.log('[updateProduct] Product updated successfully, imageUrls:', product?.imageUrls ? `present (${product.imageUrls?.substring(0, 50)}...)` : 'missing');
     
     // If imageUrls wasn't saved, try to update it directly

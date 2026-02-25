@@ -86,17 +86,30 @@ export default function StorefrontPage() {
 
     // Fetch all discounted products for hero section (independent of filters)
   const { data: allDiscountedProducts = [] } = useQuery({
-    queryKey: ["/api/products/discounted"],
+    queryKey: ["/api/products", "discounted"],
     queryFn: async () => {
       const response = await fetch('/api/products');
       if (!response.ok) throw new Error('Failed to fetch products');
       const products = await response.json();
-      return products.filter((product: Product) => 
-        product.discountPercentage && parseFloat(product.discountPercentage) > 0
-      );
+      return products.filter((product: Product) => {
+        // Check if product has a valid discount percentage > 0
+        const discount = product.discountPercentage;
+        if (!discount || discount === "0" || discount === 0) return false;
+        
+        // Handle both string and number types
+        const discountValue = typeof discount === 'number' 
+          ? discount 
+          : parseFloat(String(discount));
+        
+        if (isNaN(discountValue) || discountValue <= 0) return false;
+        
+        // Also check that product is in stock
+        return product.stock > 0;
+      });
     },
     staleTime: 60000, // Cache for 1 minute
     gcTime: 300000, // Keep in cache for 5 minutes
+    refetchOnMount: true, // Always refetch when component mounts to get latest deals
   });
 
   // Image rotation timer for hero section
@@ -262,11 +275,11 @@ export default function StorefrontPage() {
 
   return (
     <div className="space-y-8">
-      {/* Hero Section */}
-      <div className="relative rounded-2xl mb-12 overflow-hidden">
-        {/* Background Image Carousel */}
-        <div className="absolute inset-0">
-          {allDiscountedProducts.length > 0 ? (
+      {/* Hero Section - Only show if there are discounted products */}
+      {allDiscountedProducts.length > 0 && (
+        <div className="relative rounded-2xl mb-12 overflow-hidden">
+          {/* Background Image Carousel */}
+          <div className="absolute inset-0">
             <div className="relative w-full h-full">
               {allDiscountedProducts.map((product, index) => (
                 <div
@@ -284,36 +297,34 @@ export default function StorefrontPage() {
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="hero-gradient w-full h-full"></div>
-          )}
-        </div>
+          </div>
 
-        {/* Content Overlay */}
-        <div className="relative py-16 px-8">
-          <div className="max-w-2xl">
-            <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-lg">Today's Amazing Deals!</h2>
-            <p className="text-xl mb-6 text-white/90 drop-shadow-md">
-              Check out our special discounts on selected products every day!
-            </p>
-            <Button 
-              className="bg-white text-primary hover:bg-white/90 drop-shadow-md"
-              onClick={() => {
-                // Save current state before showing deals
-                const currentState = {
-                  parentCategory: currentParentCategory,
-                  selectedCategory: selectedCategory,
-                  showDealsOnly: showDealsOnly
-                };
-                setNavigationHistory(prev => [...prev, currentState]);
-                setShowDealsOnly(true);
-              }}
-            >
-              Shop Now
-            </Button>
+          {/* Content Overlay */}
+          <div className="relative py-16 px-8">
+            <div className="max-w-2xl">
+              <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-lg">Today's Amazing Deals!</h2>
+              <p className="text-xl mb-6 text-white/90 drop-shadow-md">
+                Check out our special discounts on selected products every day!
+              </p>
+              <Button 
+                className="bg-white text-primary hover:bg-white/90 drop-shadow-md"
+                onClick={() => {
+                  // Save current state before showing deals
+                  const currentState = {
+                    parentCategory: currentParentCategory,
+                    selectedCategory: selectedCategory,
+                    showDealsOnly: showDealsOnly
+                  };
+                  setNavigationHistory(prev => [...prev, currentState]);
+                  setShowDealsOnly(true);
+                }}
+              >
+                Shop Now
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Search and Filters */}
       <div className="space-y-6">

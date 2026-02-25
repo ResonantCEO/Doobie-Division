@@ -225,6 +225,16 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         totalStock = data.sizes.reduce((sum: number, s: { quantity: string }) => sum + parseInt(s.quantity || "0"), 0);
       }
 
+      // Handle discountPercentage - convert empty string, null, or undefined to "0"
+      // Also handle the case where user wants to remove discount (set to 0)
+      let discountValue = "0";
+      if (data.discountPercentage !== undefined && data.discountPercentage !== null) {
+        const trimmed = String(data.discountPercentage).trim();
+        if (trimmed !== "" && !isNaN(parseFloat(trimmed))) {
+          discountValue = trimmed;
+        }
+      }
+      
       const productData: any = {
         ...data,
         imageUrl,
@@ -235,7 +245,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         price: data.sellingMethod === "units" && data.price ? data.price : null,
         pricePerGram: data.sellingMethod === "weight" && data.pricePerGram ? data.pricePerGram : null,
         pricePerOunce: data.sellingMethod === "weight" && data.pricePerOunce ? data.pricePerOunce : null,
-        discountPercentage: data.discountPercentage || null,
+        discountPercentage: discountValue,
         purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice).toFixed(2) : null,
         purchasePriceMethod: data.purchasePriceMethod || "units",
         purchasePricePerGram: data.purchasePricePerGram ? parseFloat(data.purchasePricePerGram).toFixed(4) : null,
@@ -246,6 +256,13 @@ export default function EditProductModal({ open, onOpenChange, product, categori
           : [],
       };
       delete productData.enableSizes;
+      
+      // Remove undefined values to avoid sending them
+      Object.keys(productData).forEach(key => {
+        if (productData[key] === undefined) {
+          delete productData[key];
+        }
+      });
 
       await apiRequest("PUT", `/api/products/${product.id}`, productData);
     },
@@ -261,7 +278,8 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       setImagePreviews([]);
       setExistingImages([]);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error('[EditProductModal] Update error:', error);
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -273,9 +291,13 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         }, 500);
         return;
       }
+      const errorMessage = error?.response?.data?.error || error?.message || "Failed to update product";
+      const validationErrors = error?.response?.data?.errors;
       toast({
         title: "Error",
-        description: "Failed to update product",
+        description: validationErrors 
+          ? `Validation error: ${validationErrors.map((e: any) => e.message).join(", ")}`
+          : errorMessage,
         variant: "destructive",
       });
     },
