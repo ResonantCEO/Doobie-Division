@@ -401,7 +401,8 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 export const insertSupportTicketSchema = createInsertSchema(supportTickets).extend({
   customerName: z.string().min(1, "Customer name is required"),
   customerEmail: z.string().email("Valid email is required"),
-  customerPhone: z.string().min(1, "Phone number is required")
+  customerPhone: z.string().min(1, "Phone number is required"),
+  userId: z.string().nullable().optional(),
 });
 
 export const insertSupportTicketResponseSchema = createInsertSchema(supportTicketResponses).omit({
