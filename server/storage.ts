@@ -792,14 +792,17 @@ export class DatabaseStorage implements IStorage {
 
     console.log('[updateProduct] Updating product', id, 'with fields:', Object.keys(updateData).join(', '));
 
-    const [product] = await retryQuery(() =>
+    await retryQuery(() =>
       db.update(products)
         .set({
           ...updateData,
           updatedAt: new Date()
         })
         .where(eq(products.id, id))
-        .returning()
+    );
+
+    const [product] = await retryQuery(() =>
+      db.select().from(products).where(eq(products.id, id))
     );
 
     if (!product) {
