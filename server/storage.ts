@@ -2253,29 +2253,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSupportTicket(data: any) {
-    const [ticket] = await db
-      .insert(supportTickets)
-      .values(data)
-      .returning();
+    const [ticket] = await retryQuery(() =>
+      db.insert(supportTickets).values(data).returning()
+    );
 
-    // Notify admins and managers about the new ticket
-    const adminUsers = await this.getUsersWithRole('admin');
-    const managerUsers = await this.getUsersWithRole('manager');
-    const allStaff = [...adminUsers, ...managerUsers];
+    try {
+      const adminUsers = await this.getUsersWithRole('admin');
+      const managerUsers = await this.getUsersWithRole('manager');
+      const allStaff = [...adminUsers, ...managerUsers];
 
-    for (const user of allStaff) {
-      await this.createNotification({
-        userId: user.id,
-        type: 'new_support_ticket',
-        title: 'New Support Ticket',
-        message: `New support ticket from ${data.customerName}: ${data.subject}`,
-        data: {
-          ticketId: ticket.id,
-          customerName: data.customerName,
-          subject: data.subject,
-          priority: data.priority
-        }
-      });
+      for (const user of allStaff) {
+        await this.createNotification({
+          userId: user.id,
+          type: 'new_support_ticket',
+          title: 'New Support Ticket',
+          message: `New support ticket from ${data.customerName}: ${data.subject}`,
+          data: {
+            ticketId: ticket.id,
+            customerName: data.customerName,
+            subject: data.subject,
+            priority: data.priority
+          }
+        });
+      }
+    } catch (notifyError) {
+      console.error("Failed to send notifications for support ticket:", notifyError);
     }
 
     return ticket;
@@ -2292,7 +2294,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(supportTickets.priority, filters.priority));
     }
 
-    const tickets = await db
+    const tickets = await retryQuery(() => db
       .select({
         ticket: supportTickets,
         user: {
@@ -2305,7 +2307,7 @@ export class DatabaseStorage implements IStorage {
       .from(supportTickets)
       .leftJoin(users, eq(supportTickets.userId, users.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(supportTickets.createdAt));
+      .orderBy(desc(supportTickets.createdAt)));
 
     // Process each ticket to add responses and assigned user
     const processedTickets = [];
@@ -2313,7 +2315,7 @@ export class DatabaseStorage implements IStorage {
     for (const ticket of tickets) {
       try {
         // Get responses for this ticket
-        const responses = await db
+        const responses = await retryQuery(() => db
           .select({
             id: supportTicketResponses.id,
             message: supportTicketResponses.message,
@@ -2329,7 +2331,7 @@ export class DatabaseStorage implements IStorage {
           .from(supportTicketResponses)
           .leftJoin(users, eq(supportTicketResponses.createdBy, users.id))
           .where(eq(supportTicketResponses.ticketId, ticket.ticket.id))
-          .orderBy(asc(supportTicketResponses.createdAt));
+          .orderBy(asc(supportTicketResponses.createdAt)));
 
         // Get assigned user if ticket has one
         let assignedUser = null;
