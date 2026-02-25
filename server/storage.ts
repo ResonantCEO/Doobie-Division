@@ -765,9 +765,6 @@ export class DatabaseStorage implements IStorage {
     const updateData: Record<string, any> = { ...dataWithoutSizes };
     delete updateData.enableSizes;
 
-    console.log('[updateProduct] dataWithoutSizes:', JSON.stringify(dataWithoutSizes, null, 2));
-    console.log('[updateProduct] updateData before update:', JSON.stringify(updateData, null, 2));
-
     if (dataWithoutSizes.stock !== undefined) {
       updateData.physicalInventory = dataWithoutSizes.stock;
     }
@@ -777,79 +774,47 @@ export class DatabaseStorage implements IStorage {
       if (field in updateData) {
         const val = toNumericStr(updateData[field]);
         if (val !== undefined) {
-          // For discountPercentage, ensure it's a valid number string (can be "0")
           if (field === 'discountPercentage') {
             const numVal = parseFloat(val);
-            if (isNaN(numVal) || numVal < 0) {
-              updateData[field] = "0";
-            } else {
-              updateData[field] = val;
-            }
+            updateData[field] = (isNaN(numVal) || numVal < 0) ? "0" : val;
           } else {
             updateData[field] = val;
           }
         } else {
-          // For discountPercentage, set to "0" to match the default when empty
           if (field === 'discountPercentage') {
             updateData[field] = "0";
           } else {
-            // For other nullable numeric fields, delete the field to keep existing value
-            // This prevents trying to set null which might cause issues
             delete updateData[field];
           }
         }
       }
     }
-    
-    console.log('[updateProduct] updateData after numeric field processing:', JSON.stringify(updateData, null, 2));
 
-    console.log('[updateProduct] Attempting to update product with imageUrls:', updateData.imageUrls ? `present (${typeof updateData.imageUrls})` : 'missing');
-    console.log('[updateProduct] imageUrls value:', updateData.imageUrls);
-    
-    let product;
-    try {
-      [product] = await db.update(products)
+    console.log('[updateProduct] Updating product', id, 'with fields:', Object.keys(updateData).join(', '));
+
+    const [product] = await retryQuery(() =>
+      db.update(products)
         .set({
           ...updateData,
           updatedAt: new Date()
         })
         .where(eq(products.id, id))
-        .returning();
-    } catch (dbError: any) {
-      console.error('[updateProduct] Database update error:', dbError);
-      console.error('[updateProduct] Error details:', {
-        message: dbError?.message,
-        code: dbError?.code,
-        detail: dbError?.detail,
-        constraint: dbError?.constraint,
-        updateData: JSON.stringify(updateData, null, 2)
-      });
-      throw new Error(`Database update failed: ${dbError?.message || String(dbError)}`);
-    }
-    console.log('[updateProduct] Product updated successfully, imageUrls:', product?.imageUrls ? `present (${product.imageUrls?.substring(0, 50)}...)` : 'missing');
-    
-    // If imageUrls wasn't saved, try to update it directly
-    if (updateData.imageUrls && !product?.imageUrls) {
-      console.warn('[updateProduct] imageUrls was not saved in update, attempting direct SQL update');
-      const { sql } = await import("./db");
-      await sql`UPDATE products SET image_urls = ${updateData.imageUrls} WHERE id = ${id}`;
-      // Fetch again to get updated product
-      const updated = await db.select().from(products).where(eq(products.id, id));
-      if (updated[0]) {
-        Object.assign(product, updated[0]);
-        console.log('[updateProduct] Successfully updated imageUrls via direct SQL');
-      }
-    }
+        .returning()
+    );
 
     if (!product) {
       throw new Error("Product not found");
     }
 
+    console.log('[updateProduct] Product updated successfully, id:', product.id);
+
     if (sizes !== undefined) {
       try {
-        await db.delete(productSizes).where(eq(productSizes.productId, id));
-      } catch (e) {
-        console.warn('Could not delete old product sizes:', e);
+        await retryQuery(() =>
+          db.delete(productSizes).where(eq(productSizes.productId, id))
+        );
+      } catch (e: any) {
+        console.log('[updateProduct] Could not delete old product sizes:', e?.message);
       }
 
       if (sizes && sizes.length > 0) {
@@ -863,9 +828,11 @@ export class DatabaseStorage implements IStorage {
         }));
 
         try {
-          await db.insert(productSizes).values(sizeRecords);
-        } catch (sizeError) {
-          console.warn('Error creating product sizes:', sizeError);
+          await retryQuery(() =>
+            db.insert(productSizes).values(sizeRecords)
+          );
+        } catch (sizeError: any) {
+          console.log('[updateProduct] Error creating product sizes:', sizeError?.message);
         }
       }
     }

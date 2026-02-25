@@ -511,15 +511,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const productData = insertProductSchema.partial().parse(req.body);
       console.log('[PUT /api/products/:id] Parsed productData:', JSON.stringify(productData, null, 2));
       const product = await storage.updateProduct(id, productData);
+      console.log('[PUT /api/products/:id] Update returned product id:', product?.id);
       res.json(product);
-    } catch (error) {
-      console.error('[PUT /api/products/:id] Error:', error);
+    } catch (error: any) {
+      console.log('[PUT /api/products/:id] ERROR:', error?.message || String(error));
+      console.log('[PUT /api/products/:id] ERROR stack:', error?.stack);
       if (error instanceof z.ZodError) {
-        console.error('[PUT /api/products/:id] Validation errors:', error.errors);
+        console.log('[PUT /api/products/:id] Validation errors:', JSON.stringify(error.errors));
         return res.status(400).json({ message: "Invalid product data", errors: error.errors });
       }
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('[PUT /api/products/:id] Update error:', errorMessage);
+      console.log('[PUT /api/products/:id] Update error:', errorMessage);
       res.status(500).json({ message: "Failed to update product", error: errorMessage });
     }
   });
