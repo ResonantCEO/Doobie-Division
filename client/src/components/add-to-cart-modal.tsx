@@ -335,9 +335,6 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                   className="text-center"
                   disabled={maxStock === 0}
                 />
-                <p className="text-xs text-muted-foreground text-center mt-2">
-                  Available: {maxStock > 0 ? `${maxStock} ${product.weightUnit || 'units'}` : "Out of stock"}
-                </p>
               </>
             ) : (
               <>
@@ -360,11 +357,6 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-                {(quantity >= maxStock || maxStock === 0) && (
-                  <p className="text-sm text-muted-foreground text-center mt-2">
-                    Available: {maxStock > 0 ? `${maxStock} units` : "Out of stock"}
-                  </p>
-                )}
               </>
             )}
             </div>
