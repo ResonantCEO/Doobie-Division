@@ -9,6 +9,9 @@ import ProductCard from "@/components/product-card";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
 
+// Logo image from public directory
+const logoImage = '/doobielogo.png';
+
 function ScrollableProductRow({ products, onCategoryFilter }: { products: (Product & { category: Category | null })[], onCategoryFilter?: (id: number) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -227,7 +230,24 @@ export default function StorefrontPage() {
 
   if (productsLoading || categoriesLoading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 relative min-h-screen">
+        {/* Background Image with Transparency - Fixed and centered, offset down */}
+        <div 
+          className="fixed pointer-events-none"
+          style={{
+            backgroundImage: `url(${logoImage})`,
+            backgroundSize: 'contain',
+            backgroundPosition: 'center center',
+            backgroundRepeat: 'no-repeat',
+            opacity: 0.3,
+            zIndex: 0,
+            top: '80px',
+            left: 0,
+            right: 0,
+            bottom: 0,
+          }}
+        />
+        <div className="relative z-10">
         {/* Hero Section Skeleton */}
         <div className="hero-gradient rounded-2xl p-16">
           <div className="max-w-2xl">
@@ -257,6 +277,7 @@ export default function StorefrontPage() {
             </Card>
           ))}
         </div>
+        </div>
       </div>
     );
   }
@@ -274,7 +295,25 @@ export default function StorefrontPage() {
 
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative min-h-screen">
+      {/* Background Image with Transparency - Fixed and centered, offset down */}
+      <div 
+        className="fixed pointer-events-none"
+        style={{
+          backgroundImage: `url(${logoImage})`,
+          backgroundSize: 'contain',
+          backgroundPosition: 'center center',
+          backgroundRepeat: 'no-repeat',
+          opacity: 0.3,
+          zIndex: 0,
+          top: '80px',
+          left: 0,
+          right: 0,
+          bottom: 0,
+        }}
+      />
+      <div className="relative z-10">
+      
       {/* Hero Section - Only show if there are discounted products */}
       {allDiscountedProducts.length > 0 && (
         <div className="relative rounded-2xl mb-12 overflow-hidden">
@@ -594,6 +633,7 @@ export default function StorefrontPage() {
           })()}
         </div>
       )}
+      </div>
     </div>
   );
 }

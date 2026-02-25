@@ -203,7 +203,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <Link href="/dashboard">
-                  <h1 className="text-2xl font-black text-black cursor-pointer">DOOBIE DIVISION</h1>
+                  <h1 className="text-2xl font-black text-black dark:text-white cursor-pointer">DOOBIE DIVISION</h1>
                 </Link>
               </div>
             </div>
@@ -404,7 +404,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
             {/* First row: Logo */}
             <div className="flex justify-center items-center py-3">
               <Link href="/dashboard">
-                <h1 className="text-xl font-black text-black cursor-pointer">DOOBIE DIVISION</h1>
+                <h1 className="text-xl font-black text-black dark:text-white cursor-pointer">DOOBIE DIVISION</h1>
               </Link>
             </div>
 
