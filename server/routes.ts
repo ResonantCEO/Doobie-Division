@@ -466,7 +466,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/products', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     try {
+      console.log('[POST /api/products] Received data:', JSON.stringify(req.body, null, 2));
       const productData = insertProductSchema.parse(req.body);
+      console.log('[POST /api/products] Parsed productData:', JSON.stringify(productData, null, 2));
       const product = await storage.createProduct(productData);
       res.status(201).json(product);
     } catch (error) {
@@ -505,7 +507,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/products/:id', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      console.log('[PUT /api/products/:id] Received data:', JSON.stringify(req.body, null, 2));
       const productData = insertProductSchema.partial().parse(req.body);
+      console.log('[PUT /api/products/:id] Parsed productData:', JSON.stringify(productData, null, 2));
       const product = await storage.updateProduct(id, productData);
       res.json(product);
     } catch (error) {
@@ -1031,14 +1035,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Order cannot be fulfilled in its current status" });
       }
 
-      // Get the product and verify stock
+      // Get the product and verify physical inventory
       const product = await storage.getProduct(productId);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      if (product.stock < quantity) {
-        return res.status(400).json({ message: "Insufficient stock available" });
+      // Check physicalInventory since fulfillment reduces physical inventory, not stock
+      // physicalInventory is the actual warehouse count available for fulfillment
+      const availablePhysicalInventory = (product.physicalInventory !== null && product.physicalInventory !== undefined) 
+        ? product.physicalInventory 
+        : 0;
+      
+      if (availablePhysicalInventory < quantity) {
+        return res.status(400).json({ 
+          message: `Insufficient stock available. Physical inventory: ${availablePhysicalInventory}, requested: ${quantity}` 
+        });
       }
 
       // Verify the product is part of this order
@@ -1601,14 +1613,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const { status } = req.body;
 
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ticket ID" });
+      }
+
       if (!status) {
         return res.status(400).json({ message: "Status is required" });
       }
 
       const ticket = await storage.updateSupportTicketStatus(id, status);
+      if (!ticket) {
+        return res.status(404).json({ message: "Support ticket not found" });
+      }
       res.json(ticket);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update ticket status" });
+    } catch (error: any) {
+      console.error("Error updating ticket status:", error);
+      res.status(500).json({ message: error.message || "Failed to update ticket status" });
     }
   });
 

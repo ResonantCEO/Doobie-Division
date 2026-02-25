@@ -157,6 +157,7 @@ export interface IStorage {
   assignSupportTicket(id: number, assignedTo: string | null): Promise<any>;
   addSupportTicketResponse(ticketId: number, responseData: any): Promise<any>;
   deleteSupportTicket(id: number): Promise<void>;
+  cleanupOldClosedTickets(): Promise<void>;
 
   // Password reset operations
   createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void>;
@@ -410,6 +411,7 @@ export class DatabaseStorage implements IStorage {
         sku: products.sku,
         categoryId: products.categoryId,
         imageUrl: products.imageUrl,
+        imageUrls: products.imageUrls,
         stock: products.stock,
         physicalInventory: products.physicalInventory,
         minStockThreshold: products.minStockThreshold,
@@ -553,7 +555,7 @@ export class DatabaseStorage implements IStorage {
     let product: any;
     try {
       const rawResult = await retryQuery(() =>
-        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, discount_percentage, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
+        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, discount_percentage, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
       );
       
       const row = rawResult?.rows?.[0];
@@ -567,6 +569,7 @@ export class DatabaseStorage implements IStorage {
           sku: row.sku,
           categoryId: row.category_id,
           imageUrl: row.image_url,
+          imageUrls: row.image_urls,
           stock: row.stock,
           physicalInventory: row.physical_inventory,
           minStockThreshold: row.min_stock_threshold,
@@ -657,6 +660,9 @@ export class DatabaseStorage implements IStorage {
       updatedAt: new Date()
     };
 
+    console.log('[createProduct] productDataWithoutSizes:', JSON.stringify(productDataWithoutSizes, null, 2));
+    console.log('[createProduct] processedProduct before insert:', JSON.stringify(processedProduct, null, 2));
+
     const numericFields = ['pricePerGram', 'pricePerOunce', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'] as const;
     for (const field of numericFields) {
       const val = toNumericStr(productData[field]);
@@ -667,7 +673,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    const stringFields = ['company', 'adminNotes'] as const;
+    const stringFields = ['company', 'adminNotes', 'imageUrls'] as const;
     for (const field of stringFields) {
       if (processedProduct[field] === '') {
         delete processedProduct[field];
@@ -676,13 +682,40 @@ export class DatabaseStorage implements IStorage {
 
     let newProduct: Product | undefined;
     try {
+      console.log('[createProduct] Attempting to insert product with imageUrls:', processedProduct.imageUrls ? `present (${typeof processedProduct.imageUrls})` : 'missing');
+      console.log('[createProduct] imageUrls value:', processedProduct.imageUrls);
+      
+      // Ensure imageUrls is explicitly included if it exists
+      const insertData = { ...processedProduct };
+      if (insertData.imageUrls === null || insertData.imageUrls === undefined) {
+        delete insertData.imageUrls;
+      }
+      
       const result = await db
         .insert(products)
-        .values([processedProduct])
+        .values([insertData])
         .returning();
       newProduct = result?.[0];
+      console.log('[createProduct] Product created successfully, imageUrls:', newProduct?.imageUrls ? `present (${newProduct.imageUrls.substring(0, 50)}...)` : 'missing');
+      
+      // If imageUrls wasn't saved, try to update it directly
+      if (processedProduct.imageUrls && !newProduct?.imageUrls) {
+        console.warn('[createProduct] imageUrls was not saved in insert, attempting direct SQL update');
+        const { sql } = await import("./db");
+        await sql`UPDATE products SET image_urls = ${processedProduct.imageUrls} WHERE id = ${newProduct.id}`;
+        // Fetch again to get updated product
+        const updated = await db.select().from(products).where(eq(products.id, newProduct.id));
+        if (updated[0]) {
+          newProduct = updated[0];
+          console.log('[createProduct] Successfully updated imageUrls via direct SQL');
+        }
+      }
     } catch (insertError: any) {
       if (insertError?.cause?.severity === 'ERROR') {
+        // Check if it's a column doesn't exist error
+        if (insertError?.message?.includes('image_urls') || insertError?.cause?.message?.includes('image_urls')) {
+          console.error('[createProduct] ERROR: image_urls column does not exist in database! Please run migration.');
+        }
         throw insertError;
       }
       console.warn('Insert returning() parse issue, fetching by SKU:', insertError);
@@ -732,6 +765,9 @@ export class DatabaseStorage implements IStorage {
     const updateData: Record<string, any> = { ...dataWithoutSizes };
     delete updateData.enableSizes;
 
+    console.log('[updateProduct] dataWithoutSizes:', JSON.stringify(dataWithoutSizes, null, 2));
+    console.log('[updateProduct] updateData before update:', JSON.stringify(updateData, null, 2));
+
     if (dataWithoutSizes.stock !== undefined) {
       updateData.physicalInventory = dataWithoutSizes.stock;
     }
@@ -748,6 +784,9 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    console.log('[updateProduct] Attempting to update product with imageUrls:', updateData.imageUrls ? `present (${typeof updateData.imageUrls})` : 'missing');
+    console.log('[updateProduct] imageUrls value:', updateData.imageUrls);
+    
     const [product] = await db.update(products)
       .set({
         ...updateData,
@@ -755,6 +794,20 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(products.id, id))
       .returning();
+    console.log('[updateProduct] Product updated successfully, imageUrls:', product?.imageUrls ? `present (${product.imageUrls?.substring(0, 50)}...)` : 'missing');
+    
+    // If imageUrls wasn't saved, try to update it directly
+    if (updateData.imageUrls && !product?.imageUrls) {
+      console.warn('[updateProduct] imageUrls was not saved in update, attempting direct SQL update');
+      const { sql } = await import("./db");
+      await sql`UPDATE products SET image_urls = ${updateData.imageUrls} WHERE id = ${id}`;
+      // Fetch again to get updated product
+      const updated = await db.select().from(products).where(eq(products.id, id));
+      if (updated[0]) {
+        Object.assign(product, updated[0]);
+        console.log('[updateProduct] Successfully updated imageUrls via direct SQL');
+      }
+    }
 
     if (!product) {
       throw new Error("Product not found");
@@ -959,6 +1012,7 @@ export class DatabaseStorage implements IStorage {
         sku: products.sku,
         categoryId: products.categoryId,
         imageUrl: products.imageUrl,
+        imageUrls: products.imageUrls,
         stock: products.stock,
         physicalInventory: products.physicalInventory,
         minStockThreshold: products.minStockThreshold,
@@ -2429,6 +2483,40 @@ export class DatabaseStorage implements IStorage {
   async deleteSupportTicket(id: number): Promise<void> {
     await db.delete(supportTicketResponses).where(eq(supportTicketResponses.ticketId, id));
     await db.delete(supportTickets).where(eq(supportTickets.id, id));
+  }
+
+  async cleanupOldClosedTickets(): Promise<void> {
+    // Delete closed tickets that were closed more than 24 hours ago
+    const twentyFourHoursAgo = new Date();
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+
+    // First, get all closed tickets older than 24 hours
+    const oldClosedTickets = await db
+      .select({ id: supportTickets.id })
+      .from(supportTickets)
+      .where(
+        and(
+          eq(supportTickets.status, 'closed'),
+          lt(supportTickets.updatedAt, twentyFourHoursAgo)
+        )
+      );
+
+    // Delete responses for these tickets first (foreign key constraint)
+    for (const ticket of oldClosedTickets) {
+      await db.delete(supportTicketResponses).where(eq(supportTicketResponses.ticketId, ticket.id));
+    }
+
+    // Then delete the tickets
+    if (oldClosedTickets.length > 0) {
+      await db
+        .delete(supportTickets)
+        .where(
+          and(
+            eq(supportTickets.status, 'closed'),
+            lt(supportTickets.updatedAt, twentyFourHoursAgo)
+          )
+        );
+    }
   }
 
   async getStaffUsers(): Promise<User[]> {

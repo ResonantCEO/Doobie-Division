@@ -485,10 +485,12 @@ export default function ScannerPage() {
       return;
     }
 
-    if (quantity > scannedProduct.stock) {
+    // Check physicalInventory since fulfillment reduces physical inventory, not stock
+    const availablePhysicalInventory = scannedProduct.physicalInventory || 0;
+    if (quantity > availablePhysicalInventory) {
       toast({
         title: "Insufficient Stock",
-        description: `Only ${scannedProduct.stock} units available`,
+        description: `Only ${availablePhysicalInventory} units available`,
         variant: "destructive",
       });
       return;

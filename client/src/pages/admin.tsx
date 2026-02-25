@@ -21,6 +21,19 @@ interface InventoryLogWithDetails extends InventoryLog {
   user: User | null;
 }
 
+interface SupportTicketResponse {
+  id: number;
+  message: string;
+  type: string;
+  createdAt: Date | string;
+  createdBy: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+  } | null;
+}
+
 interface SupportTicketWithDetails {
   ticket: SupportTicket;
   user: {
@@ -35,6 +48,7 @@ interface SupportTicketWithDetails {
     lastName: string | null;
     email: string | null;
   } | null;
+  responses?: SupportTicketResponse[];
 }
 
 type SortField = 'createdAt' | 'product' | 'sku' | 'type' | 'quantity' | 'previousStock' | 'newStock' | 'changedBy' | 'reason';
@@ -56,8 +70,6 @@ export default function AdminPage() {
   const [responseType, setResponseType] = useState("customer_response");
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [deleteTicketConfirmOpen, setDeleteTicketConfirmOpen] = useState(false);
-  const [ticketToDelete, setTicketToDelete] = useState<SupportTicketWithDetails | null>(null);
   const [showAddLimitModal, setShowAddLimitModal] = useState(false);
   const [editingLimit, setEditingLimit] = useState<CityPurchaseLimit | null>(null);
   const [limitForm, setLimitForm] = useState({ cityName: "", minimumAmount: "" });
@@ -236,35 +248,45 @@ export default function AdminPage() {
     },
   });
 
-  const deleteTicketMutation = useMutation({
+  const closeTicketMutation = useMutation({
     mutationFn: async (ticketId: number) => {
-      const response = await fetch(`/api/support/tickets/${ticketId}`, {
-        method: "DELETE",
+      const response = await fetch(`/api/support/tickets/${ticketId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({ status: "closed" }),
       });
-      if (!response.ok) throw new Error('Failed to delete ticket');
-      return response.json();
+      if (!response.ok) {
+        const text = await response.text();
+        let errorData;
+        try {
+          errorData = text ? JSON.parse(text) : { message: 'Failed to close ticket' };
+        } catch {
+          errorData = { message: text || 'Failed to close ticket' };
+        }
+        throw new Error(errorData.message || 'Failed to close ticket');
+      }
+      const text = await response.text();
+      if (!text) {
+        return { success: true };
+      }
+      try {
+        return JSON.parse(text);
+      } catch {
+        return { success: true };
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
-      setDeleteTicketConfirmOpen(false);
-      setTicketToDelete(null);
-      toast({ title: "Support ticket deleted successfully" });
+      toast({ title: "Support ticket closed successfully. It will be automatically deleted after 24 hours." });
     },
-    onError: () => {
-      toast({ title: "Failed to delete support ticket", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: error.message || "Failed to close support ticket", variant: "destructive" });
     },
   });
 
-  const handleDeleteTicket = (item: SupportTicketWithDetails) => {
-    setTicketToDelete(item);
-    setDeleteTicketConfirmOpen(true);
-  };
-
-  const confirmDeleteTicket = () => {
-    if (ticketToDelete) {
-      deleteTicketMutation.mutate(ticketToDelete.ticket.id);
-    }
+  const handleCloseTicket = (item: SupportTicketWithDetails) => {
+    closeTicketMutation.mutate(item.ticket.id);
   };
 
   const getTypeColor = (type: string) => {
@@ -689,7 +711,7 @@ export default function AdminPage() {
                             )}
                           </div>
                           <Badge className={getStatusColor(item.ticket.status)}>
-                            {item.ticket.status === 'in_progress' ? 'In Progress' : item.ticket.status.charAt(0).toUpperCase() + item.ticket.status.slice(1)}
+                            {item.ticket.status === 'in_progress' ? 'In Progress' : item.ticket.status === 'closed' ? 'Closed' : item.ticket.status.charAt(0).toUpperCase() + item.ticket.status.slice(1)}
                           </Badge>
                         </div>
                         {item.ticket.message && (
@@ -699,111 +721,113 @@ export default function AdminPage() {
                           {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
                         </div>
                         <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                          <Select
-                            value={item.ticket.status}
-                            onValueChange={(status) => handleUpdateTicketStatus(item.ticket.id, status)}
-                          >
-                            <SelectTrigger className="h-8 text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="open">Open</SelectItem>
-                              <SelectItem value="in_progress">In Progress</SelectItem>
-                              <SelectItem value="resolved">Resolved</SelectItem>
-                              <SelectItem value="closed">Closed</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteTicket(item)}
-                            className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Delete
-                          </Button>
+                          {item.ticket.status !== 'closed' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCloseTicket(item)}
+                              className="text-xs"
+                            >
+                              Close
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Desktop Table View */}
-                  <div className="hidden md:block border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date Created</TableHead>
-                          <TableHead>Customer</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {supportTickets.map((item) => (
-                          <TableRow key={item.ticket.id}>
-                            <TableCell className="font-medium">
-                              {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <UserIcon className="h-4 w-4 text-gray-400" />
-                                <div>
-                                  <div className="font-medium text-black dark:text-white">
-                                    {item.ticket.customerName || (item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Anonymous')}
-                                  </div>
-                                  <div className="text-sm text-gray-500">
-                                    {item.ticket.customerEmail || item.user?.email || 'No email'}
-                                  </div>
-                                  {item.ticket.customerPhone && (
-                                    <div className="text-xs text-gray-400">
-                                      📞 {item.ticket.customerPhone}
-                                    </div>
-                                  )}
+                  {/* Desktop Card View */}
+                  <div className="hidden md:block space-y-4">
+                    {supportTickets.map((item) => (
+                      <div key={item.ticket.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 space-y-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <UserIcon className="h-5 w-5 text-gray-400" />
+                              <div>
+                                <div className="font-medium text-gray-900 dark:text-white text-lg">
+                                  {item.ticket.customerName || (item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Anonymous')}
                                 </div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  {item.ticket.customerEmail || item.user?.email || 'No email'}
+                                </div>
+                                {item.ticket.customerPhone && (
+                                  <div className="text-xs text-gray-400 mt-0.5">
+                                    📞 {item.ticket.customerPhone}
+                                  </div>
+                                )}
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <Select
-                                value={item.ticket.status}
-                                onValueChange={(status) => handleUpdateTicketStatus(item.ticket.id, status)}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                              Created: {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
+                            </div>
+                            {item.ticket.status === 'closed' && (
+                              <Badge className={getStatusColor(item.ticket.status)}>
+                                Closed
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {item.ticket.status !== 'closed' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleCloseTicket(item)}
+                                className="text-xs"
                               >
-                                <SelectTrigger className="w-32">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="open">Open</SelectItem>
-                                  <SelectItem value="in_progress">In Progress</SelectItem>
-                                  <SelectItem value="resolved">Resolved</SelectItem>
-                                  <SelectItem value="closed">Closed</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleTicketView(item)}
-                                  className="text-xs"
-                                >
-                                  <Eye className="h-3 w-3 mr-1" />
-                                  View
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleDeleteTicket(item)}
-                                  className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-3 w-3 mr-1" />
-                                  Delete
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                                Close
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Ticket Message */}
+                        {item.ticket.message && (
+                          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <MessageCircle className="h-4 w-4 text-gray-400" />
+                              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Original Message:</span>
+                            </div>
+                            <p className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words">
+                              {item.ticket.message}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Ticket Responses */}
+                        {item.responses && item.responses.length > 0 && (
+                          <div className="space-y-3">
+                            <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                              Responses ({item.responses.length}):
+                            </div>
+                            <div className="space-y-2">
+                              {item.responses.map((response) => (
+                                <div key={response.id} className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                                        {response.type === 'staff' ? 'Staff' : response.type === 'customer' ? 'Customer' : 'System'}
+                                      </span>
+                                      {response.createdBy && (
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          by {response.createdBy.firstName} {response.createdBy.lastName}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      {format(new Date(response.createdAt), 'MMM dd, yyyy HH:mm')}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
+                                    {response.message}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </>
               )}
@@ -813,7 +837,7 @@ export default function AdminPage() {
 
         <TabsContent value="purchase-limits">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="h-5 w-5" />
@@ -827,7 +851,7 @@ export default function AdminPage() {
                 setLimitForm({ cityName: "", minimumAmount: "" });
                 setEditingLimit(null);
                 setShowAddLimitModal(true);
-              }}>
+              }} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" /> Add City Limit
               </Button>
             </CardHeader>
@@ -837,76 +861,146 @@ export default function AdminPage() {
               ) : cityLimits.length === 0 ? (
                 <p className="text-center text-gray-500 py-8">No city purchase limits configured yet. Add one to get started.</p>
               ) : (
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-800">
-                      <tr>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">City</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Minimum Amount</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Status</th>
-                        <th className="text-right px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y dark:divide-gray-700">
-                      {cityLimits.map((limit: CityPurchaseLimit) => (
-                        <tr key={limit.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                          <td className="px-4 py-3 text-sm font-medium">{limit.cityName}</td>
-                          <td className="px-4 py-3 text-sm">
-                            <span className="flex items-center gap-1">
-                              <DollarSign className="h-3 w-3" />
-                              {parseFloat(limit.minimumAmount).toFixed(2)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm">
-                            <Badge variant={limit.isActive ? "default" : "secondary"}>
-                              {limit.isActive ? "Active" : "Inactive"}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  updateLimitMutation.mutate({
-                                    id: limit.id,
-                                    data: { isActive: !limit.isActive },
-                                  });
-                                }}
-                              >
-                                {limit.isActive ? "Disable" : "Enable"}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingLimit(limit);
-                                  setLimitForm({
-                                    cityName: limit.cityName,
-                                    minimumAmount: limit.minimumAmount,
-                                  });
-                                  setShowAddLimitModal(true);
-                                }}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => {
-                                  setLimitToDelete(limit);
-                                  setDeleteLimitConfirmOpen(true);
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                <>
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-3">
+                    {cityLimits.map((limit: CityPurchaseLimit) => (
+                      <div key={limit.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900 dark:text-white text-base">
+                              {limit.cityName}
                             </div>
-                          </td>
+                            <div className="flex items-center gap-1 mt-1 text-sm text-gray-600 dark:text-gray-400">
+                              <DollarSign className="h-3 w-3" />
+                              <span>Minimum: ${parseFloat(limit.minimumAmount).toFixed(2)}</span>
+                            </div>
+                          </div>
+                          <Badge variant={limit.isActive ? "default" : "secondary"}>
+                            {limit.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-col gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              updateLimitMutation.mutate({
+                                id: limit.id,
+                                data: { isActive: !limit.isActive },
+                              });
+                            }}
+                            className="w-full text-xs"
+                          >
+                            {limit.isActive ? "Disable" : "Enable"}
+                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditingLimit(limit);
+                                setLimitForm({
+                                  cityName: limit.cityName,
+                                  minimumAmount: limit.minimumAmount,
+                                });
+                                setShowAddLimitModal(true);
+                              }}
+                              className="flex-1"
+                            >
+                              <Pencil className="h-3 w-3 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                setLimitToDelete(limit);
+                                setDeleteLimitConfirmOpen(true);
+                              }}
+                              className="flex-1"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-gray-800">
+                        <tr>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">City</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Minimum Amount</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Status</th>
+                          <th className="text-right px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y dark:divide-gray-700">
+                        {cityLimits.map((limit: CityPurchaseLimit) => (
+                          <tr key={limit.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="px-4 py-3 text-sm font-medium">{limit.cityName}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className="flex items-center gap-1">
+                                <DollarSign className="h-3 w-3" />
+                                {parseFloat(limit.minimumAmount).toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <Badge variant={limit.isActive ? "default" : "secondary"}>
+                                {limit.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    updateLimitMutation.mutate({
+                                      id: limit.id,
+                                      data: { isActive: !limit.isActive },
+                                    });
+                                  }}
+                                >
+                                  {limit.isActive ? "Disable" : "Enable"}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingLimit(limit);
+                                    setLimitForm({
+                                      cityName: limit.cityName,
+                                      minimumAmount: limit.minimumAmount,
+                                    });
+                                    setShowAddLimitModal(true);
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => {
+                                    setLimitToDelete(limit);
+                                    setDeleteLimitConfirmOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -1001,40 +1095,6 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Ticket Confirmation Dialog */}
-      <Dialog open={deleteTicketConfirmOpen} onOpenChange={setDeleteTicketConfirmOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Delete Support Ticket</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Are you sure you want to permanently delete this support ticket from <strong>{ticketToDelete?.ticket.customerName || 'Unknown'}</strong>?
-            </p>
-            <p className="text-sm text-red-600 mt-2 font-medium">
-              This action cannot be undone. The ticket and all its responses will be permanently removed.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setDeleteTicketConfirmOpen(false);
-                setTicketToDelete(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={confirmDeleteTicket}
-              disabled={deleteTicketMutation.isPending}
-            >
-              {deleteTicketMutation.isPending ? "Deleting..." : "Delete Ticket"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Ticket Review Modal */}
       <Dialog open={showTicketModal} onOpenChange={handleCloseTicketModal}>

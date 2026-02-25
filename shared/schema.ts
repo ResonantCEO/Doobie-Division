@@ -77,6 +77,7 @@ export const products = pgTable("products", {
   sku: varchar("sku").notNull().unique(),
   categoryId: integer("category_id").references(() => categories.id),
   imageUrl: text("image_url"),
+  imageUrls: text("image_urls"), // JSON array of image URLs
   stock: integer("stock").notNull().default(0),
   physicalInventory: integer("physical_inventory").notNull().default(0), // actual warehouse count
   minStockThreshold: integer("min_stock_threshold").notNull().default(5),
@@ -355,6 +356,8 @@ export const insertProductSchema = createInsertSchema(products).omit({
   purchasePricePerGram: z.string().nullable().optional(),
   purchasePricePerOunce: z.string().nullable().optional(),
   adminNotes: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
+  imageUrls: z.string().nullable().optional(), // JSON array as string
   sizes: z.array(z.object({
     size: z.string().min(1, "Size name is required"),
     quantity: z.number().int().min(0, "Quantity must be 0 or greater"),

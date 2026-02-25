@@ -33,7 +33,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { Lock, Plus, Trash2 } from "lucide-react";
+import { Lock, Plus, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Product, Category, ProductSize } from "@shared/schema";
 
@@ -100,8 +100,9 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
 
   const isAdmin = user?.role === "admin";
 
@@ -163,31 +164,61 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         enableSizes: productHasSizes,
         sizes: productHasSizes ? product.sizes!.map(s => ({ size: s.size, quantity: s.quantity.toString() })) : [],
       });
-      setImagePreview(product.imageUrl || null);
+      // Load existing images from imageUrls or fall back to imageUrl
+      let existing: string[] = [];
+      if ((product as any).imageUrls) {
+        try {
+          existing = JSON.parse((product as any).imageUrls);
+        } catch {
+          existing = [];
+        }
+      }
+      if (existing.length === 0 && product.imageUrl) {
+        existing = [product.imageUrl];
+      }
+      setExistingImages(existing);
+      setImagePreviews([]);
+      setSelectedFiles([]);
     }
   }, [product, open, form]);
 
   const updateProductMutation = useMutation({
     mutationFn: async (data: any) => {
-      let imageUrl = product.imageUrl;
+      // Combine existing images (not deleted) with newly uploaded ones
+      const allImages = [...existingImages];
+      
+      // Upload new images if any
+      if (selectedFiles.length > 0) {
+        const uploadPromises = selectedFiles.map(async (file) => {
+          const formData = new FormData();
+          formData.append('image', file);
 
-      if (selectedFile) {
-        const formData = new FormData();
-        formData.append('image', selectedFile);
+          const uploadResponse = await fetch('/api/upload/product-image', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+          });
 
-        const uploadResponse = await fetch('/api/upload/product-image', {
-          method: 'POST',
-          body: formData,
-          credentials: 'include'
+          if (!uploadResponse.ok) {
+            throw new Error('Failed to upload image');
+          }
+
+          const uploadResult = await uploadResponse.json();
+          return uploadResult.imageUrl;
         });
 
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload image');
-        }
-
-        const uploadResult = await uploadResponse.json();
-        imageUrl = uploadResult.imageUrl;
+        const newImageUrls = await Promise.all(uploadPromises);
+        allImages.push(...newImageUrls);
       }
+
+      const imageUrl = allImages[0] || product.imageUrl || "";
+      const imageUrls = allImages.length > 0 ? JSON.stringify(allImages) : null;
+
+      console.log('[EditProductModal] Saving images:', {
+        totalImages: allImages.length,
+        imageUrls: imageUrls,
+        imageUrl: imageUrl
+      });
 
       let totalStock = parseInt(data.stock);
       if (data.enableSizes && data.sizes && data.sizes.length > 0) {
@@ -197,6 +228,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       const productData: any = {
         ...data,
         imageUrl,
+        imageUrls,
         categoryId: data.categoryId ? parseInt(data.categoryId) : null,
         stock: totalStock,
         minStockThreshold: parseInt(data.minStockThreshold),
@@ -225,8 +257,9 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       });
       onOpenChange(false);
       form.reset();
-      setSelectedFile(null);
-      setImagePreview(null);
+      setSelectedFiles([]);
+      setImagePreviews([]);
+      setExistingImages([]);
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -252,16 +285,59 @@ export default function EditProductModal({ open, onOpenChange, product, categori
     updateProductMutation.mutate(data);
   };
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    const validFiles: File[] = [];
+    const invalidFiles: string[] = [];
+
+    files.forEach((file) => {
+      if (file.size > 5 * 1024 * 1024) {
+        invalidFiles.push(`${file.name} (too large)`);
+        return;
+      }
+
+      if (!file.type.startsWith('image/')) {
+        invalidFiles.push(`${file.name} (not an image)`);
+        return;
+      }
+
+      validFiles.push(file);
+    });
+
+    if (invalidFiles.length > 0) {
+      toast({
+        title: "Some files were skipped",
+        description: invalidFiles.join(", "),
+        variant: "destructive",
+      });
     }
+
+    if (validFiles.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...validFiles]);
+
+      // Create previews for new files
+      validFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setImagePreviews((prev) => [...prev, e.target?.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Reset input
+    event.target.value = '';
+  };
+
+  const removeExistingImage = (index: number) => {
+    setExistingImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeNewImage = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   const getDiscountedPrice = (originalPrice: number, discountPercentage: number) => {
@@ -359,22 +435,84 @@ export default function EditProductModal({ open, onOpenChange, product, categori
 
             {/* Image Upload */}
             <div className="space-y-2">
-              <Label htmlFor="image">Product Image</Label>
-              <Input
-                id="image"
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-              />
-              {imagePreview && (
-                <div className="mt-2">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-20 h-20 object-cover rounded-md border"
-                  />
+              <Label>Product Images</Label>
+              
+              {/* Existing Images */}
+              {existingImages.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Existing Images:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {existingImages.map((url, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={url}
+                          alt={`Existing ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeExistingImage(index)}
+                          className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
+
+              {/* New Image Previews */}
+              {imagePreviews.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">New Images:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {imagePreviews.map((preview, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeNewImage(index)}
+                          className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Button */}
+              <div>
+                <label htmlFor="image-upload" className="cursor-pointer">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => document.getElementById('image-upload')?.click()}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    {existingImages.length === 0 && imagePreviews.length === 0 ? "Add Images" : "Add More Images"}
+                  </Button>
+                  <input
+                    id="image-upload"
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileSelect}
+                  />
+                </label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PNG, JPG, GIF up to 5MB each (multiple images allowed)
+                </p>
+              </div>
             </div>
 
             <FormField

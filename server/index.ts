@@ -185,6 +185,23 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Ensure image_urls column exists (migration)
+  try {
+    const { sql } = await import("./db");
+    await sql`
+      ALTER TABLE products 
+      ADD COLUMN IF NOT EXISTS image_urls TEXT;
+    `;
+    console.log("✓ Verified image_urls column exists");
+  } catch (error: any) {
+    // Column might already exist, or there's a permission issue
+    if (error?.message?.includes("already exists") || error?.message?.includes("duplicate")) {
+      console.log("✓ image_urls column already exists");
+    } else {
+      console.warn("⚠ Could not verify image_urls column:", error?.message);
+    }
+  }
+
   // Add health check endpoint
   app.get("/api/health", async (req, res) => {
     const dbConnected = await checkDatabaseConnection();
@@ -214,6 +231,17 @@ app.use((req, res, next) => {
       console.log("Cleaned up expired password reset tokens");
     } catch (error) {
       console.error("Error cleaning up expired tokens:", error);
+    }
+  }, 3600000); // 1 hour
+
+  // Cleanup old closed support tickets every hour
+  setInterval(async () => {
+    try {
+      const { storage } = await import("./storage");
+      await storage.cleanupOldClosedTickets();
+      console.log("Cleaned up old closed support tickets");
+    } catch (error) {
+      console.error("Error cleaning up old closed tickets:", error);
     }
   }, 3600000); // 1 hour
 

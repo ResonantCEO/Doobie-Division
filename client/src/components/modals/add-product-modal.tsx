@@ -113,8 +113,8 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isDuplicateSku, setIsDuplicateSku] = useState(false);
 
   const isAdmin = user?.role === "admin";
@@ -157,41 +157,54 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
   }, [enableSizes, form]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast({
-          title: "File too large",
-          description: "Please select an image smaller than 5MB",
-          variant: "destructive",
-        });
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    const validFiles: File[] = [];
+    const invalidFiles: string[] = [];
+
+    files.forEach((file) => {
+      if (file.size > 5 * 1024 * 1024) {
+        invalidFiles.push(`${file.name} (too large)`);
         return;
       }
 
       if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Invalid file type",
-          description: "Please select an image file",
-          variant: "destructive",
-        });
+        invalidFiles.push(`${file.name} (not an image)`);
         return;
       }
 
-      setSelectedFile(file);
+      validFiles.push(file);
+    });
 
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (invalidFiles.length > 0) {
+      toast({
+        title: "Some files were skipped",
+        description: invalidFiles.join(", "),
+        variant: "destructive",
+      });
     }
+
+    if (validFiles.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...validFiles]);
+
+      // Create previews for new files
+      validFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setImagePreviews((prev) => [...prev, e.target?.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Reset input
+    event.target.value = '';
   };
 
-  const removeImage = () => {
-    setSelectedFile(null);
-    setImagePreview(null);
-    form.setValue("imageUrl", "");
+  const removeImage = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   const uploadImage = async (file: File): Promise<string> => {
@@ -214,10 +227,15 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
   const createProductMutation = useMutation({
     mutationFn: async (data: FormData) => {
       let imageUrl = "";
+      let imageUrls: string[] = [];
 
-      // Upload image if selected
-      if (selectedFile) {
-        imageUrl = await uploadImage(selectedFile);
+      // Upload all images if selected
+      if (selectedFiles.length > 0) {
+        const uploadedUrls = await Promise.all(
+          selectedFiles.map((file) => uploadImage(file))
+        );
+        imageUrls = uploadedUrls;
+        imageUrl = uploadedUrls[0] || ""; // First image as primary
       }
 
       // Calculate total stock if sizes are enabled
@@ -244,6 +262,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         discountPercentage: data.discountPercentage ? parseFloat(data.discountPercentage).toFixed(2) : null,
         isActive: data.isActive,
         imageUrl: imageUrl || null,
+        imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice).toFixed(2) : null,
         purchasePriceMethod: data.purchasePriceMethod || "units",
         purchasePricePerGram: data.purchasePricePerGram ? parseFloat(data.purchasePricePerGram).toFixed(4) : null,
@@ -267,8 +286,8 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       });
       onOpenChange(false);
       form.reset();
-      setSelectedFile(null);
-      setImagePreview(null);
+      setSelectedFiles([]);
+      setImagePreviews([]);
       setIsDuplicateSku(false);
     },
     onError: (error: any) => {
@@ -817,18 +836,18 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
 
             {/* Image Upload Section */}
             <div className="space-y-2">
-              <FormLabel>Product Image (Optional)</FormLabel>
+              <FormLabel>Product Images (Optional)</FormLabel>
 
-              {!imagePreview ? (
+              {imagePreviews.length === 0 ? (
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                   <Upload className="mx-auto h-12 w-12 text-gray-400" />
                   <div className="mt-4">
                     <label htmlFor="image-upload" className="cursor-pointer">
                       <span className="mt-2 block text-sm font-medium text-gray-900">
-                        Click to upload an image
+                        Click to upload images
                       </span>
                       <span className="mt-1 block text-xs text-gray-500">
-                        PNG, JPG, GIF up to 5MB
+                        PNG, JPG, GIF up to 5MB each (multiple images allowed)
                       </span>
                     </label>
                     <input
@@ -836,24 +855,51 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                       type="file"
                       className="hidden"
                       accept="image/*"
+                      multiple
                       onChange={handleFileSelect}
                     />
                   </div>
                 </div>
               ) : (
-                <div className="relative">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-full h-32 object-cover rounded-lg border"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeImage}
-                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {imagePreviews.map((preview, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <label htmlFor="image-upload-add" className="cursor-pointer">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => document.getElementById('image-upload-add')?.click()}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add More Images
+                    </Button>
+                    <input
+                      id="image-upload-add"
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      multiple
+                      onChange={handleFileSelect}
+                    />
+                  </label>
                 </div>
               )}
             </div>

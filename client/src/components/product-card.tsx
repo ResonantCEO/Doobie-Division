@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/cart-context";
-import { useState } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import AddToCartModal from "./add-to-cart-modal";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, Category, ProductSize } from "@shared/schema";
 
 interface ProductCardProps {
@@ -16,6 +17,130 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { addItem } = useCart();
   const [isFlipped, setIsFlipped] = useState(false);
   const [showAddToCartModal, setShowAddToCartModal] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [needsSmallerText, setNeedsSmallerText] = useState(false);
+  const productNameRef = useRef<HTMLHeadingElement>(null);
+
+  // Parse imageUrls or fall back to imageUrl
+  const productImages = useMemo(() => {
+    let images: string[] = [];
+    
+    // Debug logging
+    console.log('[ProductCard] Product data:', {
+      id: product.id,
+      name: product.name,
+      imageUrl: product.imageUrl,
+      imageUrls: (product as any).imageUrls,
+      imageUrlsType: typeof (product as any).imageUrls
+    });
+    
+    if ((product as any).imageUrls) {
+      try {
+        // Handle both string and already-parsed array
+        let parsed: any;
+        if (typeof (product as any).imageUrls === 'string') {
+          parsed = JSON.parse((product as any).imageUrls);
+        } else {
+          parsed = (product as any).imageUrls;
+        }
+        
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          images = parsed;
+          console.log('[ProductCard] Parsed imageUrls array:', images.length, 'images');
+        }
+      } catch (e) {
+        console.warn('[ProductCard] Failed to parse imageUrls:', e);
+        images = [];
+      }
+    }
+    
+    if (images.length === 0 && product.imageUrl) {
+      images = [product.imageUrl];
+      console.log('[ProductCard] Using single imageUrl as fallback');
+    }
+    
+    if (images.length === 0) {
+      images = ["https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"];
+      console.log('[ProductCard] Using default placeholder image');
+    }
+    
+    console.log('[ProductCard] Final images array:', images.length, 'images');
+    return images;
+  }, [product]);
+
+  // Reset image index when product changes
+  useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [product.id]);
+
+  const currentImage = productImages[currentImageIndex] || productImages[0];
+  const hasMultipleImages = productImages.length > 1;
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('[ProductCard] Render state:', {
+      productId: product.id,
+      productName: product.name,
+      totalImages: productImages.length,
+      hasMultipleImages,
+      currentImageIndex,
+      currentImage: currentImage?.substring(0, 50) + '...'
+    });
+  }, [product.id, productImages.length, hasMultipleImages, currentImageIndex, currentImage, product.name]);
+
+  // Check if product name is truncated and needs smaller text
+  useEffect(() => {
+    const checkTruncation = () => {
+      if (productNameRef.current) {
+        const element = productNameRef.current;
+        const styles = getComputedStyle(element);
+        
+        // Create a hidden clone to measure text without line-clamp
+        const clone = element.cloneNode(true) as HTMLElement;
+        clone.style.position = 'absolute';
+        clone.style.visibility = 'hidden';
+        clone.style.height = 'auto';
+        clone.style.maxHeight = 'none';
+        clone.style.webkitLineClamp = 'none';
+        clone.style.display = 'block';
+        clone.style.overflow = 'visible';
+        clone.style.textOverflow = 'clip';
+        clone.style.width = element.offsetWidth + 'px';
+        
+        document.body.appendChild(clone);
+        const cloneHeight = clone.offsetHeight;
+        document.body.removeChild(clone);
+        
+        // Calculate max height for 2 lines
+        const lineHeight = parseFloat(styles.lineHeight) || parseFloat(styles.fontSize) * 1.2;
+        const maxHeightFor2Lines = lineHeight * 2;
+        
+        // If clone height exceeds 2 lines, use smaller text
+        setNeedsSmallerText(cloneHeight > maxHeightFor2Lines);
+      }
+    };
+
+    // Check after a short delay to ensure DOM is fully rendered
+    const timeoutId = setTimeout(checkTruncation, 100);
+    
+    // Also check on window resize
+    window.addEventListener('resize', checkTruncation);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', checkTruncation);
+    };
+  }, [product.name, product.id]);
+
+  const handlePreviousImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev === 0 ? productImages.length - 1 : prev - 1));
+  };
+
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev === productImages.length - 1 ? 0 : prev + 1));
+  };
 
   const handleCardClick = () => {
     setIsFlipped(!isFlipped);
@@ -54,95 +179,143 @@ export default function ProductCard({ product }: ProductCardProps) {
       >
         {/* Front of card */}
         <Card className="product-card-face product-card-front absolute inset-0 w-full h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col rounded-2xl">
-          <div className="w-full h-32 sm:h-40 md:h-48 overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl">
+          <div className="w-full h-[250px] overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl relative group">
             <img
-              src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"}
+              src={currentImage}
               alt={product.name}
               className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-300"
             />
+            {hasMultipleImages && (
+              <>
+                <button
+                  onClick={handlePreviousImage}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 shadow-lg transition-all z-20 flex items-center justify-center backdrop-blur-sm opacity-70 hover:opacity-100"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={handleNextImage}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 shadow-lg transition-all z-20 flex items-center justify-center backdrop-blur-sm opacity-70 hover:opacity-100"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-20 bg-black/20 px-2 py-1.5 rounded-full backdrop-blur-sm opacity-70 hover:opacity-100 transition-opacity">
+                  {productImages.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentImageIndex(index);
+                      }}
+                      className={`rounded-full transition-all ${
+                        index === currentImageIndex
+                          ? "bg-white/90 w-2.5 h-2.5"
+                          : "bg-white/40 w-2 h-2 hover:bg-white/60"
+                      }`}
+                      aria-label={`Go to image ${index + 1}`}
+                    />
+                  ))}
+                </div>
+                <div className="absolute top-2 right-2 bg-black/30 text-white text-xs px-2 py-1 rounded-full z-20 backdrop-blur-sm opacity-70 hover:opacity-100 transition-opacity">
+                  {currentImageIndex + 1} / {productImages.length}
+                </div>
+              </>
+            )}
           </div>
-          <CardContent className="p-2 sm:p-3 md:p-4 bg-white dark:bg-gray-900 flex flex-col flex-1 rounded-b-2xl">
-            <div className="flex-1 text-center">
-              <h4 className="text-base sm:text-lg md:text-xl text-purple-600 dark:text-purple-400 line-clamp-1 mb-1 uppercase tracking-wide" style={{ fontFamily: '"Fredoka One", "Bungee", "Chewy", "Modak", cursive, sans-serif' }}>{product.name}</h4>
+          <CardContent className="pt-2 pb-3 px-3 sm:pt-2 sm:pb-4 sm:px-4 bg-white dark:bg-gray-900 flex flex-col flex-1 min-h-0 overflow-hidden rounded-b-2xl">
+            <div className="text-center flex-shrink-0">
+              <h4 
+                ref={productNameRef}
+                className={`${needsSmallerText ? 'text-sm sm:text-base' : 'text-base sm:text-lg'} text-purple-600 dark:text-purple-400 line-clamp-2 mb-0.5 uppercase tracking-wide`}
+                style={{ fontFamily: '"Fredoka One", "Bungee", "Chewy", "Modak", cursive, sans-serif' }}
+              >
+                {product.name}
+              </h4>
               {(product as any).company && (
-                <p className="text-sm sm:text-base font-medium text-orange-600 dark:text-orange-400 uppercase tracking-wide">{(product as any).company}</p>
+                <p className="text-xs sm:text-sm font-medium text-orange-600 dark:text-orange-400 uppercase tracking-wide mt-0.5">{(product as any).company}</p>
               )}
               {product.category && (
-                <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">{product.category.name}</p>
+                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide mt-0.5">{product.category.name}</p>
               )}
             </div>
 
-            <div className="mt-2 sm:mt-3 md:mt-4 space-y-2 sm:space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="text-center flex-1">
-                  {product.sellingMethod === "weight" ? (
-                    <div className="space-y-1">
-                      {product.pricePerGram && (
-                        <div>
-                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                            <div className="space-y-1">
-                              <div className="text-sm line-through text-gray-500 dark:text-gray-400">${product.pricePerGram}/g</div>
-                              <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                                ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
-                              </div>
-                              <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full inline-block">
+            <div className="flex-1 min-h-0"></div>
+
+            <div className="space-y-1.5 sm:space-y-2 flex-shrink-0 mt-auto">
+              {stockStatus && (
+                <div className="flex justify-center">
+                  <Badge
+                    variant={stockStatus.variant === "destructive" ? "destructive" : "secondary"}
+                    className={`
+                      font-semibold text-xs px-3 py-1
+                      ${stockStatus.variant === "destructive"
+                        ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800"
+                        : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
+                      }
+                    `}
+                  >
+                    {stockStatus.label}
+                  </Badge>
+                </div>
+              )}
+              <div className="text-center">
+                {product.sellingMethod === "weight" ? (
+                  <div className="space-y-0.5">
+                    {product.pricePerGram && (
+                      <div>
+                        {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                              <div className="text-xs sm:text-sm line-through text-gray-500 dark:text-gray-400">${product.pricePerGram}/g</div>
+                              <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">
                                 {product.discountPercentage}% OFF
                               </div>
                             </div>
-                          ) : (
-                            <div className="text-xl font-bold text-gray-900 dark:text-white">${product.pricePerGram}/g</div>
-                          )}
-                        </div>
-                      )}
-                      {product.pricePerOunce && (
-                        <div>
-                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                            <div className="text-sm text-gray-600 dark:text-gray-400">
-                              <span className="line-through">${product.pricePerOunce}/oz</span>
-                              <span className="ml-2 text-green-600 dark:text-green-400 font-semibold">
-                                ${(parseFloat(product.pricePerOunce) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/oz
-                              </span>
+                            <div className="text-lg sm:text-xl font-bold text-green-600 dark:text-green-400">
+                              ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
                             </div>
-                          ) : (
-                            <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">${product.pricePerOunce}/oz</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                        <div className="space-y-1">
-                          <div className="text-lg line-through text-gray-500 dark:text-gray-400">${Number(product.price || 0).toFixed(2)}</div>
-                          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                            ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
                           </div>
-                          <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full inline-block">
+                        ) : (
+                          <div className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">${product.pricePerGram}/g</div>
+                        )}
+                      </div>
+                    )}
+                    {product.pricePerOunce && (
+                      <div>
+                        {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                            <span className="line-through">${product.pricePerOunce}/oz</span>
+                            <span className="ml-2 text-green-600 dark:text-green-400 font-semibold">
+                              ${(parseFloat(product.pricePerOunce) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/oz
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium">${product.pricePerOunce}/oz</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                      <div className="space-y-0.5">
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                          <div className="text-sm sm:text-base line-through text-gray-500 dark:text-gray-400">${Number(product.price || 0).toFixed(2)}</div>
+                          <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">
                             {product.discountPercentage}% OFF
                           </div>
                         </div>
-                      ) : (
-                        <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                          ${Number(product.price || 0).toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {stockStatus && (
-                  <div className="ml-3">
-                    <Badge
-                      variant={stockStatus.variant === "destructive" ? "destructive" : "secondary"}
-                      className={`
-                        font-semibold text-xs px-3 py-1
-                        ${stockStatus.variant === "destructive"
-                          ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800"
-                          : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
-                        }
-                      `}
-                    >
-                      {stockStatus.label}
-                    </Badge>
+                        <div className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">
+                          ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                        ${Number(product.price || 0).toFixed(2)}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -151,7 +324,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 onClick={handleAddToCart}
                 disabled={isOutOfStock}
                 size="sm"
-                className={`w-full font-semibold py-2 sm:py-3 text-xs sm:text-sm transition-all duration-300 ${
+                className={`w-full font-semibold py-2 text-xs sm:text-sm transition-all duration-300 flex-shrink-0 ${
                   isOutOfStock
                     ? "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed border-gray-200 dark:border-gray-700"
                     : "bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 text-white shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
@@ -166,48 +339,68 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Back of card */}
         <Card className="product-card-face product-card-back absolute inset-0 w-full h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col rounded-2xl">
-          <div className="w-full h-48 overflow-hidden relative bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl">
+          <div className="w-full h-1/2 overflow-hidden relative bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl group">
             <img
-              src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop"}
+              src={currentImage}
               alt={product.name}
               className="w-full h-full object-cover object-center opacity-20"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/50"></div>
+            {hasMultipleImages && (
+              <>
+                <button
+                  onClick={handlePreviousImage}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 shadow-lg transition-all z-20 flex items-center justify-center backdrop-blur-sm opacity-70 hover:opacity-100"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={handleNextImage}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 shadow-lg transition-all z-20 flex items-center justify-center backdrop-blur-sm opacity-70 hover:opacity-100"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-20 bg-black/20 px-2 py-1.5 rounded-full backdrop-blur-sm opacity-70 hover:opacity-100 transition-opacity">
+                  {productImages.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentImageIndex(index);
+                      }}
+                      className={`rounded-full transition-all ${
+                        index === currentImageIndex
+                          ? "bg-white/90 w-2.5 h-2.5"
+                          : "bg-white/40 w-2 h-2 hover:bg-white/60"
+                      }`}
+                      aria-label={`Go to image ${index + 1}`}
+                    />
+                  ))}
+                </div>
+                <div className="absolute top-2 right-2 bg-black/30 text-white text-xs px-2 py-1 rounded-full z-20 backdrop-blur-sm opacity-70 hover:opacity-100 transition-opacity">
+                  {currentImageIndex + 1} / {productImages.length}
+                </div>
+              </>
+            )}
           </div>
-          <CardContent className="p-4 bg-white dark:bg-gray-900 flex flex-col min-h-0 flex-1 overflow-y-auto rounded-b-2xl">
-            <div className="flex-grow text-center">
-              <h4 className="text-xl text-purple-600 dark:text-purple-400 line-clamp-1 mb-1 uppercase tracking-wide" style={{ fontFamily: '"Fredoka One", "Bungee", "Chewy", "Modak", cursive, sans-serif' }}>{product.name}</h4>
-              {(product as any).company && (
-                <p className="text-base font-medium text-orange-600 dark:text-orange-400 uppercase tracking-wide mb-2">{(product as any).company}</p>
-              )}
-              {product.category && (
-                <p className="text-sm font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-3">{product.category.name}</p>
-              )}
-              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+          <CardContent className="pt-2 pb-3 px-3 sm:pt-2 sm:pb-4 sm:px-4 bg-white dark:bg-gray-900 flex flex-col min-h-0 flex-1 overflow-hidden rounded-b-2xl">
+            <div className="text-center flex-shrink-0 mb-2 h-[3.5rem] flex items-center justify-center">
+              <h4 
+                className={`${needsSmallerText ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'} text-purple-600 dark:text-purple-400 line-clamp-2 uppercase tracking-wide`}
+                style={{ fontFamily: '"Fredoka One", "Bungee", "Chewy", "Modak", cursive, sans-serif' }}
+              >
+                {product.name}
+              </h4>
+            </div>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="bg-gray-50 dark:bg-gray-800 p-2 sm:p-3 rounded-lg overflow-y-auto max-h-28 sm:max-h-32">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
                   {product.description || "No description available"}
                 </p>
               </div>
             </div>
-
-            {stockStatus && (
-              <div className="mt-4 flex-shrink-0">
-                <div className="flex justify-center">
-                  <Badge
-                    variant={stockStatus.variant === "destructive" ? "destructive" : "secondary"}
-                    className={`
-                        font-semibold text-xs px-3 py-1
-                        ${stockStatus.variant === "destructive"
-                          ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800"
-                          : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
-                        }
-                      `}
-                  >
-                    {stockStatus.label}
-                  </Badge>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>

@@ -67,9 +67,6 @@ function ScrollableProductRow({ products, onCategoryFilter }: { products: (Produ
           <ChevronRight className="w-6 h-6" />
         </button>
       )}
-      {canScrollRight && (
-        <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-white dark:from-gray-900 to-transparent pointer-events-none"></div>
-      )}
     </div>
   );
 }
