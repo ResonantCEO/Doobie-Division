@@ -1567,15 +1567,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/support/contact', async (req, res) => {
     try {
       const ticketData = insertSupportTicketSchema.parse(req.body);
-      const ticket = await storage.createSupportTicket(ticketData);
-
-      
+      const { userId, ...rest } = ticketData;
+      const insertData = userId ? { ...rest, userId } : rest;
+      const ticket = await storage.createSupportTicket(insertData);
 
       res.status(201).json(ticket);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid ticket data", errors: error.errors });
       }
+      console.error("Support ticket error:", error);
       res.status(500).json({ message: "Failed to create support ticket" });
     }
   });

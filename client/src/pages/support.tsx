@@ -34,15 +34,17 @@ export default function SupportPage() {
     e.preventDefault();
 
     try {
-      const ticketData = {
-        subject: "Support Request", // Default subject
+      const ticketData: Record<string, string> = {
+        subject: "Support Request",
         message: contactForm.message,
-        priority: "normal", // Default priority
+        priority: "normal",
         customerName: contactForm.customerName,
         customerEmail: contactForm.customerEmail,
         customerPhone: contactForm.customerPhone,
-        userId: user?.id || null
       };
+      if (user?.id) {
+        ticketData.userId = user.id;
+      }
 
       const response = await fetch("/api/support/contact", {
         method: "POST",
