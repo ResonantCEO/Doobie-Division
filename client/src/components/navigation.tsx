@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,12 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   const location = useLocation();
   const [notificationTab, setNotificationTab] = useState("all");
 
+  // Reset notification tab if customer is on users tab
+  useEffect(() => {
+    if (user.role === 'customer' && notificationTab === 'users') {
+      setNotificationTab('all');
+    }
+  }, [user.role, notificationTab]);
 
   // Fetch notifications
   const { data: notifications = [], refetch } = useQuery<any[]>({
@@ -231,7 +237,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                   <div className="p-2">
                     <h3 className="font-semibold text-sm mb-3">Notifications</h3>
                     <Tabs value={notificationTab} onValueChange={setNotificationTab} className="w-full">
-                      <TabsList className="grid w-full grid-cols-4 mb-3 h-auto">
+                      <TabsList className={`grid w-full ${user.role === 'customer' ? 'grid-cols-3' : 'grid-cols-4'} mb-3 h-auto`}>
                         <TabsTrigger value="all" className="text-sm py-2 px-3 flex items-center justify-center gap-1 relative font-medium">
                           All
                           {unreadCount > 0 && (
@@ -249,15 +255,17 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                             </Badge>
                           )}
                         </TabsTrigger>
-                        <TabsTrigger value="users" className="text-sm py-2 px-3 flex items-center justify-center gap-1 relative font-medium">
-                          <UserPlus className="h-3.5 w-3.5" />
-                          <span className="hidden sm:inline">Users</span>
-                          {getUnreadCount('users') > 0 && (
-                            <Badge className="h-4 w-4 p-0 text-[9px] bg-primary text-primary-foreground rounded-full flex items-center justify-center font-semibold border-0 absolute -top-1 -right-1">
-                              {getUnreadCount('users') > 9 ? '9+' : getUnreadCount('users')}
-                            </Badge>
-                          )}
-                        </TabsTrigger>
+                        {user.role !== 'customer' && (
+                          <TabsTrigger value="users" className="text-sm py-2 px-3 flex items-center justify-center gap-1 relative font-medium">
+                            <UserPlus className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Users</span>
+                            {getUnreadCount('users') > 0 && (
+                              <Badge className="h-4 w-4 p-0 text-[9px] bg-primary text-primary-foreground rounded-full flex items-center justify-center font-semibold border-0 absolute -top-1 -right-1">
+                                {getUnreadCount('users') > 9 ? '9+' : getUnreadCount('users')}
+                              </Badge>
+                            )}
+                          </TabsTrigger>
+                        )}
                         <TabsTrigger value="support" className="text-sm py-2 px-3 flex items-center justify-center gap-1 relative font-medium">
                           <HeadphonesIcon className="h-3.5 w-3.5" />
                           <span className="hidden sm:inline">Support</span>
@@ -269,7 +277,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                         </TabsTrigger>
                       </TabsList>
 
-                      {['all', 'orders', 'users', 'support'].map((tabValue) => (
+                      {(user.role === 'customer' ? ['all', 'orders', 'support'] : ['all', 'orders', 'users', 'support']).map((tabValue) => (
                         <TabsContent key={tabValue} value={tabValue} className="mt-0">
                           {getFilteredNotifications().length === 0 ? (
                             <p className="text-sm text-muted-foreground py-4 text-center">
@@ -430,7 +438,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                   <div className="p-2">
                     <h3 className="font-semibold text-sm mb-3">Notifications</h3>
                     <Tabs value={notificationTab} onValueChange={setNotificationTab} className="w-full">
-                      <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-3 gap-1">
+                      <TabsList className={`grid w-full ${user.role === 'customer' ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-4'} mb-3 gap-1`}>
                         <TabsTrigger value="all" className="text-xs flex items-center gap-1.5 relative">
                           All
                           {unreadCount > 0 && (
@@ -448,15 +456,17 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                             </Badge>
                           )}
                         </TabsTrigger>
-                        <TabsTrigger value="users" className="text-xs flex items-center gap-1.5 relative">
-                          <UserPlus className="h-3 w-3" />
-                          <span className="hidden sm:inline">Users</span>
-                          {getUnreadCount('users') > 0 && (
-                            <Badge className="h-5 w-5 p-0 text-[10px] bg-green-500 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto">
-                              {getUnreadCount('users') > 99 ? '99+' : getUnreadCount('users')}
-                            </Badge>
-                          )}
-                        </TabsTrigger>
+                        {user.role !== 'customer' && (
+                          <TabsTrigger value="users" className="text-xs flex items-center gap-1.5 relative">
+                            <UserPlus className="h-3 w-3" />
+                            <span className="hidden sm:inline">Users</span>
+                            {getUnreadCount('users') > 0 && (
+                              <Badge className="h-5 w-5 p-0 text-[10px] bg-green-500 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto">
+                                {getUnreadCount('users') > 99 ? '99+' : getUnreadCount('users')}
+                              </Badge>
+                            )}
+                          </TabsTrigger>
+                        )}
                         <TabsTrigger value="support" className="text-xs flex items-center gap-1.5 relative">
                           <HeadphonesIcon className="h-3 w-3" />
                           <span className="hidden sm:inline">Support</span>
@@ -468,7 +478,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                         </TabsTrigger>
                       </TabsList>
 
-                      {['all', 'orders', 'users', 'support'].map((tabValue) => (
+                      {(user.role === 'customer' ? ['all', 'orders', 'support'] : ['all', 'orders', 'users', 'support']).map((tabValue) => (
                         <TabsContent key={tabValue} value={tabValue} className="mt-0">
                           {getFilteredNotifications().length === 0 ? (
                             <p className="text-sm text-muted-foreground py-4 text-center">
