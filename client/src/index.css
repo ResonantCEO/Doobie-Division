@@ -550,21 +550,21 @@
   /* Mobile-optimized product cards */
   @media (max-width: 640px) {
     .product-card-container {
-      height: 370px !important;
-      min-height: 370px !important;
-      max-height: 370px !important;
+      height: 440px !important;
+      min-height: 440px !important;
+      max-height: 440px !important;
     }
 
     .product-card-inner {
-      height: 370px !important;
-      min-height: 370px !important;
-      max-height: 370px !important;
+      height: 440px !important;
+      min-height: 440px !important;
+      max-height: 440px !important;
     }
 
     .product-card-face {
-      height: 370px !important;
-      min-height: 370px !important;
-      max-height: 370px !important;
+      height: 440px !important;
+      min-height: 440px !important;
+      max-height: 440px !important;
     }
   }
 

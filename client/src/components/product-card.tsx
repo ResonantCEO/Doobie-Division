@@ -178,8 +178,8 @@ export default function ProductCard({ product }: ProductCardProps) {
         onClick={handleCardClick}
       >
         {/* Front of card */}
-        <Card className="product-card-face product-card-front absolute inset-0 w-full h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col rounded-2xl">
-          <div className="w-full h-[250px] overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl relative group">
+        <Card className="product-card-face product-card-front absolute inset-0 w-full h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col rounded-2xl overflow-hidden">
+          <div className="w-full h-[180px] sm:h-[220px] md:h-[250px] overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl relative group">
             <img
               src={currentImage}
               alt={product.name}
@@ -338,7 +338,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </Card>
 
         {/* Back of card */}
-        <Card className="product-card-face product-card-back absolute inset-0 w-full h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col rounded-2xl">
+        <Card className="product-card-face product-card-back absolute inset-0 w-full h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col rounded-2xl overflow-hidden">
           <div className="w-full h-1/2 overflow-hidden relative bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl group">
             <img
               src={currentImage}
