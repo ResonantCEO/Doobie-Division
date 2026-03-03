@@ -1049,30 +1049,40 @@ export class DatabaseStorage implements IStorage {
         const values: any[] = [];
         let paramIndex = 1;
 
+        const toNum = (v: any): number | null => {
+          if (v === null || v === undefined || v === '') return null;
+          const n = typeof v === 'string' ? parseFloat(v) : v;
+          return isNaN(n) ? null : n;
+        };
+        const toNumStr = (v: any): string | null => {
+          const n = toNum(v);
+          return n === null ? null : String(n);
+        };
+
         const fieldMap: Record<string, { column: string; transform?: (v: any) => any }> = {
           name: { column: 'name' },
           company: { column: 'company' },
           description: { column: 'description' },
-          price: { column: 'price', transform: (v: any) => v === null ? null : String(v) },
+          price: { column: 'price', transform: toNumStr },
           sku: { column: 'sku' },
-          categoryId: { column: 'category_id', transform: (v: any) => v === null ? null : Number(v) },
+          categoryId: { column: 'category_id', transform: (v: any) => v === null || v === '' ? null : Number(v) },
           imageUrl: { column: 'image_url' },
           imageUrls: { column: 'image_urls' },
-          stock: { column: 'stock', transform: (v: any) => Number(v) },
-          physicalInventory: { column: 'physical_inventory', transform: (v: any) => Number(v) },
-          minStockThreshold: { column: 'min_stock_threshold', transform: (v: any) => Number(v) },
+          stock: { column: 'stock', transform: (v: any) => Number(v) || 0 },
+          physicalInventory: { column: 'physical_inventory', transform: (v: any) => Number(v) || 0 },
+          minStockThreshold: { column: 'min_stock_threshold', transform: (v: any) => Number(v) || 0 },
           sellingMethod: { column: 'selling_method' },
           weightUnit: { column: 'weight_unit' },
-          pricePerGram: { column: 'price_per_gram', transform: (v: any) => v === null ? null : parseFloat(String(v)) },
-          pricePerOunce: { column: 'price_per_ounce', transform: (v: any) => v === null ? null : parseFloat(String(v)) },
-          pricePerEighth: { column: 'price_per_eighth', transform: (v: any) => v === null ? null : parseFloat(String(v)) },
-          pricePerQuarter: { column: 'price_per_quarter', transform: (v: any) => v === null ? null : parseFloat(String(v)) },
-          pricePerHalf: { column: 'price_per_half', transform: (v: any) => v === null ? null : parseFloat(String(v)) },
-          discountPercentage: { column: 'discount_percentage', transform: (v: any) => v === null ? null : String(v) },
-          purchasePrice: { column: 'purchase_price', transform: (v: any) => v === null ? null : String(v) },
+          pricePerGram: { column: 'price_per_gram', transform: toNum },
+          pricePerOunce: { column: 'price_per_ounce', transform: toNum },
+          pricePerEighth: { column: 'price_per_eighth', transform: toNum },
+          pricePerQuarter: { column: 'price_per_quarter', transform: toNum },
+          pricePerHalf: { column: 'price_per_half', transform: toNum },
+          discountPercentage: { column: 'discount_percentage', transform: toNumStr },
+          purchasePrice: { column: 'purchase_price', transform: toNumStr },
           purchasePriceMethod: { column: 'purchase_price_method' },
-          purchasePricePerGram: { column: 'purchase_price_per_gram', transform: (v: any) => v === null ? null : String(v) },
-          purchasePricePerOunce: { column: 'purchase_price_per_ounce', transform: (v: any) => v === null ? null : String(v) },
+          purchasePricePerGram: { column: 'purchase_price_per_gram', transform: toNumStr },
+          purchasePricePerOunce: { column: 'purchase_price_per_ounce', transform: toNumStr },
           adminNotes: { column: 'admin_notes' },
           isActive: { column: 'is_active' },
         };
