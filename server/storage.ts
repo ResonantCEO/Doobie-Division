@@ -1053,34 +1053,53 @@ export class DatabaseStorage implements IStorage {
         };
 
         const d = updateData;
-        await rawSql`UPDATE products SET
-          name = ${d.name},
-          company = ${d.company ?? null},
-          description = ${d.description ?? null},
-          price = ${toSafeNum(d.price)},
-          sku = ${d.sku},
-          category_id = ${toSafeNum(d.categoryId)},
-          image_url = ${d.imageUrl ?? null},
-          image_urls = ${d.imageUrls ?? null},
-          stock = ${toSafeNum(d.stock) ?? 0},
-          physical_inventory = ${toSafeNum(d.physicalInventory) ?? 0},
-          min_stock_threshold = ${toSafeNum(d.minStockThreshold) ?? 0},
-          selling_method = ${d.sellingMethod},
-          weight_unit = ${d.weightUnit ?? null},
-          price_per_gram = ${toSafeNum(d.pricePerGram)},
-          price_per_ounce = ${toSafeNum(d.pricePerOunce)},
-          price_per_eighth = ${toSafeNum(d.pricePerEighth)},
-          price_per_quarter = ${toSafeNum(d.pricePerQuarter)},
-          price_per_half = ${toSafeNum(d.pricePerHalf)},
-          discount_percentage = ${toSafeNum(d.discountPercentage)},
-          purchase_price = ${toSafeNum(d.purchasePrice)},
-          purchase_price_method = ${d.purchasePriceMethod ?? null},
-          purchase_price_per_gram = ${toSafeNum(d.purchasePricePerGram)},
-          purchase_price_per_ounce = ${toSafeNum(d.purchasePricePerOunce)},
-          admin_notes = ${d.adminNotes ?? null},
-          is_active = ${d.isActive ?? true},
-          updated_at = NOW()
-        WHERE id = ${id}`;
+
+        await rawSql`UPDATE products SET name = ${d.name}, sku = ${d.sku}, selling_method = ${d.sellingMethod}, updated_at = NOW() WHERE id = ${id}`;
+        await rawSql`UPDATE products SET company = ${d.company ?? null}, description = ${d.description ?? null}, image_url = ${d.imageUrl ?? null}, image_urls = ${d.imageUrls ?? null}, weight_unit = ${d.weightUnit ?? null}, purchase_price_method = ${d.purchasePriceMethod ?? null}, admin_notes = ${d.adminNotes ?? null}, is_active = ${d.isActive ?? true} WHERE id = ${id}`;
+        await rawSql`UPDATE products SET stock = ${toSafeNum(d.stock) ?? 0}, physical_inventory = ${toSafeNum(d.physicalInventory) ?? 0}, min_stock_threshold = ${toSafeNum(d.minStockThreshold) ?? 0}, category_id = ${toSafeNum(d.categoryId)} WHERE id = ${id}`;
+
+        const priceVal = toSafeNum(d.price);
+        if (priceVal !== null) {
+          await rawSql`UPDATE products SET price = ${priceVal} WHERE id = ${id}`;
+        } else {
+          await rawSql`UPDATE products SET price = NULL WHERE id = ${id}`;
+        }
+
+        const pgn = toSafeNum(d.pricePerGram);
+        if (pgn !== null) { await rawSql`UPDATE products SET price_per_gram = ${pgn} WHERE id = ${id}`; }
+        else { await rawSql`UPDATE products SET price_per_gram = NULL WHERE id = ${id}`; }
+
+        const pon = toSafeNum(d.pricePerOunce);
+        if (pon !== null) { await rawSql`UPDATE products SET price_per_ounce = ${pon} WHERE id = ${id}`; }
+        else { await rawSql`UPDATE products SET price_per_ounce = NULL WHERE id = ${id}`; }
+
+        const pe = toSafeNum(d.pricePerEighth);
+        if (pe !== null) { await rawSql`UPDATE products SET price_per_eighth = ${pe} WHERE id = ${id}`; }
+        else { await rawSql`UPDATE products SET price_per_eighth = NULL WHERE id = ${id}`; }
+
+        const pq = toSafeNum(d.pricePerQuarter);
+        if (pq !== null) { await rawSql`UPDATE products SET price_per_quarter = ${pq} WHERE id = ${id}`; }
+        else { await rawSql`UPDATE products SET price_per_quarter = NULL WHERE id = ${id}`; }
+
+        const ph = toSafeNum(d.pricePerHalf);
+        if (ph !== null) { await rawSql`UPDATE products SET price_per_half = ${ph} WHERE id = ${id}`; }
+        else { await rawSql`UPDATE products SET price_per_half = NULL WHERE id = ${id}`; }
+
+        const dp = toSafeNum(d.discountPercentage);
+        if (dp !== null) { await rawSql`UPDATE products SET discount_percentage = ${dp} WHERE id = ${id}`; }
+        else { await rawSql`UPDATE products SET discount_percentage = NULL WHERE id = ${id}`; }
+
+        const pp = toSafeNum(d.purchasePrice);
+        if (pp !== null) { await rawSql`UPDATE products SET purchase_price = ${pp} WHERE id = ${id}`; }
+        else { await rawSql`UPDATE products SET purchase_price = NULL WHERE id = ${id}`; }
+
+        const ppg = toSafeNum(d.purchasePricePerGram);
+        if (ppg !== null) { await rawSql`UPDATE products SET purchase_price_per_gram = ${ppg} WHERE id = ${id}`; }
+        else { await rawSql`UPDATE products SET purchase_price_per_gram = NULL WHERE id = ${id}`; }
+
+        const ppo = toSafeNum(d.purchasePricePerOunce);
+        if (ppo !== null) { await rawSql`UPDATE products SET purchase_price_per_ounce = ${ppo} WHERE id = ${id}`; }
+        else { await rawSql`UPDATE products SET purchase_price_per_ounce = NULL WHERE id = ${id}`; }
 
         console.log('[updateProduct] Successfully updated all fields via direct SQL fallback');
         updateError = null;
