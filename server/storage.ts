@@ -423,6 +423,11 @@ export class DatabaseStorage implements IStorage {
         pricePerQuarter: products.pricePerQuarter,
         pricePerHalf: products.pricePerHalf,
         discountPercentage: products.discountPercentage,
+        purchasePrice: products.purchasePrice,
+        purchasePriceMethod: products.purchasePriceMethod,
+        purchasePricePerGram: products.purchasePricePerGram,
+        purchasePricePerOunce: products.purchasePricePerOunce,
+        adminNotes: products.adminNotes,
         isActive: products.isActive,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
@@ -1034,60 +1039,96 @@ export class DatabaseStorage implements IStorage {
       );
     } catch (err: any) {
       updateError = err;
-      // Log the error but continue to update fractional fields via direct SQL
-      console.error('[updateProduct] Drizzle update failed:', err?.message);
+      console.error('[updateProduct] Drizzle update failed, falling back to direct SQL:', err?.message);
     }
-    
-      // Always update fractional pricing fields via direct SQL (regardless of Drizzle success/failure)
+
+    if (updateError) {
+      try {
+        const { sql: rawSql } = await import("./db");
+        const setClauses: string[] = [];
+        const values: any[] = [];
+        let paramIndex = 1;
+
+        const fieldMap: Record<string, { column: string; transform?: (v: any) => any }> = {
+          name: { column: 'name' },
+          company: { column: 'company' },
+          description: { column: 'description' },
+          price: { column: 'price', transform: (v: any) => v === null ? null : String(v) },
+          sku: { column: 'sku' },
+          categoryId: { column: 'category_id', transform: (v: any) => v === null ? null : Number(v) },
+          imageUrl: { column: 'image_url' },
+          imageUrls: { column: 'image_urls' },
+          stock: { column: 'stock', transform: (v: any) => Number(v) },
+          physicalInventory: { column: 'physical_inventory', transform: (v: any) => Number(v) },
+          minStockThreshold: { column: 'min_stock_threshold', transform: (v: any) => Number(v) },
+          sellingMethod: { column: 'selling_method' },
+          weightUnit: { column: 'weight_unit' },
+          pricePerGram: { column: 'price_per_gram', transform: (v: any) => v === null ? null : parseFloat(String(v)) },
+          pricePerOunce: { column: 'price_per_ounce', transform: (v: any) => v === null ? null : parseFloat(String(v)) },
+          pricePerEighth: { column: 'price_per_eighth', transform: (v: any) => v === null ? null : parseFloat(String(v)) },
+          pricePerQuarter: { column: 'price_per_quarter', transform: (v: any) => v === null ? null : parseFloat(String(v)) },
+          pricePerHalf: { column: 'price_per_half', transform: (v: any) => v === null ? null : parseFloat(String(v)) },
+          discountPercentage: { column: 'discount_percentage', transform: (v: any) => v === null ? null : String(v) },
+          purchasePrice: { column: 'purchase_price', transform: (v: any) => v === null ? null : String(v) },
+          purchasePriceMethod: { column: 'purchase_price_method' },
+          purchasePricePerGram: { column: 'purchase_price_per_gram', transform: (v: any) => v === null ? null : String(v) },
+          purchasePricePerOunce: { column: 'purchase_price_per_ounce', transform: (v: any) => v === null ? null : String(v) },
+          adminNotes: { column: 'admin_notes' },
+          isActive: { column: 'is_active' },
+        };
+
+        for (const [key, value] of Object.entries(updateData)) {
+          const mapping = fieldMap[key];
+          if (!mapping) continue;
+          const finalValue = mapping.transform ? mapping.transform(value) : value;
+          setClauses.push(`${mapping.column} = $${paramIndex}`);
+          values.push(finalValue);
+          paramIndex++;
+        }
+
+        if (setClauses.length > 0) {
+          setClauses.push('updated_at = NOW()');
+          values.push(id);
+          const query = `UPDATE products SET ${setClauses.join(', ')} WHERE id = $${paramIndex}`;
+          await rawSql(query, values);
+          console.log('[updateProduct] Successfully updated all fields via direct SQL fallback');
+        }
+        updateError = null;
+      } catch (fallbackError: any) {
+        console.error('[updateProduct] Direct SQL fallback also failed:', fallbackError?.message);
+        throw fallbackError;
+      }
+    } else {
       if (Object.keys(fractionalFieldsToUpdate).length > 0) {
         try {
-          const { sql } = await import("./db");
-          
-          // Update each field individually - update even if null to allow clearing values
-          // Convert string values to numbers for SQL, or use null
+          const { sql: rawSql } = await import("./db");
           if (fractionalFieldsToUpdate.hasOwnProperty('pricePerEighth')) {
             const value = fractionalFieldsToUpdate.pricePerEighth === null || fractionalFieldsToUpdate.pricePerEighth === '' 
               ? null 
               : parseFloat(String(fractionalFieldsToUpdate.pricePerEighth));
-            await sql`UPDATE products SET price_per_eighth = ${value} WHERE id = ${id}`;
-            console.log('[updateProduct] Updated price_per_eighth to:', value);
+            await rawSql`UPDATE products SET price_per_eighth = ${value} WHERE id = ${id}`;
           }
           if (fractionalFieldsToUpdate.hasOwnProperty('pricePerQuarter')) {
             const value = fractionalFieldsToUpdate.pricePerQuarter === null || fractionalFieldsToUpdate.pricePerQuarter === '' 
               ? null 
               : parseFloat(String(fractionalFieldsToUpdate.pricePerQuarter));
-            await sql`UPDATE products SET price_per_quarter = ${value} WHERE id = ${id}`;
-            console.log('[updateProduct] Updated price_per_quarter to:', value);
+            await rawSql`UPDATE products SET price_per_quarter = ${value} WHERE id = ${id}`;
           }
           if (fractionalFieldsToUpdate.hasOwnProperty('pricePerHalf')) {
             const value = fractionalFieldsToUpdate.pricePerHalf === null || fractionalFieldsToUpdate.pricePerHalf === '' 
               ? null 
               : parseFloat(String(fractionalFieldsToUpdate.pricePerHalf));
-            await sql`UPDATE products SET price_per_half = ${value} WHERE id = ${id}`;
-            console.log('[updateProduct] Updated price_per_half to:', value);
+            await rawSql`UPDATE products SET price_per_half = ${value} WHERE id = ${id}`;
           }
-          
           console.log('[updateProduct] Successfully updated fractional pricing via direct SQL');
         } catch (fractionalError: any) {
           console.error('[updateProduct] Failed to update fractional pricing fields:', fractionalError?.message);
-          console.error('[updateProduct] Fractional error details:', fractionalError);
-          // If Drizzle update also failed, throw the original error
-          if (updateError) {
-            throw updateError;
-          }
-          throw fractionalError;
         }
       }
-    
-    // If Drizzle update failed and we didn't update fractional fields, throw the error
-    if (updateError && Object.keys(fractionalFieldsToUpdate).length === 0) {
-      throw updateError;
     }
-    
-    // If Drizzle update failed but we successfully updated fractional fields, log a warning but continue
-    if (updateError && Object.keys(fractionalFieldsToUpdate).length > 0) {
-      console.warn('[updateProduct] Drizzle update failed but fractional fields were updated. Error:', updateError?.message);
-      // Continue - we'll fetch the product and return it
+
+    if (updateError) {
+      throw updateError;
     }
 
     // Fetch the updated product
