@@ -10,6 +10,16 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import EditProductModal from "@/components/modals/edit-product-modal";
 import StockAdjustmentModal from "@/components/modals/stock-adjustment-modal";
 import QRCodeModal from "@/components/modals/qr-code-modal";
@@ -40,18 +50,21 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+
   const deleteProductMutation = useMutation({
     mutationFn: async (productId: number) => {
       await apiRequest("DELETE", `/api/products/${productId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      setDeleteConfirmId(null);
       toast({
         title: "Success",
         description: "Product deleted successfully",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -63,9 +76,10 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
         }, 500);
         return;
       }
+      const message = error?.response?.data?.message || error?.message || "Failed to delete product";
       toast({
         title: "Error",
-        description: "Failed to delete product",
+        description: message,
         variant: "destructive",
       });
     },
@@ -299,7 +313,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
   };
 
   const confirmDelete = (productId: number) => {
-    deleteProductMutation.mutate(productId);
+    setDeleteConfirmId(productId);
   };
 
   // QR code generation mutation
@@ -867,6 +881,26 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
           isLoading={qrCodeMutation.isPending}
         />
       )}
+      <AlertDialog open={deleteConfirmId !== null} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this product? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteProductMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (deleteConfirmId !== null) deleteProductMutation.mutate(deleteConfirmId); }}
+              disabled={deleteProductMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteProductMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
