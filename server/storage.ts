@@ -1087,10 +1087,20 @@ export class DatabaseStorage implements IStorage {
           isActive: { column: 'is_active' },
         };
 
+        const numericColumns = new Set([
+          'price', 'price_per_gram', 'price_per_ounce', 'price_per_eighth',
+          'price_per_quarter', 'price_per_half', 'discount_percentage',
+          'purchase_price', 'purchase_price_per_gram', 'purchase_price_per_ounce',
+          'stock', 'physical_inventory', 'min_stock_threshold', 'category_id',
+        ]);
+
         for (const [key, value] of Object.entries(updateData)) {
           const mapping = fieldMap[key];
           if (!mapping) continue;
-          const finalValue = mapping.transform ? mapping.transform(value) : value;
+          let finalValue = mapping.transform ? mapping.transform(value) : value;
+          if (numericColumns.has(mapping.column) && (finalValue === '' || finalValue === undefined)) {
+            finalValue = null;
+          }
           setClauses.push(`${mapping.column} = $${paramIndex}`);
           values.push(finalValue);
           paramIndex++;
@@ -1100,6 +1110,7 @@ export class DatabaseStorage implements IStorage {
           setClauses.push('updated_at = NOW()');
           values.push(id);
           const query = `UPDATE products SET ${setClauses.join(', ')} WHERE id = $${paramIndex}`;
+          console.log('[updateProduct] Direct SQL fallback values:', JSON.stringify(values));
           await rawSql(query, values);
           console.log('[updateProduct] Successfully updated all fields via direct SQL fallback');
         }
