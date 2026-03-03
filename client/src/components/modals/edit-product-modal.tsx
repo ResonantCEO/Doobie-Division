@@ -241,30 +241,42 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         }
       }
       
+      // Helper to safely parse and format price values
+      const formatPrice = (value: any, decimals: number = 2): string | null => {
+        if (value === undefined || value === null || value === "") return null;
+        const num = parseFloat(String(value));
+        return isNaN(num) ? null : num.toFixed(decimals);
+      };
+
       const productData: any = {
-        ...data,
-        imageUrl,
-        imageUrls,
+        name: data.name,
+        company: data.company || null,
+        description: data.description || null,
+        sku: data.sku,
         categoryId: data.categoryId ? parseInt(data.categoryId) : null,
         stock: totalStock,
         minStockThreshold: parseInt(data.minStockThreshold),
-        price: data.sellingMethod === "units" && data.price ? data.price : null,
-        pricePerGram: data.sellingMethod === "weight" && data.pricePerGram ? data.pricePerGram : null,
-        pricePerOunce: data.sellingMethod === "weight" && data.pricePerOunce ? data.pricePerOunce : null,
-        pricePerEighth: data.sellingMethod === "weight" && (data.pricePerEighth !== undefined && data.pricePerEighth !== null && data.pricePerEighth !== "") ? data.pricePerEighth : null,
-        pricePerQuarter: data.sellingMethod === "weight" && (data.pricePerQuarter !== undefined && data.pricePerQuarter !== null && data.pricePerQuarter !== "") ? data.pricePerQuarter : null,
-        pricePerHalf: data.sellingMethod === "weight" && (data.pricePerHalf !== undefined && data.pricePerHalf !== null && data.pricePerHalf !== "") ? data.pricePerHalf : null,
+        sellingMethod: data.sellingMethod,
+        weightUnit: data.weightUnit,
+        imageUrl,
+        imageUrls,
+        price: data.sellingMethod === "units" ? formatPrice(data.price, 2) : null,
+        pricePerGram: data.sellingMethod === "weight" ? formatPrice(data.pricePerGram, 4) : null,
+        pricePerOunce: data.sellingMethod === "weight" ? formatPrice(data.pricePerOunce, 2) : null,
+        pricePerEighth: data.sellingMethod === "weight" ? formatPrice(data.pricePerEighth, 2) : null,
+        pricePerQuarter: data.sellingMethod === "weight" ? formatPrice(data.pricePerQuarter, 2) : null,
+        pricePerHalf: data.sellingMethod === "weight" ? formatPrice(data.pricePerHalf, 2) : null,
         discountPercentage: discountValue,
-        purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice).toFixed(2) : null,
+        purchasePrice: formatPrice(data.purchasePrice, 2),
         purchasePriceMethod: data.purchasePriceMethod || "units",
-        purchasePricePerGram: data.purchasePricePerGram ? parseFloat(data.purchasePricePerGram).toFixed(4) : null,
-        purchasePricePerOunce: data.purchasePricePerOunce ? parseFloat(data.purchasePricePerOunce).toFixed(2) : null,
+        purchasePricePerGram: formatPrice(data.purchasePricePerGram, 4),
+        purchasePricePerOunce: formatPrice(data.purchasePricePerOunce, 2),
         adminNotes: data.adminNotes || null,
+        isActive: data.isActive,
         sizes: data.enableSizes && data.sizes && data.sizes.length > 0
           ? data.sizes.map(s => ({ size: s.size, quantity: parseInt(s.quantity || "0") }))
           : [],
       };
-      delete productData.enableSizes;
       
       // Remove undefined values to avoid sending them
       Object.keys(productData).forEach(key => {
@@ -273,6 +285,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         }
       });
 
+      console.log('[EditProductModal] Sending product data:', JSON.stringify(productData, null, 2));
       await apiRequest("PUT", `/api/products/${product.id}`, productData);
     },
     onSuccess: () => {

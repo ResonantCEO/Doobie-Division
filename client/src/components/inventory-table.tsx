@@ -492,6 +492,26 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                               )}
                             </div>
                           )}
+                          {product.pricePerOunce && (
+                            <div className="text-xs text-muted-foreground">
+                              ${product.pricePerOunce}/oz
+                            </div>
+                          )}
+                          {(product as any).pricePerEighth && (
+                            <div className="text-xs text-muted-foreground">
+                              ${(product as any).pricePerEighth}/⅛ oz
+                            </div>
+                          )}
+                          {(product as any).pricePerQuarter && (
+                            <div className="text-xs text-muted-foreground">
+                              ${(product as any).pricePerQuarter}/¼ oz
+                            </div>
+                          )}
+                          {(product as any).pricePerHalf && (
+                            <div className="text-xs text-muted-foreground">
+                              ${(product as any).pricePerHalf}/½ oz
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="font-medium text-gray-900 dark:text-white">

@@ -729,7 +729,7 @@ export class DatabaseStorage implements IStorage {
         delete insertData.imageUrls;
       }
       
-      // Extract fractional pricing fields and use direct SQL to ensure they're saved
+      // Keep fractional pricing fields in insertData - Drizzle handles them correctly
       fractionalFieldsToInsert = {};
       if (insertData.hasOwnProperty('pricePerEighth')) {
         fractionalFieldsToInsert.pricePerEighth = insertData.pricePerEighth;
@@ -740,11 +740,6 @@ export class DatabaseStorage implements IStorage {
       if (insertData.hasOwnProperty('pricePerHalf')) {
         fractionalFieldsToInsert.pricePerHalf = insertData.pricePerHalf;
       }
-      
-      // Remove fractional fields from insertData to avoid Drizzle issues
-      delete insertData.pricePerEighth;
-      delete insertData.pricePerQuarter;
-      delete insertData.pricePerHalf;
       
       // Clean up insertData - remove undefined values but keep null for numeric fields
       // Important: For numeric fields, explicitly set null (not empty string) so PostgreSQL gets NULL
@@ -955,22 +950,26 @@ export class DatabaseStorage implements IStorage {
     const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
     for (const field of numericFields) {
       if (field in updateData) {
-        const val = toNumericStr(updateData[field]);
-        if (val !== undefined) {
-          if (field === 'discountPercentage') {
-            const numVal = parseFloat(val);
-            updateData[field] = (isNaN(numVal) || numVal < 0) ? "0" : val;
-          } else {
-            updateData[field] = val;
+        // For fractional pricing fields, preserve the value as-is (string or null) to ensure they're always updated
+        if (['pricePerEighth', 'pricePerQuarter', 'pricePerHalf'].includes(field)) {
+          // Keep the value as-is - it's already formatted as a string or null from the frontend
+          // Don't convert it, just ensure it's in the updateData
+          if (updateData[field] === '' || updateData[field] === undefined) {
+            updateData[field] = null;
           }
+          // Value is already a formatted string like "3.00" or null, keep it
         } else {
-          if (field === 'discountPercentage') {
-            updateData[field] = "0";
+          const val = toNumericStr(updateData[field]);
+          if (val !== undefined) {
+            if (field === 'discountPercentage') {
+              const numVal = parseFloat(val);
+              updateData[field] = (isNaN(numVal) || numVal < 0) ? "0" : val;
+            } else {
+              updateData[field] = val;
+            }
           } else {
-            // For fractional pricing fields, always set to null if empty (don't delete)
-            // This ensures they're included in the update even if clearing the value
-            if (['pricePerEighth', 'pricePerQuarter', 'pricePerHalf'].includes(field)) {
-              updateData[field] = null;
+            if (field === 'discountPercentage') {
+              updateData[field] = "0";
             } else if (updateData[field] === '' || updateData[field] === null) {
               updateData[field] = null;
             } else {
@@ -995,8 +994,7 @@ export class DatabaseStorage implements IStorage {
       pricePerHalf: updateData.pricePerHalf,
     });
 
-    // Always use direct SQL for fractional pricing fields to ensure they're saved
-    // Drizzle might be filtering them out or not recognizing them properly
+    // Track fractional pricing fields for backup direct SQL update
     const fractionalFieldsToUpdate: any = {};
     if (updateData.hasOwnProperty('pricePerEighth')) {
       fractionalFieldsToUpdate.pricePerEighth = updateData.pricePerEighth;
@@ -1007,11 +1005,6 @@ export class DatabaseStorage implements IStorage {
     if (updateData.hasOwnProperty('pricePerHalf')) {
       fractionalFieldsToUpdate.pricePerHalf = updateData.pricePerHalf;
     }
-    
-    // Remove fractional fields from updateData to avoid Drizzle issues
-    delete updateData.pricePerEighth;
-    delete updateData.pricePerQuarter;
-    delete updateData.pricePerHalf;
 
     // First, ensure fractional pricing columns exist
     try {
@@ -1050,20 +1043,34 @@ export class DatabaseStorage implements IStorage {
         try {
           const { sql } = await import("./db");
           
-          // Update each field individually
-          if (fractionalFieldsToUpdate.pricePerEighth !== undefined) {
-            await sql`UPDATE products SET price_per_eighth = ${fractionalFieldsToUpdate.pricePerEighth} WHERE id = ${id}`;
+          // Update each field individually - update even if null to allow clearing values
+          // Convert string values to numbers for SQL, or use null
+          if (fractionalFieldsToUpdate.hasOwnProperty('pricePerEighth')) {
+            const value = fractionalFieldsToUpdate.pricePerEighth === null || fractionalFieldsToUpdate.pricePerEighth === '' 
+              ? null 
+              : parseFloat(String(fractionalFieldsToUpdate.pricePerEighth));
+            await sql`UPDATE products SET price_per_eighth = ${value} WHERE id = ${id}`;
+            console.log('[updateProduct] Updated price_per_eighth to:', value);
           }
-          if (fractionalFieldsToUpdate.pricePerQuarter !== undefined) {
-            await sql`UPDATE products SET price_per_quarter = ${fractionalFieldsToUpdate.pricePerQuarter} WHERE id = ${id}`;
+          if (fractionalFieldsToUpdate.hasOwnProperty('pricePerQuarter')) {
+            const value = fractionalFieldsToUpdate.pricePerQuarter === null || fractionalFieldsToUpdate.pricePerQuarter === '' 
+              ? null 
+              : parseFloat(String(fractionalFieldsToUpdate.pricePerQuarter));
+            await sql`UPDATE products SET price_per_quarter = ${value} WHERE id = ${id}`;
+            console.log('[updateProduct] Updated price_per_quarter to:', value);
           }
-          if (fractionalFieldsToUpdate.pricePerHalf !== undefined) {
-            await sql`UPDATE products SET price_per_half = ${fractionalFieldsToUpdate.pricePerHalf} WHERE id = ${id}`;
+          if (fractionalFieldsToUpdate.hasOwnProperty('pricePerHalf')) {
+            const value = fractionalFieldsToUpdate.pricePerHalf === null || fractionalFieldsToUpdate.pricePerHalf === '' 
+              ? null 
+              : parseFloat(String(fractionalFieldsToUpdate.pricePerHalf));
+            await sql`UPDATE products SET price_per_half = ${value} WHERE id = ${id}`;
+            console.log('[updateProduct] Updated price_per_half to:', value);
           }
           
           console.log('[updateProduct] Successfully updated fractional pricing via direct SQL');
         } catch (fractionalError: any) {
           console.error('[updateProduct] Failed to update fractional pricing fields:', fractionalError?.message);
+          console.error('[updateProduct] Fractional error details:', fractionalError);
           // If Drizzle update also failed, throw the original error
           if (updateError) {
             throw updateError;
