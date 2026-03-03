@@ -1045,75 +1045,44 @@ export class DatabaseStorage implements IStorage {
     if (updateError) {
       try {
         const { sql: rawSql } = await import("./db");
-        const setClauses: string[] = [];
-        const values: any[] = [];
-        let paramIndex = 1;
 
-        const toNum = (v: any): number | null => {
+        const toSafeNum = (v: any): number | null => {
           if (v === null || v === undefined || v === '') return null;
           const n = typeof v === 'string' ? parseFloat(v) : v;
           return isNaN(n) ? null : n;
         };
-        const toNumStr = (v: any): string | null => {
-          const n = toNum(v);
-          return n === null ? null : String(n);
-        };
 
-        const fieldMap: Record<string, { column: string; transform?: (v: any) => any }> = {
-          name: { column: 'name' },
-          company: { column: 'company' },
-          description: { column: 'description' },
-          price: { column: 'price', transform: toNumStr },
-          sku: { column: 'sku' },
-          categoryId: { column: 'category_id', transform: (v: any) => v === null || v === '' ? null : Number(v) },
-          imageUrl: { column: 'image_url' },
-          imageUrls: { column: 'image_urls' },
-          stock: { column: 'stock', transform: (v: any) => Number(v) || 0 },
-          physicalInventory: { column: 'physical_inventory', transform: (v: any) => Number(v) || 0 },
-          minStockThreshold: { column: 'min_stock_threshold', transform: (v: any) => Number(v) || 0 },
-          sellingMethod: { column: 'selling_method' },
-          weightUnit: { column: 'weight_unit' },
-          pricePerGram: { column: 'price_per_gram', transform: toNum },
-          pricePerOunce: { column: 'price_per_ounce', transform: toNum },
-          pricePerEighth: { column: 'price_per_eighth', transform: toNum },
-          pricePerQuarter: { column: 'price_per_quarter', transform: toNum },
-          pricePerHalf: { column: 'price_per_half', transform: toNum },
-          discountPercentage: { column: 'discount_percentage', transform: toNumStr },
-          purchasePrice: { column: 'purchase_price', transform: toNumStr },
-          purchasePriceMethod: { column: 'purchase_price_method' },
-          purchasePricePerGram: { column: 'purchase_price_per_gram', transform: toNumStr },
-          purchasePricePerOunce: { column: 'purchase_price_per_ounce', transform: toNumStr },
-          adminNotes: { column: 'admin_notes' },
-          isActive: { column: 'is_active' },
-        };
+        const d = updateData;
+        await rawSql`UPDATE products SET
+          name = ${d.name},
+          company = ${d.company ?? null},
+          description = ${d.description ?? null},
+          price = ${toSafeNum(d.price)},
+          sku = ${d.sku},
+          category_id = ${toSafeNum(d.categoryId)},
+          image_url = ${d.imageUrl ?? null},
+          image_urls = ${d.imageUrls ?? null},
+          stock = ${toSafeNum(d.stock) ?? 0},
+          physical_inventory = ${toSafeNum(d.physicalInventory) ?? 0},
+          min_stock_threshold = ${toSafeNum(d.minStockThreshold) ?? 0},
+          selling_method = ${d.sellingMethod},
+          weight_unit = ${d.weightUnit ?? null},
+          price_per_gram = ${toSafeNum(d.pricePerGram)},
+          price_per_ounce = ${toSafeNum(d.pricePerOunce)},
+          price_per_eighth = ${toSafeNum(d.pricePerEighth)},
+          price_per_quarter = ${toSafeNum(d.pricePerQuarter)},
+          price_per_half = ${toSafeNum(d.pricePerHalf)},
+          discount_percentage = ${toSafeNum(d.discountPercentage)},
+          purchase_price = ${toSafeNum(d.purchasePrice)},
+          purchase_price_method = ${d.purchasePriceMethod ?? null},
+          purchase_price_per_gram = ${toSafeNum(d.purchasePricePerGram)},
+          purchase_price_per_ounce = ${toSafeNum(d.purchasePricePerOunce)},
+          admin_notes = ${d.adminNotes ?? null},
+          is_active = ${d.isActive ?? true},
+          updated_at = NOW()
+        WHERE id = ${id}`;
 
-        const numericColumns = new Set([
-          'price', 'price_per_gram', 'price_per_ounce', 'price_per_eighth',
-          'price_per_quarter', 'price_per_half', 'discount_percentage',
-          'purchase_price', 'purchase_price_per_gram', 'purchase_price_per_ounce',
-          'stock', 'physical_inventory', 'min_stock_threshold', 'category_id',
-        ]);
-
-        for (const [key, value] of Object.entries(updateData)) {
-          const mapping = fieldMap[key];
-          if (!mapping) continue;
-          let finalValue = mapping.transform ? mapping.transform(value) : value;
-          if (numericColumns.has(mapping.column) && (finalValue === '' || finalValue === undefined)) {
-            finalValue = null;
-          }
-          setClauses.push(`${mapping.column} = $${paramIndex}`);
-          values.push(finalValue);
-          paramIndex++;
-        }
-
-        if (setClauses.length > 0) {
-          setClauses.push('updated_at = NOW()');
-          values.push(id);
-          const query = `UPDATE products SET ${setClauses.join(', ')} WHERE id = $${paramIndex}`;
-          console.log('[updateProduct] Direct SQL fallback values:', JSON.stringify(values));
-          await rawSql(query, values);
-          console.log('[updateProduct] Successfully updated all fields via direct SQL fallback');
-        }
+        console.log('[updateProduct] Successfully updated all fields via direct SQL fallback');
         updateError = null;
       } catch (fallbackError: any) {
         console.error('[updateProduct] Direct SQL fallback also failed:', fallbackError?.message);
