@@ -555,7 +555,7 @@ export class DatabaseStorage implements IStorage {
     let product: any;
     try {
       const rawResult = await retryQuery(() =>
-        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, discount_percentage, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
+        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
       );
       
       const row = rawResult?.rows?.[0];
@@ -577,6 +577,9 @@ export class DatabaseStorage implements IStorage {
           weightUnit: row.weight_unit,
           pricePerGram: row.price_per_gram,
           pricePerOunce: row.price_per_ounce,
+          pricePerEighth: row.price_per_eighth,
+          pricePerQuarter: row.price_per_quarter,
+          pricePerHalf: row.price_per_half,
           discountPercentage: row.discount_percentage,
           purchasePrice: row.purchase_price,
           purchasePriceMethod: row.purchase_price_method,
@@ -663,15 +666,33 @@ export class DatabaseStorage implements IStorage {
     console.log('[createProduct] productDataWithoutSizes:', JSON.stringify(productDataWithoutSizes, null, 2));
     console.log('[createProduct] processedProduct before insert:', JSON.stringify(processedProduct, null, 2));
 
-    const numericFields = ['pricePerGram', 'pricePerOunce', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'] as const;
+    const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'] as const;
     for (const field of numericFields) {
       const val = toNumericStr(productData[field]);
       if (val !== undefined) {
         processedProduct[field] = val;
       } else {
-        delete processedProduct[field];
+        // Don't delete the field if it's explicitly set to null or empty - let it be null
+        // Only delete if it was never provided
+        if (field in productData) {
+          processedProduct[field] = null;
+        } else {
+          delete processedProduct[field];
+        }
       }
     }
+    
+    // Log the fractional ounce pricing fields specifically for debugging
+    console.log('[createProduct] Fractional ounce pricing fields:', {
+      pricePerEighth: processedProduct.pricePerEighth,
+      pricePerQuarter: processedProduct.pricePerQuarter,
+      pricePerHalf: processedProduct.pricePerHalf,
+      rawData: {
+        pricePerEighth: productData.pricePerEighth,
+        pricePerQuarter: productData.pricePerQuarter,
+        pricePerHalf: productData.pricePerHalf,
+      }
+    });
 
     const stringFields = ['company', 'adminNotes', 'imageUrls'] as const;
     for (const field of stringFields) {
@@ -685,18 +706,122 @@ export class DatabaseStorage implements IStorage {
       console.log('[createProduct] Attempting to insert product with imageUrls:', processedProduct.imageUrls ? `present (${typeof processedProduct.imageUrls})` : 'missing');
       console.log('[createProduct] imageUrls value:', processedProduct.imageUrls);
       
+      // First, ensure fractional pricing columns exist
+      try {
+        const { sql } = await import("./db");
+        await sql`
+          ALTER TABLE products 
+          ADD COLUMN IF NOT EXISTS price_per_eighth DECIMAL(10, 2),
+          ADD COLUMN IF NOT EXISTS price_per_quarter DECIMAL(10, 2),
+          ADD COLUMN IF NOT EXISTS price_per_half DECIMAL(10, 2);
+        `;
+      } catch (colError: any) {
+        // Columns might already exist, that's fine
+        if (!colError?.message?.includes('already exists') && !colError?.message?.includes('duplicate')) {
+          console.warn('[createProduct] Could not ensure fractional pricing columns exist:', colError?.message);
+        }
+      }
+
       // Ensure imageUrls is explicitly included if it exists
       const insertData = { ...processedProduct };
       if (insertData.imageUrls === null || insertData.imageUrls === undefined) {
         delete insertData.imageUrls;
       }
       
-      const result = await db
-        .insert(products)
-        .values([insertData])
-        .returning();
-      newProduct = result?.[0];
+      // Extract fractional pricing fields and use direct SQL to ensure they're saved
+      const fractionalFieldsToInsert: any = {};
+      if (insertData.hasOwnProperty('pricePerEighth')) {
+        fractionalFieldsToInsert.pricePerEighth = insertData.pricePerEighth;
+      }
+      if (insertData.hasOwnProperty('pricePerQuarter')) {
+        fractionalFieldsToInsert.pricePerQuarter = insertData.pricePerQuarter;
+      }
+      if (insertData.hasOwnProperty('pricePerHalf')) {
+        fractionalFieldsToInsert.pricePerHalf = insertData.pricePerHalf;
+      }
+      
+      // Remove fractional fields from insertData to avoid Drizzle issues
+      delete insertData.pricePerEighth;
+      delete insertData.pricePerQuarter;
+      delete insertData.pricePerHalf;
+      
+      // Clean up insertData - remove undefined values and ensure only valid data
+      const cleanedInsertData: Record<string, any> = {};
+      for (const [key, value] of Object.entries(insertData)) {
+        // Skip undefined values
+        if (value === undefined) {
+          continue;
+        }
+        // For optional fields, keep null if explicitly set, otherwise skip
+        const optionalFields = ['company', 'description', 'imageUrl', 'imageUrls', 'adminNotes', 'price', 'pricePerGram', 'pricePerOunce', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
+        if (value === null && !optionalFields.includes(key)) {
+          continue;
+        }
+        cleanedInsertData[key] = value;
+      }
+      
+      // Log what we're about to insert for fractional ounce pricing
+      console.log('[createProduct] Inserting with fractional pricing:', fractionalFieldsToInsert);
+      console.log('[createProduct] Insert data keys:', Object.keys(cleanedInsertData).join(', '));
+      console.log('[createProduct] Insert data sample:', JSON.stringify(Object.fromEntries(Object.entries(cleanedInsertData).slice(0, 10)), null, 2));
+      
+      try {
+        const result = await db
+          .insert(products)
+          .values([cleanedInsertData])
+          .returning();
+        newProduct = result?.[0];
+        console.log('[createProduct] Insert successful, product ID:', newProduct?.id);
+      } catch (insertErr: any) {
+        console.error('[createProduct] Drizzle insert failed:', insertErr?.message);
+        console.error('[createProduct] Insert error details:', {
+          message: insertErr?.message,
+          cause: insertErr?.cause?.message,
+          code: insertErr?.code,
+          severity: insertErr?.cause?.severity,
+          sql: insertErr?.cause?.sql,
+        });
+        console.error('[createProduct] Attempted insert data:', JSON.stringify(cleanedInsertData, null, 2));
+        throw insertErr; // Re-throw to be caught by outer catch
+      }
+      
       console.log('[createProduct] Product created successfully, imageUrls:', newProduct?.imageUrls ? `present (${newProduct.imageUrls.substring(0, 50)}...)` : 'missing');
+      
+      // Now update fractional pricing fields via direct SQL
+      if (Object.keys(fractionalFieldsToInsert).length > 0 && newProduct) {
+        try {
+          const { sql } = await import("./db");
+          const updateParts: any[] = [];
+          if (fractionalFieldsToInsert.pricePerEighth !== undefined && fractionalFieldsToInsert.pricePerEighth !== null) {
+            updateParts.push(sql`price_per_eighth = ${fractionalFieldsToInsert.pricePerEighth}`);
+          }
+          if (fractionalFieldsToInsert.pricePerQuarter !== undefined && fractionalFieldsToInsert.pricePerQuarter !== null) {
+            updateParts.push(sql`price_per_quarter = ${fractionalFieldsToInsert.pricePerQuarter}`);
+          }
+          if (fractionalFieldsToInsert.pricePerHalf !== undefined && fractionalFieldsToInsert.pricePerHalf !== null) {
+            updateParts.push(sql`price_per_half = ${fractionalFieldsToInsert.pricePerHalf}`);
+          }
+          
+          if (updateParts.length > 0) {
+            await sql`UPDATE products SET ${sql.join(updateParts, sql`, `)} WHERE id = ${newProduct.id}`;
+            console.log('[createProduct] Successfully updated fractional pricing via direct SQL');
+            // Fetch again to get updated product
+            const updated = await db.select().from(products).where(eq(products.id, newProduct.id));
+            if (updated[0]) {
+              newProduct = updated[0];
+            }
+          }
+        } catch (fractionalError: any) {
+          // Log but don't fail - product was created successfully
+          console.warn('[createProduct] Failed to update fractional pricing fields (product was created):', fractionalError?.message);
+        }
+      }
+      
+      console.log('[createProduct] Product created with fractional pricing:', {
+        pricePerEighth: (newProduct as any)?.pricePerEighth,
+        pricePerQuarter: (newProduct as any)?.pricePerQuarter,
+        pricePerHalf: (newProduct as any)?.pricePerHalf,
+      });
       
       // If imageUrls wasn't saved, try to update it directly
       if (processedProduct.imageUrls && !newProduct?.imageUrls) {
@@ -710,15 +835,62 @@ export class DatabaseStorage implements IStorage {
           console.log('[createProduct] Successfully updated imageUrls via direct SQL');
         }
       }
+      
     } catch (insertError: any) {
+      console.error('[createProduct] Insert error:', insertError?.message || String(insertError));
+      console.error('[createProduct] Insert error cause:', insertError?.cause?.message || insertError?.cause);
+      
       if (insertError?.cause?.severity === 'ERROR') {
         // Check if it's a column doesn't exist error
-        if (insertError?.message?.includes('image_urls') || insertError?.cause?.message?.includes('image_urls')) {
-          console.error('[createProduct] ERROR: image_urls column does not exist in database! Please run migration.');
+        const errorMsg = insertError?.message || insertError?.cause?.message || String(insertError);
+        if (errorMsg.includes('image_urls') || (errorMsg.includes('column') && errorMsg.includes('does not exist'))) {
+          console.error('[createProduct] ERROR: Required column does not exist in database! Please run migration.');
         }
-        throw insertError;
+        // Check if it's related to fractional pricing columns
+        if (errorMsg.includes('price_per_eighth') || errorMsg.includes('price_per_quarter') || errorMsg.includes('price_per_half')) {
+          console.error('[createProduct] ERROR: Fractional pricing columns do not exist! Attempting to create...');
+          try {
+            const { sql } = await import("./db");
+            await sql`
+              ALTER TABLE products 
+              ADD COLUMN IF NOT EXISTS price_per_eighth DECIMAL(10, 2),
+              ADD COLUMN IF NOT EXISTS price_per_quarter DECIMAL(10, 2),
+              ADD COLUMN IF NOT EXISTS price_per_half DECIMAL(10, 2);
+            `;
+            console.log('[createProduct] Created fractional pricing columns, retrying insert...');
+            // Retry the insert
+            const retryResult = await db
+              .insert(products)
+              .values([insertData])
+              .returning();
+            newProduct = retryResult?.[0];
+            // Continue with fractional field update if product was created
+            if (newProduct && Object.keys(fractionalFieldsToInsert).length > 0) {
+              const { sql: updateSql } = await import("./db");
+              const updateParts: any[] = [];
+              if (fractionalFieldsToInsert.pricePerEighth !== undefined && fractionalFieldsToInsert.pricePerEighth !== null) {
+                updateParts.push(updateSql`price_per_eighth = ${fractionalFieldsToInsert.pricePerEighth}`);
+              }
+              if (fractionalFieldsToInsert.pricePerQuarter !== undefined && fractionalFieldsToInsert.pricePerQuarter !== null) {
+                updateParts.push(updateSql`price_per_quarter = ${fractionalFieldsToInsert.pricePerQuarter}`);
+              }
+              if (fractionalFieldsToInsert.pricePerHalf !== undefined && fractionalFieldsToInsert.pricePerHalf !== null) {
+                updateParts.push(updateSql`price_per_half = ${fractionalFieldsToInsert.pricePerHalf}`);
+              }
+              if (updateParts.length > 0) {
+                await updateSql`UPDATE products SET ${updateSql.join(updateParts, updateSql`, `)} WHERE id = ${newProduct.id}`;
+              }
+            }
+          } catch (retryError: any) {
+            console.error('[createProduct] Retry after creating columns also failed:', retryError?.message);
+            throw insertError; // Throw original error
+          }
+        } else {
+          throw insertError;
+        }
+      } else {
+        console.warn('Insert returning() parse issue, fetching by SKU:', insertError);
       }
-      console.warn('Insert returning() parse issue, fetching by SKU:', insertError);
     }
 
     if (!newProduct) {
@@ -769,7 +941,7 @@ export class DatabaseStorage implements IStorage {
       updateData.physicalInventory = dataWithoutSizes.stock;
     }
 
-    const numericFields = ['pricePerGram', 'pricePerOunce', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
+    const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
     for (const field of numericFields) {
       if (field in updateData) {
         const val = toNumericStr(updateData[field]);
@@ -784,29 +956,137 @@ export class DatabaseStorage implements IStorage {
           if (field === 'discountPercentage') {
             updateData[field] = "0";
           } else {
-            delete updateData[field];
+            // For fractional pricing fields, always set to null if empty (don't delete)
+            // This ensures they're included in the update even if clearing the value
+            if (['pricePerEighth', 'pricePerQuarter', 'pricePerHalf'].includes(field)) {
+              updateData[field] = null;
+            } else if (updateData[field] === '' || updateData[field] === null) {
+              updateData[field] = null;
+            } else {
+              delete updateData[field];
+            }
           }
         }
       }
     }
+    
+    // Log the fractional ounce pricing fields specifically for debugging
+    console.log('[updateProduct] Fractional ounce pricing fields:', {
+      pricePerEighth: updateData.pricePerEighth,
+      pricePerQuarter: updateData.pricePerQuarter,
+      pricePerHalf: updateData.pricePerHalf,
+    });
 
     console.log('[updateProduct] Updating product', id, 'with fields:', Object.keys(updateData).join(', '));
+    console.log('[updateProduct] Fractional pricing values:', {
+      pricePerEighth: updateData.pricePerEighth,
+      pricePerQuarter: updateData.pricePerQuarter,
+      pricePerHalf: updateData.pricePerHalf,
+    });
 
-    await retryQuery(() =>
-      db.update(products)
-        .set({
-          ...updateData,
-          updatedAt: new Date()
-        })
-        .where(eq(products.id, id))
-    );
+    // Always use direct SQL for fractional pricing fields to ensure they're saved
+    // Drizzle might be filtering them out or not recognizing them properly
+    const fractionalFieldsToUpdate: any = {};
+    if (updateData.hasOwnProperty('pricePerEighth')) {
+      fractionalFieldsToUpdate.pricePerEighth = updateData.pricePerEighth;
+    }
+    if (updateData.hasOwnProperty('pricePerQuarter')) {
+      fractionalFieldsToUpdate.pricePerQuarter = updateData.pricePerQuarter;
+    }
+    if (updateData.hasOwnProperty('pricePerHalf')) {
+      fractionalFieldsToUpdate.pricePerHalf = updateData.pricePerHalf;
+    }
+    
+    // Remove fractional fields from updateData to avoid Drizzle issues
+    delete updateData.pricePerEighth;
+    delete updateData.pricePerQuarter;
+    delete updateData.pricePerHalf;
 
+    // First, ensure fractional pricing columns exist
+    try {
+      const { sql } = await import("./db");
+      await sql`
+        ALTER TABLE products 
+        ADD COLUMN IF NOT EXISTS price_per_eighth DECIMAL(10, 2),
+        ADD COLUMN IF NOT EXISTS price_per_quarter DECIMAL(10, 2),
+        ADD COLUMN IF NOT EXISTS price_per_half DECIMAL(10, 2);
+      `;
+    } catch (colError: any) {
+      // Columns might already exist, that's fine
+      if (!colError?.message?.includes('already exists') && !colError?.message?.includes('duplicate')) {
+        console.warn('[updateProduct] Could not ensure fractional pricing columns exist:', colError?.message);
+      }
+    }
+
+    let updateError: any = null;
+    try {
+      await retryQuery(() =>
+        db.update(products)
+          .set({
+            ...updateData,
+            updatedAt: new Date()
+          })
+          .where(eq(products.id, id))
+      );
+    } catch (err: any) {
+      updateError = err;
+      // Log the error but continue to update fractional fields via direct SQL
+      console.error('[updateProduct] Drizzle update failed:', err?.message);
+    }
+    
+    // Always update fractional pricing fields via direct SQL (regardless of Drizzle success/failure)
+    if (Object.keys(fractionalFieldsToUpdate).length > 0) {
+      try {
+        const { sql } = await import("./db");
+        const updateParts: any[] = [];
+        if (fractionalFieldsToUpdate.pricePerEighth !== undefined) {
+          updateParts.push(sql`price_per_eighth = ${fractionalFieldsToUpdate.pricePerEighth}`);
+        }
+        if (fractionalFieldsToUpdate.pricePerQuarter !== undefined) {
+          updateParts.push(sql`price_per_quarter = ${fractionalFieldsToUpdate.pricePerQuarter}`);
+        }
+        if (fractionalFieldsToUpdate.pricePerHalf !== undefined) {
+          updateParts.push(sql`price_per_half = ${fractionalFieldsToUpdate.pricePerHalf}`);
+        }
+        
+        if (updateParts.length > 0) {
+          await sql`UPDATE products SET ${sql.join(updateParts, sql`, `)} WHERE id = ${id}`;
+          console.log('[updateProduct] Successfully updated fractional pricing via direct SQL');
+        }
+      } catch (fractionalError: any) {
+        console.error('[updateProduct] Failed to update fractional pricing fields:', fractionalError?.message);
+        // If Drizzle update also failed, throw the original error
+        if (updateError) {
+          throw updateError;
+        }
+        throw fractionalError;
+      }
+    }
+    
+    // If Drizzle update failed and we didn't update fractional fields, throw the error
+    if (updateError && Object.keys(fractionalFieldsToUpdate).length === 0) {
+      throw updateError;
+    }
+    
+    // If Drizzle update failed but we successfully updated fractional fields, log a warning but continue
+    if (updateError && Object.keys(fractionalFieldsToUpdate).length > 0) {
+      console.warn('[updateProduct] Drizzle update failed but fractional fields were updated. Error:', updateError?.message);
+      // Continue - we'll fetch the product and return it
+    }
+
+    // Fetch the updated product
     const [product] = await retryQuery(() =>
       db.select().from(products).where(eq(products.id, id))
     );
 
     if (!product) {
       throw new Error("Product not found");
+    }
+
+    // If Drizzle update failed but we updated fractional fields, we should still return success
+    // Only throw if we couldn't update anything
+    if (updateError && Object.keys(fractionalFieldsToUpdate).length === 0) {
+      throw updateError;
     }
 
     console.log('[updateProduct] Product updated successfully, id:', product.id);

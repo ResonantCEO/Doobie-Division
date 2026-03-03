@@ -228,6 +228,97 @@ export default function StorefrontPage() {
     setShowDealsOnly(false);
   };
 
+  // Filter products by stock and deals only (search and category filtering is handled by backend)
+  // IMPORTANT: All hooks must be called before any conditional returns
+  const products = useMemo(() => {
+    return allProducts.filter((product: Product & { category: Category | null }) => {
+      const hasStock = product.stock > 0;
+      const matchesDeals = !showDealsOnly || (product.discountPercentage && parseFloat(String(product.discountPercentage)) > 0);
+      return hasStock && matchesDeals;
+    });
+  }, [allProducts, showDealsOnly]);
+
+  // Build a set of category IDs that have products (directly or in descendants)
+  // This is used to hide empty categories
+  const categoriesWithProducts = useMemo(() => {
+    const hasProducts = new Set<number>();
+    const categoryById = new Map<number, Category>();
+    categories.forEach(cat => categoryById.set(cat.id, cat));
+
+    // Helper to get all descendant category IDs (recursive)
+    const getAllDescendants = (parentId: number, visited = new Set<number>()): number[] => {
+      if (visited.has(parentId)) return []; // Cycle protection
+      visited.add(parentId);
+      
+      const directChildren = categories
+        .filter(cat => cat.parentId === parentId)
+        .map(cat => cat.id);
+      
+      let allDescendants = [...directChildren];
+      for (const childId of directChildren) {
+        allDescendants = allDescendants.concat(getAllDescendants(childId, visited));
+      }
+      return allDescendants;
+    };
+
+    // Step 1: Mark categories that have direct products
+    products.forEach((product: Product & { category: Category | null }) => {
+      if (product.category) {
+        hasProducts.add(product.category.id);
+      }
+    });
+
+    // Step 2: For each category with products, mark all its ancestors (walk up the tree)
+    products.forEach((product: Product & { category: Category | null }) => {
+      if (!product.category) return;
+      
+      let currentId: number | null = product.category.id;
+      const visited = new Set<number>();
+      while (currentId) {
+        if (visited.has(currentId)) break; // Cycle protection
+        visited.add(currentId);
+        
+        const category = categoryById.get(currentId);
+        if (category?.parentId) {
+          hasProducts.add(category.parentId);
+          currentId = category.parentId;
+        } else {
+          break;
+        }
+      }
+    });
+
+    // Step 3: For each category, check if any of its descendants (recursively) have products
+    // This ensures categories like "Clothing" show up if "Mens" (a subcategory) has products
+    categories.forEach(cat => {
+      const descendants = getAllDescendants(cat.id);
+      const hasProductsInSubtree = descendants.some(descId => hasProducts.has(descId));
+      if (hasProductsInSubtree) {
+        hasProducts.add(cat.id);
+      }
+    });
+
+    // Step 4: Propagate up the tree again to ensure all ancestors of newly marked categories are also marked
+    // This handles cases where Step 3 marked a category, and we need to mark its ancestors too
+    let changed = true;
+    while (changed) {
+      changed = false;
+      categories.forEach(cat => {
+        if (hasProducts.has(cat.id) && cat.parentId && !hasProducts.has(cat.parentId)) {
+          hasProducts.add(cat.parentId);
+          changed = true;
+        }
+      });
+    }
+
+    return hasProducts;
+  }, [products, categories]);
+
+  // Helper function to check if a category has products (including descendants)
+  const categoryHasProducts = useCallback((categoryId: number): boolean => {
+    return categoriesWithProducts.has(categoryId);
+  }, [categoriesWithProducts]);
+
   if (productsLoading || categoriesLoading) {
     return (
       <div className="space-y-8 relative min-h-screen">
@@ -281,18 +372,6 @@ export default function StorefrontPage() {
       </div>
     );
   }
-
-  // Filter products by stock and deals only (search and category filtering is handled by backend)
-  const products = allProducts.filter(product => {
-    const hasStock = product.stock > 0;
-    const matchesDeals = !showDealsOnly || (product.discountPercentage && parseFloat(product.discountPercentage) > 0);
-
-    return hasStock && matchesDeals;
-  });
-
-
-
-
 
   return (
     <div className="space-y-8 relative min-h-screen">
@@ -411,7 +490,9 @@ export default function StorefrontPage() {
             {currentParentCategory ? (
               // Show subcategories when a parent category is selected
               (() => {
-                const subcategoriesForParent = categories.filter(cat => cat.parentId === currentParentCategory);
+                const subcategoriesForParent = categories
+                  .filter(cat => cat.parentId === currentParentCategory)
+                  .filter(cat => categoryHasProducts(cat.id)); // Only show categories with products
                 const parentCategory = categories.find(cat => cat.id === currentParentCategory);
                 return (
                   <>
@@ -457,6 +538,7 @@ export default function StorefrontPage() {
               <>
                 {categories
                   .filter(category => !category.parentId) // Only show root categories
+                  .filter(category => categoryHasProducts(category.id)) // Only show categories with products
                   .sort((a, b) => a.sortOrder - b.sortOrder) // Sort by sortOrder
                   .map((category) => (
                     <Button
@@ -489,43 +571,86 @@ export default function StorefrontPage() {
           {(() => {
             // If we're viewing a parent category with subcategories, group by subcategories
             if (currentParentCategory && !selectedCategory) {
-              const subcategoriesForParent = categories.filter(cat => cat.parentId === currentParentCategory);
+              const subcategoriesForParent = categories
+                .filter(cat => cat.parentId === currentParentCategory)
+                .filter(cat => categoryHasProducts(cat.id)); // Only show subcategories with products
 
-              if (subcategoriesForParent.length > 0) {
-                // Group products by their direct subcategory
-                const productsBySubcategory = new Map<number, (Product & { category: Category | null })[]>();
-
-                // First, group all products by their category ID
-                products.forEach(product => {
-                  if (product.category) {
-                    if (!productsBySubcategory.has(product.category.id)) {
-                      productsBySubcategory.set(product.category.id, []);
-                    }
-                    productsBySubcategory.get(product.category.id)!.push(product);
+              // Group products by their direct category ID
+              const productsBySubcategory = new Map<number, (Product & { category: Category | null })[]>();
+              products.forEach(product => {
+                if (product.category) {
+                  if (!productsBySubcategory.has(product.category.id)) {
+                    productsBySubcategory.set(product.category.id, []);
                   }
+                  productsBySubcategory.get(product.category.id)!.push(product);
+                }
+              });
+
+              // Get products directly assigned to the parent category
+              const parentDirectProducts = productsBySubcategory.get(currentParentCategory) || [];
+              const parentCategory = categories.find(cat => cat.id === currentParentCategory);
+
+              const sections: JSX.Element[] = [];
+
+              // Show parent category products if any exist
+              if (parentDirectProducts.length > 0) {
+                sections.push(
+                  <div key={`${currentParentCategory}-direct`} className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 
+                        className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-primary transition-colors duration-200"
+                        onClick={() => handleCategoryFilter(currentParentCategory)}
+                      >
+                        {parentCategory?.name || "All Products"}
+                      </h3>
+                    </div>
+                    <ScrollableProductRow products={parentDirectProducts} />
+                  </div>
+                );
+              }
+
+              // Helper function to recursively get all descendant category IDs
+              const getAllDescendantIds = (parentId: number, visited = new Set<number>()): number[] => {
+                if (visited.has(parentId)) return []; // Cycle protection
+                visited.add(parentId);
+                
+                const directChildren = categories
+                  .filter(cat => cat.parentId === parentId)
+                  .map(cat => cat.id);
+                
+                let allDescendants = [...directChildren];
+                for (const childId of directChildren) {
+                  allDescendants = allDescendants.concat(getAllDescendantIds(childId, visited));
+                }
+                return allDescendants;
+              };
+
+              // Helper function to get products for a subcategory and ALL its descendants (recursive)
+              const getProductsForSubcategory = (subcategoryId: number): (Product & { category: Category | null })[] => {
+                const directProducts = productsBySubcategory.get(subcategoryId) || [];
+                
+                // Get all descendant category IDs recursively
+                const descendantIds = getAllDescendantIds(subcategoryId);
+                
+                // Get products from all descendant categories
+                const descendantProducts: (Product & { category: Category | null })[] = [];
+                descendantIds.forEach(descId => {
+                  const descProducts = productsBySubcategory.get(descId) || [];
+                  descendantProducts.push(...descProducts);
                 });
+                
+                return [...directProducts, ...descendantProducts];
+              };
 
-                // Always show all subcategories, even if they have no products
-                return subcategoriesForParent.map(subcategory => {
-                  // Get products that belong to this specific subcategory OR any of its children
-                  const getProductsForSubcategory = (subcategoryId: number): (Product & { category: Category | null })[] => {
-                    // Get direct products for this subcategory
-                    const directProducts = productsBySubcategory.get(subcategoryId) || [];
-
-                    // Get all child categories of this subcategory
-                    const childCategories = categories.filter(cat => cat.parentId === subcategoryId);
-
-                    // Get products from all child categories
-                    const childProducts: (Product & { category: Category | null })[] = [];
-                    childCategories.forEach(childCat => {
-                      const childCatProducts = productsBySubcategory.get(childCat.id) || [];
-                      childProducts.push(...childCatProducts);
-                    });
-
-                    return [...directProducts, ...childProducts];
-                  };
-
-                  const subcategoryProducts = getProductsForSubcategory(subcategory.id);
+              // Show subcategories that have products
+              if (subcategoriesForParent.length > 0) {
+                const subcategorySections = subcategoriesForParent
+                  .filter(subcategory => {
+                    const subcategoryProducts = getProductsForSubcategory(subcategory.id);
+                    return subcategoryProducts.length > 0;
+                  })
+                  .map(subcategory => {
+                    const subcategoryProducts = getProductsForSubcategory(subcategory.id);
 
                   return (
                     <div key={subcategory.id} className="space-y-4">
@@ -536,22 +661,17 @@ export default function StorefrontPage() {
                         >
                           {subcategory.name}
                         </h3>
-                        <span className="text-sm text-muted-foreground">
-                          {subcategoryProducts.length} products
-                        </span>
                       </div>
 
-                      {subcategoryProducts.length > 0 ? (
-                        <ScrollableProductRow products={subcategoryProducts} />
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <p>No products available in this category</p>
-                        </div>
-                      )}
+                      <ScrollableProductRow products={subcategoryProducts} />
                     </div>
                   );
                 });
+                sections.push(...subcategorySections);
               }
+
+              // Return all sections (parent direct products + subcategories)
+              return sections.length > 0 ? sections : null;
             }
 
             // Default behavior: Group products by main parent category (root level)

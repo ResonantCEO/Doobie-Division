@@ -85,6 +85,9 @@ export const products = pgTable("products", {
   weightUnit: varchar("weight_unit").default("grams"), // grams, ounces
   pricePerGram: decimal("price_per_gram", { precision: 10, scale: 4 }),
   pricePerOunce: decimal("price_per_ounce", { precision: 10, scale: 2 }),
+  pricePerEighth: decimal("price_per_eighth", { precision: 10, scale: 2 }), // price per 1/8th ounce
+  pricePerQuarter: decimal("price_per_quarter", { precision: 10, scale: 2 }), // price per 1/4 ounce
+  pricePerHalf: decimal("price_per_half", { precision: 10, scale: 2 }), // price per 1/2 ounce
   discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default("0"), // discount percentage (0-100)
   purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }), // admin only - cost price per unit
   purchasePriceMethod: varchar("purchase_price_method").default("units"), // units or weight
@@ -345,6 +348,9 @@ export const insertProductSchema = createInsertSchema(products).omit({
   weightUnit: z.enum(["grams", "ounces"]).optional(),
   pricePerGram: z.string().nullable().optional(),
   pricePerOunce: z.string().nullable().optional(),
+  pricePerEighth: z.string().nullable().optional(),
+  pricePerQuarter: z.string().nullable().optional(),
+  pricePerHalf: z.string().nullable().optional(),
   price: z.string().nullable().optional(),
   company: z.string().nullable().optional(),
   description: z.string().nullable().optional(),

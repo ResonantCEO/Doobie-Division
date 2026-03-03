@@ -202,6 +202,25 @@ app.use((req, res, next) => {
     }
   }
 
+  // Ensure fractional ounce pricing columns exist (migration)
+  try {
+    const { sql } = await import("./db");
+    await sql`
+      ALTER TABLE products 
+      ADD COLUMN IF NOT EXISTS price_per_eighth DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_per_quarter DECIMAL(10, 2),
+      ADD COLUMN IF NOT EXISTS price_per_half DECIMAL(10, 2);
+    `;
+    console.log("✓ Verified fractional ounce pricing columns exist");
+  } catch (error: any) {
+    // Columns might already exist, or there's a permission issue
+    if (error?.message?.includes("already exists") || error?.message?.includes("duplicate")) {
+      console.log("✓ Fractional ounce pricing columns already exist");
+    } else {
+      console.warn("⚠ Could not verify fractional ounce pricing columns:", error?.message);
+    }
+  }
+
   // Add health check endpoint
   app.get("/api/health", async (req, res) => {
     const dbConnected = await checkDatabaseConnection();

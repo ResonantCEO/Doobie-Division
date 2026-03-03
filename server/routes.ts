@@ -500,7 +500,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      res.status(500).json({ message: "Failed to create product", error: error instanceof Error ? error.message : String(error) });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error('[POST /api/products] Full error details:', {
+        message: errorMessage,
+        stack: errorStack,
+        cause: (error as any)?.cause,
+        code: (error as any)?.code,
+      });
+      res.status(500).json({ 
+        message: "Failed to create product", 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? {
+          stack: errorStack,
+          cause: (error as any)?.cause?.message,
+        } : undefined
+      });
     }
   });
 

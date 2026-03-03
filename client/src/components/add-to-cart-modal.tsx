@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
   const [quantity, setQuantity] = useState(1);
   const [weight, setWeight] = useState(1);
   const [sizeQuantities, setSizeQuantities] = useState<Record<string, number>>({});
+  const [weightOptionQuantities, setWeightOptionQuantities] = useState<Record<string, number>>({});
   const { toast } = useToast();
   const { addItem } = useCart();
 
@@ -40,6 +41,20 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
   const hasSizes = product.sizes && product.sizes.length > 0;
   const allSizesOutOfStock = hasSizes && product.sizes!.every(s => s.quantity <= 0);
   const maxStock = product.stock;
+
+  // Weight options for weight-based products
+  const weightOptions = useMemo(() => {
+    if (!isWeightBased) return [];
+    return [
+      { key: "grams", label: "Grams", price: product.pricePerGram },
+      { key: "eighth", label: "1/8 oz", price: (product as any).pricePerEighth },
+      { key: "quarter", label: "1/4 oz", price: (product as any).pricePerQuarter },
+      { key: "half", label: "1/2 oz", price: (product as any).pricePerHalf },
+      { key: "ounce", label: "1 oz", price: product.pricePerOunce },
+    ].filter(opt => opt.price);
+  }, [isWeightBased, product.pricePerGram, product.pricePerOunce, (product as any).pricePerEighth, (product as any).pricePerQuarter, (product as any).pricePerHalf]);
+
+  const hasWeightOptions = isWeightBased && weightOptions.length > 0;
 
   // Initialize size quantities when product changes
   useEffect(() => {
@@ -51,6 +66,17 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
       setSizeQuantities(initial);
     }
   }, [product?.id, hasSizes]);
+
+  // Initialize weight option quantities when product changes
+  useEffect(() => {
+    if (hasWeightOptions) {
+      const initial: Record<string, number> = {};
+      weightOptions.forEach(opt => {
+        initial[opt.key] = 0;
+      });
+      setWeightOptionQuantities(initial);
+    }
+  }, [product?.id, hasWeightOptions, weightOptions]);
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -97,6 +123,31 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
         title: "Added to Cart",
         description: `${totalSizeQuantity} ${totalSizeQuantity === 1 ? 'item' : 'items'} of ${product.name} added to your cart.`,
       });
+    } else if (hasWeightOptions) {
+      // Handle weight options similar to sizes
+      const totalWeightQuantity = Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0);
+      
+      if (totalWeightQuantity <= 0) {
+        toast({
+          title: "Invalid Quantity",
+          description: "Please select at least one weight option to add to cart.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Add items with weight option information
+      weightOptions.forEach(opt => {
+        const qty = weightOptionQuantities[opt.key] || 0;
+        for (let i = 0; i < qty; i++) {
+          addItem(product, opt.label);
+        }
+      });
+
+      toast({
+        title: "Added to Cart",
+        description: `${totalWeightQuantity} ${totalWeightQuantity === 1 ? 'item' : 'items'} of ${product.name} added to your cart.`,
+      });
     } else {
       const finalQuantity = isWeightBased ? weight : quantity;
 
@@ -139,59 +190,68 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
       });
       setSizeQuantities(reset);
     }
+    if (hasWeightOptions) {
+      const reset: Record<string, number> = {};
+      weightOptions.forEach(opt => {
+        reset[opt.key] = 0;
+      });
+      setWeightOptionQuantities(reset);
+    }
     onOpenChange(false);
   };
 
   const getPrice = () => {
-    let totalQuantity = 0;
+    let totalPrice = 0;
     
     if (hasSizes) {
-      totalQuantity = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
+      const totalQuantity = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
+      const basePrice = Number(product.price) || 0;
+      totalPrice = basePrice * totalQuantity;
+    } else if (hasWeightOptions) {
+      // Calculate price based on selected weight options
+      weightOptions.forEach(opt => {
+        const qty = weightOptionQuantities[opt.key] || 0;
+        const price = Number(opt.price) || 0;
+        totalPrice += price * qty;
+      });
     } else if (isWeightBased) {
-      totalQuantity = weight;
-    } else {
-      totalQuantity = quantity;
-    }
-
-    if (isWeightBased) {
       const basePrice = Number(product.pricePerGram) || 0;
-      const totalPrice = basePrice * totalQuantity;
-
-      if (product.discountPercentage && parseFloat(product.discountPercentage) > 0) {
-        const discountedPrice = totalPrice * (1 - parseFloat(product.discountPercentage) / 100);
-        return discountedPrice.toFixed(2);
-      }
-      return totalPrice.toFixed(2);
+      totalPrice = basePrice * weight;
     } else {
       const basePrice = Number(product.price) || 0;
-      const totalPrice = basePrice * totalQuantity;
-
-      if (product.discountPercentage && parseFloat(product.discountPercentage) > 0) {
-        const discountedPrice = totalPrice * (1 - parseFloat(product.discountPercentage) / 100);
-        return discountedPrice.toFixed(2);
-      }
-      return totalPrice.toFixed(2);
+      totalPrice = basePrice * quantity;
     }
+
+    if (product.discountPercentage && parseFloat(product.discountPercentage) > 0) {
+      const discountedPrice = totalPrice * (1 - parseFloat(product.discountPercentage) / 100);
+      return discountedPrice.toFixed(2);
+    }
+    return totalPrice.toFixed(2);
   };
 
   const getOriginalPrice = () => {
-    let totalQuantity = 0;
+    let totalPrice = 0;
     
     if (hasSizes) {
-      totalQuantity = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
+      const totalQuantity = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
+      const basePrice = Number(product.price) || 0;
+      totalPrice = basePrice * totalQuantity;
+    } else if (hasWeightOptions) {
+      // Calculate price based on selected weight options
+      weightOptions.forEach(opt => {
+        const qty = weightOptionQuantities[opt.key] || 0;
+        const price = Number(opt.price) || 0;
+        totalPrice += price * qty;
+      });
     } else if (isWeightBased) {
-      totalQuantity = weight;
-    } else {
-      totalQuantity = quantity;
-    }
-
-    if (isWeightBased) {
       const basePrice = Number(product.pricePerGram) || 0;
-      return (basePrice * totalQuantity).toFixed(2);
+      totalPrice = basePrice * weight;
     } else {
       const basePrice = Number(product.price) || 0;
-      return (basePrice * totalQuantity).toFixed(2);
+      totalPrice = basePrice * quantity;
     }
+
+    return totalPrice.toFixed(2);
   };
 
   const hasDiscount = product.discountPercentage && parseFloat(product.discountPercentage) > 0;
@@ -207,6 +267,13 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
           reset[size.size] = 0;
         });
         setSizeQuantities(reset);
+      }
+      if (hasWeightOptions) {
+        const reset: Record<string, number> = {};
+        weightOptions.forEach(opt => {
+          reset[opt.key] = 0;
+        });
+        setWeightOptionQuantities(reset);
       }
     }
   }, [open, product?.id]);
@@ -240,9 +307,20 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
               <div className="mt-1">
                 {isWeightBased ? (
                   <div className="text-sm">
-                    <span className="font-medium">${product.pricePerGram}/g</span>
+                    {product.pricePerGram && (
+                      <span className="font-medium">${product.pricePerGram}/g</span>
+                    )}
                     {product.pricePerOunce && (
                       <span className="text-muted-foreground ml-2">${product.pricePerOunce}/oz</span>
+                    )}
+                    {(product as any).pricePerEighth && (
+                      <span className="text-muted-foreground ml-2">${(product as any).pricePerEighth}/⅛ oz</span>
+                    )}
+                    {(product as any).pricePerQuarter && (
+                      <span className="text-muted-foreground ml-2">${(product as any).pricePerQuarter}/¼ oz</span>
+                    )}
+                    {(product as any).pricePerHalf && (
+                      <span className="text-muted-foreground ml-2">${(product as any).pricePerHalf}/½ oz</span>
                     )}
                   </div>
                 ) : (
@@ -255,7 +333,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
           {/* Size Selection or Quantity/Weight Input */}
           {hasSizes ? (
             <div className="space-y-3">
-              <Label>Select Sizes</Label>
+              <Label>Options</Label>
               <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
                 {product.sizes!.map((size) => {
                   const isOutOfStock = size.quantity <= 0;
@@ -263,10 +341,8 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                   <div key={size.id} className={`flex items-center justify-between ${isOutOfStock ? 'opacity-50' : ''}`}>
                     <div className="flex-1 flex items-center gap-2">
                       <Label className="text-sm font-medium">{size.size}</Label>
-                      {isOutOfStock ? (
+                      {isOutOfStock && (
                         <span className="text-xs font-semibold text-red-500">Out of Stock</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">({size.quantity} available)</span>
                       )}
                     </div>
                     {!isOutOfStock && (
@@ -312,6 +388,59 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
               </div>
               <p className="text-xs text-muted-foreground">
                 Total: {Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0)} items
+              </p>
+            </div>
+          ) : hasWeightOptions ? (
+            <div className="space-y-3">
+              <Label>Weight Options</Label>
+              <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+                {weightOptions.map((opt) => {
+                  return (
+                    <div key={opt.key} className="flex items-center justify-between">
+                      <div className="flex-1 flex items-center gap-2">
+                        <Label className="text-sm font-medium">{opt.label}</Label>
+                        <span className="text-xs text-muted-foreground">${Number(opt.price || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            const current = weightOptionQuantities[opt.key] || 0;
+                            setWeightOptionQuantities({
+                              ...weightOptionQuantities,
+                              [opt.key]: Math.max(0, current - 1)
+                            });
+                          }}
+                          disabled={(weightOptionQuantities[opt.key] || 0) <= 0}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="text-sm font-semibold w-8 text-center">
+                          {weightOptionQuantities[opt.key] || 0}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            const current = weightOptionQuantities[opt.key] || 0;
+                            setWeightOptionQuantities({
+                              ...weightOptionQuantities,
+                              [opt.key]: current + 1
+                            });
+                          }}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Total: {Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0)} items
               </p>
             </div>
           ) : (
@@ -399,9 +528,11 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
               allSizesOutOfStock ||
               (hasSizes 
                 ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
-                : ((isWeightBased ? weight : quantity) <= 0 || 
-                   (isWeightBased ? weight : quantity) > maxStock ||
-                   maxStock === 0))
+                : hasWeightOptions
+                  ? Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
+                  : ((isWeightBased ? weight : quantity) <= 0 || 
+                     (isWeightBased ? weight : quantity) > maxStock ||
+                     maxStock === 0))
             }
           >
             <ShoppingCart className="h-4 w-4 mr-2" />
@@ -411,9 +542,13 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                 ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
                   ? "Select Items"
                   : "Add to Cart"
-                : (isWeightBased ? weight : quantity) > maxStock 
-                  ? "Insufficient Stock"
-                  : `Add to Cart`
+                : hasWeightOptions
+                  ? Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
+                    ? "Select Items"
+                    : "Add to Cart"
+                  : (isWeightBased ? weight : quantity) > maxStock 
+                    ? "Insufficient Stock"
+                    : `Add to Cart`
             }
           </Button>
         </DialogFooter>

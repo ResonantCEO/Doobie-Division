@@ -38,6 +38,9 @@ const formSchema = z.object({
   weightUnit: z.enum(["grams", "ounces"]).default("grams"),
   pricePerGram: z.string().optional(),
   pricePerOunce: z.string().optional(),
+  pricePerEighth: z.string().optional(),
+  pricePerQuarter: z.string().optional(),
+  pricePerHalf: z.string().optional(),
   discountPercentage: z.string().nullable().optional(),
   isActive: z.boolean().default(true),
   purchasePrice: z.string().optional(),
@@ -135,6 +138,9 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       weightUnit: "grams",
       pricePerGram: "",
       pricePerOunce: "",
+      pricePerEighth: "",
+      pricePerQuarter: "",
+      pricePerHalf: "",
       isActive: true,
       purchasePrice: "",
       purchasePriceMethod: "units",
@@ -259,6 +265,9 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         weightUnit: data.weightUnit,
         pricePerGram: data.pricePerGram ? parseFloat(data.pricePerGram).toFixed(4) : null,
         pricePerOunce: data.pricePerOunce ? parseFloat(data.pricePerOunce).toFixed(2) : null,
+        pricePerEighth: data.pricePerEighth ? parseFloat(data.pricePerEighth).toFixed(2) : null,
+        pricePerQuarter: data.pricePerQuarter ? parseFloat(data.pricePerQuarter).toFixed(2) : null,
+        pricePerHalf: data.pricePerHalf ? parseFloat(data.pricePerHalf).toFixed(2) : null,
         discountPercentage: data.discountPercentage ? parseFloat(data.discountPercentage).toFixed(2) : null,
         isActive: data.isActive,
         imageUrl: imageUrl || null,
@@ -777,7 +786,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                       placeholder="0"
                       value={form.watch("pricePerGram") || ""}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, "");
+                        const val = e.target.value.replace(/[^0-9.]/g, "");
                         form.setValue("pricePerGram", val);
                       }}
                     />
@@ -790,8 +799,49 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                       placeholder="0"
                       value={form.watch("pricePerOunce") || ""}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, "");
+                        const val = e.target.value.replace(/[^0-9.]/g, "");
                         form.setValue("pricePerOunce", val);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Price per 1/8th ($)</label>
+                    <input
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+                      placeholder="0"
+                      value={form.watch("pricePerEighth") || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                        form.setValue("pricePerEighth", val);
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Price per 1/4 ($)</label>
+                    <input
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+                      placeholder="0"
+                      value={form.watch("pricePerQuarter") || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                        form.setValue("pricePerQuarter", val);
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Price per 1/2 ($)</label>
+                    <input
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+                      placeholder="0"
+                      value={form.watch("pricePerHalf") || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                        form.setValue("pricePerHalf", val);
                       }}
                     />
                   </div>

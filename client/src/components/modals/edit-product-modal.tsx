@@ -61,6 +61,9 @@ const formSchema = z.object({
   weightUnit: z.enum(["grams", "ounces"]).optional(),
   pricePerGram: z.string().optional(),
   pricePerOunce: z.string().optional(),
+  pricePerEighth: z.string().optional(),
+  pricePerQuarter: z.string().optional(),
+  pricePerHalf: z.string().optional(),
   discountPercentage: z.string().nullable().optional(),
   isActive: z.boolean(),
   purchasePrice: z.string().optional(),
@@ -154,6 +157,9 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         weightUnit: (product.weightUnit as "grams" | "ounces") || "grams",
         pricePerGram: product.pricePerGram || "",
         pricePerOunce: product.pricePerOunce || "",
+        pricePerEighth: (product as any).pricePerEighth || "",
+        pricePerQuarter: (product as any).pricePerQuarter || "",
+        pricePerHalf: (product as any).pricePerHalf || "",
         discountPercentage: product.discountPercentage || "0",
         isActive: product.isActive,
         purchasePrice: (product as any).purchasePrice || "",
@@ -245,6 +251,9 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         price: data.sellingMethod === "units" && data.price ? data.price : null,
         pricePerGram: data.sellingMethod === "weight" && data.pricePerGram ? data.pricePerGram : null,
         pricePerOunce: data.sellingMethod === "weight" && data.pricePerOunce ? data.pricePerOunce : null,
+        pricePerEighth: data.sellingMethod === "weight" && (data.pricePerEighth !== undefined && data.pricePerEighth !== null && data.pricePerEighth !== "") ? data.pricePerEighth : null,
+        pricePerQuarter: data.sellingMethod === "weight" && (data.pricePerQuarter !== undefined && data.pricePerQuarter !== null && data.pricePerQuarter !== "") ? data.pricePerQuarter : null,
+        pricePerHalf: data.sellingMethod === "weight" && (data.pricePerHalf !== undefined && data.pricePerHalf !== null && data.pricePerHalf !== "") ? data.pricePerHalf : null,
         discountPercentage: discountValue,
         purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice).toFixed(2) : null,
         purchasePriceMethod: data.purchasePriceMethod || "units",
@@ -694,30 +703,73 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                   )}
                 />
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium leading-none">Price per Gram ($)</label>
-                  <input
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
-                    placeholder="0"
-                    value={form.watch("pricePerGram") || ""}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/[^0-9]/g, "");
-                      form.setValue("pricePerGram", val);
-                    }}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Price per Gram ($)</label>
+                    <input
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+                      placeholder="0"
+                      value={form.watch("pricePerGram") || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                        form.setValue("pricePerGram", val);
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Price per Ounce ($)</label>
+                    <input
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+                      placeholder="0"
+                      value={form.watch("pricePerOunce") || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                        form.setValue("pricePerOunce", val);
+                      }}
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium leading-none">Price per Ounce ($)</label>
-                  <input
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
-                    placeholder="0"
-                    value={form.watch("pricePerOunce") || ""}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/[^0-9]/g, "");
-                      form.setValue("pricePerOunce", val);
-                    }}
-                  />
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Price per 1/8th ($)</label>
+                    <input
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+                      placeholder="0"
+                      value={form.watch("pricePerEighth") || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                        form.setValue("pricePerEighth", val);
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Price per 1/4 ($)</label>
+                    <input
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+                      placeholder="0"
+                      value={form.watch("pricePerQuarter") || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                        form.setValue("pricePerQuarter", val);
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Price per 1/2 ($)</label>
+                    <input
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+                      placeholder="0"
+                      value={form.watch("pricePerHalf") || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, "");
+                        form.setValue("pricePerHalf", val);
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             )}
