@@ -447,7 +447,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                           <QrCode className="h-4 w-4 mr-2" />
                           View QR Code
                         </DropdownMenuItem>
-                        {user?.role === 'admin' && (
+                        {(user?.role === 'admin' || user?.role === 'manager' || user?.role === 'staff') && (
                           <DropdownMenuItem 
                             onClick={() => confirmDelete(product.id)}
                             className="text-red-600"
