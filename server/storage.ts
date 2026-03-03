@@ -672,13 +672,9 @@ export class DatabaseStorage implements IStorage {
       if (val !== undefined) {
         processedProduct[field] = val;
       } else {
-        // Don't delete the field if it's explicitly set to null or empty - let it be null
-        // Only delete if it was never provided
-        if (field in productData) {
-          processedProduct[field] = null;
-        } else {
-          delete processedProduct[field];
-        }
+        // Explicitly set to null instead of deleting - this ensures Drizzle sends NULL to PostgreSQL
+        // instead of using defaults or empty strings
+        processedProduct[field] = null;
       }
     }
     
@@ -702,6 +698,10 @@ export class DatabaseStorage implements IStorage {
     }
 
     let newProduct: Product | undefined;
+    // Declare these outside try block so they're accessible in catch block
+    let cleanedInsertData: Record<string, any> = {};
+    let fractionalFieldsToInsert: any = {};
+    
     try {
       console.log('[createProduct] Attempting to insert product with imageUrls:', processedProduct.imageUrls ? `present (${typeof processedProduct.imageUrls})` : 'missing');
       console.log('[createProduct] imageUrls value:', processedProduct.imageUrls);
@@ -729,7 +729,7 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Extract fractional pricing fields and use direct SQL to ensure they're saved
-      const fractionalFieldsToInsert: any = {};
+      fractionalFieldsToInsert = {};
       if (insertData.hasOwnProperty('pricePerEighth')) {
         fractionalFieldsToInsert.pricePerEighth = insertData.pricePerEighth;
       }
@@ -745,18 +745,43 @@ export class DatabaseStorage implements IStorage {
       delete insertData.pricePerQuarter;
       delete insertData.pricePerHalf;
       
-      // Clean up insertData - remove undefined values and ensure only valid data
-      const cleanedInsertData: Record<string, any> = {};
+      // Clean up insertData - remove undefined values but keep null for numeric fields
+      // Important: For numeric fields, explicitly set null (not empty string) so PostgreSQL gets NULL
+      cleanedInsertData = {};
+      const numericFieldNames = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
+      
       for (const [key, value] of Object.entries(insertData)) {
         // Skip undefined values
         if (value === undefined) {
           continue;
         }
-        // For optional fields, keep null if explicitly set, otherwise skip
-        const optionalFields = ['company', 'description', 'imageUrl', 'imageUrls', 'adminNotes', 'price', 'pricePerGram', 'pricePerOunce', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
-        if (value === null && !optionalFields.includes(key)) {
+        
+        // For numeric fields: keep null explicitly, but skip empty strings
+        if (numericFieldNames.includes(key)) {
+          if (value === '' || value === 'null' || (typeof value === 'string' && value.trim() === '')) {
+            // Convert empty strings to null for numeric fields
+            cleanedInsertData[key] = null;
+            continue;
+          }
+          // Keep null values as-is (Drizzle will send NULL to PostgreSQL)
+          if (value === null) {
+            cleanedInsertData[key] = null;
+            continue;
+          }
+          // Ensure it's a valid number string
+          if (typeof value === 'string' && isNaN(parseFloat(value))) {
+            // Invalid number, set to null
+            cleanedInsertData[key] = null;
+            continue;
+          }
+        }
+        
+        // For optional string fields, keep null if explicitly set
+        const optionalStringFields = ['company', 'description', 'imageUrl', 'imageUrls', 'adminNotes'];
+        if (value === null && !optionalStringFields.includes(key) && !numericFieldNames.includes(key)) {
           continue;
         }
+        
         cleanedInsertData[key] = value;
       }
       
@@ -768,7 +793,7 @@ export class DatabaseStorage implements IStorage {
       try {
         const result = await db
           .insert(products)
-          .values([cleanedInsertData])
+          .values([cleanedInsertData as any])
           .returning();
         newProduct = result?.[0];
         console.log('[createProduct] Insert successful, product ID:', newProduct?.id);
@@ -791,25 +816,23 @@ export class DatabaseStorage implements IStorage {
       if (Object.keys(fractionalFieldsToInsert).length > 0 && newProduct) {
         try {
           const { sql } = await import("./db");
-          const updateParts: any[] = [];
+          
+          // Build update query with proper parameterization
           if (fractionalFieldsToInsert.pricePerEighth !== undefined && fractionalFieldsToInsert.pricePerEighth !== null) {
-            updateParts.push(sql`price_per_eighth = ${fractionalFieldsToInsert.pricePerEighth}`);
+            await sql`UPDATE products SET price_per_eighth = ${fractionalFieldsToInsert.pricePerEighth} WHERE id = ${newProduct.id}`;
           }
           if (fractionalFieldsToInsert.pricePerQuarter !== undefined && fractionalFieldsToInsert.pricePerQuarter !== null) {
-            updateParts.push(sql`price_per_quarter = ${fractionalFieldsToInsert.pricePerQuarter}`);
+            await sql`UPDATE products SET price_per_quarter = ${fractionalFieldsToInsert.pricePerQuarter} WHERE id = ${newProduct.id}`;
           }
           if (fractionalFieldsToInsert.pricePerHalf !== undefined && fractionalFieldsToInsert.pricePerHalf !== null) {
-            updateParts.push(sql`price_per_half = ${fractionalFieldsToInsert.pricePerHalf}`);
+            await sql`UPDATE products SET price_per_half = ${fractionalFieldsToInsert.pricePerHalf} WHERE id = ${newProduct.id}`;
           }
           
-          if (updateParts.length > 0) {
-            await sql`UPDATE products SET ${sql.join(updateParts, sql`, `)} WHERE id = ${newProduct.id}`;
-            console.log('[createProduct] Successfully updated fractional pricing via direct SQL');
-            // Fetch again to get updated product
-            const updated = await db.select().from(products).where(eq(products.id, newProduct.id));
-            if (updated[0]) {
-              newProduct = updated[0];
-            }
+          console.log('[createProduct] Successfully updated fractional pricing via direct SQL');
+          // Fetch again to get updated product
+          const updated = await db.select().from(products).where(eq(products.id, newProduct.id));
+          if (updated[0]) {
+            newProduct = updated[0];
           }
         } catch (fractionalError: any) {
           // Log but don't fail - product was created successfully
@@ -858,27 +881,25 @@ export class DatabaseStorage implements IStorage {
               ADD COLUMN IF NOT EXISTS price_per_half DECIMAL(10, 2);
             `;
             console.log('[createProduct] Created fractional pricing columns, retrying insert...');
-            // Retry the insert
+            // Retry the insert with cleaned data
             const retryResult = await db
               .insert(products)
-              .values([insertData])
+              .values([cleanedInsertData as any])
               .returning();
             newProduct = retryResult?.[0];
             // Continue with fractional field update if product was created
             if (newProduct && Object.keys(fractionalFieldsToInsert).length > 0) {
               const { sql: updateSql } = await import("./db");
-              const updateParts: any[] = [];
+              
+              // Update each field individually
               if (fractionalFieldsToInsert.pricePerEighth !== undefined && fractionalFieldsToInsert.pricePerEighth !== null) {
-                updateParts.push(updateSql`price_per_eighth = ${fractionalFieldsToInsert.pricePerEighth}`);
+                await updateSql`UPDATE products SET price_per_eighth = ${fractionalFieldsToInsert.pricePerEighth} WHERE id = ${newProduct.id}`;
               }
               if (fractionalFieldsToInsert.pricePerQuarter !== undefined && fractionalFieldsToInsert.pricePerQuarter !== null) {
-                updateParts.push(updateSql`price_per_quarter = ${fractionalFieldsToInsert.pricePerQuarter}`);
+                await updateSql`UPDATE products SET price_per_quarter = ${fractionalFieldsToInsert.pricePerQuarter} WHERE id = ${newProduct.id}`;
               }
               if (fractionalFieldsToInsert.pricePerHalf !== undefined && fractionalFieldsToInsert.pricePerHalf !== null) {
-                updateParts.push(updateSql`price_per_half = ${fractionalFieldsToInsert.pricePerHalf}`);
-              }
-              if (updateParts.length > 0) {
-                await updateSql`UPDATE products SET ${updateSql.join(updateParts, updateSql`, `)} WHERE id = ${newProduct.id}`;
+                await updateSql`UPDATE products SET price_per_half = ${fractionalFieldsToInsert.pricePerHalf} WHERE id = ${newProduct.id}`;
               }
             }
           } catch (retryError: any) {
@@ -1034,34 +1055,32 @@ export class DatabaseStorage implements IStorage {
       console.error('[updateProduct] Drizzle update failed:', err?.message);
     }
     
-    // Always update fractional pricing fields via direct SQL (regardless of Drizzle success/failure)
-    if (Object.keys(fractionalFieldsToUpdate).length > 0) {
-      try {
-        const { sql } = await import("./db");
-        const updateParts: any[] = [];
-        if (fractionalFieldsToUpdate.pricePerEighth !== undefined) {
-          updateParts.push(sql`price_per_eighth = ${fractionalFieldsToUpdate.pricePerEighth}`);
-        }
-        if (fractionalFieldsToUpdate.pricePerQuarter !== undefined) {
-          updateParts.push(sql`price_per_quarter = ${fractionalFieldsToUpdate.pricePerQuarter}`);
-        }
-        if (fractionalFieldsToUpdate.pricePerHalf !== undefined) {
-          updateParts.push(sql`price_per_half = ${fractionalFieldsToUpdate.pricePerHalf}`);
-        }
-        
-        if (updateParts.length > 0) {
-          await sql`UPDATE products SET ${sql.join(updateParts, sql`, `)} WHERE id = ${id}`;
+      // Always update fractional pricing fields via direct SQL (regardless of Drizzle success/failure)
+      if (Object.keys(fractionalFieldsToUpdate).length > 0) {
+        try {
+          const { sql } = await import("./db");
+          
+          // Update each field individually
+          if (fractionalFieldsToUpdate.pricePerEighth !== undefined) {
+            await sql`UPDATE products SET price_per_eighth = ${fractionalFieldsToUpdate.pricePerEighth} WHERE id = ${id}`;
+          }
+          if (fractionalFieldsToUpdate.pricePerQuarter !== undefined) {
+            await sql`UPDATE products SET price_per_quarter = ${fractionalFieldsToUpdate.pricePerQuarter} WHERE id = ${id}`;
+          }
+          if (fractionalFieldsToUpdate.pricePerHalf !== undefined) {
+            await sql`UPDATE products SET price_per_half = ${fractionalFieldsToUpdate.pricePerHalf} WHERE id = ${id}`;
+          }
+          
           console.log('[updateProduct] Successfully updated fractional pricing via direct SQL');
+        } catch (fractionalError: any) {
+          console.error('[updateProduct] Failed to update fractional pricing fields:', fractionalError?.message);
+          // If Drizzle update also failed, throw the original error
+          if (updateError) {
+            throw updateError;
+          }
+          throw fractionalError;
         }
-      } catch (fractionalError: any) {
-        console.error('[updateProduct] Failed to update fractional pricing fields:', fractionalError?.message);
-        // If Drizzle update also failed, throw the original error
-        if (updateError) {
-          throw updateError;
-        }
-        throw fractionalError;
       }
-    }
     
     // If Drizzle update failed and we didn't update fractional fields, throw the error
     if (updateError && Object.keys(fractionalFieldsToUpdate).length === 0) {
