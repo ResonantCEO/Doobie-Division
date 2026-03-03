@@ -672,9 +672,7 @@ export class DatabaseStorage implements IStorage {
       if (val !== undefined) {
         processedProduct[field] = val;
       } else {
-        // Explicitly set to null instead of deleting - this ensures Drizzle sends NULL to PostgreSQL
-        // instead of using defaults or empty strings
-        processedProduct[field] = null;
+        delete processedProduct[field];
       }
     }
     
@@ -756,22 +754,11 @@ export class DatabaseStorage implements IStorage {
           continue;
         }
         
-        // For numeric fields: keep null explicitly, but skip empty strings
         if (numericFieldNames.includes(key)) {
-          if (value === '' || value === 'null' || (typeof value === 'string' && value.trim() === '')) {
-            // Convert empty strings to null for numeric fields
-            cleanedInsertData[key] = null;
+          if (value === null || value === '' || value === 'null' || (typeof value === 'string' && value.trim() === '')) {
             continue;
           }
-          // Keep null values as-is (Drizzle will send NULL to PostgreSQL)
-          if (value === null) {
-            cleanedInsertData[key] = null;
-            continue;
-          }
-          // Ensure it's a valid number string
           if (typeof value === 'string' && isNaN(parseFloat(value))) {
-            // Invalid number, set to null
-            cleanedInsertData[key] = null;
             continue;
           }
         }
