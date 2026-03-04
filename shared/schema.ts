@@ -390,6 +390,8 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
   subtotal: z.string().or(z.number()).transform(val => String(val)),
   orderId: z.number().optional(),
   productSku: z.string().optional(),
+  // Preserve size from the client so stock logic can distinguish weight options
+  size: z.string().optional(),
 });
 
 export const insertUserActivityLogSchema = createInsertSchema(userActivityLogs).omit({

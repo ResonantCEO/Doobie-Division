@@ -180,6 +180,53 @@ export class DatabaseStorage implements IStorage {
     return match ? match[1].trim() : null;
   }
 
+  private extractWeightOptionFromProductName(productName: string): string | null {
+    // Try to extract weight options from productName
+    // Weight options might be appended like "Product Name - 1/8 oz" or similar
+    const weightPatterns = [
+      /(?:[-–—]\s*)?(1\/8\s*oz|⅛\s*oz|1\/8oz)/i,
+      /(?:[-–—]\s*)?(1\/4\s*oz|¼\s*oz|1\/4oz)/i,
+      /(?:[-–—]\s*)?(1\/2\s*oz|½\s*oz|1\/2oz)/i,
+      /(?:[-–—]\s*)?(1\s*oz|1oz|ounce)/i,
+      /(?:[-–—]\s*)?(grams?)/i,
+    ];
+    
+    for (const pattern of weightPatterns) {
+      const match = productName.match(pattern);
+      if (match) {
+        return match[1].trim();
+      }
+    }
+    
+    return null;
+  }
+
+  private getGramEquivalentFromSize(sizeLabel: string | null | undefined): number {
+    if (!sizeLabel) return 1; // Default to 1 if no size label
+    
+    const normalized = sizeLabel.toLowerCase().trim();
+    
+    // Check for weight options
+    if (normalized.includes('1/8') || normalized.includes('⅛')) {
+      return 3.5;
+    }
+    if (normalized.includes('1/4') || normalized.includes('¼')) {
+      return 7;
+    }
+    if (normalized.includes('1/2') || normalized.includes('½')) {
+      return 14;
+    }
+    if ((normalized.includes('1') && normalized.includes('oz')) || normalized === '1oz' || normalized === 'ounce') {
+      return 28;
+    }
+    if (normalized.includes('gram') || normalized === 'grams') {
+      return 1;
+    }
+    
+    // Default to 1 if no match (assume grams)
+    return 1;
+  }
+
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -1610,11 +1657,37 @@ export class DatabaseStorage implements IStorage {
 
     for (const item of items) {
       try {
-        await db.execute(sql`UPDATE products SET stock = stock - ${item.quantity}, updated_at = NOW() WHERE id = ${item.productId}`);
+        if (!item.productId) {
+          console.warn('[createOrder] Skipping stock update for item without productId');
+          continue;
+        }
+
+        // Parse size label from the item or product name
+        // This supports both unit-based "Size: Large" and weight-based options like "1 oz"
+        const sizeLabel =
+          (item as any).size ||
+          this.extractWeightOptionFromProductName(item.productName) ||
+          this.extractSizeFromProductName(item.productName);
+
+        // Default stock deduction is the item quantity (non-weight items or unknown labels)
+        let stockToDeduct = item.quantity;
+
+        if (sizeLabel) {
+          // Convert known weight options to their gram equivalent for stock deduction
+          const gramEquivalent = this.getGramEquivalentFromSize(sizeLabel);
+          // Stock is tracked in grams for weight-based items, so multiply the quantity by the gram equivalent
+          stockToDeduct = item.quantity * gramEquivalent;
+        }
+
+        await db.execute(
+          sql`UPDATE products SET stock = stock - ${stockToDeduct}, updated_at = NOW() WHERE id = ${item.productId}`
+        );
 
         const sizeName = this.extractSizeFromProductName(item.productName);
         if (sizeName) {
-          await db.execute(sql`UPDATE product_sizes SET quantity = quantity - ${item.quantity}, updated_at = NOW() WHERE product_id = ${item.productId} AND size = ${sizeName}`);
+          await db.execute(
+            sql`UPDATE product_sizes SET quantity = quantity - ${item.quantity}, updated_at = NOW() WHERE product_id = ${item.productId} AND size = ${sizeName}`
+          );
         }
       } catch (stockErr) {
         console.warn('[createOrder] Stock update error:', stockErr);
@@ -1669,13 +1742,37 @@ export class DatabaseStorage implements IStorage {
 
   async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void> {
     // Get the product
-    const product = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-    if (product.length === 0) {
+    const productRows = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+    if (productRows.length === 0) {
       throw new Error("Product not found");
     }
+    const product = productRows[0];
 
-    const currentPhysicalInventory = product[0].physicalInventory || 0;
-    const newPhysicalInventory = currentPhysicalInventory - quantity;
+    // Get the order item so we can inspect size/weight option
+    const [orderItem] = await db
+      .select()
+      .from(orderItems)
+      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)))
+      .limit(1);
+
+    if (!orderItem) {
+      throw new Error("Order item not found");
+    }
+
+    const sizeLabel =
+      (orderItem as any).size ||
+      this.extractWeightOptionFromProductName(orderItem.productName) ||
+      this.extractSizeFromProductName(orderItem.productName);
+
+    // Default to raw quantity; for weight options convert to grams
+    let physicalDelta = quantity;
+    if (sizeLabel) {
+      const gramEquivalent = this.getGramEquivalentFromSize(sizeLabel);
+      physicalDelta = quantity * gramEquivalent;
+    }
+
+    const currentPhysicalInventory = product.physicalInventory || 0;
+    const newPhysicalInventory = currentPhysicalInventory - physicalDelta;
 
     if (newPhysicalInventory < 0) {
       throw new Error("Insufficient physical inventory");
@@ -1691,22 +1788,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(products.id, productId));
 
     // Mark order item as fulfilled
-    const [fulfilledItem] = await db
-      .select()
-      .from(orderItems)
-      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)))
-      .limit(1);
-
     await db
       .update(orderItems)
       .set({ fulfilled: true })
       .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
 
-    if (fulfilledItem) {
-      const sizeName = this.extractSizeFromProductName(fulfilledItem.productName);
-      if (sizeName) {
-        await db.execute(sql`UPDATE product_sizes SET physical_quantity = physical_quantity - ${quantity}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`);
-      }
+    // Update per-size physical quantity if applicable
+    const sizeName = this.extractSizeFromProductName(orderItem.productName);
+    if (sizeName) {
+      await db.execute(
+        sql`UPDATE product_sizes SET physical_quantity = physical_quantity - ${physicalDelta}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
+      );
     }
 
     // Log the physical inventory change
@@ -1714,7 +1806,7 @@ export class DatabaseStorage implements IStorage {
       productId,
       userId,
       type: 'physical_out',
-      quantity: -quantity,
+      quantity: -physicalDelta,
       previousStock: currentPhysicalInventory,
       newStock: newPhysicalInventory,
       reason: `Order fulfillment - Order #${orderId} (Physical inventory reduced)`,
@@ -1744,8 +1836,19 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Order item is not fulfilled");
     }
 
+    const sizeLabel =
+      (orderItem[0] as any).size ||
+      this.extractWeightOptionFromProductName(orderItem[0].productName) ||
+      this.extractSizeFromProductName(orderItem[0].productName);
+
+    let physicalDelta = quantity;
+    if (sizeLabel) {
+      const gramEquivalent = this.getGramEquivalentFromSize(sizeLabel);
+      physicalDelta = quantity * gramEquivalent;
+    }
+
     const currentPhysicalInventory = product[0].physicalInventory || 0;
-    const newPhysicalInventory = currentPhysicalInventory + quantity;
+    const newPhysicalInventory = currentPhysicalInventory + physicalDelta;
 
     // Update only physical inventory (add back)
     await db
@@ -1772,7 +1875,9 @@ export class DatabaseStorage implements IStorage {
     if (unfulfillItem) {
       const sizeName = this.extractSizeFromProductName(unfulfillItem.productName);
       if (sizeName) {
-        await db.execute(sql`UPDATE product_sizes SET physical_quantity = physical_quantity + ${quantity}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`);
+        await db.execute(
+          sql`UPDATE product_sizes SET physical_quantity = physical_quantity + ${physicalDelta}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
+        );
       }
     }
 
@@ -1781,7 +1886,7 @@ export class DatabaseStorage implements IStorage {
       productId,
       userId,
       type: 'physical_in',
-      quantity: quantity,
+      quantity: physicalDelta,
       previousStock: currentPhysicalInventory,
       newStock: newPhysicalInventory,
       reason: `Order unfulfillment - Order #${orderId} (Physical inventory restored)`,
@@ -1811,12 +1916,26 @@ export class DatabaseStorage implements IStorage {
     }
 
     const packedQuantity = orderItem[0].quantity;
+
+    const sizeLabel =
+      (orderItem[0] as any).size ||
+      this.extractWeightOptionFromProductName(orderItem[0].productName) ||
+      this.extractSizeFromProductName(orderItem[0].productName);
+
+    let physicalDelta = packedQuantity;
+    if (sizeLabel) {
+      const gramEquivalent = this.getGramEquivalentFromSize(sizeLabel);
+      physicalDelta = packedQuantity * gramEquivalent;
+    }
+
     const currentPhysicalInventory = product[0].physicalInventory || 0;
-    const newPhysicalInventory = currentPhysicalInventory - packedQuantity;
+    const newPhysicalInventory = currentPhysicalInventory - physicalDelta;
 
     // Check if there's enough physical inventory
     if (newPhysicalInventory < 0) {
-      throw new Error(`Insufficient physical inventory. Available: ${currentPhysicalInventory}, Required: ${packedQuantity}`);
+      throw new Error(
+        `Insufficient physical inventory. Available: ${currentPhysicalInventory}, Required: ${physicalDelta}`
+      );
     }
 
     // Mark the order item as packed (fulfilled = true) and update physical inventory
@@ -1841,7 +1960,7 @@ export class DatabaseStorage implements IStorage {
         productId,
         userId,
         type: 'packing',
-        quantity: -packedQuantity, // Negative because we're reducing physical inventory
+        quantity: -physicalDelta, // Negative because we're reducing physical inventory
         previousStock: currentPhysicalInventory,
         newStock: newPhysicalInventory,
         reason: `Order item packed - Order #${orderId} (Physical inventory reduced)`,

@@ -243,9 +243,33 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         notes: shippingForm.notes,
       };
 
+      // Helper function to get price based on weight option size
+      const getWeightOptionPrice = (product: typeof state.items[0]['product'], size?: string): number => {
+        if (!size) {
+          return Number(product.pricePerGram) || 0;
+        }
+        
+        const normalizedSize = size.toLowerCase().trim();
+        
+        if (normalizedSize.includes('1/8') || normalizedSize.includes('⅛')) {
+          return Number((product as any).pricePerEighth) || 0;
+        }
+        if (normalizedSize.includes('1/4') || normalizedSize.includes('¼')) {
+          return Number((product as any).pricePerQuarter) || 0;
+        }
+        if (normalizedSize.includes('1/2') || normalizedSize.includes('½')) {
+          return Number((product as any).pricePerHalf) || 0;
+        }
+        if (normalizedSize.includes('1 oz') || normalizedSize === '1 oz' || normalizedSize === 'ounce') {
+          return Number(product.pricePerOunce) || 0;
+        }
+        // Default to grams
+        return Number(product.pricePerGram) || 0;
+      };
+
       const orderItems = state.items.map(item => {
         const itemPrice = item.product.sellingMethod === "weight"
-          ? Number(item.product.pricePerGram) || 0
+          ? getWeightOptionPrice(item.product, item.size)
           : Number(item.product.price) || 0;
 
         const productName = item.size 
@@ -431,10 +455,27 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
                       {/* Subtotal */}
                       <p className="text-sm font-medium mt-2">
-                        Subtotal: ${(item.product.sellingMethod === "weight"
-                          ? (Number(item.product.pricePerGram) || 0) * item.quantity
-                          : (Number(item.product.price) || 0) * item.quantity
-                        ).toFixed(2)}
+                        Subtotal: ${(() => {
+                          if (item.product.sellingMethod === "weight") {
+                            const normalizedSize = (item.size || '').toLowerCase().trim();
+                            let price = 0;
+                            
+                            if (normalizedSize.includes('1/8') || normalizedSize.includes('⅛')) {
+                              price = Number((item.product as any).pricePerEighth) || 0;
+                            } else if (normalizedSize.includes('1/4') || normalizedSize.includes('¼')) {
+                              price = Number((item.product as any).pricePerQuarter) || 0;
+                            } else if (normalizedSize.includes('1/2') || normalizedSize.includes('½')) {
+                              price = Number((item.product as any).pricePerHalf) || 0;
+                            } else if (normalizedSize.includes('1 oz') || normalizedSize === '1 oz' || normalizedSize === 'ounce') {
+                              price = Number(item.product.pricePerOunce) || 0;
+                            } else {
+                              price = Number(item.product.pricePerGram) || 0;
+                            }
+                            return (price * item.quantity).toFixed(2);
+                          } else {
+                            return ((Number(item.product.price) || 0) * item.quantity).toFixed(2);
+                          }
+                        })()}
                       </p>
                     </div>
                   </div>

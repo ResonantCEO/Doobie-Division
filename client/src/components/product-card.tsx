@@ -263,7 +263,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               <div className="text-center">
                 {product.sellingMethod === "weight" ? (
                   <div className="space-y-0.5">
-                    {product.pricePerGram && (
+                    {product.pricePerGram && Number(product.pricePerGram) > 0 && (
                       <div>
                         {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
                           <div className="space-y-0.5">
@@ -282,7 +282,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                         )}
                       </div>
                     )}
-                    {product.pricePerOunce && (
+                    {product.pricePerOunce && Number(product.pricePerOunce) > 0 && (
                       <div>
                         {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
                           <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">

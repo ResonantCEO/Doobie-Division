@@ -27,11 +27,35 @@ const initialState: CartState = {
   itemCount: 0,
 };
 
-// Helper function to calculate item price based on selling method
-function getItemPrice(product: Product & { category: Category | null }): number {
-  if (product.sellingMethod === "weight") {
-    // For weight-based products, use pricePerGram as the base unit price
+// Helper function to get price based on weight option size
+function getWeightOptionPrice(product: Product & { category: Category | null }, size?: string): number {
+  if (!size) {
     return Number(product.pricePerGram) || 0;
+  }
+  
+  const normalizedSize = size.toLowerCase().trim();
+  
+  if (normalizedSize.includes('1/8') || normalizedSize.includes('⅛')) {
+    return Number((product as any).pricePerEighth) || 0;
+  }
+  if (normalizedSize.includes('1/4') || normalizedSize.includes('¼')) {
+    return Number((product as any).pricePerQuarter) || 0;
+  }
+  if (normalizedSize.includes('1/2') || normalizedSize.includes('½')) {
+    return Number((product as any).pricePerHalf) || 0;
+  }
+  if (normalizedSize.includes('1 oz') || normalizedSize === '1 oz' || normalizedSize === 'ounce') {
+    return Number(product.pricePerOunce) || 0;
+  }
+  // Default to grams
+  return Number(product.pricePerGram) || 0;
+}
+
+// Helper function to calculate item price based on selling method
+function getItemPrice(product: Product & { category: Category | null }, size?: string): number {
+  if (product.sellingMethod === "weight") {
+    // For weight-based products, use the appropriate price based on size
+    return getWeightOptionPrice(product, size);
   } else {
     // For unit-based products, use the regular price
     return Number(product.price) || 0;
@@ -67,7 +91,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         }];
       }
       
-      const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product) * item.quantity), 0);
+      const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product, item.size) * item.quantity), 0);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
       
       return { items: newItems, total, itemCount };
@@ -82,7 +106,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         const key = item.size ? `${item.product.id}-${item.size}` : `${item.product.id}`;
         return key !== itemKey;
       });
-      const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product) * item.quantity), 0);
+      const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product, item.size) * item.quantity), 0);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
       
       return { items: newItems, total, itemCount };
@@ -100,7 +124,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
           : item;
       }).filter(item => item.quantity > 0);
       
-      const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product) * item.quantity), 0);
+      const total = newItems.reduce((sum, item) => sum + (getItemPrice(item.product, item.size) * item.quantity), 0);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
       
       return { items: newItems, total, itemCount };

@@ -694,28 +694,6 @@ export default function EditProductModal({ open, onOpenChange, product, categori
 
             {sellingMethod === "weight" && (
               <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="weightUnit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Weight Unit</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select weight unit" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="grams">Grams</SelectItem>
-                          <SelectItem value="ounces">Ounces</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium leading-none">Price per Gram ($)</label>

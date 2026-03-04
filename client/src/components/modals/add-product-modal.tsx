@@ -756,28 +756,6 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                   </div>
                 )}
 
-                <FormField
-                  control={form.control}
-                  name="weightUnit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Weight Unit</FormLabel>
-                      <FormControl>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select weight unit" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="grams">Grams</SelectItem>
-                            <SelectItem value="ounces">Ounces</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium leading-none">Price per Gram ($)</label>

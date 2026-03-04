@@ -51,7 +51,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
       { key: "quarter", label: "1/4 oz", price: (product as any).pricePerQuarter },
       { key: "half", label: "1/2 oz", price: (product as any).pricePerHalf },
       { key: "ounce", label: "1 oz", price: product.pricePerOunce },
-    ].filter(opt => opt.price);
+    ].filter(opt => Number(opt.price) > 0);
   }, [isWeightBased, product.pricePerGram, product.pricePerOunce, (product as any).pricePerEighth, (product as any).pricePerQuarter, (product as any).pricePerHalf]);
 
   const hasWeightOptions = isWeightBased && weightOptions.length > 0;
@@ -307,10 +307,10 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
               <div className="mt-1">
                 {isWeightBased ? (
                   <div className="text-sm">
-                    {product.pricePerGram && (
+                    {product.pricePerGram && Number(product.pricePerGram) > 0 && (
                       <span className="font-medium">${product.pricePerGram}/g</span>
                     )}
-                    {product.pricePerOunce && (
+                    {product.pricePerOunce && Number(product.pricePerOunce) > 0 && (
                       <span className="text-muted-foreground ml-2">${product.pricePerOunce}/oz</span>
                     )}
                     {(product as any).pricePerEighth && (

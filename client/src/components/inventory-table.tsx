@@ -56,8 +56,19 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
     mutationFn: async (productId: number) => {
       await apiRequest("DELETE", `/api/products/${productId}`);
     },
-    onSuccess: () => {
+    onSuccess: (_, productId) => {
+      // Optimistically remove the product from all product queries
+      queryClient.setQueriesData<(Product & { category: Category | null; sizes?: ProductSize[] })[]>(
+        { queryKey: ["/api/products"] },
+        (oldData) => {
+          if (!oldData) return oldData;
+          return oldData.filter((product) => product.id !== productId);
+        }
+      );
+      // Also invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      // Remove from selected products if it was selected
+      onSelectionChange(selectedProducts.filter(id => id !== productId));
       setDeleteConfirmId(null);
       toast({
         title: "Success",
