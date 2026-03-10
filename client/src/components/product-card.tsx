@@ -268,7 +268,9 @@ export default function ProductCard({ product }: ProductCardProps) {
                         {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
                           <div className="space-y-0.5">
                             <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                              <div className="text-xs sm:text-sm line-through text-gray-500 dark:text-gray-400">${product.pricePerGram}/g</div>
+                              <div className="text-xs sm:text-sm line-through text-gray-500 dark:text-gray-400">
+                                ${Number(product.pricePerGram).toFixed(2)}/g
+                              </div>
                               <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">
                                 {product.discountPercentage}% OFF
                               </div>
@@ -278,7 +280,9 @@ export default function ProductCard({ product }: ProductCardProps) {
                             </div>
                           </div>
                         ) : (
-                          <div className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">${product.pricePerGram}/g</div>
+                          <div className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+                            ${Number(product.pricePerGram).toFixed(2)}/g
+                          </div>
                         )}
                       </div>
                     )}

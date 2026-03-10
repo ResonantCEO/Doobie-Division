@@ -493,13 +493,17 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                             <div className="font-medium text-gray-900 dark:text-white">
                               {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
                                 <span>
-                                  <span className="line-through text-gray-500">${product.pricePerGram}/g</span>
+                                  <span className="line-through text-gray-500">
+                                    ${Number(product.pricePerGram).toFixed(2)}/g
+                                  </span>
                                   <span className="ml-2 text-green-600">
                                     ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
                                   </span>
                                 </span>
                               ) : (
-                                <span>${product.pricePerGram}/g</span>
+                                <span>
+                                  ${Number(product.pricePerGram).toFixed(2)}/g
+                                </span>
                               )}
                             </div>
                           )}
@@ -765,14 +769,18 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                         <div className="space-y-1">
                           {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
                             <div>
-                              <span className="line-through text-gray-500">${product.pricePerGram}/g</span>
+                              <span className="line-through text-gray-500">
+                                ${Number(product.pricePerGram).toFixed(2)}/g
+                              </span>
                               <span className="ml-2 text-green-600">
                                 ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
                               </span>
                               <span className="ml-1 text-xs text-green-600">({product.discountPercentage}% off)</span>
                             </div>
                           ) : (
-                            <div>${product.pricePerGram}/g</div>
+                            <div>
+                              ${Number(product.pricePerGram).toFixed(2)}/g
+                            </div>
                           )}
                         </div>
                       )}
