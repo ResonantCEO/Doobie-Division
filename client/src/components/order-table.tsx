@@ -786,9 +786,24 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                     </div>
                   </div>
 
-                  <div className="text-sm">
-                    <div className="font-medium text-gray-900 dark:text-gray-100">{order.customerName}</div>
-                    <div className="text-gray-600 dark:text-gray-400">{order.customerEmail}</div>
+                  <div className="text-sm space-y-0.5">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
+                      {order.customerName}
+                    </div>
+                    <div className="text-gray-600 dark:text-gray-400">
+                      {order.customerEmail}
+                    </div>
+                    <div className="text-gray-600 dark:text-gray-400">
+                      {order.customerPhone}
+                    </div>
+                    <div className="text-gray-500 dark:text-gray-400 text-xs">
+                      {order.shippingAddress}
+                    </div>
+                    {order.notes && (
+                      <div className="text-gray-400 dark:text-gray-500 text-xs italic">
+                        Notes: {order.notes}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-2 pt-2">
@@ -906,9 +921,24 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm">
-                        <div className="font-medium text-gray-900 dark:text-white">{order.customerName}</div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">{order.customerEmail}</div>
+                      <div className="text-sm space-y-0.5">
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {order.customerName}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {order.customerEmail}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {order.customerPhone}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {order.shippingAddress}
+                        </div>
+                        {order.notes && (
+                          <div className="text-xs text-gray-400 dark:text-gray-500 italic">
+                            Notes: {order.notes}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="font-medium text-gray-900 dark:text-white">
