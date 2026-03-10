@@ -37,6 +37,11 @@ interface OrderTableProps {
 
 type OrderWithItems = Order & { items: (OrderItem & { product: Product | null })[] };
 
+const formatOrderItemName = (name?: string | null) => {
+  if (!name) return "";
+  return name.replace("(Size:", "(Option:");
+};
+
 function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number }) {
   const { toast } = useToast();
   const [fulfillingItems, setFulfillingItems] = useState<Set<number>>(new Set());
@@ -237,7 +242,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                     />
                   )}
                   <div>
-                    <span className={`font-medium ${fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>{item.productName}</span>
+                    <span className={`font-medium ${fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>{formatOrderItemName(item.productName)}</span>
                     {item.productSku && (
                       <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">SKU: {item.productSku}</span>
                     )}
@@ -460,7 +465,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
           )}
           <div className="flex-1 min-w-0">
             <div className={`font-medium text-sm ${fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
-              {item.productName}
+              {formatOrderItemName(item.productName)}
               {fulfilled && <span className="ml-1 text-xs">(Fulfilled)</span>}
             </div>
             {item.productSku && (
