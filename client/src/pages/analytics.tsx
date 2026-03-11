@@ -140,6 +140,28 @@ export default function AnalyticsPage() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  // Fetch today's new customers (first-time buyers today)
+  const { data: dailyNewCustomersData, isLoading: dailyNewCustomersLoading } = useQuery<{ newCustomersToday: number }>({
+    queryKey: ["/api/analytics/daily-new-customers"],
+    queryFn: async () => {
+      const response = await fetch("/api/analytics/daily-new-customers", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch new customers today");
+      return response.json();
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes for more frequent updates
+  });
+
+  // Fetch today's return customers (repeat buyers today)
+  const { data: dailyReturnCustomersData, isLoading: dailyReturnCustomersLoading } = useQuery<{ returnCustomersToday: number }>({
+    queryKey: ["/api/analytics/daily-return-customers"],
+    queryFn: async () => {
+      const response = await fetch("/api/analytics/daily-return-customers", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch return customers today");
+      return response.json();
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes for more frequent updates
+  });
+
 
 
 
@@ -569,7 +591,11 @@ export default function AnalyticsPage() {
                       <UserPlus className="h-4 w-4 text-green-600" />
                       <span className="text-sm font-medium">New Customers</span>
                     </div>
-                    <span className="text-sm font-semibold">--</span>
+                    {dailyNewCustomersLoading ? (
+                      <Skeleton className="h-5 w-8" />
+                    ) : (
+                      <span className="text-sm font-semibold">{dailyNewCustomersData?.newCustomersToday || 0}</span>
+                    )}
                   </div>
 
                   <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
@@ -577,7 +603,11 @@ export default function AnalyticsPage() {
                       <RefreshCw className="h-4 w-4 text-orange-600" />
                       <span className="text-sm font-medium">Return Customers</span>
                     </div>
-                    <span className="text-sm font-semibold">--</span>
+                    {dailyReturnCustomersLoading ? (
+                      <Skeleton className="h-5 w-8" />
+                    ) : (
+                      <span className="text-sm font-semibold">{dailyReturnCustomersData?.returnCustomersToday || 0}</span>
+                    )}
                   </div>
 
                   <Card>

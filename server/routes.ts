@@ -1159,7 +1159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             gte(orders.createdAt, startOfDay),
             lt(orders.createdAt, endOfDay),
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed'])
           )
         )
         .groupBy(sql`EXTRACT(HOUR FROM ${orders.createdAt})`)
@@ -1202,7 +1202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             gte(orders.createdAt, startOfDay),
             lt(orders.createdAt, endOfDay),
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed'])
           )
         )
         .groupBy(products.id)
@@ -1337,6 +1337,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Daily new users error:', error);
       res.status(500).json({ message: "Failed to fetch daily new users" });
+    }
+  });
+
+  // Today's new customers (customers who placed their first order today)
+  app.get('/api/analytics/daily-new-customers', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+      // Get all customers who ordered today
+      const customersToday = await db
+        .select({ 
+          customerId: orders.customerId 
+        })
+        .from(orders)
+        .where(
+          and(
+            gte(orders.createdAt, startOfDay),
+            lt(orders.createdAt, endOfDay),
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed']),
+            sql`${orders.customerId} IS NOT NULL`
+          )
+        )
+        .groupBy(orders.customerId);
+
+      // For each customer, check if they have orders before today
+      let newCustomersCount = 0;
+      for (const customer of customersToday) {
+        if (customer.customerId) {
+          const previousOrders = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(orders)
+            .where(
+              and(
+                eq(orders.customerId, customer.customerId),
+                lt(orders.createdAt, startOfDay)
+              )
+            );
+          
+          if (Number(previousOrders[0]?.count || 0) === 0) {
+            newCustomersCount++;
+          }
+        }
+      }
+
+      res.json({
+        newCustomersToday: newCustomersCount
+      });
+    } catch (error) {
+      console.error('Daily new customers error:', error);
+      res.status(500).json({ message: "Failed to fetch daily new customers" });
+    }
+  });
+
+  // Today's return customers (customers who ordered today but have ordered before)
+  app.get('/api/analytics/daily-return-customers', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+      // Get all customers who ordered today
+      const customersToday = await db
+        .select({ 
+          customerId: orders.customerId 
+        })
+        .from(orders)
+        .where(
+          and(
+            gte(orders.createdAt, startOfDay),
+            lt(orders.createdAt, endOfDay),
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed']),
+            sql`${orders.customerId} IS NOT NULL`
+          )
+        )
+        .groupBy(orders.customerId);
+
+      // For each customer, check if they have orders before today
+      let returnCustomersCount = 0;
+      for (const customer of customersToday) {
+        if (customer.customerId) {
+          const previousOrders = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(orders)
+            .where(
+              and(
+                eq(orders.customerId, customer.customerId),
+                lt(orders.createdAt, startOfDay)
+              )
+            );
+          
+          if (Number(previousOrders[0]?.count || 0) > 0) {
+            returnCustomersCount++;
+          }
+        }
+      }
+
+      res.json({
+        returnCustomersToday: returnCustomersCount
+      });
+    } catch (error) {
+      console.error('Daily return customers error:', error);
+      res.status(500).json({ message: "Failed to fetch daily return customers" });
     }
   });
 
