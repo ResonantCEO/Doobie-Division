@@ -2063,7 +2063,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             sql`${orders.createdAt} >= ${startDate}`,
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed'])
           )
         );
 
@@ -2136,7 +2136,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             sql`${orders.createdAt} >= ${startDate}`,
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed'])
           )
         )
         .groupBy(sql`DATE_TRUNC('day', ${orders.createdAt})`)
@@ -2296,6 +2296,7 @@ export class DatabaseStorage implements IStorage {
             eq(orders.status, 'shipped'),
             eq(orders.status, 'processing'),
             eq(orders.status, 'pending'),
+            eq(orders.status, 'delivered'),
             eq(orders.status, 'completed')
           )
         )
@@ -2475,7 +2476,7 @@ export class DatabaseStorage implements IStorage {
           .where(
             and(
               sql`${orders.createdAt} >= ${startDate}`,
-              inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+              inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed'])
             )
           )
           .groupBy(orders.customerId)
@@ -2567,9 +2568,9 @@ export class DatabaseStorage implements IStorage {
     const [fulfillmentStats] = await db
       .select({
         totalOrders: sql<number>`COUNT(*)`,
-        fulfilledOrders: sql<number>`COUNT(CASE WHEN ${orders.status} IN ('shipped', 'completed') THEN 1 END)`,
+        fulfilledOrders: sql<number>`COUNT(CASE WHEN ${orders.status} IN ('shipped', 'delivered', 'completed') THEN 1 END)`,
         avgFulfillmentHours: sql<number>`COALESCE(AVG(
-          CASE WHEN ${orders.status} IN ('shipped', 'completed') AND ${orders.updatedAt} IS NOT NULL
+          CASE WHEN ${orders.status} IN ('shipped', 'delivered', 'completed') AND ${orders.updatedAt} IS NOT NULL
             THEN EXTRACT(EPOCH FROM (${orders.updatedAt} - ${orders.createdAt})) / 3600
           END
         ), 0)`,
@@ -3211,6 +3212,7 @@ export class DatabaseStorage implements IStorage {
             WHEN ${orders.status} = 'pending' THEN 'Order Placed'
             WHEN ${orders.status} = 'processing' THEN 'Order Processing'
             WHEN ${orders.status} = 'shipped' THEN 'Order Shipped'
+            WHEN ${orders.status} = 'delivered' THEN 'Order Delivered'
             WHEN ${orders.status} = 'completed' THEN 'Order Completed'
             WHEN ${orders.status} = 'cancelled' THEN 'Order Cancelled'
             ELSE 'Order Updated'
