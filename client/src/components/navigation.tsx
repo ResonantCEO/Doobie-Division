@@ -202,7 +202,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
           <div className="hidden md:flex justify-between items-center h-16">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <Link href="/dashboard">
+                <Link href="/dashboard/storefront">
                   <h1 className="text-2xl font-black text-black dark:text-white cursor-pointer">DOOBIE DIVISION</h1>
                 </Link>
               </div>
@@ -403,7 +403,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
           <div className="md:hidden">
             {/* First row: Logo */}
             <div className="flex justify-center items-center py-3">
-              <Link href="/dashboard">
+              <Link href="/dashboard/storefront">
                 <h1 className="text-xl font-black text-black dark:text-white cursor-pointer">DOOBIE DIVISION</h1>
               </Link>
             </div>
