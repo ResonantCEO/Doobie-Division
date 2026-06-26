@@ -166,7 +166,7 @@ export default function OrdersPage() {
         escape(addr.city),
         escape(addr.state),
         escape(addr.zip),
-        "1",
+        escape(Number(o.total).toFixed(2)),
         escape(o.orderNumber),
         escape(Number(o.total).toFixed(2)),
         escape(o.createdAt ? new Date(o.createdAt).toLocaleDateString() : ""),
