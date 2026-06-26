@@ -518,6 +518,9 @@ export default function UsersPage() {
                               </Badge>
                             )}
                           </div>
+                          {user.telegramUsername && (
+                            <div className="text-xs text-blue-500 dark:text-blue-400 truncate">@{user.telegramUsername}</div>
+                          )}
                           <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</div>
                         </div>
                       </div>
@@ -723,6 +726,9 @@ export default function UsersPage() {
                                   </Badge>
                                 )}
                               </div>
+                              {user.telegramUsername && (
+                                <div className="text-sm text-blue-500 dark:text-blue-400">@{user.telegramUsername}</div>
+                              )}
                               <div className="text-sm text-gray-500 dark:text-gray-400">{user.email}</div>
                             </div>
                           </div>
