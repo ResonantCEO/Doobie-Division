@@ -751,8 +751,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                         <p className="text-sm text-green-600">✓ Verification video uploaded</p>
                       )}
                       <p className="text-sm text-muted-foreground">
-                        Record a short video of yourself holding a sign that says "Doobie Division!" 
-                        Make sure your face and the sign are clearly visible. Max 200MB.
+                        Record a short video of yourself enjoying a 420 activity. Make sure your face is clearly visible. Max 200MB.
                       </p>
                     </div>
                     <div className="flex gap-2">
