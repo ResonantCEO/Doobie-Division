@@ -16,6 +16,7 @@ import "@uppy/dashboard/css/style.css";
 interface ObjectUploaderProps {
   maxNumberOfFiles?: number;
   maxFileSize?: number;
+  allowedFileTypes?: string[];
   onGetUploadParameters: (file: any) => Promise<{
     method: "PUT";
     url: string;
@@ -60,6 +61,7 @@ interface ObjectUploaderProps {
 export function ObjectUploader({
   maxNumberOfFiles = 1,
   maxFileSize = 10485760, // 10MB default
+  allowedFileTypes = ['image/*'],
   onGetUploadParameters,
   onComplete,
   buttonClassName,
@@ -88,7 +90,7 @@ export function ObjectUploader({
       restrictions: {
         maxNumberOfFiles,
         maxFileSize,
-        allowedFileTypes: ['image/*'],
+        allowedFileTypes,
       },
       autoProceed: false,
     })

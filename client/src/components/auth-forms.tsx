@@ -705,45 +705,39 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                 ) : (
                   <>
                     <div className="text-center mb-4">
-                      <p className="text-sm text-muted-foreground">Step 4 of 4 - Verification Photo</p>
+                      <p className="text-sm text-muted-foreground">Step 4 of 4 - Verification Video</p>
                     </div>
                     <div className="space-y-2">
-                      <Label>Verification Photo</Label>
+                      <Label>Verification Video</Label>
                       <ObjectUploader
-                        uploaderId="verification-photo-uploader"
+                        uploaderId="verification-video-uploader"
                         maxNumberOfFiles={1}
-                        maxFileSize={5 * 1024 * 1024}
+                        maxFileSize={200 * 1024 * 1024}
+                        allowedFileTypes={['video/*']}
                         onGetUploadParameters={async (file: any) => {
-                          console.log('Verification photo - getting upload parameters for file:', file?.name);
                           const response = await fetch('/api/objects/upload', {
                             method: 'POST',
                             credentials: 'include',
                           });
                           if (!response.ok) throw new Error('Failed to get upload URL');
                           const { uploadURL, objectPath } = await response.json();
-                          console.log('Verification photo - received objectPath:', objectPath);
-                          // Store objectPath in a way that Uppy preserves it
                           file.meta.objectPath = objectPath;
                           return { method: 'PUT' as const, url: uploadURL };
                         }}
                         onComplete={(result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-                          console.log('Verification photo upload complete result:', result);
                           if (result.successful && result.successful.length > 0) {
                             const file = result.successful[0];
-                            console.log('Verification photo file meta:', file.meta);
                             const objectPath = file.meta.objectPath as string;
                             if (objectPath) {
-                              console.log('Setting verification photo URL to:', objectPath);
                               setVerificationPhotoUrl(objectPath);
                               toast({
-                                title: "Verification photo uploaded",
-                                description: "Your verification photo has been uploaded successfully.",
+                                title: "Verification video uploaded",
+                                description: "Your verification video has been uploaded successfully.",
                               });
                             } else {
-                              console.error('No objectPath in verification photo file meta:', file.meta);
                               toast({
                                 title: "Upload error",
-                                description: "Failed to get object path from verification photo upload",
+                                description: "Failed to get object path from verification video upload",
                                 variant: "destructive",
                               });
                             }
@@ -751,14 +745,14 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                         }}
                       >
                         <Upload className="w-4 h-4 mr-2" />
-                        {verificationPhotoUrl ? "Upload Different Photo" : "Upload Verification Photo"}
+                        {verificationPhotoUrl ? "Upload Different Video" : "Upload Verification Video"}
                       </ObjectUploader>
                       {verificationPhotoUrl && (
-                        <p className="text-sm text-green-600">✓ Verification photo uploaded</p>
+                        <p className="text-sm text-green-600">✓ Verification video uploaded</p>
                       )}
                       <p className="text-sm text-muted-foreground">
-                        Upload a photo of yourself holding a sign that says "Doobie Division!" 
-                        Make sure your face and the sign are clearly visible.
+                        Record a short video of yourself holding a sign that says "Doobie Division!" 
+                        Make sure your face and the sign are clearly visible. Max 200MB.
                       </p>
                     </div>
                     <div className="flex gap-2">

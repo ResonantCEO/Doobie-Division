@@ -567,19 +567,16 @@ export default function UsersPage() {
                         )}
                         {user.verificationPhotoUrl ? (
                           <div className="flex flex-col items-center">
-                            <img
-                              src={user.verificationPhotoUrl}
-                              alt={`${user.firstName} ${user.lastName} Verification`}
-                              className="w-10 h-10 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                            <div
+                              className="w-10 h-10 bg-gray-800 rounded border cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center"
                               onClick={() => handlePhotoClick(user, 'verification')}
-                              title="Click to view full size"
-                              onError={(e) => {
-                                console.error('Verification photo failed to load:', user.verificationPhotoUrl);
-                                const target = e.target as HTMLImageElement;
-                                target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yNCAxNkMyMS43OTA5IDE2IDE5Ljk5OTkgMTcuNzkwOSAxOS45OTk5IDIwQzE5Ljk5OTkgMjIuMjA5MSAyMS43OTA5IDI0IDI0IDI0QzI2LjIwOTEgMjQgMjggMjIuMjA5MSAyOCAyMEMyOCAxNy43OTA5IDI2LjIwOTEgMTYgMjQgMTYiIGZpbGw9IiM5Q0E0QUIiLz4KPHBhdGggZD0iTTE2IDM0QzE2IDI5LjU4MTcgMTkuNTgxNyAyNiAyNCAyNkMyOC40MTgzIDI2IDMyIDI5LjU4MTcgMzIgMzRIMTYiIGZpbGw9IiM5Q0E0QUIiLz4KPC9zdmc+';
-                                target.className = "w-10 h-10 object-cover rounded border bg-gray-100";
-                              }}
-                            />
+                              title="Click to play verification video"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </div>
                             <span className="text-xs text-gray-500 mt-0.5">Verify</span>
                           </div>
                         ) : (
@@ -772,19 +769,16 @@ export default function UsersPage() {
                             )}
                             {user.verificationPhotoUrl ? (
                               <div className="flex flex-col items-center">
-                                <img
-                                  src={user.verificationPhotoUrl}
-                                  alt={`${user.firstName} ${user.lastName} Verification`}
-                                  className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                <div
+                                  className="w-12 h-12 bg-gray-800 rounded border cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center relative overflow-hidden"
                                   onClick={() => handlePhotoClick(user, 'verification')}
-                                  title="Click to view full size"
-                                  onError={(e) => {
-                                    console.error('Verification photo failed to load:', user.verificationPhotoUrl);
-                                    const target = e.target as HTMLImageElement;
-                                    target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yNCAxNkMyMS43OTA5IDE2IDE5Ljk5OTkgMTcuNzkwOSAxOS45OTk5IDIwQzE5Ljk5OTkgMjIuMjA5MSAyMS43OTA5IDI0IDI0IDI0QzI2LjIwOTEgMjQgMjggMjIuMjA5MSAyOCAyMEMyOCAxNy43OTA5IDI2LjIwOTEgMTYgMjQgMTYiIGZpbGw9IiM5Q0E0QUIiLz4KPHBhdGggZD0iTTE2IDM0QzE2IDI5LjU4MTcgMTkuNTgxNyAyNiAyNCAyNkMyOC40MTgzIDI2IDMyIDI5LjU4MTcgMzIgMzRIMTYiIGZpbGw9IiM5Q0E0QUIiLz4KPC9zdmc+';
-                                    target.className = "w-12 h-12 object-cover rounded border bg-gray-100";
-                                  }}
-                                />
+                                  title="Click to play verification video"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                </div>
                                 <span className="text-xs text-gray-500 mt-1">Verification</span>
                               </div>
                             ) : (
@@ -885,13 +879,13 @@ export default function UsersPage() {
         </CardContent>
       </Card>
 
-      {/* Photo Enlargement Modal */}
+      {/* Photo/Video Enlargement Modal */}
       <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] p-6">
           <DialogHeader>
             <DialogTitle>
               {selectedUser && selectedPhotoType === 'id' && `${selectedUser.firstName} ${selectedUser.lastName}'s ID Photo`}
-              {selectedUser && selectedPhotoType === 'verification' && `${selectedUser.firstName} ${selectedUser.lastName}'s Verification Photo`}
+              {selectedUser && selectedPhotoType === 'verification' && `${selectedUser.firstName} ${selectedUser.lastName}'s Verification Video`}
             </DialogTitle>
           </DialogHeader>
           <div className="flex justify-center items-center">
@@ -903,10 +897,11 @@ export default function UsersPage() {
               />
             )}
             {selectedUser && selectedPhotoType === 'verification' && selectedUser.verificationPhotoUrl && (
-              <img
+              <video
                 src={selectedUser.verificationPhotoUrl}
-                alt={`${selectedUser.firstName} ${selectedUser.lastName} Verification`}
-                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
+                controls
+                autoPlay
+                className="max-w-full max-h-[70vh] rounded-lg shadow-lg"
               />
             )}
           </div>
