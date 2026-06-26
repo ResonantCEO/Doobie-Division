@@ -796,7 +796,9 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                       {order.customerName}
                     </div>
                     <div className="text-gray-600 dark:text-gray-400">
-                      {order.customerEmail}
+                      {order.customerTelegramUsername
+                        ? `@${order.customerTelegramUsername}`
+                        : order.customerEmail}
                     </div>
                     <div className="text-gray-600 dark:text-gray-400">
                       {order.customerPhone}
@@ -931,7 +933,9 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                           {order.customerName}
                         </div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {order.customerEmail}
+                          {order.customerTelegramUsername
+                            ? `@${order.customerTelegramUsername}`
+                            : order.customerEmail}
                         </div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">
                           {order.customerPhone}
