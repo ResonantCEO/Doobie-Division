@@ -123,8 +123,6 @@ export default function OrdersPage() {
       return;
     }
 
-    const headers = ["Order #", "Customer Name", "Customer Email", "Customer Phone", "City", "Shipping Address", "Total", "Status", "Date", "Notes"];
-
     const escape = (val: string | null | undefined) => {
       const s = String(val ?? "");
       return s.includes(",") || s.includes('"') || s.includes("\n")
@@ -132,18 +130,49 @@ export default function OrdersPage() {
         : s;
     };
 
-    const rows = packedOrders.map(o => [
-      escape(o.orderNumber),
-      escape(o.customerName),
-      escape(o.customerEmail),
-      escape(o.customerPhone),
-      escape(extractCity(o.shippingAddress)),
-      escape(o.shippingAddress),
-      escape(Number(o.total).toFixed(2)),
-      escape(o.status),
-      escape(o.createdAt ? new Date(o.createdAt).toLocaleDateString() : ""),
-      escape(o.notes),
-    ]);
+    // Split "street, city, state, zip" into separate fields for Spoke.com
+    const parseAddress = (addr: string) => {
+      const parts = addr.split(",").map(p => p.trim());
+      return {
+        line1: parts[0] ?? "",
+        city: parts[1] ?? "",
+        state: parts[2] ?? "",
+        zip: parts[3] ?? "",
+      };
+    };
+
+    const headers = [
+      "Order #",
+      "Customer Name",
+      "Customer Email",
+      "Customer Phone",
+      "Address Line 1",
+      "City",
+      "State",
+      "Zip",
+      "Total",
+      "Status",
+      "Date",
+      "Notes",
+    ];
+
+    const rows = packedOrders.map(o => {
+      const addr = parseAddress(o.shippingAddress);
+      return [
+        escape(o.orderNumber),
+        escape(o.customerName),
+        escape(o.customerEmail),
+        escape(o.customerPhone),
+        escape(addr.line1),
+        escape(addr.city),
+        escape(addr.state),
+        escape(addr.zip),
+        escape(Number(o.total).toFixed(2)),
+        escape(o.status),
+        escape(o.createdAt ? new Date(o.createdAt).toLocaleDateString() : ""),
+        escape(o.notes),
+      ];
+    });
 
     const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
