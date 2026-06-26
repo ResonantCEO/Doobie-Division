@@ -116,8 +116,45 @@ export default function OrdersPage() {
   }, [orders, cityFilter, citySort]);
 
   const handleExportOrders = () => {
-    // In a real app, this would generate and download a CSV/Excel file
-    alert("Orders export functionality would be implemented here");
+    const packedOrders = processedOrders.filter(o => o.status === "packed");
+
+    if (packedOrders.length === 0) {
+      alert("No packed orders to export.");
+      return;
+    }
+
+    const headers = ["Order #", "Customer Name", "Customer Email", "Customer Phone", "City", "Shipping Address", "Total", "Status", "Date", "Notes"];
+
+    const escape = (val: string | null | undefined) => {
+      const s = String(val ?? "");
+      return s.includes(",") || s.includes('"') || s.includes("\n")
+        ? `"${s.replace(/"/g, '""')}"`
+        : s;
+    };
+
+    const rows = packedOrders.map(o => [
+      escape(o.orderNumber),
+      escape(o.customerName),
+      escape(o.customerEmail),
+      escape(o.customerPhone),
+      escape(extractCity(o.shippingAddress)),
+      escape(o.shippingAddress),
+      escape(Number(o.total).toFixed(2)),
+      escape(o.status),
+      escape(o.createdAt ? new Date(o.createdAt).toLocaleDateString() : ""),
+      escape(o.notes),
+    ]);
+
+    const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `packed-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleRefresh = () => {
