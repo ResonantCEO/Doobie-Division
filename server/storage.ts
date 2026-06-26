@@ -3036,6 +3036,8 @@ export class DatabaseStorage implements IStorage {
 
     await db.update(orders).set({ assignedUserId: null }).where(eq(orders.assignedUserId, id));
 
+    await db.delete(userActivityLogs).where(eq(userActivityLogs.userId, id));
+
     await db.delete(sessions).where(
       sql`sess::jsonb->>'userId' = ${id}`
     );
