@@ -280,6 +280,28 @@ export default function AnalyticsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Fetch city analytics data
+  const { data: cityAnalytics = [], isLoading: cityAnalyticsLoading } = useQuery<{
+    city: string;
+    total_orders: number;
+    total_revenue: number;
+    outstanding_orders: number;
+    completed_orders: number;
+    pending_orders: number;
+    processing_orders: number;
+    shipped_orders: number;
+    avg_order_value: number;
+    last_order_date: string | null;
+  }[]>({
+    queryKey: ["/api/analytics/city-analytics", days],
+    queryFn: async () => {
+      const response = await fetch(`/api/analytics/city-analytics/${days}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch city analytics");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Transform products data for inventory aging report
   const inventoryData = allProducts.map(product => ({
     product: product.name,
@@ -371,13 +393,14 @@ export default function AnalyticsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-0 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 gap-1 sm:gap-0 h-auto p-1">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
           <TabsTrigger value="daily" className="text-xs sm:text-sm">Daily</TabsTrigger>
           <TabsTrigger value="sales" className="text-xs sm:text-sm">Sales</TabsTrigger>
           <TabsTrigger value="customers" className="text-xs sm:text-sm">Customers</TabsTrigger>
           <TabsTrigger value="inventory" className="text-xs sm:text-sm">Inventory</TabsTrigger>
           <TabsTrigger value="operations" className="text-xs sm:text-sm">Operations</TabsTrigger>
+          <TabsTrigger value="cities" className="text-xs sm:text-sm">Cities</TabsTrigger>
         </TabsList>
 
         <TabsContent value="daily" className="space-y-6">
@@ -1406,6 +1429,210 @@ export default function AnalyticsPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Cities Tab */}
+        <TabsContent value="cities" className="space-y-6">
+          {/* Summary cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center">
+                  <div className="p-2 sm:p-3 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
+                    <MapPin className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div className="ml-3 sm:ml-4">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Active Cities</p>
+                    <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">{cityAnalytics.length}</p>
+                    <p className="text-xs sm:text-sm text-blue-600 dark:text-blue-400">Last {days} days</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center">
+                  <div className="p-2 sm:p-3 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400">
+                    <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div className="ml-3 sm:ml-4">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Total Orders</p>
+                    <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">
+                      {cityAnalytics.reduce((sum, c) => sum + c.total_orders, 0)}
+                    </p>
+                    <p className="text-xs sm:text-sm text-green-600 dark:text-green-400">Across all cities</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center">
+                  <div className="p-2 sm:p-3 rounded-full bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400">
+                    <Clock className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div className="ml-3 sm:ml-4">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Outstanding Orders</p>
+                    <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">
+                      {cityAnalytics.reduce((sum, c) => sum + c.outstanding_orders, 0)}
+                    </p>
+                    <p className="text-xs sm:text-sm text-yellow-600 dark:text-yellow-400">Pending + processing</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center">
+                  <div className="p-2 sm:p-3 rounded-full bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400">
+                    <DollarSign className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </div>
+                  <div className="ml-3 sm:ml-4">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Total Revenue</p>
+                    <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">
+                      ${cityAnalytics.reduce((sum, c) => sum + c.total_revenue, 0).toFixed(2)}
+                    </p>
+                    <p className="text-xs sm:text-sm text-purple-600 dark:text-purple-400">All cities combined</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Revenue by City bar chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Revenue by City
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {cityAnalyticsLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : cityAnalytics.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <MapPin className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500 dark:text-gray-400">No city data for this period</p>
+                </div>
+              ) : (
+                <ChartContainer config={{ revenue: { label: "Revenue", color: "hsl(var(--chart-1))" }, orders: { label: "Orders", color: "hsl(var(--chart-2))" } }} className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={cityAnalytics} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                      <XAxis dataKey="city" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
+                      <ChartTooltip content={<ChartTooltipContent formatter={(value) => [`$${Number(value).toFixed(2)}`, "Revenue"]} />} />
+                      <Bar dataKey="total_revenue" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Orders by City bar chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                Order Breakdown by City
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {cityAnalyticsLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : cityAnalytics.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <ShoppingCart className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500 dark:text-gray-400">No order data for this period</p>
+                </div>
+              ) : (
+                <ChartContainer config={{ completed: { label: "Completed", color: "hsl(var(--chart-2))" }, outstanding: { label: "Outstanding", color: "hsl(var(--chart-4))" } }} className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={cityAnalytics} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                      <XAxis dataKey="city" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="completed_orders" name="Completed" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} stackId="a" />
+                      <Bar dataKey="outstanding_orders" name="Outstanding" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} stackId="a" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Detailed city table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                City-by-City Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {cityAnalyticsLoading ? (
+                <div className="space-y-3">
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : cityAnalytics.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <MapPin className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500 dark:text-gray-400">No city data available for this period</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>City</TableHead>
+                        <TableHead className="text-right">Total Orders</TableHead>
+                        <TableHead className="text-right">Total Revenue</TableHead>
+                        <TableHead className="text-right">Outstanding</TableHead>
+                        <TableHead className="text-right">Pending</TableHead>
+                        <TableHead className="text-right">Processing</TableHead>
+                        <TableHead className="text-right">Shipped/Done</TableHead>
+                        <TableHead className="text-right">Avg Order</TableHead>
+                        <TableHead className="text-right">Last Order</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {cityAnalytics.map((row, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                              {row.city}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">{row.total_orders}</TableCell>
+                          <TableCell className="text-right font-medium text-green-600 dark:text-green-400">${row.total_revenue.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">
+                            {row.outstanding_orders > 0 ? (
+                              <Badge variant="outline" className="text-yellow-600 border-yellow-400 dark:text-yellow-400">
+                                {row.outstanding_orders}
+                              </Badge>
+                            ) : (
+                              <span className="text-gray-400">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right text-orange-500">{row.pending_orders}</TableCell>
+                          <TableCell className="text-right text-blue-500">{row.processing_orders}</TableCell>
+                          <TableCell className="text-right text-green-500">{row.shipped_orders + (row.completed_orders - row.shipped_orders > 0 ? row.completed_orders - row.shipped_orders : 0)}</TableCell>
+                          <TableCell className="text-right">${row.avg_order_value.toFixed(2)}</TableCell>
+                          <TableCell className="text-right text-xs text-gray-500">
+                            {row.last_order_date ? new Date(row.last_order_date).toLocaleDateString() : "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
             </CardContent>

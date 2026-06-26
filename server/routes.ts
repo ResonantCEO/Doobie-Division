@@ -1491,6 +1491,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // City analytics endpoint
+  app.get('/api/analytics/city-analytics/:days?', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    try {
+      const days = parseInt(req.params.days || '30');
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+
+      const result = await db.execute(sql`
+        SELECT
+          COALESCE(u.city, 'Unknown') AS city,
+          COUNT(o.id)::int AS total_orders,
+          COALESCE(SUM(o.total::numeric), 0)::float AS total_revenue,
+          COUNT(CASE WHEN o.status IN ('pending', 'processing') THEN 1 END)::int AS outstanding_orders,
+          COUNT(CASE WHEN o.status IN ('shipped', 'delivered', 'completed') THEN 1 END)::int AS completed_orders,
+          COUNT(CASE WHEN o.status = 'pending' THEN 1 END)::int AS pending_orders,
+          COUNT(CASE WHEN o.status = 'processing' THEN 1 END)::int AS processing_orders,
+          COUNT(CASE WHEN o.status = 'shipped' THEN 1 END)::int AS shipped_orders,
+          COALESCE(AVG(o.total::numeric), 0)::float AS avg_order_value,
+          MAX(o.created_at) AS last_order_date
+        FROM orders o
+        LEFT JOIN users u ON o.customer_id = u.id
+        WHERE o.created_at >= ${since}
+        GROUP BY COALESCE(u.city, 'Unknown')
+        ORDER BY total_orders DESC
+      `);
+
+      res.json(result.rows);
+    } catch (error) {
+      console.error('City analytics error:', error);
+      res.status(500).json({ message: "Failed to fetch city analytics" });
+    }
+  });
+
   // Notification routes
   app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
     try {
