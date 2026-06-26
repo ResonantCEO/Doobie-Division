@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import OrderTable from "@/components/order-table";
 import { useOrderNotifications } from "@/hooks/useOrderNotifications";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw, UserCheck } from "lucide-react";
+import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw, UserCheck, MapPin } from "lucide-react";
 import type { Order } from "@shared/schema";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +14,16 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/api";
 import OrderDetailsModal from "@/components/modals/order-details-modal";
 
+function extractCity(shippingAddress: string): string {
+  const parts = shippingAddress.split(",").map(p => p.trim());
+  return parts.length >= 2 ? parts[1] : "Unknown";
+}
+
 export default function OrdersPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [cityFilter, setCityFilter] = useState<string>("all");
+  const [citySort, setCitySort] = useState<string>("none");
   const queryClient = useQueryClient();
 
   // State for the modal
@@ -88,6 +95,26 @@ export default function OrdersPage() {
 
   const stats = getStatusStats();
 
+  // Derive unique cities from all orders
+  const uniqueCities = useMemo(() => {
+    const cities = new Set(orders.map(o => extractCity(o.shippingAddress)));
+    return Array.from(cities).sort();
+  }, [orders]);
+
+  // Filter and sort orders by city
+  const processedOrders = useMemo(() => {
+    let result = [...orders];
+    if (cityFilter !== "all") {
+      result = result.filter(o => extractCity(o.shippingAddress) === cityFilter);
+    }
+    if (citySort === "asc") {
+      result.sort((a, b) => extractCity(a.shippingAddress).localeCompare(extractCity(b.shippingAddress)));
+    } else if (citySort === "desc") {
+      result.sort((a, b) => extractCity(b.shippingAddress).localeCompare(extractCity(a.shippingAddress)));
+    }
+    return result;
+  }, [orders, cityFilter, citySort]);
+
   const handleExportOrders = () => {
     // In a real app, this would generate and download a CSV/Excel file
     alert("Orders export functionality would be implemented here");
@@ -130,9 +157,9 @@ export default function OrdersPage() {
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Order Management</h2>
 
         {/* Mobile-first filters and actions */}
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-3 sm:items-center">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-3 sm:items-center flex-wrap">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className="w-full sm:w-44">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
@@ -141,6 +168,30 @@ export default function OrdersPage() {
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={cityFilter} onValueChange={setCityFilter}>
+            <SelectTrigger className="w-full sm:w-44">
+              <MapPin className="h-3.5 w-3.5 mr-1 text-gray-400 flex-shrink-0" />
+              <SelectValue placeholder="Filter by city" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Cities</SelectItem>
+              {uniqueCities.map(city => (
+                <SelectItem key={city} value={city}>{city}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={citySort} onValueChange={setCitySort}>
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue placeholder="Sort by city" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Default order</SelectItem>
+              <SelectItem value="asc">City A → Z</SelectItem>
+              <SelectItem value="desc">City Z → A</SelectItem>
             </SelectContent>
           </Select>
 
@@ -205,7 +256,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders Table */}
-      <OrderTable orders={orders} user={user} staffUsers={staffUsers} />
+      <OrderTable orders={processedOrders} user={user} staffUsers={staffUsers} />
 
       <OrderDetailsModal
         order={selectedOrder}
