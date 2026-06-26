@@ -142,16 +142,16 @@ export default function OrdersPage() {
     };
 
     const headers = [
-      "Order #",
-      "Customer Name",
-      "Customer Email",
-      "Customer Phone",
+      "Name",
+      "Phone",
+      "Email",
       "Address Line 1",
       "City",
       "State",
       "Zip",
-      "Total",
-      "Status",
+      "Package Size",
+      "Order Number",
+      "Order Total",
       "Date",
       "Notes",
     ];
@@ -159,16 +159,16 @@ export default function OrdersPage() {
     const rows = packedOrders.map(o => {
       const addr = parseAddress(o.shippingAddress);
       return [
-        escape(o.orderNumber),
         escape(o.customerName),
-        escape(o.customerEmail),
         escape(o.customerPhone),
+        escape(o.customerEmail),
         escape(addr.line1),
         escape(addr.city),
         escape(addr.state),
         escape(addr.zip),
+        "1",
+        escape(o.orderNumber),
         escape(Number(o.total).toFixed(2)),
-        escape(o.status),
         escape(o.createdAt ? new Date(o.createdAt).toLocaleDateString() : ""),
         escape(o.notes),
       ];
