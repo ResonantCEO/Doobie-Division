@@ -32,8 +32,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt } from "drizzle-orm";
-import { getTableColumns, alias } from "drizzle-orm";
-const customerUsers = alias(users, "customer_users");
+import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
 async function retryQuery<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
@@ -1460,11 +1459,10 @@ export class DatabaseStorage implements IStorage {
           createdAt: orders.createdAt,
           updatedAt: orders.updatedAt,
           assignedUser: users,
-          customerTelegramUsername: customerUsers.telegramUsername,
+          customerTelegramUsername: sql<string | null>`(SELECT telegram_username FROM users WHERE id = ${orders.customerId})`,
         })
         .from(orders)
-        .leftJoin(users, eq(orders.assignedUserId, users.id))
-        .leftJoin(customerUsers, eq(orders.customerId, customerUsers.id));
+        .leftJoin(users, eq(orders.assignedUserId, users.id));
 
       const conditions = [];
 
