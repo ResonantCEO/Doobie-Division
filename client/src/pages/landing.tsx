@@ -430,7 +430,7 @@ export default function Landing() {
       </footer>
 
       <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
-        <DialogContent className="bg-slate-900 border-white/20">
+        <DialogContent className="bg-slate-900 border-white/20 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">Join Doobie Division</DialogTitle>
           </DialogHeader>
