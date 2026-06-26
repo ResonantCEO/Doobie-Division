@@ -261,6 +261,7 @@ export class DatabaseStorage implements IStorage {
     state?: string;
     postalCode?: string;
     country?: string;
+    telegramUsername?: string | null;
     idVerificationStatus?: string;
     role: string;
     status: string;

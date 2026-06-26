@@ -47,6 +47,7 @@ export const users = pgTable("users", {
   state: varchar("state"),
   postalCode: varchar("postal_code"),
   country: varchar("country").default("Canada"),
+  telegramUsername: varchar("telegram_username"),
   minPurchaseExempt: boolean("min_purchase_exempt").notNull().default(false),
   minPurchaseOverride: decimal("min_purchase_override", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow(),

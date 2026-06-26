@@ -66,7 +66,7 @@ export async function setupAuth(app: Express) {
   // Register endpoint
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { email, password, firstName, lastName, address, city, state, postalCode, country, idImageUrl, verificationPhotoUrl } = req.body;
+      const { email, password, firstName, lastName, address, city, state, postalCode, country, idImageUrl, verificationPhotoUrl, telegramUsername } = req.body;
 
       // Only check for essential fields that are actually sent from frontend
       if (!email || !password || !firstName || !lastName) {
@@ -165,6 +165,7 @@ export async function setupAuth(app: Express) {
         state,
         postalCode,
         country: country || 'USA',
+        telegramUsername: telegramUsername || null,
         idVerificationStatus: isFirstUser ? "verified" : (processedIdImageUrl ? "pending" : "not_provided"),
         role: isFirstUser ? "admin" : "customer",
         status: isFirstUser ? "active" : "pending"

@@ -24,6 +24,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
     confirmPassword: "",
     firstName: "",
     lastName: "",
+    telegramUsername: "",
     address: "",
     city: "",
     state: "Virginia",
@@ -162,6 +163,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
       password: string;
       firstName: string;
       lastName: string;
+      telegramUsername: string;
       address: string;
       city: string;
       state: string;
@@ -454,6 +456,25 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                           required
                         />
                       </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="telegramUsername">
+                        Telegram Username <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground select-none">@</span>
+                        <Input
+                          id="telegramUsername"
+                          type="text"
+                          placeholder="your_username"
+                          value={registerData.telegramUsername}
+                          onChange={(e) => setRegisterData({ ...registerData, telegramUsername: e.target.value.replace(/^@/, "") })}
+                          className="pl-7"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Not required, but providing your Telegram username helps us reach you faster for order updates and support.
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="registerEmail">Email</Label>
