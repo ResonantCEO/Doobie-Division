@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ShoppingBag, Users, BarChart3, Package, Star, Shield, Clock, Smartphone, Truck, ArrowRight, CheckCircle, Zap, Heart, Sparkles, MessageCircle, Send } from "lucide-react";
 import { AuthForms } from "@/components/auth-forms";
 import { useToast } from "@/hooks/use-toast";
-import bgLogo from "@assets/Untitled_design_1782581422172.png";
+import bgLogo from "@assets/Remove_White_Background_1782586017716.png";
 
 export default function Landing() {
   const [showAuthDialog, setShowAuthDialog] = useState(false);
