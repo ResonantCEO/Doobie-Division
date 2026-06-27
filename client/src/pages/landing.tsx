@@ -7,8 +7,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { ShoppingBag, Users, BarChart3, Package, Star, Shield, Clock, Smartphone, Truck, ArrowRight, CheckCircle, Zap, Heart, Sparkles, MessageCircle, Send } from "lucide-react";
 import { AuthForms } from "@/components/auth-forms";
 import { useToast } from "@/hooks/use-toast";
-import bgLogo from "@assets/Remove_White_Background_1782586017716.png";
-
 export default function Landing() {
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [showSupportDialog, setShowSupportDialog] = useState(false);
@@ -72,8 +70,7 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen text-white overflow-hidden" style={{ backgroundImage: `url(${bgLogo})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed', backgroundRepeat: 'no-repeat' }}>
-      <div className="fixed inset-0 bg-black/70 z-0 pointer-events-none" />
+    <div className="min-h-screen text-white overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
       {/* Navigation */}
       <nav className="bg-black/10 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
