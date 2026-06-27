@@ -324,19 +324,20 @@ export default function StorefrontPage() {
     return (
       <div className="space-y-8 relative min-h-screen">
         {/* Background Image with Transparency - Fixed and centered, offset down */}
-        <div 
-          className="fixed pointer-events-none"
+        <img
+          src={logoImage}
+          alt=""
+          className="fixed pointer-events-none select-none"
           style={{
-            backgroundImage: `url(${logoImage})`,
-            backgroundSize: 'contain',
-            backgroundPosition: 'center center',
-            backgroundRepeat: 'no-repeat',
-            opacity: 0.3,
+            opacity: 0.45,
+            mixBlendMode: 'screen',
             zIndex: 0,
-            top: '80px',
-            left: 0,
-            right: 0,
-            bottom: 0,
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -40%)',
+            width: '60vmin',
+            height: '60vmin',
+            objectFit: 'contain',
           }}
         />
         <div className="relative z-10">
@@ -377,19 +378,20 @@ export default function StorefrontPage() {
   return (
     <div className="space-y-8 relative min-h-screen">
       {/* Background Image with Transparency - Fixed and centered, offset down */}
-      <div 
-        className="fixed pointer-events-none"
+      <img
+        src={logoImage}
+        alt=""
+        className="fixed pointer-events-none select-none"
         style={{
-          backgroundImage: `url(${logoImage})`,
-          backgroundSize: 'contain',
-          backgroundPosition: 'center center',
-          backgroundRepeat: 'no-repeat',
-          opacity: 0.3,
+          opacity: 0.45,
+          mixBlendMode: 'screen',
           zIndex: 0,
-          top: '80px',
-          left: 0,
-          right: 0,
-          bottom: 0,
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -40%)',
+          width: '60vmin',
+          height: '60vmin',
+          objectFit: 'contain',
         }}
       />
       <div className="relative z-10">
