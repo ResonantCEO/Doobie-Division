@@ -890,9 +890,8 @@ export default function AdminPage() {
                                 data: { deliveryBlocked: !(limit as any).deliveryBlocked },
                               });
                             }}
-                            className={`w-full text-xs ${(limit as any).deliveryBlocked
-                              ? "border-red-500 bg-red-500 text-white hover:bg-red-600 hover:border-red-600"
-                              : "border-orange-400 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950"}`}
+                            variant={(limit as any).deliveryBlocked ? "destructive" : "outline"}
+                            className={`w-full text-xs ${!(limit as any).deliveryBlocked ? "border-orange-500 text-orange-500 hover:text-orange-600 hover:border-orange-600" : ""}`}
                           >
                             <TruckIcon className="h-3 w-3 mr-1" />
                             {(limit as any).deliveryBlocked ? "Unblock Delivery" : "Block Delivery"}
@@ -982,9 +981,8 @@ export default function AdminPage() {
                                       data: { deliveryBlocked: !(limit as any).deliveryBlocked },
                                     });
                                   }}
-                                  className={(limit as any).deliveryBlocked
-                                    ? "border-red-500 bg-red-500 text-white hover:bg-red-600 hover:border-red-600"
-                                    : "border-orange-400 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950"}
+                                  variant={(limit as any).deliveryBlocked ? "destructive" : "outline"}
+                                  className={!(limit as any).deliveryBlocked ? "border-orange-500 text-orange-500 hover:text-orange-600 hover:border-orange-600" : ""}
                                 >
                                   <TruckIcon className="h-3 w-3 mr-1" />
                                   {(limit as any).deliveryBlocked ? "Unblock" : "Block Delivery"}
