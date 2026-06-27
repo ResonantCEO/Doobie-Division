@@ -382,13 +382,25 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="0">No Parent (Root Category)</SelectItem>
-                            {allCategories
-                              .filter(cat => mode === 'edit' ? cat.id !== selectedCategory?.id : true)
-                              .map((category) => (
-                                <SelectItem key={category.id} value={category.id.toString()}>
-                                  {category.name}
-                                </SelectItem>
-                              ))}
+                            {(() => {
+                              const excludeId = mode === 'edit' ? selectedCategory?.id : undefined;
+                              const renderOptions = (parentId: number | null, depth: number): JSX.Element[] => {
+                                const items = localCategories
+                                  .filter(cat => (parentId === null ? !cat.parentId : cat.parentId === parentId) && cat.id !== excludeId)
+                                  .slice()
+                                  .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+                                return items.flatMap(cat => [
+                                  <SelectItem key={cat.id} value={cat.id.toString()}>
+                                    <span className="text-gray-400 select-none">
+                                      {depth > 0 ? '\u00a0'.repeat(depth * 4) + '└ ' : ''}
+                                    </span>
+                                    {cat.name}
+                                  </SelectItem>,
+                                  ...renderOptions(cat.id, depth + 1),
+                                ]);
+                              };
+                              return renderOptions(null, 0);
+                            })()}
                           </SelectContent>
                         </Select>
                       </FormControl>
