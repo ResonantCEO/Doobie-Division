@@ -204,11 +204,20 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         });
         const limitResult = await limitCheck.json();
         if (!limitResult.allowed) {
-          toast({
-            title: "Minimum Order Not Met",
-            description: `Orders shipping to ${limitResult.cityName || city} require a minimum of $${limitResult.minimumAmount?.toFixed(2)}. Your current total is $${state.total.toFixed(2)}.`,
-            variant: "destructive",
-          });
+          if (limitResult.deliveryBlocked) {
+            toast({
+              title: "Delivery Not Available",
+              description: `We're sorry, but we do not currently deliver to ${limitResult.cityName || city}. We apologize for the inconvenience and hope to serve your area in the future.`,
+              variant: "destructive",
+              duration: 8000,
+            });
+          } else {
+            toast({
+              title: "Minimum Order Not Met",
+              description: `Orders shipping to ${limitResult.cityName || city} require a minimum of $${limitResult.minimumAmount?.toFixed(2)}. Your current total is $${state.total.toFixed(2)}.`,
+              variant: "destructive",
+            });
+          }
           setIsCheckingOut(false);
           return;
         }

@@ -3264,6 +3264,12 @@ export class DatabaseStorage implements IStorage {
     return results[0];
   }
 
+  async getCityByNameAny(cityName: string): Promise<any | undefined> {
+    const results = await retryQuery(() => db.select().from(cityPurchaseLimits)
+      .where(ilike(cityPurchaseLimits.cityName, cityName)));
+    return results[0];
+  }
+
   async createCityPurchaseLimit(data: any): Promise<any> {
     const results = await retryQuery(() => db.insert(cityPurchaseLimits).values(data).returning());
     return results[0];

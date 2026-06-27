@@ -214,6 +214,7 @@ export const cityPurchaseLimits = pgTable("city_purchase_limits", {
   cityName: varchar("city_name").notNull().unique(),
   minimumAmount: decimal("minimum_amount", { precision: 10, scale: 2 }).notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  deliveryBlocked: boolean("delivery_blocked").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -430,6 +431,7 @@ export const insertCityPurchaseLimitSchema = createInsertSchema(cityPurchaseLimi
   cityName: z.string().min(1, "City name is required"),
   minimumAmount: z.string().or(z.number()).transform(val => String(val)),
   isActive: z.boolean().optional(),
+  deliveryBlocked: z.boolean().optional(),
 });
 
 // Types

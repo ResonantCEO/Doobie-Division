@@ -768,11 +768,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const orderData = insertOrderSchema.parse(order);
 
-      // Server-side purchase limit enforcement
+      // Server-side delivery block and purchase limit enforcement
       if (orderData.shippingAddress) {
         const addressParts = orderData.shippingAddress.split(",").map((s: string) => s.trim());
         const city = addressParts.length >= 2 ? addressParts[1] : "";
         if (city) {
+          // Check delivery block first
+          const cityRecord = await storage.getCityByNameAny(city);
+          if (cityRecord && cityRecord.deliveryBlocked) {
+            return res.status(400).json({
+              message: `We're sorry, but we do not currently deliver to ${city}. Please contact us for more information.`,
+              deliveryBlocked: true,
+            });
+          }
+
           let allowed = true;
           let minimumAmount: number | null = null;
 
@@ -1905,7 +1914,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Check minimum purchase requirement for a city/user combo
+  // Check minimum purchase requirement and delivery eligibility for a city/user combo
   app.post('/api/check-purchase-limit', async (req, res) => {
     try {
       const { city, total, userId } = req.body;
@@ -1913,6 +1922,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!city) {
         return res.json({ allowed: true, minimumAmount: null });
+      }
+
+      // Check delivery block first (independent of isActive or user overrides)
+      const cityRecord = await storage.getCityByNameAny(city.trim());
+      if (cityRecord && cityRecord.deliveryBlocked) {
+        return res.json({
+          allowed: false,
+          deliveryBlocked: true,
+          cityName: cityRecord.cityName,
+        });
       }
 
       if (userId) {

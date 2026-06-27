@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil } from "lucide-react";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon } from "lucide-react";
 import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit } from "@shared/schema";
 
 interface InventoryLogWithDetails extends InventoryLog {
@@ -887,6 +887,22 @@ export default function AdminPage() {
                             onClick={() => {
                               updateLimitMutation.mutate({
                                 id: limit.id,
+                                data: { deliveryBlocked: !(limit as any).deliveryBlocked },
+                              });
+                            }}
+                            className={`w-full text-xs ${(limit as any).deliveryBlocked
+                              ? "border-red-500 bg-red-500 text-white hover:bg-red-600 hover:border-red-600"
+                              : "border-orange-400 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950"}`}
+                          >
+                            <TruckIcon className="h-3 w-3 mr-1" />
+                            {(limit as any).deliveryBlocked ? "Unblock Delivery" : "Block Delivery"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              updateLimitMutation.mutate({
+                                id: limit.id,
                                 data: { isActive: !limit.isActive },
                               });
                             }}
@@ -957,6 +973,22 @@ export default function AdminPage() {
                             </td>
                             <td className="px-4 py-3 text-sm text-right">
                               <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    updateLimitMutation.mutate({
+                                      id: limit.id,
+                                      data: { deliveryBlocked: !(limit as any).deliveryBlocked },
+                                    });
+                                  }}
+                                  className={(limit as any).deliveryBlocked
+                                    ? "border-red-500 bg-red-500 text-white hover:bg-red-600 hover:border-red-600"
+                                    : "border-orange-400 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950"}
+                                >
+                                  <TruckIcon className="h-3 w-3 mr-1" />
+                                  {(limit as any).deliveryBlocked ? "Unblock" : "Block Delivery"}
+                                </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
