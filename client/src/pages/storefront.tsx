@@ -10,7 +10,7 @@ import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
 
 // Logo image from public directory
-import newLogoImage from '@assets/Untitled_design_1782581422172.png';
+import newLogoImage from '@assets/Remove_White_Background_1782586017716.png';
 const logoImage = newLogoImage;
 
 function ScrollableProductRow({ products, onCategoryFilter }: { products: (Product & { category: Category | null })[], onCategoryFilter?: (id: number) => void }) {
