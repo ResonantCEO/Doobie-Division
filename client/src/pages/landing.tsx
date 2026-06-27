@@ -325,7 +325,7 @@ export default function Landing() {
                 verified: true
               },
               {
-                name: "Nick P.",
+                name: "Chris H.",
                 text: "Get your hands off your belly like that",
                 rating: 5,
                 verified: true
