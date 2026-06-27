@@ -882,7 +882,7 @@ export default function AdminPage() {
                         </div>
                         <div className="flex flex-col gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
                           <Button
-                            variant="outline"
+                            variant={(limit as any).deliveryBlocked ? "destructive" : "outline"}
                             size="sm"
                             onClick={() => {
                               updateLimitMutation.mutate({
@@ -890,7 +890,6 @@ export default function AdminPage() {
                                 data: { deliveryBlocked: !(limit as any).deliveryBlocked },
                               });
                             }}
-                            variant={(limit as any).deliveryBlocked ? "destructive" : "outline"}
                             className={`w-full text-xs ${!(limit as any).deliveryBlocked ? "border-orange-500 text-orange-500 hover:text-orange-600 hover:border-orange-600" : ""}`}
                           >
                             <TruckIcon className="h-3 w-3 mr-1" />
@@ -973,7 +972,7 @@ export default function AdminPage() {
                             <td className="px-4 py-3 text-sm text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <Button
-                                  variant="outline"
+                                  variant={(limit as any).deliveryBlocked ? "destructive" : "outline"}
                                   size="sm"
                                   onClick={() => {
                                     updateLimitMutation.mutate({
@@ -981,7 +980,6 @@ export default function AdminPage() {
                                       data: { deliveryBlocked: !(limit as any).deliveryBlocked },
                                     });
                                   }}
-                                  variant={(limit as any).deliveryBlocked ? "destructive" : "outline"}
                                   className={!(limit as any).deliveryBlocked ? "border-orange-500 text-orange-500 hover:text-orange-600 hover:border-orange-600" : ""}
                                 >
                                   <TruckIcon className="h-3 w-3 mr-1" />

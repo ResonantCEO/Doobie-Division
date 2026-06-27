@@ -1886,6 +1886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cityName: z.string().min(1).optional(),
         minimumAmount: z.string().or(z.number()).transform(val => String(val)).optional(),
         isActive: z.boolean().optional(),
+        deliveryBlocked: z.boolean().optional(),
       });
       const data = updateSchema.parse(req.body);
       const limit = await storage.updateCityPurchaseLimit(id, data);
