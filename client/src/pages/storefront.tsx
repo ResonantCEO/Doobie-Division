@@ -329,14 +329,13 @@ export default function StorefrontPage() {
           alt=""
           className="fixed pointer-events-none select-none"
           style={{
-            opacity: 0.45,
-            mixBlendMode: 'screen',
+            opacity: 0.2,
             zIndex: 0,
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -40%)',
-            width: '60vmin',
-            height: '60vmin',
+            width: '120vmin',
+            height: '120vmin',
             objectFit: 'contain',
           }}
         />
@@ -383,14 +382,13 @@ export default function StorefrontPage() {
         alt=""
         className="fixed pointer-events-none select-none"
         style={{
-          opacity: 0.45,
-          mixBlendMode: 'screen',
+          opacity: 0.2,
           zIndex: 0,
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -40%)',
-          width: '60vmin',
-          height: '60vmin',
+          width: '120vmin',
+          height: '120vmin',
           objectFit: 'contain',
         }}
       />
