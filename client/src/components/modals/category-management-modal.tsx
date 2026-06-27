@@ -229,105 +229,101 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
     }
   };
 
-  const renderSubcategoryItem = (category: CategoryWithChildren, index: number) => (
-    <Draggable key={category.id} draggableId={`sub-${category.id}`} index={index}>
+  const renderDraggableChildren = (parentId: number, level: number): JSX.Element | null => {
+    const children = localCategories
+      .filter(cat => cat.parentId === parentId)
+      .slice()
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+    if (children.length === 0) return null;
+
+    return (
+      <Droppable droppableId={`subcategories-${parentId}`}>
+        {(subProvided, subSnapshot) => (
+          <div
+            ref={subProvided.innerRef}
+            {...subProvided.droppableProps}
+            className={`space-y-1 rounded-lg transition-colors ${subSnapshot.isDraggingOver ? 'bg-blue-50' : ''}`}
+          >
+            {children.map((child, childIndex) => (
+              <Draggable key={child.id} draggableId={`sub-${child.id}`} index={childIndex}>
+                {(dragProvided, dragSnapshot) => (
+                  <div
+                    ref={dragProvided.innerRef}
+                    {...dragProvided.draggableProps}
+                    className="space-y-1"
+                    style={dragProvided.draggableProps.style}
+                  >
+                    <div
+                      className={`flex items-center justify-between p-3 border border-dashed border-gray-300 rounded-lg transition-colors hover:bg-gray-50 ${dragSnapshot.isDragging ? 'shadow-lg bg-white' : ''}`}
+                      style={{ marginLeft: `${level * 1.5}rem` }}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <div {...dragProvided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                          <GripVertical className="h-4 w-4 text-gray-400" />
+                        </div>
+                        <div className="flex items-center text-gray-400">└</div>
+                        <ChevronRight className="h-3 w-3 text-gray-400" />
+                        <span className="font-medium text-sm">{child.name}</span>
+                        <Badge variant="outline" size="sm">Subcategory</Badge>
+                      </div>
+                      <div className="flex space-x-1">
+                        <Button size="sm" variant="outline" onClick={() => handleEdit(child)}>
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleDeleteCategory(child.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    {renderDraggableChildren(child.id, level + 1)}
+                  </div>
+                )}
+              </Draggable>
+            ))}
+            {subProvided.placeholder}
+          </div>
+        )}
+      </Droppable>
+    );
+  };
+
+  const renderRootCategory = (category: CategoryWithChildren, index: number) => (
+    <Draggable key={category.id} draggableId={`root-${category.id}`} index={index}>
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={`flex items-center justify-between p-3 border border-dashed border-gray-300 rounded-lg transition-colors hover:bg-gray-50 ${snapshot.isDragging ? 'shadow-lg bg-white' : ''}`}
-          style={{ marginLeft: '1.5rem', ...provided.draggableProps.style }}
+          className="space-y-1"
+          style={provided.draggableProps.style}
         >
-          <div className="flex items-center space-x-2">
-            <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
-              <GripVertical className="h-4 w-4 text-gray-400" />
+          <div className={`flex items-center justify-between p-3 border border-gray-200 rounded-lg transition-colors hover:bg-gray-50 ${snapshot.isDragging ? 'shadow-lg bg-white' : ''}`}>
+            <div className="flex items-center space-x-2">
+              <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                <GripVertical className="h-4 w-4 text-gray-400" />
+              </div>
+              <span className="font-medium">{category.name}</span>
+              {category.description && (
+                <p className="text-sm text-gray-500 ml-2">{category.description}</p>
+              )}
             </div>
-            <div className="flex items-center text-gray-400">└</div>
-            <ChevronRight className="h-3 w-3 text-gray-400" />
-            <span className="font-medium text-sm">{category.name}</span>
-            <Badge variant="outline" size="sm">Subcategory</Badge>
-            {category.description && (
-              <p className="text-sm text-gray-500 ml-2">{category.description}</p>
-            )}
+            <div className="flex space-x-1">
+              <Button size="sm" variant="outline" onClick={() => handleEdit(category)}>
+                <Edit2 className="h-3 w-3" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => handleDeleteCategory(category.id)}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
-          <div className="flex space-x-1">
-            <Button size="sm" variant="outline" onClick={() => handleEdit(category)}>
-              <Edit2 className="h-3 w-3" />
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => handleDeleteCategory(category.id)}>
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
+          {renderDraggableChildren(category.id, 1)}
         </div>
       )}
     </Draggable>
   );
 
-  const renderRootCategory = (category: CategoryWithChildren, index: number) => {
-    const children = localCategories.filter(cat => cat.parentId === category.id);
-    return (
-      <Draggable key={category.id} draggableId={`root-${category.id}`} index={index}>
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.draggableProps}
-            className="space-y-1"
-            style={provided.draggableProps.style}
-          >
-            <div className={`flex items-center justify-between p-3 border border-gray-200 rounded-lg transition-colors hover:bg-gray-50 ${snapshot.isDragging ? 'shadow-lg bg-white' : ''}`}>
-              <div className="flex items-center space-x-2">
-                <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
-                  <GripVertical className="h-4 w-4 text-gray-400" />
-                </div>
-                <span className="font-medium">{category.name}</span>
-                {category.description && (
-                  <p className="text-sm text-gray-500 ml-2">{category.description}</p>
-                )}
-              </div>
-              <div className="flex space-x-1">
-                <Button size="sm" variant="outline" onClick={() => handleEdit(category)}>
-                  <Edit2 className="h-3 w-3" />
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => handleDeleteCategory(category.id)}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-            {children.length > 0 && (
-              <Droppable droppableId={`subcategories-${category.id}`}>
-                {(subProvided, subSnapshot) => (
-                  <div
-                    ref={subProvided.innerRef}
-                    {...subProvided.droppableProps}
-                    className={`space-y-1 rounded-lg transition-colors ${subSnapshot.isDraggingOver ? 'bg-blue-50' : ''}`}
-                  >
-                    {children
-                      .slice()
-                      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-                      .map((child, childIndex) => renderSubcategoryItem(child, childIndex))}
-                    {subProvided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            )}
-          </div>
-        )}
-      </Draggable>
-    );
-  };
-
-  const getAllCategories = (cats: CategoryWithChildren[]): Category[] => {
-    const result: Category[] = [];
-    for (const cat of cats) {
-      result.push(cat);
-      if (cat.children) {
-        result.push(...getAllCategories(cat.children));
-      }
-    }
-    return result;
-  };
-
-  const allCategories = getAllCategories(localCategories);
+  // localCategories is already flat (flattened in useEffect/useState), use directly
+  const allCategories = localCategories;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
