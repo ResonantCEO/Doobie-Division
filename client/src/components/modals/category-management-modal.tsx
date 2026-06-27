@@ -39,10 +39,21 @@ interface CategoryManagementModalProps {
   categories: CategoryWithChildren[];
 }
 
+function flattenCategories(cats: CategoryWithChildren[]): CategoryWithChildren[] {
+  const result: CategoryWithChildren[] = [];
+  for (const cat of cats) {
+    result.push(cat);
+    if (cat.children && cat.children.length > 0) {
+      result.push(...flattenCategories(cat.children));
+    }
+  }
+  return result;
+}
+
 export default function CategoryManagementModal({ open, onOpenChange, categories }: CategoryManagementModalProps) {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [mode, setMode] = useState<'create' | 'edit'>('create');
-  const [localCategories, setLocalCategories] = useState<CategoryWithChildren[]>(categories);
+  const [localCategories, setLocalCategories] = useState<CategoryWithChildren[]>(() => flattenCategories(categories));
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<number | null>(null);
   const { toast } = useToast();
@@ -124,7 +135,7 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
 
   // Update local categories when props change
   useEffect(() => {
-    setLocalCategories(categories);
+    setLocalCategories(flattenCategories(categories));
   }, [categories]);
 
   const handleDragEnd = (result: DropResult) => {
