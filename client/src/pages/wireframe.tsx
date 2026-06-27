@@ -1,7 +1,7 @@
 
 
 import MobileWireframe from "@/components/mobile-wireframe";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 const screenDetails = {
   landing: {
@@ -121,35 +121,10 @@ const screenDetails = {
 export default function WireframePage() {
   const [currentScreen, setCurrentScreen] = useState("landing");
 
-  useEffect(() => {
-    const updateScreenDetails = () => {
-      const detailsContainer = document.getElementById('screen-details');
-      if (detailsContainer && screenDetails[currentScreen as keyof typeof screenDetails]) {
-        const screen = screenDetails[currentScreen as keyof typeof screenDetails];
-        detailsContainer.innerHTML = `
-          <ul class="space-y-3 text-gray-600 text-sm">
-            ${screen.details.map(detail => `
-              <li class="flex items-center">
-                <span class="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                ${detail}
-              </li>
-            `).join('')}
-          </ul>
-        `;
-      }
-    };
-
-    updateScreenDetails();
-
-    const handleScreenChange = (event: CustomEvent) => {
-      setCurrentScreen(event.detail);
-    };
-
-    window.addEventListener('screenChange', handleScreenChange as EventListener);
-    return () => {
-      window.removeEventListener('screenChange', handleScreenChange as EventListener);
-    };
-  }, [currentScreen]);
+  const handleScreenChange = (screen: string) => {
+    setCurrentScreen(screen);
+    window.dispatchEvent(new CustomEvent('screenChange', { detail: screen }));
+  };
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-7xl mx-auto px-4">
@@ -175,113 +150,47 @@ export default function WireframePage() {
               <h3 className="font-bold text-lg mb-4">Available Screens</h3>
               <div className="space-y-2 text-sm">
                 <div className="grid grid-cols-2 gap-2">
-                  <div 
-                    className="p-2 bg-blue-50 rounded border cursor-pointer hover:bg-blue-100 transition-colors"
-                    onClick={() => {
-                      setCurrentScreen('landing');
-                      window.dispatchEvent(new CustomEvent('screenChange', { detail: 'landing' }));
-                    }}
-                  >
+                  <div className="p-2 bg-blue-50 rounded border cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => handleScreenChange('landing')}>
                     <div className="font-medium text-blue-800">Landing</div>
                     <div className="text-xs text-blue-600">Welcome & Auth</div>
                   </div>
-                  <div 
-                    className="p-2 bg-green-50 rounded border cursor-pointer hover:bg-green-100 transition-colors"
-                    onClick={() => {
-                      setCurrentScreen('dashboard');
-                      window.dispatchEvent(new CustomEvent('screenChange', { detail: 'dashboard' }));
-                    }}
-                  >
+                  <div className="p-2 bg-green-50 rounded border cursor-pointer hover:bg-green-100 transition-colors" onClick={() => handleScreenChange('dashboard')}>
                     <div className="font-medium text-green-800">Dashboard</div>
                     <div className="text-xs text-green-600">Main Overview</div>
                   </div>
-                  <div 
-                    className="p-2 bg-purple-50 rounded border cursor-pointer hover:bg-purple-100 transition-colors"
-                    onClick={() => {
-                      setCurrentScreen('storefront');
-                      window.dispatchEvent(new CustomEvent('screenChange', { detail: 'storefront' }));
-                    }}
-                  >
+                  <div className="p-2 bg-purple-50 rounded border cursor-pointer hover:bg-purple-100 transition-colors" onClick={() => handleScreenChange('storefront')}>
                     <div className="font-medium text-purple-800">Storefront</div>
                     <div className="text-xs text-purple-600">Product Browse</div>
                   </div>
-                  <div 
-                    className="p-2 bg-cyan-50 rounded border cursor-pointer hover:bg-cyan-100 transition-colors"
-                    onClick={() => {
-                      setCurrentScreen('cart');
-                      window.dispatchEvent(new CustomEvent('screenChange', { detail: 'cart' }));
-                    }}
-                  >
+                  <div className="p-2 bg-cyan-50 rounded border cursor-pointer hover:bg-cyan-100 transition-colors" onClick={() => handleScreenChange('cart')}>
                     <div className="font-medium text-cyan-800">Cart</div>
                     <div className="text-xs text-cyan-600">Shopping Cart</div>
                   </div>
-                  <div 
-                    className="p-2 bg-emerald-50 rounded border cursor-pointer hover:bg-emerald-100 transition-colors"
-                    onClick={() => {
-                      setCurrentScreen('orderConfirmation');
-                      window.dispatchEvent(new CustomEvent('screenChange', { detail: 'orderConfirmation' }));
-                    }}
-                  >
+                  <div className="p-2 bg-emerald-50 rounded border cursor-pointer hover:bg-emerald-100 transition-colors" onClick={() => handleScreenChange('orderConfirmation')}>
                     <div className="font-medium text-emerald-800">Order Confirm</div>
                     <div className="text-xs text-emerald-600">Order Success</div>
                   </div>
-                  <div 
-                    className="p-2 bg-orange-50 rounded border cursor-pointer hover:bg-orange-100 transition-colors"
-                    onClick={() => {
-                      setCurrentScreen('inventory');
-                      window.dispatchEvent(new CustomEvent('screenChange', { detail: 'inventory' }));
-                    }}
-                  >
+                  <div className="p-2 bg-orange-50 rounded border cursor-pointer hover:bg-orange-100 transition-colors" onClick={() => handleScreenChange('inventory')}>
                     <div className="font-medium text-orange-800">Inventory</div>
                     <div className="text-xs text-orange-600">Stock Management</div>
                   </div>
-                  <div 
-                    className="p-2 bg-red-50 rounded border cursor-pointer hover:bg-red-100 transition-colors"
-                    onClick={() => {
-                      setCurrentScreen('orders');
-                      window.dispatchEvent(new CustomEvent('screenChange', { detail: 'orders' }));
-                    }}
-                  >
+                  <div className="p-2 bg-red-50 rounded border cursor-pointer hover:bg-red-100 transition-colors" onClick={() => handleScreenChange('orders')}>
                     <div className="font-medium text-red-800">Orders</div>
                     <div className="text-xs text-red-600">Order Tracking</div>
                   </div>
-                  <div 
-                    className="p-2 bg-indigo-50 rounded border cursor-pointer hover:bg-indigo-100 transition-colors"
-                    onClick={() => {
-                      setCurrentScreen('analytics');
-                      window.dispatchEvent(new CustomEvent('screenChange', { detail: 'analytics' }));
-                    }}
-                  >
+                  <div className="p-2 bg-indigo-50 rounded border cursor-pointer hover:bg-indigo-100 transition-colors" onClick={() => handleScreenChange('analytics')}>
                     <div className="font-medium text-indigo-800">Analytics</div>
                     <div className="text-xs text-indigo-600">Business Insights</div>
                   </div>
-                  <div 
-                    className="p-2 bg-yellow-50 rounded border cursor-pointer hover:bg-yellow-100 transition-colors"
-                    onClick={() => {
-                      setCurrentScreen('users');
-                      window.dispatchEvent(new CustomEvent('screenChange', { detail: 'users' }));
-                    }}
-                  >
+                  <div className="p-2 bg-yellow-50 rounded border cursor-pointer hover:bg-yellow-100 transition-colors" onClick={() => handleScreenChange('users')}>
                     <div className="font-medium text-yellow-800">Users</div>
                     <div className="text-xs text-yellow-600">User Management</div>
                   </div>
-                  <div 
-                    className="p-2 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => {
-                      setCurrentScreen('profile');
-                      window.dispatchEvent(new CustomEvent('screenChange', { detail: 'profile' }));
-                    }}
-                  >
+                  <div className="p-2 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleScreenChange('profile')}>
                     <div className="font-medium text-gray-800">Profile</div>
                     <div className="text-xs text-gray-600">User Settings</div>
                   </div>
-                  <div 
-                    className="p-2 bg-red-100 rounded border border-red-200 cursor-pointer hover:bg-red-200 transition-colors"
-                    onClick={() => {
-                      setCurrentScreen('admin');
-                      window.dispatchEvent(new CustomEvent('screenChange', { detail: 'admin' }));
-                    }}
-                  >
+                  <div className="p-2 bg-red-100 rounded border border-red-200 cursor-pointer hover:bg-red-200 transition-colors" onClick={() => handleScreenChange('admin')}>
                     <div className="font-medium text-red-800">Admin</div>
                     <div className="text-xs text-red-600">System Admin</div>
                   </div>
@@ -339,26 +248,14 @@ export default function WireframePage() {
             {/* Screen Details */}
             <div className="bg-white p-6 rounded-lg shadow-lg w-80">
               <h3 className="font-bold text-lg mb-4">{screenDetails[currentScreen as keyof typeof screenDetails]?.name || 'Selected Screen Details'}</h3>
-              <div id="screen-details">
-                <ul className="space-y-3 text-gray-600 text-sm">
-                  <li className="flex items-center">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                    Welcome hero section with gradient background
+              <ul className="space-y-3 text-gray-600 text-sm">
+                {(screenDetails[currentScreen as keyof typeof screenDetails]?.details ?? []).map((detail, i) => (
+                  <li key={i} className="flex items-center">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-3 flex-shrink-0"></span>
+                    {detail}
                   </li>
-                  <li className="flex items-center">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                    Sign up and sign in authentication buttons
-                  </li>
-                  <li className="flex items-center">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                    Clean, minimal design for first impressions
-                  </li>
-                  <li className="flex items-center">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                    Entry point to the application
-                  </li>
-                </ul>
-              </div>
+                ))}
+              </ul>
             </div>
 
             {/* User Flows */}
