@@ -129,30 +129,36 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
+    if (result.source.index === result.destination.index && result.source.droppableId === result.destination.droppableId) return;
 
-    const rootCategories = localCategories.filter(cat => !cat.parentId);
-    const reorderedCategories = Array.from(rootCategories);
-    const [removed] = reorderedCategories.splice(result.source.index, 1);
-    reorderedCategories.splice(result.destination.index, 0, removed);
+    const { droppableId } = result.source;
 
-    // Update sort orders
-    const updatedCategories = reorderedCategories.map((cat, index) => ({
-      ...cat,
-      sortOrder: index
-    }));
+    if (droppableId === "root-categories") {
+      // Reordering root categories
+      const rootCategories = localCategories.filter(cat => !cat.parentId);
+      const reordered = Array.from(rootCategories);
+      const [removed] = reordered.splice(result.source.index, 1);
+      reordered.splice(result.destination.index, 0, removed);
 
-    // Update local state optimistically
-    const nonRootCategories = localCategories.filter(cat => cat.parentId);
-    const newLocalCategories = [...updatedCategories, ...nonRootCategories];
-    setLocalCategories(newLocalCategories);
+      const updatedRoot = reordered.map((cat, index) => ({ ...cat, sortOrder: index }));
+      const nonRoot = localCategories.filter(cat => cat.parentId);
+      setLocalCategories([...updatedRoot, ...nonRoot]);
 
-    // Send updates to server
-    const reorderData = updatedCategories.map((cat, index) => ({
-      id: cat.id,
-      sortOrder: index
-    }));
+      reorderCategoriesMutation.mutate(updatedRoot.map((cat, index) => ({ id: cat.id, sortOrder: index })));
+    } else if (droppableId.startsWith("subcategories-")) {
+      // Reordering subcategories within a parent
+      const parentId = parseInt(droppableId.replace("subcategories-", ""));
+      const siblings = localCategories.filter(cat => cat.parentId === parentId);
+      const reordered = Array.from(siblings);
+      const [removed] = reordered.splice(result.source.index, 1);
+      reordered.splice(result.destination.index, 0, removed);
 
-    reorderCategoriesMutation.mutate(reorderData);
+      const updatedSiblings = reordered.map((cat, index) => ({ ...cat, sortOrder: index }));
+      const others = localCategories.filter(cat => cat.parentId !== parentId);
+      setLocalCategories([...others, ...updatedSiblings]);
+
+      reorderCategoriesMutation.mutate(updatedSiblings.map((cat, index) => ({ id: cat.id, sortOrder: index })));
+    }
   };
 
   function handleError(error: any) {
@@ -212,82 +218,91 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
     }
   };
 
-  const renderCategoryTree = (cats: CategoryWithChildren[], level = 0, isDragDisabled = false) => {
-    return cats.map((category, index) => {
-      const CategoryCard = ({ provided, isDragging }: any = {}) => (
-        <div 
-          ref={provided?.innerRef}
-          {...provided?.draggableProps}
-          className={`flex items-center justify-between p-3 border rounded-lg transition-colors hover:bg-gray-50 ${
-            level > 0 ? `ml-${level * 6} border-dashed border-gray-300` : 'border-gray-200'
-          } ${isDragging ? 'shadow-lg' : ''}`}
-          style={{ 
-            marginLeft: level > 0 ? `${level * 1.5}rem` : '0',
-            ...provided?.draggableProps?.style
-          }}
+  const renderSubcategoryItem = (category: CategoryWithChildren, index: number) => (
+    <Draggable key={category.id} draggableId={`sub-${category.id}`} index={index}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          className={`flex items-center justify-between p-3 border border-dashed border-gray-300 rounded-lg transition-colors hover:bg-gray-50 ${snapshot.isDragging ? 'shadow-lg bg-white' : ''}`}
+          style={{ marginLeft: '1.5rem', ...provided.draggableProps.style }}
         >
           <div className="flex items-center space-x-2">
-            {level === 0 && !isDragDisabled && (
-              <div {...provided?.dragHandleProps} className="cursor-grab active:cursor-grabbing">
-                <GripVertical className="h-4 w-4 text-gray-400" />
-              </div>
-            )}
-            {level > 0 && (
-              <>
-                <div className="flex items-center text-gray-400">
-                  {"└".repeat(1)} 
-                </div>
-                <ChevronRight className="h-3 w-3 text-gray-400" />
-              </>
-            )}
-            <div className="flex items-center space-x-2">
-              <span className={`font-medium ${level > 0 ? 'text-sm' : ''}`}>
-                {category.name}
-              </span>
-              {level > 0 && <Badge variant="outline" size="sm">Subcategory</Badge>}
+            <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+              <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
+            <div className="flex items-center text-gray-400">└</div>
+            <ChevronRight className="h-3 w-3 text-gray-400" />
+            <span className="font-medium text-sm">{category.name}</span>
+            <Badge variant="outline" size="sm">Subcategory</Badge>
             {category.description && (
               <p className="text-sm text-gray-500 ml-2">{category.description}</p>
             )}
           </div>
           <div className="flex space-x-1">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleEdit(category)}
-            >
+            <Button size="sm" variant="outline" onClick={() => handleEdit(category)}>
               <Edit2 className="h-3 w-3" />
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleDeleteCategory(category.id)}
-            >
+            <Button size="sm" variant="outline" onClick={() => handleDeleteCategory(category.id)}>
               <Trash2 className="h-3 w-3" />
             </Button>
           </div>
         </div>
-      );
+      )}
+    </Draggable>
+  );
 
-      return (
-        <div key={category.id} className="space-y-1">
-          {level === 0 && !isDragDisabled ? (
-            <Draggable draggableId={category.id.toString()} index={index}>
-              {(provided, snapshot) => (
-                <CategoryCard provided={provided} isDragging={snapshot.isDragging} />
-              )}
-            </Draggable>
-          ) : (
-            <CategoryCard />
-          )}
-          {category.children && category.children.length > 0 && (
-            <div className="space-y-1">
-              {renderCategoryTree(category.children, level + 1, true)}
+  const renderRootCategory = (category: CategoryWithChildren, index: number) => {
+    const children = localCategories.filter(cat => cat.parentId === category.id);
+    return (
+      <Draggable key={category.id} draggableId={`root-${category.id}`} index={index}>
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            className="space-y-1"
+            style={provided.draggableProps.style}
+          >
+            <div className={`flex items-center justify-between p-3 border border-gray-200 rounded-lg transition-colors hover:bg-gray-50 ${snapshot.isDragging ? 'shadow-lg bg-white' : ''}`}>
+              <div className="flex items-center space-x-2">
+                <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                  <GripVertical className="h-4 w-4 text-gray-400" />
+                </div>
+                <span className="font-medium">{category.name}</span>
+                {category.description && (
+                  <p className="text-sm text-gray-500 ml-2">{category.description}</p>
+                )}
+              </div>
+              <div className="flex space-x-1">
+                <Button size="sm" variant="outline" onClick={() => handleEdit(category)}>
+                  <Edit2 className="h-3 w-3" />
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => handleDeleteCategory(category.id)}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
             </div>
-          )}
-        </div>
-      );
-    });
+            {children.length > 0 && (
+              <Droppable droppableId={`subcategories-${category.id}`}>
+                {(subProvided, subSnapshot) => (
+                  <div
+                    ref={subProvided.innerRef}
+                    {...subProvided.droppableProps}
+                    className={`space-y-1 rounded-lg transition-colors ${subSnapshot.isDraggingOver ? 'bg-blue-50' : ''}`}
+                  >
+                    {children
+                      .slice()
+                      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                      .map((child, childIndex) => renderSubcategoryItem(child, childIndex))}
+                    {subProvided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            )}
+          </div>
+        )}
+      </Draggable>
+    );
   };
 
   const getAllCategories = (cats: CategoryWithChildren[]): Category[] => {
@@ -423,7 +438,7 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Existing Categories</h3>
-              <p className="text-xs text-gray-500">Drag to reorder root categories</p>
+              <p className="text-xs text-gray-500">Drag to reorder</p>
             </div>
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {localCategories.length > 0 ? (
@@ -435,14 +450,12 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
                         ref={provided.innerRef}
                         className="space-y-3"
                       >
-                        {renderCategoryTree(localCategories.filter(cat => !cat.parentId))}
+                        {localCategories
+                          .filter(cat => !cat.parentId)
+                          .slice()
+                          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                          .map((cat, index) => renderRootCategory(cat, index))}
                         {provided.placeholder}
-                        {/* Render subcategories separately */}
-                        {localCategories.filter(cat => cat.parentId).map(category => (
-                          <div key={category.id} className="space-y-1">
-                            {renderCategoryTree([category], 1, true)}
-                          </div>
-                        ))}
                       </div>
                     )}
                   </Droppable>
