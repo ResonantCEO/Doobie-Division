@@ -325,8 +325,8 @@ export default function Landing() {
                 verified: true
               },
               {
-                name: "Jessica L.",
-                text: "Love the mobile app and real-time tracking. Makes shopping so convenient!",
+                name: "Nick P.",
+                text: "Get your hands off your belly like that",
                 rating: 5,
                 verified: true
               }
