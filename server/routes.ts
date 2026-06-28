@@ -1596,6 +1596,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.updateUserStatus(id, status);
+
+      // If activating an account, also mark ID verification as verified
+      if (status === 'active') {
+        await storage.updateUserIdVerification(id, 'verified');
+      }
+
       res.json(user);
     } catch (error) {
       res.status(500).json({ message: "Failed to update user status" });
