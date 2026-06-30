@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -32,29 +32,19 @@ function Router() {
 
   return (
     <Switch>
-      {!isAuthenticated ? (
-        <>
-          <Route path="/" component={Landing} />
-          <Route path="/storefront" component={StorefrontPage} />
-          <Route path="/:rest*" component={NotFound} />
-        </>
-      ) : (
-        <>
-          <Route path="/" component={Dashboard} />
-          <Route path="/dashboard/:tab?" component={Dashboard} />
-          <Route path="/storefront" component={StorefrontPage} />
-          <Route path="/inventory" component={InventoryPage} />
-          <Route path="/orders" component={OrdersPage} />
-          <Route path="/scanner" component={ScannerPage} />
-          <Route path="/analytics" component={AnalyticsPage} />
-          <Route path="/users" component={UsersPage} />
-          <Route path="/profile" component={ProfilePage} />
-          <Route path="/wireframe" component={WireframePage} />
-          <Route path="/support" component={SupportPage} />
-          <Route path="/customer-orders" component={CustomerOrdersWrapper} />
-          <Route path="/:rest*" component={NotFound} />
-        </>
-      )}
+      <Route path="/" component={isAuthenticated ? Dashboard : Landing} />
+      <Route path="/storefront" component={StorefrontPage} />
+      <Route path="/dashboard/:tab?" component={Dashboard} />
+      <Route path="/inventory" component={InventoryPage} />
+      <Route path="/orders" component={OrdersPage} />
+      <Route path="/scanner" component={ScannerPage} />
+      <Route path="/analytics" component={AnalyticsPage} />
+      <Route path="/users" component={UsersPage} />
+      <Route path="/profile" component={ProfilePage} />
+      <Route path="/wireframe" component={WireframePage} />
+      <Route path="/support" component={SupportPage} />
+      <Route path="/customer-orders" component={CustomerOrdersWrapper} />
+      <Route component={NotFound} />
     </Switch>
   );
 }
