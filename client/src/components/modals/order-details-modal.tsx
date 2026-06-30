@@ -615,9 +615,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
                               <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                  {isWeightBased
-                                    ? `Quantity to fulfill (order requires ${item.quantity} ${item.quantity === 1 ? "unit" : "units"})`
-                                    : `Units to fulfill (order requires ${item.quantity})`}
+                                  Units fulfilled
                                 </label>
                                 <div className="flex items-center gap-2">
                                   <input
@@ -647,6 +645,9 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                 >
                                   <CheckCircle className="h-4 w-4 mr-2" />
                                   {fulfillItemMutation.isPending ? "Fulfilling…" : "Confirm Fulfillment"}
+                                  {!fulfillItemMutation.isPending && (
+                                    <span className="ml-2 font-bold">x{item.quantity}</span>
+                                  )}
                                 </Button>
                                 <Button
                                   onClick={cancelPendingFulfillment}
