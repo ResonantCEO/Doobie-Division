@@ -814,21 +814,35 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                    <Select
-                      value={order.status}
-                      onValueChange={(status) => handleStatusUpdate(order.id, status)}
-                    >
-                      <SelectTrigger className="flex-1 h-8 bg-gray-700 dark:bg-gray-700 text-white dark:text-gray-100 border-gray-600 dark:border-gray-600 hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="processing">Processing</SelectItem>
-                        <SelectItem value="packed">Packed</SelectItem>
-                        <SelectItem value="shipped">Shipped</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {activeTab === "packed" ? (
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                        disabled={updateStatusMutation.isPending}
+                        onClick={() => handleStatusUpdate(order.id, "shipped")}
+                      >
+                        {updateStatusMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                        ) : null}
+                        Mark as Shipped
+                      </Button>
+                    ) : (
+                      <Select
+                        value={order.status}
+                        onValueChange={(status) => handleStatusUpdate(order.id, status)}
+                      >
+                        <SelectTrigger className="flex-1 h-8 bg-gray-700 dark:bg-gray-700 text-white dark:text-gray-100 border-gray-600 dark:border-gray-600 hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="processing">Processing</SelectItem>
+                          <SelectItem value="packed">Packed</SelectItem>
+                          <SelectItem value="shipped">Shipped</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
 
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -990,21 +1004,35 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                     )}
                     <TableCell>
                       <div className="flex items-center justify-end space-x-2">
-                        <Select
-                          value={order.status}
-                          onValueChange={(status) => handleStatusUpdate(order.id, status)}
-                        >
-                          <SelectTrigger className="w-32 h-8 bg-gray-700 text-white border-gray-600 hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="processing">Processing</SelectItem>
-                            <SelectItem value="packed">Packed</SelectItem>
-                            <SelectItem value="shipped">Shipped</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {activeTab === "packed" ? (
+                          <Button
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            disabled={updateStatusMutation.isPending}
+                            onClick={() => handleStatusUpdate(order.id, "shipped")}
+                          >
+                            {updateStatusMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                            ) : null}
+                            Mark as Shipped
+                          </Button>
+                        ) : (
+                          <Select
+                            value={order.status}
+                            onValueChange={(status) => handleStatusUpdate(order.id, status)}
+                          >
+                            <SelectTrigger className="w-32 h-8 bg-gray-700 text-white border-gray-600 hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="processing">Processing</SelectItem>
+                              <SelectItem value="packed">Packed</SelectItem>
+                              <SelectItem value="shipped">Shipped</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
 
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
