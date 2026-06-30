@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle } from "lucide-react";
+import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Order } from "@shared/schema";
 
@@ -26,6 +26,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [isScanning, setIsScanning] = useState(false);
   const [scanningError, setScanningError] = useState<string>("");
   const [lastScanTime, setLastScanTime] = useState(0);
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -94,7 +95,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   });
 
   // Start camera for QR scanning
-  const startScanning = async () => {
+  const startScanning = async (requestedFacingMode?: "environment" | "user") => {
     try {
       setScanningError("");
 
@@ -116,13 +117,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         }
       } catch (permError) {
         console.warn('Permission check failed:', permError);
-        // Continue anyway as some browsers don't support permission query
       }
 
-      // Try different camera configurations starting with basic
+      const currentFacing = requestedFacingMode ?? facingMode;
+
+      // Try with the requested facing mode first, then fall back to any camera
       const constraints = [
+        { video: { facingMode: currentFacing, width: { ideal: 640 }, height: { ideal: 480 } } },
         { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
-        { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } },
         { video: true }
       ];
 
@@ -155,7 +157,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
           video.srcObject = streamRef.current;
           video.play().then(() => {
             setTimeout(detectQRCode, 100);
-          }).catch(e => {
+          }).catch(() => {
             setScanningError("Failed to start video. Please try again.");
             setIsScanning(false);
           });
@@ -174,6 +176,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         errorMessage = "Camera is being used by another application.";
       } else if (error.name === 'OverconstrainedError') {
         errorMessage = "Camera constraints not supported.";
+      } else {
+        errorMessage = error.message || errorMessage;
       }
       
       setScanningError(errorMessage);
@@ -186,6 +190,20 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       });
     }
   };
+
+  // Switch between front and rear camera
+  const switchCamera = useCallback(async () => {
+    const newFacing = facingMode === "environment" ? "user" : "environment";
+    setFacingMode(newFacing);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    await startScanning(newFacing);
+  }, [facingMode]);
 
   // Stop camera
   const stopScanning = useCallback(() => {
@@ -454,6 +472,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                               </div>
                             </div>
                           </div>
+                          {/* Switch camera button */}
+                          <button
+                            onClick={switchCamera}
+                            className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                            title={facingMode === "environment" ? "Switch to front camera" : "Switch to rear camera"}
+                          >
+                            <SwitchCamera className="h-5 w-5" />
+                          </button>
                         </div>
                       ) : (
                         <div className="text-center py-8 text-gray-500">
