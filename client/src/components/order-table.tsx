@@ -485,6 +485,55 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
 
 type OrderTab = "new" | "packed" | "shipped" | "cancelled";
 
+function PackButton({ order, onOpenDetails, updateStatusMutation }: { 
+  order: Order; 
+  onOpenDetails: () => void; 
+  updateStatusMutation: ReturnType<typeof useMutation<void, Error, { orderId: number; status: string }>>;
+}) {
+  const { data: orderWithItems, isLoading } = useQuery<OrderWithItems>({
+    queryKey: ['/api/order-detail', order.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/orders/${order.id}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch order');
+      return res.json();
+    },
+    staleTime: 30000,
+    gcTime: Infinity,
+  });
+
+  const allFulfilled = !isLoading && 
+    orderWithItems?.items != null && 
+    orderWithItems.items.length > 0 && 
+    orderWithItems.items.every(item => item.fulfilled);
+
+  const handleClick = () => {
+    if (!allFulfilled) {
+      onOpenDetails();
+    } else {
+      updateStatusMutation.mutate({ orderId: order.id, status: 'packed' });
+    }
+  };
+
+  return (
+    <Button
+      size="sm"
+      title={allFulfilled ? "Move order to Packed" : "Fulfill all items first — click to open order details"}
+      className={
+        allFulfilled
+          ? "bg-green-600 hover:bg-green-700 text-white"
+          : "bg-gray-400 dark:bg-gray-600 text-white cursor-pointer opacity-60 hover:opacity-80"
+      }
+      onClick={handleClick}
+      disabled={updateStatusMutation.isPending && updateStatusMutation.variables?.orderId === order.id}
+    >
+      {updateStatusMutation.isPending && updateStatusMutation.variables?.orderId === order.id ? (
+        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+      ) : null}
+      Pack
+    </Button>
+  );
+}
+
 export default function OrderTable({ orders, user, staffUsers }: OrderTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -826,6 +875,12 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                         ) : null}
                         Mark as Shipped
                       </Button>
+                    ) : activeTab === "new" ? (
+                      <PackButton
+                        order={order}
+                        onOpenDetails={() => handleViewOrder(order.id)}
+                        updateStatusMutation={updateStatusMutation}
+                      />
                     ) : (
                       <Select
                         value={order.status}
@@ -1016,6 +1071,12 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                             ) : null}
                             Mark as Shipped
                           </Button>
+                        ) : activeTab === "new" ? (
+                          <PackButton
+                            order={order}
+                            onOpenDetails={() => handleViewOrder(order.id)}
+                            updateStatusMutation={updateStatusMutation}
+                          />
                         ) : (
                           <Select
                             value={order.status}
