@@ -460,9 +460,15 @@ Please manually send this reset URL to the user via their preferred communicatio
   // Get current user endpoint
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
-      const user = await storage.getUser(req.userId);
+      let user = await storage.getUser(req.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
+      }
+
+      // Auto-correct: active accounts should always have verified status
+      if (user.status === 'active' && user.idVerificationStatus === 'pending') {
+        await storage.updateUserIdVerification(req.userId, 'verified');
+        user = { ...user, idVerificationStatus: 'verified' };
       }
 
       const { password: _, ...userResponse } = user;
