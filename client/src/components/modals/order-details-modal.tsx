@@ -27,7 +27,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [scanningError, setScanningError] = useState<string>("");
   const [lastScanTime, setLastScanTime] = useState(0);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  const [pendingFulfillment, setPendingFulfillment] = useState<{ item: any } | null>(null);
+  const [confirmQuantity, setConfirmQuantity] = useState<string>("");
 
+  const isFulfillingRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -81,11 +84,18 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       });
       queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      isFulfillingRef.current = false;
+      setPendingFulfillment(null);
+      setConfirmQuantity("");
       setScanningMode(false);
       setSelectedItemId(null);
       stopScanning();
     },
     onError: (error: any) => {
+      // Reset the lock so the user can try again
+      isFulfillingRef.current = false;
+      setPendingFulfillment(null);
+      setConfirmQuantity("");
       toast({
         title: "Fulfillment Failed",
         description: error.message || "Failed to fulfill item",
@@ -221,6 +231,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   // QR code detection
   const detectQRCode = useCallback(() => {
     if (!videoRef.current || !canvasRef.current || !isScanning) return;
+    // If we already matched a code and are awaiting confirmation, don't process more frames
+    if (isFulfillingRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -234,6 +246,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
       import('jsqr').then(({ default: jsQR }) => {
+        if (isFulfillingRef.current) return;
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
           inversionAttempts: "dontInvert",
         });
@@ -255,23 +268,31 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     }
   }, [isScanning, lastScanTime]);
 
-  // Handle QR code detection
+  // Handle QR code detection — stop scanning immediately and show confirmation
   const handleQRCodeDetected = (qrData: string) => {
     if (!selectedItemId || !fullOrder) return;
+    if (isFulfillingRef.current) return;
 
-    const selectedItem = fullOrder.items?.find(item => item.id === selectedItemId);
+    const selectedItem = fullOrder.items?.find((item: any) => item.id === selectedItemId);
     if (!selectedItem) return;
 
-    // Extract SKU from QR data (assuming QR contains just the SKU)
     const scannedSku = qrData.trim();
 
-    // Check if scanned SKU matches the selected item's SKU
     if (selectedItem.productSku === scannedSku) {
-      fulfillItemMutation.mutate({
-        orderId: fullOrder.id,
-        productId: selectedItem.productId!,
-        quantity: selectedItem.quantity
-      });
+      // Lock immediately to prevent the scan loop from firing again
+      isFulfillingRef.current = true;
+      // Stop camera — we have a match
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      setIsScanning(false);
+      // Show confirmation step
+      setConfirmQuantity(String(selectedItem.quantity));
+      setPendingFulfillment({ item: selectedItem });
     } else {
       toast({
         title: "Wrong Item",
@@ -279,6 +300,34 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         variant: "destructive",
       });
     }
+  };
+
+  // Confirm and execute the fulfillment
+  const confirmFulfillment = () => {
+    if (!pendingFulfillment || !fullOrder) return;
+    const { item } = pendingFulfillment;
+    const qty = parseInt(confirmQuantity);
+    if (isNaN(qty) || qty < 1 || qty > item.quantity) {
+      toast({
+        title: "Invalid Quantity",
+        description: `Please enter a number between 1 and ${item.quantity}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    fulfillItemMutation.mutate({
+      orderId: fullOrder.id,
+      productId: item.productId,
+      quantity: qty,
+    });
+  };
+
+  // Cancel pending fulfillment and return to scanning
+  const cancelPendingFulfillment = () => {
+    isFulfillingRef.current = false;
+    setPendingFulfillment(null);
+    setConfirmQuantity("");
+    startScanning();
   };
 
   const handleItemClick = async (itemId: number, item: any) => {
@@ -295,6 +344,9 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   };
 
   const cancelScanning = () => {
+    isFulfillingRef.current = false;
+    setPendingFulfillment(null);
+    setConfirmQuantity("");
     setScanningMode(false);
     setSelectedItemId(null);
     stopScanning();
@@ -455,7 +507,83 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                         </Alert>
                       )}
 
-                      {isScanning ? (
+                      {pendingFulfillment ? (
+                        /* ── Confirmation step ── */
+                        (() => {
+                          const { item } = pendingFulfillment;
+                          const isWeightBased = item.product?.sellingMethod === "weight";
+                          const weightUnit = item.product?.weightUnit || "grams";
+                          return (
+                            <div className="space-y-4">
+                              <div className="flex items-center gap-2 text-green-600">
+                                <CheckCircle className="h-5 w-5" />
+                                <span className="font-medium">QR Code Matched!</span>
+                              </div>
+
+                              <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 p-4 space-y-2">
+                                <p className="font-semibold text-gray-900 dark:text-gray-100">{item.productName}</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">SKU: {item.productSku}</p>
+
+                                {isWeightBased && (
+                                  <div className="mt-2 p-2 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+                                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                                      ⚖️ Weight-based product — measured in {weightUnit}
+                                    </p>
+                                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                                      Confirm the correct weight is ready before fulfilling.
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                  {isWeightBased
+                                    ? `Quantity to fulfill (order requires ${item.quantity} ${item.quantity === 1 ? "unit" : "units"})`
+                                    : `Units to fulfill (order requires ${item.quantity})`}
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={item.quantity}
+                                    value={confirmQuantity}
+                                    onChange={(e) => setConfirmQuantity(e.target.value)}
+                                    className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                  />
+                                  <span className="text-sm text-gray-500">
+                                    {isWeightBased ? `${weightUnit} unit(s)` : "unit(s)"}
+                                  </span>
+                                </div>
+                                {item.quantity > 1 && (
+                                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                                    ⚠ This order requires {item.quantity} {isWeightBased ? `${weightUnit} unit(s)` : "unit(s)"}. Verify the amount before confirming.
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="flex gap-2">
+                                <Button
+                                  onClick={confirmFulfillment}
+                                  disabled={fulfillItemMutation.isPending}
+                                  className="flex-1 bg-green-600 hover:bg-green-700"
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  {fulfillItemMutation.isPending ? "Fulfilling…" : "Confirm Fulfillment"}
+                                </Button>
+                                <Button
+                                  onClick={cancelPendingFulfillment}
+                                  variant="outline"
+                                  disabled={fulfillItemMutation.isPending}
+                                >
+                                  Rescan
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : isScanning ? (
+                        /* ── Live camera feed ── */
                         <div className="relative">
                           <video
                             ref={videoRef}
@@ -482,44 +610,47 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                           </button>
                         </div>
                       ) : (
+                        /* ── Idle / not started ── */
                         <div className="text-center py-8 text-gray-500">
                           <Camera className="h-12 w-12 mx-auto mb-2 opacity-50" />
                           <p>Camera not active. Click "Start Camera" to begin scanning.</p>
                         </div>
                       )}
 
-                      {/* Manual SKU input as fallback */}
-                      <div className="border-t pt-4">
-                        <p className="text-sm text-gray-600 mb-2">Or manually confirm SKU:</p>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Enter SKU manually"
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                const input = e.target as HTMLInputElement;
-                                if (input.value.trim()) {
+                      {/* Manual SKU input — only show when not confirming */}
+                      {!pendingFulfillment && (
+                        <div className="border-t pt-4">
+                          <p className="text-sm text-gray-600 mb-2">Or manually confirm SKU:</p>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Enter SKU manually"
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const input = e.target as HTMLInputElement;
+                                  if (input.value.trim()) {
+                                    handleQRCodeDetected(input.value.trim());
+                                    input.value = '';
+                                  }
+                                }
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                const input = (e.target as HTMLElement).parentElement?.querySelector('input') as HTMLInputElement;
+                                if (input?.value.trim()) {
                                   handleQRCodeDetected(input.value.trim());
                                   input.value = '';
                                 }
-                              }
-                            }}
-                          />
-                          <Button 
-                            size="sm"
-                            onClick={(e) => {
-                              const input = (e.target as HTMLElement).parentElement?.querySelector('input') as HTMLInputElement;
-                              if (input?.value.trim()) {
-                                handleQRCodeDetected(input.value.trim());
-                                input.value = '';
-                              }
-                            }}
-                          >
-                            Confirm
-                          </Button>
+                              }}
+                            >
+                              Confirm
+                            </Button>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
