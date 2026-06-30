@@ -520,8 +520,8 @@ function PackButton({ order, onOpenDetails, updateStatusMutation }: {
       title={allFulfilled ? "Move order to Packed" : "Fulfill all items first — click to open order details"}
       className={
         allFulfilled
-          ? "bg-green-600 hover:bg-green-700 text-white"
-          : "bg-gray-400 dark:bg-gray-600 text-white cursor-pointer opacity-60 hover:opacity-80"
+          ? "bg-green-600 hover:bg-green-700 text-white w-20"
+          : "bg-gray-400 dark:bg-gray-600 text-white cursor-pointer opacity-60 hover:opacity-80 w-20"
       }
       onClick={handleClick}
       disabled={updateStatusMutation.isPending && updateStatusMutation.variables?.orderId === order.id}
@@ -1033,7 +1033,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                             value={order.assignedUserId || "unassigned"}
                             onValueChange={(assignedUserId) => handleAssignOrder(order.id, assignedUserId === "unassigned" ? "" : assignedUserId)}
                           >
-                            <SelectTrigger className="w-full min-w-40 h-8 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
+                            <SelectTrigger className="w-full min-w-28 h-8 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
                               <SelectValue placeholder="Assign to staff..." />
                             </SelectTrigger>
                             <SelectContent>
