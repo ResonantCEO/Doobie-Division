@@ -1058,7 +1058,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                       </TableCell>
                     )}
                     <TableCell>
-                      <div className="flex items-center justify-end space-x-2">
+                      <div className="flex items-center justify-start space-x-2">
                         {activeTab === "packed" ? (
                           <Button
                             size="sm"
