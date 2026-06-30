@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera } from "lucide-react";
+import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Order } from "@shared/schema";
 
@@ -101,6 +101,28 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         description: error.message || "Failed to fulfill item",
         variant: "destructive",
       });
+    }
+  });
+
+  // Mark order as packed
+  const packOrderMutation = useMutation({
+    mutationFn: async (orderId: number) => {
+      const response = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'packed' })
+      });
+      if (!response.ok) throw new Error('Failed to update order status');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Order Packed", description: "Order has been marked as packed." });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to mark order as packed.", variant: "destructive" });
     }
   });
 
@@ -372,6 +394,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         return <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">Pending</Badge>;
       case "processing":
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Processing</Badge>;
+      case "packed":
+        return <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-200"><Archive className="h-3 w-3 mr-1" />Packed</Badge>;
       case "shipped":
         return <Badge variant="default" className="status-completed">Shipped</Badge>;
       case "cancelled":
@@ -382,6 +406,13 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   };
 
   const canScan = userRole === 'staff' || userRole === 'manager' || userRole === 'admin';
+
+  const allItemsFulfilled =
+    displayOrder.items &&
+    displayOrder.items.length > 0 &&
+    displayOrder.items.every((item: any) => item.fulfilled);
+
+  const isAlreadyPacked = displayOrder.status === 'packed';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -738,6 +769,39 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                   <div className="text-sm text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-300 dark:border-gray-600">
                     <p className="whitespace-pre-wrap">{displayOrder.notes}</p>
                   </div>
+                </div>
+              </>
+            )}
+
+            {/* Pack button — only visible to staff/managers/admins, not shown if already packed/shipped */}
+            {canScan && !isAlreadyPacked && displayOrder.status !== 'shipped' && displayOrder.status !== 'delivered' && displayOrder.status !== 'cancelled' && (
+              <>
+                <Separator />
+                <div className="pt-2 pb-1">
+                  {!allItemsFulfilled && (
+                    <p className="text-sm text-muted-foreground mb-3 text-center">
+                      Fulfill all items above to enable packing.
+                    </p>
+                  )}
+                  <Button
+                    onClick={() => packOrderMutation.mutate(displayOrder.id)}
+                    disabled={!allItemsFulfilled || packOrderMutation.isPending}
+                    className="w-full h-12 text-base font-semibold bg-purple-600 hover:bg-purple-700 disabled:opacity-40"
+                    size="lg"
+                  >
+                    <Archive className="h-5 w-5 mr-2" />
+                    {packOrderMutation.isPending ? "Packing…" : "Pack Order"}
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {isAlreadyPacked && (
+              <>
+                <Separator />
+                <div className="flex items-center justify-center gap-2 py-3 text-purple-600 dark:text-purple-400">
+                  <Archive className="h-5 w-5" />
+                  <span className="font-medium">This order has been packed</span>
                 </div>
               </>
             )}
