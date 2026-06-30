@@ -921,7 +921,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'pending': 'Your order is pending confirmation',
             'processing': 'Your order is being processed',
             'shipped': 'Your order has been shipped',
-            'delivered': 'Your order has been delivered',
             'cancelled': 'Your order has been cancelled'
           };
 

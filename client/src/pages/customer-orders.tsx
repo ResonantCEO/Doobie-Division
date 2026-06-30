@@ -53,9 +53,7 @@ export default function CustomerOrdersPage() {
       case "processing":
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Processing</Badge>;
       case "shipped":
-        return <Badge variant="secondary" className="bg-green-100 text-green-800">Shipped</Badge>;
-      case "delivered":
-        return <Badge variant="default" className="bg-green-600">Delivered</Badge>;
+        return <Badge variant="default" className="bg-green-600">Shipped</Badge>;
       case "cancelled":
         return <Badge variant="destructive">Cancelled</Badge>;
       default:
@@ -71,8 +69,6 @@ export default function CustomerOrdersPage() {
         return <Package className="h-4 w-4 text-blue-500" />;
       case "shipped":
         return <Truck className="h-4 w-4 text-green-500" />;
-      case "delivered":
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
       case "cancelled":
         return <X className="h-4 w-4 text-red-500" />;
       default:
@@ -131,7 +127,6 @@ export default function CustomerOrdersPage() {
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
@@ -149,7 +144,7 @@ export default function CustomerOrdersPage() {
           { label: "Total Orders", count: orders.length, color: "bg-blue-500", icon: Package },
           { label: "Pending", count: orders.filter(o => o.status === 'pending').length, color: "bg-orange-500", icon: Clock },
           { label: "Shipped", count: orders.filter(o => o.status === 'shipped').length, color: "bg-green-500", icon: Truck },
-          { label: "Delivered", count: orders.filter(o => o.status === 'delivered').length, color: "bg-green-600", icon: CheckCircle }
+          { label: "Cancelled", count: orders.filter(o => o.status === 'cancelled').length, color: "bg-red-500", icon: CheckCircle }
         ].map((stat, i) => (
           <Card key={i}>
             <CardContent className="p-4">

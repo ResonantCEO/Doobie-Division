@@ -921,7 +921,7 @@ function OrdersWireframe() {
           { label: "Total Orders", value: "156", color: "bg-blue-500", icon: ShoppingCart },
           { label: "Pending", value: "23", color: "bg-yellow-500", icon: Clock },
           { label: "Shipped", value: "89", color: "bg-green-500", icon: CheckCircle },
-          { label: "Delivered", value: "44", color: "bg-purple-500", icon: Package }
+          { label: "Shipped", value: "44", color: "bg-purple-500", icon: Package }
         ].map((stat, i) => (
           <Card key={i}>
             <CardContent className="p-4">
@@ -946,7 +946,6 @@ function OrdersWireframe() {
           <option>Pending</option>
           <option>Processing</option>
           <option>Shipped</option>
-          <option>Delivered</option>
           <option>Cancelled</option>
         </select>
         <Button variant="outline" size="sm">
@@ -959,7 +958,7 @@ function OrdersWireframe() {
         {[
           { id: "#ORD-001", customer: "John Doe", status: "Pending", amount: "$125.50", items: 3 },
           { id: "#ORD-002", customer: "Jane Smith", status: "Shipped", amount: "$89.99", items: 2 },
-          { id: "#ORD-003", customer: "Bob Wilson", status: "Delivered", amount: "$234.00", items: 5 },
+          { id: "#ORD-003", customer: "Bob Wilson", status: "Shipped", amount: "$234.00", items: 5 },
           { id: "#ORD-004", customer: "Alice Brown", status: "Processing", amount: "$156.75", items: 1 }
         ].map((order, i) => (
           <Card key={i}>
@@ -971,7 +970,7 @@ function OrdersWireframe() {
                   <p className="text-xs text-gray-500">{order.items} items</p>
                   <Badge 
                     variant={
-                      order.status === "Delivered" ? "default" : 
+                      order.status === "Shipped" ? "default" : 
                       order.status === "Pending" ? "secondary" :
                       order.status === "Shipped" ? "outline" : "secondary"
                     } 

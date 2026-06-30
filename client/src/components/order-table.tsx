@@ -483,7 +483,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
   );
 }
 
-type OrderTab = "new" | "packed" | "delivered" | "cancelled";
+type OrderTab = "new" | "packed" | "shipped" | "cancelled";
 
 export default function OrderTable({ orders, user, staffUsers }: OrderTableProps) {
   const { toast } = useToast();
@@ -517,7 +517,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
   const getStatusesForTab = (tab: OrderTab): string[] => {
     switch (tab) {
       case "packed": return ["packed"];
-      case "delivered": return ["delivered"];
+      case "shipped": return ["shipped"];
       case "cancelled": return ["cancelled"];
       default: return [];
     }
@@ -526,7 +526,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
   const getTabLabel = (tab: OrderTab): string => {
     switch (tab) {
       case "packed": return "Packed";
-      case "delivered": return "Delivered";
+      case "shipped": return "Shipped";
       case "cancelled": return "Cancelled";
       default: return "";
     }
@@ -557,8 +557,8 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
         return orders.filter(order => order.status === "pending" || order.status === "processing");
       case "packed":
         return orders.filter(order => order.status === "packed");
-      case "delivered":
-        return orders.filter(order => order.status === "delivered");
+      case "shipped":
+        return orders.filter(order => order.status === "shipped");
       case "cancelled":
         return orders.filter(order => order.status === "cancelled");
       default:
@@ -569,7 +569,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
   const tabCounts = useMemo(() => ({
     new: orders.filter(o => o.status === "pending" || o.status === "processing").length,
     packed: orders.filter(o => o.status === "packed").length,
-    delivered: orders.filter(o => o.status === "delivered").length,
+    shipped: orders.filter(o => o.status === "shipped").length,
     cancelled: orders.filter(o => o.status === "cancelled").length,
   }), [orders]);
 
@@ -670,8 +670,8 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Processing</Badge>;
       case "packed":
         return <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-200">Packed</Badge>;
-      case "delivered":
-        return <Badge variant="default" className="status-completed">Delivered</Badge>;
+      case "shipped":
+        return <Badge variant="default" className="status-completed">Shipped</Badge>;
       case "cancelled":
         return <Badge variant="destructive" className="status-cancelled">Cancelled</Badge>;
       default:
@@ -825,7 +825,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="processing">Processing</SelectItem>
                         <SelectItem value="packed">Packed</SelectItem>
-                        <SelectItem value="delivered">Delivered</SelectItem>
+                        <SelectItem value="shipped">Shipped</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1001,7 +1001,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                             <SelectItem value="pending">Pending</SelectItem>
                             <SelectItem value="processing">Processing</SelectItem>
                             <SelectItem value="packed">Packed</SelectItem>
-                            <SelectItem value="delivered">Delivered</SelectItem>
+                            <SelectItem value="shipped">Shipped</SelectItem>
                             <SelectItem value="cancelled">Cancelled</SelectItem>
                           </SelectContent>
                         </Select>
@@ -1150,14 +1150,14 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
               Packed {tabCounts.packed > 0 && <span className="ml-1.5 bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded-full">{tabCounts.packed}</span>}
             </button>
             <button
-              onClick={() => setActiveTab("delivered")}
+              onClick={() => setActiveTab("shipped")}
               className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
-                activeTab === "delivered"
+                activeTab === "shipped"
                   ? "bg-white dark:bg-gray-600 text-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600"
               }`}
             >
-              Delivered {tabCounts.delivered > 0 && <span className="ml-1.5 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">{tabCounts.delivered}</span>}
+              Shipped {tabCounts.shipped > 0 && <span className="ml-1.5 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">{tabCounts.shipped}</span>}
             </button>
             <button
               onClick={() => setActiveTab("cancelled")}

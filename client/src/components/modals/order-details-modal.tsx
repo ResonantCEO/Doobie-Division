@@ -849,7 +849,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
             )}
 
             {/* Pack button — only visible to staff/managers/admins, not shown if already packed/shipped */}
-            {canScan && !isAlreadyPacked && displayOrder.status !== 'shipped' && displayOrder.status !== 'delivered' && displayOrder.status !== 'cancelled' && (
+            {canScan && !isAlreadyPacked && displayOrder.status !== 'shipped' && displayOrder.status !== 'cancelled' && (
               <>
                 <Separator />
                 <div className="pt-2 pb-1">

@@ -1482,14 +1482,14 @@ export class DatabaseStorage implements IStorage {
         conditions.push(eq(orders.assignedUserId, filters.assignedUserId));
       }
 
-      // Hide delivered orders older than 48 hours for customers
+      // Hide shipped orders older than 48 hours for customers
       if (filters.hideOldDelivered) {
         const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
         conditions.push(
           or(
-            ne(orders.status, 'delivered'),
+            ne(orders.status, 'shipped'),
             and(
-              eq(orders.status, 'delivered'),
+              eq(orders.status, 'shipped'),
               gte(orders.updatedAt, fortyEightHoursAgo)
             )
           )
