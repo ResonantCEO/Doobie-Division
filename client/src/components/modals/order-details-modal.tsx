@@ -25,12 +25,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanningError, setScanningError] = useState<string>("");
-  const [lastScanTime, setLastScanTime] = useState(0);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [pendingFulfillment, setPendingFulfillment] = useState<{ item: any } | null>(null);
   const [confirmQuantity, setConfirmQuantity] = useState<string>("");
 
   const isFulfillingRef = useRef(false);
+  const isScanningRef = useRef(false);                        // mirrors isScanning synchronously
+  const lastScanTimeRef = useRef(0);                          // mirrors lastScanTime without closure capture
+  const handleQRCodeDetectedRef = useRef<(data: string) => void>(() => {}); // always-current handler
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -180,6 +182,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       }
 
       streamRef.current = stream;
+      isScanningRef.current = true;
+      lastScanTimeRef.current = 0;
       setIsScanning(true);
       
       // Simple video setup
@@ -188,9 +192,11 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         if (video && streamRef.current) {
           video.srcObject = streamRef.current;
           video.play().then(() => {
-            setTimeout(detectQRCode, 100);
+            // Small delay to let the video frame populate before scanning
+            setTimeout(detectQRCode, 300);
           }).catch(() => {
             setScanningError("Failed to start video. Please try again.");
+            isScanningRef.current = false;
             setIsScanning(false);
           });
         }
@@ -239,6 +245,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
   // Stop camera
   const stopScanning = useCallback(() => {
+    isScanningRef.current = false;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
@@ -250,10 +257,11 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     setScanningError("");
   }, []);
 
-  // QR code detection
+  // QR code detection — reads only from refs so it never has stale closure values
   const detectQRCode = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current || !isScanning) return;
-    // If we already matched a code and are awaiting confirmation, don't process more frames
+    // Use the ref (synchronous) instead of the state (async) to avoid stale-closure bail-out
+    if (!isScanningRef.current) return;
+    if (!videoRef.current || !canvasRef.current) return;
     if (isFulfillingRef.current) return;
 
     const video = videoRef.current;
@@ -268,16 +276,16 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
       import('jsqr').then(({ default: jsQR }) => {
-        if (isFulfillingRef.current) return;
+        if (!isScanningRef.current || isFulfillingRef.current) return;
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "dontInvert",
+          inversionAttempts: "attemptBoth",
         });
 
         if (code) {
           const now = Date.now();
-          if (now - lastScanTime > 2000) {
-            setLastScanTime(now);
-            handleQRCodeDetected(code.data);
+          if (now - lastScanTimeRef.current > 2000) {
+            lastScanTimeRef.current = now;
+            handleQRCodeDetectedRef.current(code.data);
           }
         }
       }).catch((error) => {
@@ -285,12 +293,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       });
     }
 
-    if (isScanning) {
+    // Schedule next frame using the ref so we don't depend on stale state
+    if (isScanningRef.current) {
       animationFrameRef.current = requestAnimationFrame(detectQRCode);
     }
-  }, [isScanning, lastScanTime]);
+  }, []);
 
   // Handle QR code detection — stop scanning immediately and show confirmation
+  // NOTE: keep this as a regular function so handleQRCodeDetectedRef always points to the latest version
   const handleQRCodeDetected = (qrData: string) => {
     if (!selectedItemId || !fullOrder) return;
     if (isFulfillingRef.current) return;
@@ -311,6 +321,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
+      isScanningRef.current = false;
       setIsScanning(false);
       // Show confirmation step — leave quantity blank so it must be typed manually
       setConfirmQuantity("");
@@ -323,6 +334,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       });
     }
   };
+  // Keep the ref pointing to the latest version so detectQRCode (empty-dep useCallback) always calls current logic
+  handleQRCodeDetectedRef.current = handleQRCodeDetected;
 
   // Confirm and execute the fulfillment
   const confirmFulfillment = () => {
