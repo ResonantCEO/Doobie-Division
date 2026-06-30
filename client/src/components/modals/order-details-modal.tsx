@@ -34,6 +34,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const lastScanTimeRef = useRef(0);                          // mirrors lastScanTime without closure capture
   const handleQRCodeDetectedRef = useRef<(data: string) => void>(() => {}); // always-current handler
   const jsQRRef = useRef<any>(null);                          // pre-loaded jsQR module
+  const firstDetectedAtRef = useRef<number>(0);               // when current code was first seen
+  const lastDetectedCodeRef = useRef<string>('');             // code value being held
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -296,10 +298,25 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
       if (code && isScanningRef.current && !isFulfillingRef.current) {
         const now = Date.now();
-        if (now - lastScanTimeRef.current > 2000) {
-          lastScanTimeRef.current = now;
-          handleQRCodeDetectedRef.current(code.data);
+        if (lastDetectedCodeRef.current === code.data) {
+          // Same code still visible — check if held for at least 250 ms
+          if (firstDetectedAtRef.current && now - firstDetectedAtRef.current >= 250) {
+            if (now - lastScanTimeRef.current > 2000) {
+              lastScanTimeRef.current = now;
+              firstDetectedAtRef.current = 0;
+              lastDetectedCodeRef.current = '';
+              handleQRCodeDetectedRef.current(code.data);
+            }
+          }
+        } else {
+          // New code in view — start the hold timer fresh
+          lastDetectedCodeRef.current = code.data;
+          firstDetectedAtRef.current = now;
         }
+      } else {
+        // Nothing detected — reset hold timer so a flash doesn't accumulate
+        lastDetectedCodeRef.current = '';
+        firstDetectedAtRef.current = 0;
       }
     }
 
