@@ -54,15 +54,15 @@ export default function OrdersPage() {
 
       return response.json();
     },
-    staleTime: Infinity, // Never consider data stale
-    gcTime: Infinity, // Keep in cache indefinitely
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // Fetch order status breakdown
   const { data: statusBreakdown = [] } = useQuery<{ status: string; count: number }[]>({
     queryKey: ["/api/analytics/order-status-breakdown"],
-    staleTime: Infinity, // Never consider data stale
-    gcTime: Infinity, // Keep in cache indefinitely
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // Fetch staff users if the current user is an admin or manager
@@ -86,7 +86,7 @@ export default function OrdersPage() {
       stats.total += item.count;
       if (item.status === "pending") stats.pending = item.count;
       else if (item.status === "processing") stats.processing = item.count;
-      else if (item.status === "shipped") stats.shipped = item.count;
+      else if (item.status === "shipped" || item.status === "delivered") stats.shipped += item.count;
       else if (item.status === "cancelled") stats.cancelled = item.count;
     });
 
