@@ -512,11 +512,6 @@ export default function UsersPage() {
                             <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                               {user.firstName} {user.lastName}
                             </span>
-                            {user.role === 'admin' && user.createdAt && new Date(user.createdAt).getTime() === Math.min(...users.map(u => new Date(u.createdAt || 0).getTime())) && (
-                              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                                Founder
-                              </Badge>
-                            )}
                           </div>
                           {user.telegramUsername && (
                             <div className="text-xs text-blue-500 dark:text-blue-400 truncate">@{user.telegramUsername}</div>
@@ -720,11 +715,6 @@ export default function UsersPage() {
                             <div>
                               <div className="flex items-center space-x-2">
                                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.firstName} {user.lastName}</span>
-                                {user.role === 'admin' && user.createdAt && new Date(user.createdAt).getTime() === Math.min(...users.map(u => new Date(u.createdAt || 0).getTime())) && (
-                                  <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                                    Founder
-                                  </Badge>
-                                )}
                               </div>
                               {user.telegramUsername && (
                                 <div className="text-sm text-blue-500 dark:text-blue-400">@{user.telegramUsername}</div>
