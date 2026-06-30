@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { Camera, Package, Plus, Minus, RotateCcw, Scan, AlertCircle, CheckCircle, ShoppingCart, Truck, Clock, AlertTriangle } from "lucide-react";
+import { Camera, Package, Plus, Minus, RotateCcw, Scan, AlertCircle, CheckCircle, ShoppingCart, Truck, Clock, AlertTriangle, SwitchCamera } from "lucide-react";
 import type { Product, Category, Order } from "@shared/schema";
 
 interface ScannedProduct extends Product {
@@ -65,6 +65,9 @@ export default function ScannerPage() {
     timestamp: string;
   }>>([]);
 
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -95,7 +98,7 @@ export default function ScannerPage() {
   });
 
   // Start camera for QR scanning
-  const startScanning = async () => {
+  const startScanning = async (requestedFacingMode?: "environment" | "user") => {
     try {
       setScanningError("");
       setScanningStatus("initializing");
@@ -108,20 +111,28 @@ export default function ScannerPage() {
       // Check for permissions first
       try {
         const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
-
-        
         if (permissionStatus.state === 'denied') {
           throw new Error("Camera permission denied. Please enable camera access in your browser settings and reload the page.");
         }
       } catch (permError) {
         console.warn('Permission check failed:', permError);
-        // Continue anyway as some browsers don't support permission query
       }
 
-      // Try different camera configurations starting with basic
+      // Detect how many video input devices exist
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        setHasMultipleCameras(videoDevices.length > 1);
+      } catch {
+        // Ignore — we'll still show the switch button if needed
+      }
+
+      const currentFacing = requestedFacingMode ?? facingMode;
+
+      // Try with the requested facing mode first, then fall back to any camera
       const constraints = [
+        { video: { facingMode: currentFacing, width: { ideal: 640 }, height: { ideal: 480 } } },
         { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
-        { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } },
         { video: true }
       ];
 
@@ -155,13 +166,12 @@ export default function ScannerPage() {
           video.srcObject = streamRef.current;
           video.play().then(() => {
             setTimeout(detectQRCode, 100);
-          }).catch(e => {
+          }).catch(() => {
             setScanningError("Failed to start video. Please try again.");
             setScanningStatus("error");
           });
         }
       }, 100);
-
 
     } catch (error: any) {
       console.error('Camera access error:', error);
@@ -175,6 +185,8 @@ export default function ScannerPage() {
         errorMessage = "Camera is being used by another application.";
       } else if (error.name === 'OverconstrainedError') {
         errorMessage = "Camera constraints not supported.";
+      } else {
+        errorMessage = error.message || errorMessage;
       }
       
       setScanningError(errorMessage);
@@ -188,6 +200,21 @@ export default function ScannerPage() {
       });
     }
   };
+
+  // Switch between front and rear camera
+  const switchCamera = useCallback(async () => {
+    const newFacing = facingMode === "environment" ? "user" : "environment";
+    setFacingMode(newFacing);
+    // Stop the current stream then restart with the new facing mode
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    await startScanning(newFacing);
+  }, [facingMode]);
 
   // Stop camera
   const stopScanning = useCallback(() => {
@@ -607,22 +634,32 @@ export default function ScannerPage() {
                       </div>
 
                       {/* Status indicator */}
-                      <div className="absolute top-2 left-2 right-2">
-                        {scanningStatus === "scanning" && (
-                          <Badge variant="default" className="bg-blue-500">
-                            Scanning for QR codes...
-                          </Badge>
-                        )}
-                        {scanningStatus === "found" && (
-                          <Badge variant="default" className="bg-green-500">
-                            QR Code Found!
-                          </Badge>
-                        )}
-                        {scanningStatus === "error" && (
-                          <Badge variant="destructive">
-                            Scan Error
-                          </Badge>
-                        )}
+                      <div className="absolute top-2 left-2 right-2 flex justify-between items-start">
+                        <div>
+                          {scanningStatus === "scanning" && (
+                            <Badge variant="default" className="bg-blue-500">
+                              Scanning for QR codes...
+                            </Badge>
+                          )}
+                          {scanningStatus === "found" && (
+                            <Badge variant="default" className="bg-green-500">
+                              QR Code Found!
+                            </Badge>
+                          )}
+                          {scanningStatus === "error" && (
+                            <Badge variant="destructive">
+                              Scan Error
+                            </Badge>
+                          )}
+                        </div>
+                        {/* Switch camera button */}
+                        <button
+                          onClick={switchCamera}
+                          className="bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                          title={facingMode === "environment" ? "Switch to front camera" : "Switch to rear camera"}
+                        >
+                          <SwitchCamera className="h-5 w-5" />
+                        </button>
                       </div>
                     </div>
 
@@ -630,7 +667,7 @@ export default function ScannerPage() {
                       Stop Scanner
                     </Button>
                     <p className="text-sm text-muted-foreground">
-                      Scan product QR codes to view detailed information
+                      {facingMode === "environment" ? "Using rear camera" : "Using front camera"} — tap <SwitchCamera className="inline h-3 w-3" /> to switch
                     </p>
                   </div>
                 )}
@@ -1114,28 +1151,40 @@ export default function ScannerPage() {
                       </div>
 
                       {/* Status indicator */}
-                      <div className="absolute top-2 left-2 right-2">
-                        {scanningStatus === "scanning" && (
-                          <Badge variant="default" className="bg-blue-500">
-                            Scanning for QR codes...
-                          </Badge>
-                        )}
-                        {scanningStatus === "found" && (
-                          <Badge variant="default" className="bg-green-500">
-                            QR Code Found!
-                          </Badge>                        )}
-                        {scanningStatus === "error" && (
-                          <Badge variant="destructive">
-                            Scan Error
-                          </Badge>
-                        )}</div>
+                      <div className="absolute top-2 left-2 right-2 flex justify-between items-start">
+                        <div>
+                          {scanningStatus === "scanning" && (
+                            <Badge variant="default" className="bg-blue-500">
+                              Scanning for QR codes...
+                            </Badge>
+                          )}
+                          {scanningStatus === "found" && (
+                            <Badge variant="default" className="bg-green-500">
+                              QR Code Found!
+                            </Badge>
+                          )}
+                          {scanningStatus === "error" && (
+                            <Badge variant="destructive">
+                              Scan Error
+                            </Badge>
+                          )}
+                        </div>
+                        {/* Switch camera button */}
+                        <button
+                          onClick={switchCamera}
+                          className="bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                          title={facingMode === "environment" ? "Switch to front camera" : "Switch to rear camera"}
+                        >
+                          <SwitchCamera className="h-5 w-5" />
+                        </button>
+                      </div>
                     </div>
 
                     <Button onClick={stopScanning} variant="outline">
                       Stop Scanner
                     </Button>
                     <p className="text-sm text-muted-foreground">
-                      Scan products to fulfill the selected order
+                      {facingMode === "environment" ? "Using rear camera" : "Using front camera"} — tap <SwitchCamera className="inline h-3 w-3" /> to switch
                     </p>
                   </div>
                 )}
