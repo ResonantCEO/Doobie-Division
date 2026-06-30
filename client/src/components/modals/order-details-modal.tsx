@@ -33,6 +33,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const isScanningRef = useRef(false);                        // mirrors isScanning synchronously
   const lastScanTimeRef = useRef(0);                          // mirrors lastScanTime without closure capture
   const handleQRCodeDetectedRef = useRef<(data: string) => void>(() => {}); // always-current handler
+  const jsQRRef = useRef<any>(null);                          // pre-loaded jsQR module
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -185,22 +186,28 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       isScanningRef.current = true;
       lastScanTimeRef.current = 0;
       setIsScanning(true);
-      
-      // Simple video setup
+
+      // Wait for React to render the video element into the DOM, then kick off scanning.
+      // We do NOT rely on video.play().then() — on Android Chrome the promise can hang
+      // silently on the first camera open, which was the root cause of "first click broken".
       setTimeout(() => {
         const video = videoRef.current;
-        if (video && streamRef.current) {
-          video.srcObject = streamRef.current;
-          video.play().then(() => {
-            // Small delay to let the video frame populate before scanning
-            setTimeout(detectQRCode, 300);
-          }).catch(() => {
-            setScanningError("Failed to start video. Please try again.");
-            isScanningRef.current = false;
-            setIsScanning(false);
-          });
+        if (!video || !streamRef.current) return;
+
+        video.srcObject = streamRef.current;
+
+        // Fire-and-forget play(); the detection loop handles waiting for HAVE_ENOUGH_DATA
+        video.play().catch(e => console.warn('video.play():', e));
+
+        // Cancel any stale loop before starting a fresh one
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = undefined;
         }
-      }, 100);
+
+        // Start the detection loop immediately — it polls readyState each frame
+        detectQRCode();
+      }, 150);
 
     } catch (error: any) {
       console.error('Camera access error:', error);
@@ -257,9 +264,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     setScanningError("");
   }, []);
 
-  // QR code detection — reads only from refs so it never has stale closure values
+  // QR code detection — fully synchronous, reads only from refs (no stale closures)
   const detectQRCode = useCallback(() => {
-    // Use the ref (synchronous) instead of the state (async) to avoid stale-closure bail-out
     if (!isScanningRef.current) return;
     if (!videoRef.current || !canvasRef.current) return;
     if (isFulfillingRef.current) return;
@@ -268,32 +274,29 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
 
-    if (video.readyState === video.HAVE_ENOUGH_DATA && context) {
+    // Only process frames when the video is truly ready
+    if (video.readyState === video.HAVE_ENOUGH_DATA && context && jsQRRef.current) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
-      import('jsqr').then(({ default: jsQR }) => {
-        if (!isScanningRef.current || isFulfillingRef.current) return;
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "attemptBoth",
-        });
-
-        if (code) {
-          const now = Date.now();
-          if (now - lastScanTimeRef.current > 2000) {
-            lastScanTimeRef.current = now;
-            handleQRCodeDetectedRef.current(code.data);
-          }
-        }
-      }).catch((error) => {
-        console.warn('jsQR not available:', error);
+      // jsQR is pre-loaded — this is now fully synchronous, no async gap
+      const code = jsQRRef.current(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "attemptBoth",
       });
+
+      if (code && isScanningRef.current && !isFulfillingRef.current) {
+        const now = Date.now();
+        if (now - lastScanTimeRef.current > 2000) {
+          lastScanTimeRef.current = now;
+          handleQRCodeDetectedRef.current(code.data);
+        }
+      }
     }
 
-    // Schedule next frame using the ref so we don't depend on stale state
+    // Always reschedule — the loop waits for HAVE_ENOUGH_DATA naturally
     if (isScanningRef.current) {
       animationFrameRef.current = requestAnimationFrame(detectQRCode);
     }
@@ -386,6 +389,13 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     setSelectedItemId(null);
     stopScanning();
   };
+
+  // Pre-load jsQR so first scan is instant (dynamic import is slow on first call)
+  useEffect(() => {
+    import('jsqr').then(({ default: jsQR }) => {
+      jsQRRef.current = jsQR;
+    }).catch(() => {});
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
