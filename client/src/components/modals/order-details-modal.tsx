@@ -264,7 +264,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     setScanningError("");
   }, []);
 
-  // QR code detection — fully synchronous, reads only from refs (no stale closures)
+  // QR code detection — only scans the center region matching the scan indicator
   const detectQRCode = useCallback(() => {
     if (!isScanningRef.current) return;
     if (!videoRef.current || !canvasRef.current) return;
@@ -274,15 +274,22 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
 
-    // Only process frames when the video is truly ready
     if (video.readyState === video.HAVE_ENOUGH_DATA && context && jsQRRef.current) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Crop to the center 60% of the frame (both axes) — matches the on-screen indicator.
+      // QR codes outside this region are intentionally ignored.
+      const cropFraction = 0.60;
+      const sw = Math.floor(video.videoWidth * cropFraction);
+      const sh = Math.floor(video.videoHeight * cropFraction);
+      const sx = Math.floor((video.videoWidth - sw) / 2);
+      const sy = Math.floor((video.videoHeight - sh) / 2);
 
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      canvas.width = sw;
+      canvas.height = sh;
+      // Draw only the cropped region onto the canvas
+      context.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
 
-      // jsQR is pre-loaded — this is now fully synchronous, no async gap
+      const imageData = context.getImageData(0, 0, sw, sh);
+
       const code = jsQRRef.current(imageData.data, imageData.width, imageData.height, {
         inversionAttempts: "attemptBoth",
       });
@@ -296,7 +303,6 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       }
     }
 
-    // Always reschedule — the loop waits for HAVE_ENOUGH_DATA naturally
     if (isScanningRef.current) {
       animationFrameRef.current = requestAnimationFrame(detectQRCode);
     }
@@ -647,11 +653,25 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                             className="w-full max-w-sm mx-auto rounded-lg border-2 border-blue-500"
                           />
                           <canvas ref={canvasRef} className="hidden" />
+                          {/* Scan region overlay — detection only fires inside this area */}
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="border-2 border-white border-dashed w-32 h-32 rounded-lg animate-pulse">
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Scan className="h-6 w-6 text-white animate-spin" />
-                              </div>
+                            {/* Dark vignette outside the scan zone */}
+                            <div className="absolute inset-0 bg-black/40" style={{
+                              maskImage: 'radial-gradient(ellipse 55% 55% at 50% 50%, transparent 0%, black 100%)',
+                              WebkitMaskImage: 'radial-gradient(ellipse 55% 55% at 50% 50%, transparent 0%, black 100%)',
+                            }} />
+                            {/* Corner-bracket scan box */}
+                            <div className="relative w-48 h-48">
+                              {/* Top-left */}
+                              <span className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-white rounded-tl-md" />
+                              {/* Top-right */}
+                              <span className="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-white rounded-tr-md" />
+                              {/* Bottom-left */}
+                              <span className="absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-white rounded-bl-md" />
+                              {/* Bottom-right */}
+                              <span className="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-white rounded-br-md" />
+                              {/* Animated scan line */}
+                              <div className="absolute inset-x-2 top-0 h-0.5 bg-blue-400 opacity-80 animate-bounce" style={{ animationDuration: '1.5s' }} />
                             </div>
                           </div>
                           {/* Switch camera button */}
