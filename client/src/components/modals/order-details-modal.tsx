@@ -290,8 +290,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         cancelAnimationFrame(animationFrameRef.current);
       }
       setIsScanning(false);
-      // Show confirmation step
-      setConfirmQuantity(String(selectedItem.quantity));
+      // Show confirmation step — leave quantity blank so it must be typed manually
+      setConfirmQuantity("");
       setPendingFulfillment({ item: selectedItem });
     } else {
       toast({
