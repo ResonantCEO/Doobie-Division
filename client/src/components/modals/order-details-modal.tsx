@@ -597,7 +597,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                 <span className="font-medium">QR Code Matched!</span>
                               </div>
 
-                              <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 p-4 space-y-2">
+                              <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 p-4 flex items-center justify-between">
+                                <div className="space-y-2 flex-1">
                                 <p className="font-semibold text-gray-900 dark:text-gray-100">{item.productName}</p>
                                 <p className="text-sm text-gray-600 dark:text-gray-400">SKU: {item.productSku}</p>
 
@@ -611,6 +612,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                     </p>
                                   </div>
                                 )}
+                                </div>
+                                <span className="text-lg font-bold text-green-700 dark:text-green-400 ml-4">x{item.quantity}</span>
                               </div>
 
                               <div className="space-y-2">
@@ -645,9 +648,6 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                 >
                                   <CheckCircle className="h-4 w-4 mr-2" />
                                   {fulfillItemMutation.isPending ? "Fulfilling…" : "Confirm Fulfillment"}
-                                  {!fulfillItemMutation.isPending && (
-                                    <span className="ml-2 font-bold">x{item.quantity}</span>
-                                  )}
                                 </Button>
                                 <Button
                                   onClick={cancelPendingFulfillment}
