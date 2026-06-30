@@ -382,10 +382,11 @@ export default function ScannerPage() {
 
   // Order fulfillment mutation
   const fulfillOrderItemMutation = useMutation({
-    mutationFn: async (data: { orderId: number; productId: number; quantity: number }) => {
+    mutationFn: async (data: { orderId: number; productId: number; quantity: number; orderItemId?: number }) => {
       await apiRequest("POST", `/api/orders/${data.orderId}/fulfill-item`, {
         productId: data.productId,
-        quantity: data.quantity
+        quantity: data.quantity,
+        orderItemId: data.orderItemId
       });
     },
     onSuccess: (_, variables) => {
@@ -483,21 +484,16 @@ export default function ScannerPage() {
       return;
     }
 
-    // Check if this product is in the order
-    const orderItem = selectedOrder.items?.find(item => item.productId === scannedProduct.id);
+    // Find the first unfulfilled item for this product in the order
+    const orderItem = selectedOrder.items?.find(item => item.productId === scannedProduct.id && !item.fulfilled);
     if (!orderItem) {
+      // Check if all matching items are already fulfilled
+      const anyItem = selectedOrder.items?.find(item => item.productId === scannedProduct.id);
       toast({
-        title: "Product Not in Order",
-        description: "This product is not part of the selected order",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (orderItem.fulfilled) {
-      toast({
-        title: "Already Fulfilled",
-        description: "This item has already been fulfilled",
+        title: anyItem ? "Already Fulfilled" : "Product Not in Order",
+        description: anyItem
+          ? "All items for this product have already been fulfilled"
+          : "This product is not part of the selected order",
         variant: "destructive",
       });
       return;
@@ -526,7 +522,8 @@ export default function ScannerPage() {
     fulfillOrderItemMutation.mutate({
       orderId: selectedOrder.id,
       productId: scannedProduct.id,
-      quantity
+      quantity,
+      orderItemId: orderItem.id
     });
   };
 

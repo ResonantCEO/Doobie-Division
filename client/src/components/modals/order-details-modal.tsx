@@ -72,12 +72,12 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
   // Fulfill order item mutation (reduces physical inventory)
   const fulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId?: number }) => {
       const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ productId, quantity })
+        body: JSON.stringify({ productId, quantity, orderItemId })
       });
       if (!response.ok) throw new Error('Failed to fulfill item');
       return response.json();
@@ -380,6 +380,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       orderId: fullOrder.id,
       productId: item.productId,
       quantity: qty,
+      orderItemId: item.id,
     });
   };
 

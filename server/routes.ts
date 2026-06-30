@@ -1006,7 +1006,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders/:id/pack-item', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
       const orderId = parseInt(req.params.id);
-      const { productId } = req.body;
+      const { productId, orderItemId } = req.body;
 
       if (!productId) {
         return res.status(400).json({ message: "Product ID is required" });
@@ -1023,8 +1023,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Order cannot be packed in its current status" });
       }
 
-      // Verify the product is part of this order
-      const orderItem = order.items?.find(item => item.productId === productId);
+      // Verify the specific order item exists (match by item ID when provided)
+      const orderItem = orderItemId
+        ? order.items?.find(item => item.id === orderItemId)
+        : order.items?.find(item => item.productId === productId && !item.fulfilled);
       if (!orderItem) {
         return res.status(400).json({ message: "Product is not part of this order" });
       }
@@ -1034,7 +1036,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Mark the item as packed (fulfilled)
-      await storage.markOrderItemAsPacked(orderId, productId, req.currentUser.id);
+      await storage.markOrderItemAsPacked(orderId, productId, req.currentUser.id, orderItemId);
 
       res.status(200).json({ message: "Order item marked as packed successfully" });
     } catch (error) {
@@ -1047,7 +1049,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders/:id/fulfill-item', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
       const orderId = parseInt(req.params.id);
-      const { productId, quantity } = req.body;
+      const { productId, quantity, orderItemId } = req.body;
 
       if (!productId || !quantity || quantity <= 0) {
         return res.status(400).json({ message: "Product ID and positive quantity are required" });
@@ -1082,8 +1084,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Verify the product is part of this order
-      const orderItem = order.items?.find(item => item.productId === productId);
+      // Verify the specific order item exists (match by item ID when provided)
+      const orderItem = orderItemId
+        ? order.items?.find(item => item.id === orderItemId)
+        : order.items?.find(item => item.productId === productId && !item.fulfilled);
       if (!orderItem) {
         return res.status(400).json({ message: "Product is not part of this order" });
       }
@@ -1097,7 +1101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fulfill the item (reduce stock and mark as fulfilled)
-      await storage.fulfillOrderItem(orderId, productId, quantity, req.currentUser.id);
+      await storage.fulfillOrderItem(orderId, productId, quantity, req.currentUser.id, orderItemId);
 
       res.status(200).json({ message: "Order item fulfilled successfully" });
     } catch (error) {
@@ -1110,7 +1114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders/:id/unfulfill-item', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
       const orderId = parseInt(req.params.id);
-      const { productId, quantity } = req.body;
+      const { productId, quantity, orderItemId } = req.body;
 
       if (!productId || !quantity || quantity <= 0) {
         return res.status(400).json({ message: "Product ID and positive quantity are required" });
@@ -1127,8 +1131,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cannot unfulfill items for orders that are already packed, delivered, or cancelled" });
       }
 
-      // Verify the product is part of this order
-      const orderItem = order.items?.find(item => item.productId === productId);
+      // Verify the specific order item exists (match by item ID when provided)
+      const orderItem = orderItemId
+        ? order.items?.find(item => item.id === orderItemId)
+        : order.items?.find(item => item.productId === productId && item.fulfilled);
       if (!orderItem) {
         return res.status(400).json({ message: "Product is not part of this order" });
       }
@@ -1139,7 +1145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Unfulfill the item (restore stock and mark as not fulfilled)
       // Use the order item's actual quantity instead of client-supplied value for security
-      await storage.unfulfillOrderItem(orderId, productId, orderItem.quantity, req.currentUser.id);
+      await storage.unfulfillOrderItem(orderId, productId, orderItem.quantity, req.currentUser.id, orderItemId);
 
       res.status(200).json({ message: "Order item unfulfilled successfully" });
     } catch (error) {

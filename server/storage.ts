@@ -86,9 +86,9 @@ export interface IStorage {
   getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined>;
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
-  fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void>;
-  unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void>;
-  markOrderItemAsPacked(orderId: number, productId: number, userId: string): Promise<{ success: boolean; allPacked: boolean }>;
+  fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
+  unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
+  markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }>;
   assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order>;
   deleteOrder(id: number): Promise<void>;
   clearAllOrders(statuses?: string[]): Promise<number>;
@@ -1742,7 +1742,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void> {
+  async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void> {
     // Get the product
     const productRows = await db.select().from(products).where(eq(products.id, productId)).limit(1);
     if (productRows.length === 0) {
@@ -1750,11 +1750,16 @@ export class DatabaseStorage implements IStorage {
     }
     const product = productRows[0];
 
-    // Get the order item so we can inspect size/weight option
+    // Get the specific order item — prefer matching by item ID when provided to
+    // correctly handle multiple variants of the same product in one order
+    const itemFilter = orderItemId
+      ? and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItemId))
+      : and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId));
+
     const [orderItem] = await db
       .select()
       .from(orderItems)
-      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)))
+      .where(itemFilter)
       .limit(1);
 
     if (!orderItem) {
@@ -1789,11 +1794,15 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(products.id, productId));
 
-    // Mark order item as fulfilled
+    // Mark the specific order item as fulfilled
+    const fulfillFilter = orderItemId
+      ? and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItemId))
+      : and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId));
+
     await db
       .update(orderItems)
       .set({ fulfilled: true })
-      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
+      .where(fulfillFilter);
 
     // Update per-size physical quantity if applicable
     const sizeName = this.extractSizeFromProductName(orderItem.productName);
@@ -1816,18 +1825,22 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void> {
+  async unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void> {
     // Get the product
     const product = await db.select().from(products).where(eq(products.id, productId)).limit(1);
     if (product.length === 0) {
       throw new Error("Product not found");
     }
 
-    // Get the order item to verify it's fulfilled
+    // Get the specific order item — prefer matching by item ID when provided
+    const unfulfillItemFilter = orderItemId
+      ? and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItemId))
+      : and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId));
+
     const orderItem = await db
       .select()
       .from(orderItems)
-      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)))
+      .where(unfulfillItemFilter)
       .limit(1);
 
     if (orderItem.length === 0) {
@@ -1861,18 +1874,14 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(products.id, productId));
 
-    // Get the order item to extract size info before marking as unfulfilled
-    const [unfulfillItem] = await db
-      .select()
-      .from(orderItems)
-      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)))
-      .limit(1);
+    // Use the already-fetched orderItem[0] for size info
+    const unfulfillItem = orderItem[0];
 
-    // Mark order item as not fulfilled
+    // Mark the specific order item as not fulfilled
     await db
       .update(orderItems)
       .set({ fulfilled: false })
-      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
+      .where(unfulfillItemFilter);
 
     if (unfulfillItem) {
       const sizeName = this.extractSizeFromProductName(unfulfillItem.productName);
@@ -1896,17 +1905,22 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async markOrderItemAsPacked(orderId: number, productId: number, userId: string): Promise<{ success: boolean; allPacked: boolean }> {
+  async markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }> {
     // Get the product and order item
     const product = await db.select().from(products).where(eq(products.id, productId)).limit(1);
     if (product.length === 0) {
       throw new Error("Product not found");
     }
 
+    // Prefer matching by item ID when provided to handle variant products sharing the same productId
+    const packItemFilter = orderItemId
+      ? and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItemId))
+      : and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId));
+
     const orderItem = await db
       .select()
       .from(orderItems)
-      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)))
+      .where(packItemFilter)
       .limit(1);
 
     if (orderItem.length === 0) {
@@ -1942,11 +1956,11 @@ export class DatabaseStorage implements IStorage {
 
     // Mark the order item as packed (fulfilled = true) and update physical inventory
     await db.transaction(async (tx) => {
-      // Mark order item as packed
+      // Mark the specific order item as packed
       await tx
         .update(orderItems)
         .set({ fulfilled: true })
-        .where(and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId)));
+        .where(packItemFilter);
 
       // Update physical inventory (reduce by packed quantity)
       await tx
