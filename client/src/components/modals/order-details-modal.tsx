@@ -653,25 +653,39 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                             className="w-full max-w-sm mx-auto rounded-lg border-2 border-blue-500"
                           />
                           <canvas ref={canvasRef} className="hidden" />
-                          {/* Scan region overlay — detection only fires inside this area */}
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            {/* Dark vignette outside the scan zone */}
-                            <div className="absolute inset-0 bg-black/40" style={{
-                              maskImage: 'radial-gradient(ellipse 55% 55% at 50% 50%, transparent 0%, black 100%)',
-                              WebkitMaskImage: 'radial-gradient(ellipse 55% 55% at 50% 50%, transparent 0%, black 100%)',
-                            }} />
-                            {/* Corner-bracket scan box */}
-                            <div className="relative w-48 h-48">
-                              {/* Top-left */}
+                          {/*
+                            Scan region overlay — the detection crop is exactly 60% of the video
+                            frame centered on both axes. The overlay mirrors this with a CSS grid
+                            that creates four dark panels (20% each side) leaving a precise 60×60%
+                            rectangular window. QR codes outside this window are not processed.
+                          */}
+                          <div
+                            className="absolute inset-0 pointer-events-none"
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '20% 60% 20%',
+                              gridTemplateRows: '20% 60% 20%',
+                            }}
+                          >
+                            {/* Left column — all 3 rows */}
+                            <div className="bg-black/55" style={{ gridColumn: 1, gridRow: '1 / 4' }} />
+                            {/* Right column — all 3 rows */}
+                            <div className="bg-black/55" style={{ gridColumn: 3, gridRow: '1 / 4' }} />
+                            {/* Top centre */}
+                            <div className="bg-black/55" style={{ gridColumn: 2, gridRow: 1 }} />
+                            {/* Bottom centre */}
+                            <div className="bg-black/55" style={{ gridColumn: 2, gridRow: 3 }} />
+                            {/* Centre cell = scan zone (transparent) — corner brackets sit here */}
+                            <div className="relative" style={{ gridColumn: 2, gridRow: 2 }}>
                               <span className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-white rounded-tl-md" />
-                              {/* Top-right */}
                               <span className="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-white rounded-tr-md" />
-                              {/* Bottom-left */}
                               <span className="absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-white rounded-bl-md" />
-                              {/* Bottom-right */}
                               <span className="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-white rounded-br-md" />
-                              {/* Animated scan line */}
-                              <div className="absolute inset-x-2 top-0 h-0.5 bg-blue-400 opacity-80 animate-bounce" style={{ animationDuration: '1.5s' }} />
+                              {/* Animated scan line inside the zone */}
+                              <div
+                                className="absolute inset-x-3 h-0.5 bg-blue-400 opacity-90 animate-bounce"
+                                style={{ animationDuration: '1.5s', top: '50%' }}
+                              />
                             </div>
                           </div>
                           {/* Switch camera button */}
