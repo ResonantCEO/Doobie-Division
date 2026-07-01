@@ -392,8 +392,12 @@ Please manually send this reset URL to the user via their preferred communicatio
     try {
       const { email, token, password, confirmPassword } = req.body;
 
-      if (!email || !token || !password || !confirmPassword) {
-        return res.status(400).json({ message: "Email, token, password, and confirm password are required" });
+      if (!email || !token || !password) {
+        return res.status(400).json({ message: "Email, token, and password are required" });
+      }
+
+      if (confirmPassword && password !== confirmPassword) {
+        return res.status(400).json({ message: "Passwords do not match" });
       }
 
       if (password.length < 8) {
