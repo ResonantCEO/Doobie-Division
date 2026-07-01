@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -18,10 +19,8 @@ export default function Dashboard() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const [location] = useLocation();
 
-  // Extract tab from URL
   const tab = location.split("/")[2] || "storefront";
 
-  // Redirect to home if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       toast({
@@ -62,7 +61,6 @@ export default function Dashboard() {
         return user.role === 'admin' ? <UsersPage /> : <StorefrontPage />;
       case "admin":
         return user.role === 'admin' ? <AdminPage /> : <StorefrontPage />;
-      
       default:
         return <StorefrontPage />;
     }
@@ -70,22 +68,28 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Background logo - fixed to viewport, never scrolls */}
-      <img
-        src={logoImage}
-        alt=""
-        className="fixed pointer-events-none select-none"
-        style={{
-          opacity: 0.2,
-          zIndex: 0,
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -40%)',
-          width: '120vmin',
-          height: '120vmin',
-          objectFit: 'contain',
-        }}
-      />
+      {/* Render logo directly into document.body via portal so no ancestor
+          CSS can interfere with position:fixed on iOS Safari */}
+      {createPortal(
+        <img
+          src={logoImage}
+          alt=""
+          style={{
+            position: 'fixed',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            opacity: 0.2,
+            zIndex: 0,
+            top: '50%',
+            left: '50%',
+            transform: 'translate3d(-50%, -40%, 0)',
+            width: '120vmin',
+            height: '120vmin',
+            objectFit: 'contain',
+          }}
+        />,
+        document.body
+      )}
       <Navigation user={user} currentTab={tab} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderTabContent()}
