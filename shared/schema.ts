@@ -188,6 +188,7 @@ export const supportTickets = pgTable("support_tickets", {
   priority: varchar("priority").notNull().default('normal'),
   status: varchar("status").notNull().default('open'),
   assignedTo: varchar("assigned_to").references(() => users.id),
+  archived: boolean("archived").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -1857,6 +1857,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/support/tickets/:id/archive', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ticket ID" });
+      }
+      const ticket = await storage.archiveSupportTicket(id);
+      res.json(ticket);
+    } catch (error) {
+      console.error("Failed to archive support ticket:", error);
+      res.status(500).json({ message: "Failed to archive support ticket" });
+    }
+  });
+
+  app.delete('/api/support/tickets', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      await storage.clearAllSupportTickets();
+      res.json({ message: "All non-archived support tickets cleared successfully" });
+    } catch (error) {
+      console.error("Failed to clear support tickets:", error);
+      res.status(500).json({ message: "Failed to clear support tickets" });
+    }
+  });
+
   // City Purchase Limits routes
   app.get('/api/city-purchase-limits', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {

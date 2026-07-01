@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon } from "lucide-react";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash } from "lucide-react";
 import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit } from "@shared/schema";
 
 interface InventoryLogWithDetails extends InventoryLog {
@@ -75,6 +75,7 @@ export default function AdminPage() {
   const [limitForm, setLimitForm] = useState({ cityName: "", minimumAmount: "" });
   const [deleteLimitConfirmOpen, setDeleteLimitConfirmOpen] = useState(false);
   const [limitToDelete, setLimitToDelete] = useState<CityPurchaseLimit | null>(null);
+  const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
 
 
   // Redirect if not admin
@@ -288,6 +289,43 @@ export default function AdminPage() {
   const handleCloseTicket = (item: SupportTicketWithDetails) => {
     closeTicketMutation.mutate(item.ticket.id);
   };
+
+  const archiveTicketMutation = useMutation({
+    mutationFn: async (ticketId: number) => {
+      const response = await fetch(`/api/support/tickets/${ticketId}/archive`, {
+        method: "PUT",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to archive ticket");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
+      toast({ title: "Ticket archived. It will not be auto-deleted." });
+    },
+    onError: () => {
+      toast({ title: "Failed to archive ticket", variant: "destructive" });
+    },
+  });
+
+  const clearAllTicketsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/support/tickets", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to clear tickets");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
+      setClearAllConfirmOpen(false);
+      toast({ title: "All non-archived tickets cleared." });
+    },
+    onError: () => {
+      toast({ title: "Failed to clear tickets", variant: "destructive" });
+    },
+  });
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -665,14 +703,25 @@ export default function AdminPage() {
         <TabsContent value="support">
           {/* Support Tickets Section */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <MessageCircle className="h-5 w-5 mr-2" />
-                Support Ticket Management
-              </CardTitle>
-              <p className="text-sm text-gray-600">
-                Manage customer support tickets and assign them to staff members
-              </p>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center">
+                  <MessageCircle className="h-5 w-5 mr-2" />
+                  Support Ticket Management
+                </CardTitle>
+                <p className="text-sm text-gray-600 mt-1">
+                  Manage customer support tickets and assign them to staff members. Closed tickets auto-delete after 24 hours unless archived.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setClearAllConfirmOpen(true)}
+                className="w-full sm:w-auto flex items-center gap-2"
+              >
+                <Trash className="h-4 w-4" />
+                Clear All Tickets
+              </Button>
             </CardHeader>
             <CardContent>
               {/* Filters */}
@@ -731,6 +780,24 @@ export default function AdminPage() {
                               Close
                             </Button>
                           )}
+                          {!item.ticket.archived && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => archiveTicketMutation.mutate(item.ticket.id)}
+                              disabled={archiveTicketMutation.isPending}
+                              className="text-xs text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                            >
+                              <Archive className="h-3 w-3 mr-1" />
+                              Archive
+                            </Button>
+                          )}
+                          {item.ticket.archived && (
+                            <Badge className="bg-amber-100 text-amber-800 text-xs">
+                              <Archive className="h-3 w-3 mr-1" />
+                              Archived
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -777,6 +844,24 @@ export default function AdminPage() {
                               >
                                 Close
                               </Button>
+                            )}
+                            {!item.ticket.archived && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => archiveTicketMutation.mutate(item.ticket.id)}
+                                disabled={archiveTicketMutation.isPending}
+                                className="text-xs text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                              >
+                                <Archive className="h-3 w-3 mr-1" />
+                                Archive
+                              </Button>
+                            )}
+                            {item.ticket.archived && (
+                              <Badge className="bg-amber-100 text-amber-800">
+                                <Archive className="h-3 w-3 mr-1" />
+                                Archived
+                              </Badge>
                             )}
                           </div>
                         </div>
@@ -1174,6 +1259,28 @@ export default function AdminPage() {
             </Button>
             <Button onClick={handleSendResponse} disabled={!ticketResponse || sendTicketResponseMutation.isPending}>
               {sendTicketResponseMutation.isPending ? 'Sending...' : 'Send Response'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear All Tickets Confirmation Dialog */}
+      <Dialog open={clearAllConfirmOpen} onOpenChange={setClearAllConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear All Support Tickets</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            This will permanently delete all <strong>non-archived</strong> support tickets. Archived tickets will be kept. This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearAllConfirmOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => clearAllTicketsMutation.mutate()}
+              disabled={clearAllTicketsMutation.isPending}
+            >
+              {clearAllTicketsMutation.isPending ? "Clearing..." : "Clear All"}
             </Button>
           </DialogFooter>
         </DialogContent>

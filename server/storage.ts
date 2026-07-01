@@ -157,6 +157,8 @@ export interface IStorage {
   assignSupportTicket(id: number, assignedTo: string | null): Promise<any>;
   addSupportTicketResponse(ticketId: number, responseData: any): Promise<any>;
   deleteSupportTicket(id: number): Promise<void>;
+  archiveSupportTicket(id: number): Promise<any>;
+  clearAllSupportTickets(): Promise<void>;
   cleanupOldClosedTickets(): Promise<void>;
 
   // Password reset operations
@@ -2971,18 +2973,44 @@ export class DatabaseStorage implements IStorage {
     await db.delete(supportTickets).where(eq(supportTickets.id, id));
   }
 
+  async archiveSupportTicket(id: number): Promise<any> {
+    const [ticket] = await db
+      .update(supportTickets)
+      .set({ archived: true, updatedAt: new Date() })
+      .where(eq(supportTickets.id, id))
+      .returning();
+    return ticket;
+  }
+
+  async clearAllSupportTickets(): Promise<void> {
+    // Only delete non-archived tickets
+    const nonArchivedTickets = await db
+      .select({ id: supportTickets.id })
+      .from(supportTickets)
+      .where(eq(supportTickets.archived, false));
+
+    for (const ticket of nonArchivedTickets) {
+      await db.delete(supportTicketResponses).where(eq(supportTicketResponses.ticketId, ticket.id));
+    }
+
+    if (nonArchivedTickets.length > 0) {
+      await db.delete(supportTickets).where(eq(supportTickets.archived, false));
+    }
+  }
+
   async cleanupOldClosedTickets(): Promise<void> {
-    // Delete closed tickets that were closed more than 24 hours ago
+    // Delete closed, non-archived tickets that were closed more than 24 hours ago
     const twentyFourHoursAgo = new Date();
     twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
-    // First, get all closed tickets older than 24 hours
+    // First, get all closed non-archived tickets older than 24 hours
     const oldClosedTickets = await db
       .select({ id: supportTickets.id })
       .from(supportTickets)
       .where(
         and(
           eq(supportTickets.status, 'closed'),
+          eq(supportTickets.archived, false),
           lt(supportTickets.updatedAt, twentyFourHoursAgo)
         )
       );
@@ -2999,6 +3027,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             eq(supportTickets.status, 'closed'),
+            eq(supportTickets.archived, false),
             lt(supportTickets.updatedAt, twentyFourHoursAgo)
           )
         );
