@@ -549,42 +549,45 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                 {/* Stock vs Physical — always shown */}
                 <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 flex items-start justify-between gap-4 text-xs">
                   <div className="space-y-0.5">
-                    <span className="font-medium text-gray-500 dark:text-gray-400">Stock</span>
+                    <span className="font-medium text-white">Stock</span>
                     {hasSizes ? (
                       <div className="space-y-0.5 mt-0.5">
-                        <div className="text-gray-900 dark:text-white font-medium">{product.stock} total</div>
+                        <div className="text-white font-medium">{product.stock} total</div>
                         {product.sizes!.map((size) => (
-                          <div key={size.id} className="text-gray-600 dark:text-gray-400 pl-1">
+                          <div key={size.id} className="text-white pl-1">
                             {size.size}: {size.quantity}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="text-gray-900 dark:text-white font-medium mt-0.5">{product.stock} units</div>
+                      <div className="text-white font-medium mt-0.5">{product.stock} units</div>
                     )}
                   </div>
                   <div className="space-y-0.5 text-right">
-                    <span className="font-medium text-gray-500 dark:text-gray-400">Physical</span>
+                    <span className="font-medium text-white">Physical</span>
                     {hasSizes ? (
                       <div className="space-y-0.5 mt-0.5">
-                        <div className={`font-medium ${hasVariance ? "text-orange-500" : "text-gray-900 dark:text-white"}`}>
+                        <div className={`font-medium ${hasVariance ? "text-red-500" : "text-white"}`}>
                           {product.physicalInventory || 0} total
                         </div>
-                        {product.sizes!.map((size) => (
-                          <div key={size.id} className="text-gray-600 dark:text-gray-400 pr-0">
-                            {size.size}: {size.physicalQuantity || 0}
-                          </div>
-                        ))}
+                        {product.sizes!.map((size) => {
+                          const sizeVariance = (size.physicalQuantity || 0) - size.quantity;
+                          return (
+                            <div key={size.id} className={sizeVariance !== 0 ? "text-red-500" : "text-white"}>
+                              {size.size}: {size.physicalQuantity || 0}
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
-                      <div className={`font-medium mt-0.5 ${hasVariance ? "text-orange-500" : "text-gray-900 dark:text-white"}`}>
+                      <div className={`font-medium mt-0.5 ${hasVariance ? "text-red-500" : "text-white"}`}>
                         {product.physicalInventory || 0} units
                       </div>
                     )}
                   </div>
                 </div>
                 {hasVariance && (
-                  <div className="mt-1.5 flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 font-medium">
+                  <div className="mt-1.5 flex items-center gap-1 text-xs text-red-500 font-medium">
                     <TrendingDown className="h-3 w-3 shrink-0" />
                     <span>Variance: {variance > 0 ? "+" : ""}{variance} units</span>
                   </div>
