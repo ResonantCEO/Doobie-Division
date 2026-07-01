@@ -97,7 +97,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
   });
 
   const resetPasswordMutation = useMutation({
-    mutationFn: async (data: { email: string; token: string; password: string }) => {
+    mutationFn: async (data: { email: string; token: string; password: string; confirmPassword: string }) => {
       const response = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -339,6 +339,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
       email: resetPasswordData.email,
       token: resetPasswordData.token,
       password: resetPasswordData.password,
+      confirmPassword: resetPasswordData.confirmPassword,
     });
   };
 
