@@ -2983,18 +2983,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async clearAllSupportTickets(): Promise<void> {
-    // Only delete non-archived tickets
-    const nonArchivedTickets = await db
+    // Only delete closed, non-archived tickets
+    const ticketsToDelete = await db
       .select({ id: supportTickets.id })
       .from(supportTickets)
-      .where(eq(supportTickets.archived, false));
+      .where(
+        and(
+          eq(supportTickets.archived, false),
+          eq(supportTickets.status, 'closed')
+        )
+      );
 
-    for (const ticket of nonArchivedTickets) {
+    for (const ticket of ticketsToDelete) {
       await db.delete(supportTicketResponses).where(eq(supportTicketResponses.ticketId, ticket.id));
     }
 
-    if (nonArchivedTickets.length > 0) {
-      await db.delete(supportTickets).where(eq(supportTickets.archived, false));
+    if (ticketsToDelete.length > 0) {
+      await db.delete(supportTickets).where(
+        and(
+          eq(supportTickets.archived, false),
+          eq(supportTickets.status, 'closed')
+        )
+      );
     }
   }
 

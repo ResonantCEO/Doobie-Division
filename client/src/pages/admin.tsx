@@ -1271,7 +1271,7 @@ export default function AdminPage() {
             <DialogTitle>Clear All Support Tickets</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            This will permanently delete all <strong>non-archived</strong> support tickets. Archived tickets will be kept. This action cannot be undone.
+            This will permanently delete all <strong>closed</strong> support tickets that are not archived. Open or in-progress tickets will not be affected. This action cannot be undone.
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setClearAllConfirmOpen(false)}>Cancel</Button>
