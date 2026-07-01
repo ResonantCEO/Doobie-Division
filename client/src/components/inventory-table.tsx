@@ -465,6 +465,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                       )}
                     </div>
                   </div>
+                  <div className="shrink-0">{getStatusBadge(product)}</div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="shrink-0 h-8 w-8 p-0">
@@ -543,9 +544,9 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                     )}
                   </div>
 
-                  {/* Stock + status badge */}
+                  {/* Stock count */}
                   <div className="text-right shrink-0">
-                    <div className="flex items-center justify-end gap-2 mb-1">
+                    <div className="mb-1">
                       <span className={`text-sm font-semibold ${
                         product.stock === 0 ? "text-red-600" :
                         product.stock <= product.minStockThreshold ? "text-orange-500" :
@@ -553,7 +554,6 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                       }`}>
                         {product.stock} units
                       </span>
-                      {getStatusBadge(product)}
                     </div>
 
                     {/* Stock bar (simple products only) */}
