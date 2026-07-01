@@ -544,48 +544,6 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                     )}
                   </div>
 
-                  {/* Stock count */}
-                  <div className="text-right shrink-0">
-                    <div className="mb-1">
-                      <span className={`text-sm font-semibold ${
-                        product.stock === 0 ? "text-red-600" :
-                        product.stock <= product.minStockThreshold ? "text-orange-500" :
-                        "text-gray-900 dark:text-white"
-                      }`}>
-                        {product.stock} units
-                      </span>
-                    </div>
-
-                    {/* Stock bar (simple products only) */}
-                    {!hasSizes && (
-                      <div className="w-20 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full ml-auto">
-                        <div
-                          className={`h-1.5 rounded-full transition-all ${
-                            product.stock === 0 ? "bg-red-500" :
-                            product.stock <= product.minStockThreshold ? "bg-orange-500" :
-                            "bg-green-500"
-                          }`}
-                          style={{ width: `${Math.min((product.stock / Math.max(product.minStockThreshold * 2, 1)) * 100, 100)}%` }}
-                        />
-                      </div>
-                    )}
-
-                    {/* Size breakdown (only for sized products) */}
-                    {hasSizes && (
-                      <div className="mt-1 space-y-0.5 text-xs text-gray-600 dark:text-gray-400 text-right">
-                        {product.sizes!.map((size) => (
-                          <div key={size.id} className="flex items-center justify-end gap-2">
-                            <span>{size.size}:</span>
-                            <span className={`font-medium ${
-                              size.quantity === 0 ? "text-red-600" :
-                              size.quantity <= product.minStockThreshold ? "text-orange-500" :
-                              "text-gray-900 dark:text-white"
-                            }`}>{size.quantity}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
                 </div>
 
                 {/* Stock vs Physical — always shown */}
