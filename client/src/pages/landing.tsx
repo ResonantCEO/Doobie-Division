@@ -16,7 +16,7 @@ export default function Landing() {
     customerPhone: "",
     customerTelegram: "",
     message: "",
-    contactMethod: "phone" as "phone" | "telegram"
+    contactMethod: "telegram" as "phone" | "telegram"
   });
   const { toast } = useToast();
 
@@ -466,30 +466,20 @@ export default function Landing() {
               <div className="flex rounded-lg overflow-hidden border border-slate-600 mb-3">
                 <button
                   type="button"
-                  onClick={() => setSupportForm(prev => ({ ...prev, contactMethod: "phone" }))}
-                  className={`flex-1 py-2 text-sm font-medium transition-colors ${supportForm.contactMethod === "phone" ? "bg-green-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
-                >
-                  📞 Phone Number
-                </button>
-                <button
-                  type="button"
                   onClick={() => setSupportForm(prev => ({ ...prev, contactMethod: "telegram" }))}
                   className={`flex-1 py-2 text-sm font-medium transition-colors ${supportForm.contactMethod === "telegram" ? "bg-green-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
                 >
                   ✈️ Telegram
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setSupportForm(prev => ({ ...prev, contactMethod: "phone" }))}
+                  className={`flex-1 py-2 text-sm font-medium transition-colors ${supportForm.contactMethod === "phone" ? "bg-green-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
+                >
+                  📞 Phone Number
+                </button>
               </div>
-              {supportForm.contactMethod === "phone" ? (
-                <Input
-                  value={supportForm.customerPhone}
-                  onChange={(e) => setSupportForm(prev => ({ ...prev, customerPhone: e.target.value }))}
-                  placeholder="Your phone number"
-                  type="tel"
-                  required
-                  className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
-                  data-testid="input-support-phone"
-                />
-              ) : (
+              {supportForm.contactMethod === "telegram" ? (
                 <Input
                   value={supportForm.customerTelegram}
                   onChange={(e) => setSupportForm(prev => ({ ...prev, customerTelegram: e.target.value }))}
@@ -498,6 +488,21 @@ export default function Landing() {
                   className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
                   data-testid="input-support-telegram"
                 />
+              ) : (
+                <>
+                  <Input
+                    value={supportForm.customerPhone}
+                    onChange={(e) => setSupportForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                    placeholder="Your phone number"
+                    type="tel"
+                    required
+                    className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
+                    data-testid="input-support-phone"
+                  />
+                  <p className="text-xs text-yellow-400 mt-2 flex items-center gap-1">
+                    ⚠️ Phone number is a less secure form of communication. We recommend using Telegram for better privacy.
+                  </p>
+                </>
               )}
             </div>
             <div>

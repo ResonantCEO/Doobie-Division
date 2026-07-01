@@ -29,7 +29,7 @@ export default function SupportPage() {
     customerPhone: "",
     customerTelegram: "",
     message: "",
-    contactMethod: "phone" as "phone" | "telegram"
+    contactMethod: "telegram" as "phone" | "telegram"
   });
 
   const handleSubmitContact = async (e: React.FormEvent) => {
@@ -150,34 +150,39 @@ export default function SupportPage() {
                     <div className="flex rounded-lg overflow-hidden border border-input mb-3">
                       <button
                         type="button"
-                        onClick={() => setContactForm(prev => ({ ...prev, contactMethod: "phone" }))}
-                        className={`flex-1 py-2 text-sm font-medium transition-colors ${contactForm.contactMethod === "phone" ? "bg-green-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-                      >
-                        📞 Phone Number
-                      </button>
-                      <button
-                        type="button"
                         onClick={() => setContactForm(prev => ({ ...prev, contactMethod: "telegram" }))}
                         className={`flex-1 py-2 text-sm font-medium transition-colors ${contactForm.contactMethod === "telegram" ? "bg-green-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
                       >
                         ✈️ Telegram
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setContactForm(prev => ({ ...prev, contactMethod: "phone" }))}
+                        className={`flex-1 py-2 text-sm font-medium transition-colors ${contactForm.contactMethod === "phone" ? "bg-green-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                      >
+                        📞 Phone Number
+                      </button>
                     </div>
-                    {contactForm.contactMethod === "phone" ? (
-                      <Input
-                        value={contactForm.customerPhone}
-                        onChange={(e) => setContactForm(prev => ({ ...prev, customerPhone: e.target.value }))}
-                        placeholder="Your phone number"
-                        type="tel"
-                        required
-                      />
-                    ) : (
+                    {contactForm.contactMethod === "telegram" ? (
                       <Input
                         value={contactForm.customerTelegram}
                         onChange={(e) => setContactForm(prev => ({ ...prev, customerTelegram: e.target.value }))}
                         placeholder="@yourusername"
                         required
                       />
+                    ) : (
+                      <>
+                        <Input
+                          value={contactForm.customerPhone}
+                          onChange={(e) => setContactForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                          placeholder="Your phone number"
+                          type="tel"
+                          required
+                        />
+                        <p className="text-xs text-yellow-500 mt-2 flex items-center gap-1">
+                          ⚠️ Phone number is a less secure form of communication. We recommend using Telegram for better privacy.
+                        </p>
+                      </>
                     )}
                   </div>
                   <div>
