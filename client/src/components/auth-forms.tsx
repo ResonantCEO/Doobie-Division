@@ -823,7 +823,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                   className="w-full"
                   disabled={forgotPasswordMutation.isPending}
                 >
-                  {forgotPasswordMutation.isPending ? "Sending..." : "Send Reset Link"}
+                  {forgotPasswordMutation.isPending ? "Sending..." : "Send Reset Request"}
                 </Button>
                 <div className="text-center">
                   <button
