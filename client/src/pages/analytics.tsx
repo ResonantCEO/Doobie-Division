@@ -889,85 +889,12 @@ export default function AnalyticsPage() {
 
         <TabsContent value="sales" className="space-y-6">
           {/* Sales Metrics */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  {advancedLoading ? (
-                    <Skeleton className="h-8 w-20 mb-2" />
-                  ) : (
-                    <div className="text-2xl font-bold">
-                      ${advancedMetrics?.netProfit?.toFixed(2) || "0.00"}
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Based on actual purchase costs
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Sales Growth Rate</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  {advancedLoading ? (
-                    <Skeleton className="h-8 w-16 mb-2" />
-                  ) : (
-                    <div className="text-2xl font-bold">
-                      {advancedMetrics?.salesGrowthRate?.toFixed(1) || "0.0"}%
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    <span className={advancedMetrics?.salesGrowthRate >= 0 ? "text-green-600" : "text-red-600"}>
-                      {advancedMetrics?.salesGrowthRate >= 0 ? "+" : ""}{advancedMetrics?.salesGrowthRate?.toFixed(1) || "0.0"}%
-                    </span> from previous period
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Return Rate</CardTitle>
-                  <RefreshCw className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  {advancedLoading ? (
-                    <Skeleton className="h-8 w-16 mb-2" />
-                  ) : (
-                    <div className="text-2xl font-bold">
-                      {advancedMetrics?.returnRate?.toFixed(1) || "0.0"}%
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Cancelled orders ratio
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Abandoned Cart Rate</CardTitle>
-                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  {advancedLoading ? (
-                    <Skeleton className="h-8 w-16 mb-2" />
-                  ) : (
-                    <div className="text-2xl font-bold">
-                      {advancedMetrics?.abandonedCartRate?.toFixed(1) || "0.0"}%
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Requires cart tracking implementation
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <MetricCard title="Net Profit" value={`$${advancedMetrics?.netProfit?.toFixed(2) || "0.00"}`} change="Based on actual purchase costs" icon={DollarSign} color="green" />
+            <MetricCard title="Sales Growth Rate" value={`${advancedMetrics?.salesGrowthRate?.toFixed(1) || "0.0"}%`} change={`${advancedMetrics?.salesGrowthRate >= 0 ? "+" : ""}${advancedMetrics?.salesGrowthRate?.toFixed(1) || "0.0"}% from previous period`} icon={TrendingUp} color="blue" />
+            <MetricCard title="Return Rate" value={`${advancedMetrics?.returnRate?.toFixed(1) || "0.0"}%`} change="Cancelled orders ratio" icon={RefreshCw} color="orange" />
+            <MetricCard title="Abandoned Cart Rate" value={`${advancedMetrics?.abandonedCartRate?.toFixed(1) || "0.0"}%`} change="Requires cart tracking" icon={ShoppingCart} color="purple" />
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
             {/* Sales Trends */}
