@@ -83,7 +83,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
     onSuccess: () => {
       toast({
         title: "Reset link sent",
-        description: "Your request has been submitted. A support team member will send you your reset token — this may take some time, so please check your email frequently.",
+        description: "Your request has been submitted. Our support team will review the password reset request and email you shortly.",
       });
       setForgotPasswordEmail("");
     },
