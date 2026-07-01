@@ -419,215 +419,183 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
       {/* Mobile Card View */}
       <div className="md:hidden">
         <div className="divide-y divide-gray-200 dark:divide-gray-700">
-          {sortedProducts.map((product) => (
-            <div key={product.id} className={`p-4 ${selectedProducts && selectedProducts.includes(product.id) ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}>
-              <div className="flex items-start space-x-3">
-                <Checkbox
-                  checked={selectedProducts ? selectedProducts.includes(product.id) : false}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      onSelectionChange([...(selectedProducts || []), product.id]);
-                    } else {
-                      onSelectionChange((selectedProducts || []).filter(id => id !== product.id));
-                    }
-                  }}
-                  className="mt-1 rounded border-gray-300"
-                />
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={product.imageUrl || undefined} />
-                  <AvatarFallback>{product.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1">
-                        {product.name}
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-white line-clamp-1">
-                        {product.description}
-                      </div>
-                      <div className="flex items-center mt-1 space-x-4 text-xs text-gray-600 dark:text-white line-clamp-1">
-                        <span>SKU: {product.sku}</span>
-                        <span>Category: {product.category?.name || "—"}</span>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {user?.role === 'admin' && (
-                          <DropdownMenuItem onClick={() => setEditingProduct(product)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit Product
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onClick={() => setAdjustingStockProduct(product)}>
-                          <Package className="h-4 w-4 mr-2" />
-                          Adjust Stock
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleViewQRCode(product)}>
-                          <QrCode className="h-4 w-4 mr-2" />
-                          View QR Code
-                        </DropdownMenuItem>
-                        {(user?.role === 'admin' || user?.role === 'manager' || user?.role === 'staff') && (
-                          <DropdownMenuItem 
-                            onClick={() => confirmDelete(product.id)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+          {sortedProducts.map((product) => {
+            const hasVariance = (product.physicalInventory ?? product.stock) !== product.stock;
+            const variance = (product.physicalInventory || 0) - product.stock;
+            const hasSizes = product.sizes && product.sizes.length > 0;
 
-                  <div className="mt-3 flex items-center justify-between">
-                    <div className="text-sm">
-                      {product.sellingMethod === "weight" ? (
-                        <div className="space-y-1">
-                          {product.pricePerGram && (
-                            <div className="font-medium text-gray-900 dark:text-white">
-                              {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                                <span>
-                                  <span className="line-through text-gray-500">
-                                    ${Number(product.pricePerGram).toFixed(2)}/g
-                                  </span>
-                                  <span className="ml-2 text-green-600">
-                                    ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
-                                  </span>
-                                </span>
-                              ) : (
-                                <span>
-                                  ${Number(product.pricePerGram).toFixed(2)}/g
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {product.pricePerOunce && (
-                            <div className="text-xs text-muted-foreground">
-                              ${product.pricePerOunce}/oz
-                            </div>
-                          )}
-                          {(product as any).pricePerEighth && (
-                            <div className="text-xs text-muted-foreground">
-                              ${(product as any).pricePerEighth}/⅛ oz
-                            </div>
-                          )}
-                          {(product as any).pricePerQuarter && (
-                            <div className="text-xs text-muted-foreground">
-                              ${(product as any).pricePerQuarter}/¼ oz
-                            </div>
-                          )}
-                          {(product as any).pricePerHalf && (
-                            <div className="text-xs text-muted-foreground">
-                              ${(product as any).pricePerHalf}/½ oz
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="font-medium text-gray-900 dark:text-white">
-                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                            <span>
-                              <span className="line-through text-gray-500">${Number(product.price || 0).toFixed(2)}</span>
-                              <span className="ml-2 text-green-600">
-                                ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
-                              </span>
-                            </span>
-                          ) : (
-                            `$${Number(product.price || 0).toFixed(2)}`
-                          )}
-                        </div>
+            return (
+              <div
+                key={product.id}
+                className={`p-4 ${selectedProducts && selectedProducts.includes(product.id) ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
+              >
+                {/* Top row: checkbox + image + name/meta + menu */}
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    checked={selectedProducts ? selectedProducts.includes(product.id) : false}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        onSelectionChange([...(selectedProducts || []), product.id]);
+                      } else {
+                        onSelectionChange((selectedProducts || []).filter(id => id !== product.id));
+                      }
+                    }}
+                    className="rounded border-gray-300 shrink-0"
+                  />
+                  <Avatar className="h-11 w-11 shrink-0">
+                    <AvatarImage src={product.imageUrl || undefined} />
+                    <AvatarFallback>{product.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                      {product.name}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      <span className="font-mono">{product.sku}</span>
+                      {product.category?.name && (
+                        <>
+                          <span>·</span>
+                          <span>{product.category.name}</span>
+                        </>
                       )}
                     </div>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="shrink-0 h-8 w-8 p-0">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {user?.role === 'admin' && (
+                        <DropdownMenuItem onClick={() => setEditingProduct(product)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Product
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={() => setAdjustingStockProduct(product)}>
+                        <Package className="h-4 w-4 mr-2" />
+                        Adjust Stock
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleViewQRCode(product)}>
+                        <QrCode className="h-4 w-4 mr-2" />
+                        View QR Code
+                      </DropdownMenuItem>
+                      {(user?.role === 'admin' || user?.role === 'manager' || user?.role === 'staff') && (
+                        <DropdownMenuItem
+                          onClick={() => confirmDelete(product.id)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
 
-                    <div className="flex items-center space-x-2">
-                      <div className="text-right">
-                        {renderStockDisplay(product)}
-                        {(!product.sizes || product.sizes.length === 0) && (
-                        <div className="w-16 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mt-1">
-                          <div 
-                            className={`h-1 rounded-full transition-all ${
-                              product.stock === 0 ? "bg-red-500" :
-                              product.stock <= product.minStockThreshold ? "bg-orange-500" :
-                              "bg-green-500"
-                            }`}
-                            style={{ 
-                              width: `${Math.min((product.stock / (product.minStockThreshold * 2)) * 100, 100)}%` 
-                            }}
-                          />
-                        </div>
+                {/* Bottom row: price (left) + stock info (right) */}
+                <div className="mt-3 flex items-start justify-between gap-3">
+                  {/* Price */}
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    {product.sellingMethod === "weight" ? (
+                      <div className="space-y-0.5">
+                        {product.pricePerGram && (
+                          <div>
+                            {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                              <>
+                                <span className="line-through text-gray-400 text-xs mr-1">
+                                  ${Number(product.pricePerGram).toFixed(2)}/g
+                                </span>
+                                <span className="text-green-600">
+                                  ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
+                                </span>
+                              </>
+                            ) : (
+                              <span>${Number(product.pricePerGram).toFixed(2)}/g</span>
+                            )}
+                          </div>
+                        )}
+                        {product.pricePerOunce && (
+                          <div className="text-xs text-muted-foreground">${product.pricePerOunce}/oz</div>
                         )}
                       </div>
+                    ) : (
+                      <div>
+                        {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                          <>
+                            <span className="line-through text-gray-400 text-xs mr-1">
+                              ${Number(product.price || 0).toFixed(2)}
+                            </span>
+                            <span className="text-green-600">
+                              ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
+                            </span>
+                          </>
+                        ) : (
+                          `$${Number(product.price || 0).toFixed(2)}`
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Stock + status badge */}
+                  <div className="text-right shrink-0">
+                    <div className="flex items-center justify-end gap-2 mb-1">
+                      <span className={`text-sm font-semibold ${
+                        product.stock === 0 ? "text-red-600" :
+                        product.stock <= product.minStockThreshold ? "text-orange-500" :
+                        "text-gray-900 dark:text-white"
+                      }`}>
+                        {product.stock} units
+                      </span>
                       {getStatusBadge(product)}
                     </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* Physical Inventory Display */}
-              <div className="mt-3 border-t border-gray-200 dark:border-gray-700 pt-3">
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <div className="font-medium text-gray-700 dark:text-gray-300 mb-1">Stock:</div>
-                    {product.sizes && product.sizes.length > 0 ? (
-                      <div className="ml-2 space-y-0.5">
-                        <div>Total: {product.stock} units</div>
-                        {product.sizes.map((size) => (
-                          <div key={size.id} className="ml-2">
-                            {size.size}: {size.quantity}
+                    {/* Stock bar (simple products only) */}
+                    {!hasSizes && (
+                      <div className="w-20 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full ml-auto">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${
+                            product.stock === 0 ? "bg-red-500" :
+                            product.stock <= product.minStockThreshold ? "bg-orange-500" :
+                            "bg-green-500"
+                          }`}
+                          style={{ width: `${Math.min((product.stock / Math.max(product.minStockThreshold * 2, 1)) * 100, 100)}%` }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Size breakdown (only for sized products) */}
+                    {hasSizes && (
+                      <div className="mt-1 space-y-0.5 text-xs text-gray-600 dark:text-gray-400 text-right">
+                        {product.sizes!.map((size) => (
+                          <div key={size.id} className="flex items-center justify-end gap-2">
+                            <span>{size.size}:</span>
+                            <span className={`font-medium ${
+                              size.quantity === 0 ? "text-red-600" :
+                              size.quantity <= product.minStockThreshold ? "text-orange-500" :
+                              "text-gray-900 dark:text-white"
+                            }`}>{size.quantity}</span>
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <div className="ml-2">{product.stock} units</div>
                     )}
                   </div>
-                  <div>
-                    <div className="font-medium text-gray-700 dark:text-gray-300 mb-1">Physical:</div>
-                    {product.sizes && product.sizes.length > 0 && product.stock > 0 ? (
-                      <div className="ml-2 space-y-0.5">
-                        <div>Total: {product.physicalInventory || 0} units</div>
-                        {(() => {
-                          const physicalTotal = product.physicalInventory || 0;
-                          const physicalPerSize = product.sizes.map(size => {
-                            const proportion = size.quantity / product.stock;
-                            return {
-                              size: size.size,
-                              physical: Math.round(physicalTotal * proportion)
-                            };
-                          });
-                          const calculatedTotal = physicalPerSize.reduce((sum, item) => sum + item.physical, 0);
-                          const difference = physicalTotal - calculatedTotal;
-                          if (difference !== 0 && physicalPerSize.length > 0) {
-                            const largestIndex = physicalPerSize.reduce((maxIdx, item, idx) => 
-                              item.physical > physicalPerSize[maxIdx].physical ? idx : maxIdx, 0
-                            );
-                            physicalPerSize[largestIndex].physical += difference;
-                          }
-                          return physicalPerSize.map((item, idx) => (
-                            <div key={`${item.size}-${idx}`} className="ml-2">
-                              {item.size}: {item.physical}
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    ) : (
-                      <div className="ml-2">{product.physicalInventory || 0} units</div>
-                    )}
                 </div>
-                {product.physicalInventory !== product.stock && (
-                    <div className="text-orange-600 mt-1">
-                    Variance: {(product.physicalInventory || 0) - product.stock} units
+
+                {/* Variance warning — only shown when physical ≠ system stock */}
+                {hasVariance && (
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-orange-600 dark:text-orange-400 font-medium">
+                    <TrendingDown className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Physical: {product.physicalInventory || 0} units
+                      {" · "}Variance: {variance > 0 ? "+" : ""}{variance}
+                    </span>
                   </div>
                 )}
-                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
