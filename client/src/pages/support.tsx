@@ -172,6 +172,9 @@ export default function SupportPage() {
                       />
                     ) : (
                       <>
+                        <p className="text-xs text-yellow-500 mb-2 flex items-center gap-1">
+                          ⚠️ Phone number is a less secure form of communication. We recommend using Telegram for better privacy.
+                        </p>
                         <Input
                           value={contactForm.customerPhone}
                           onChange={(e) => setContactForm(prev => ({ ...prev, customerPhone: e.target.value }))}
@@ -179,9 +182,6 @@ export default function SupportPage() {
                           type="tel"
                           required
                         />
-                        <p className="text-xs text-yellow-500 mt-2 flex items-center gap-1">
-                          ⚠️ Phone number is a less secure form of communication. We recommend using Telegram for better privacy.
-                        </p>
                       </>
                     )}
                   </div>
