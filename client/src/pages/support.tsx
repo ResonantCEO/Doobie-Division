@@ -27,20 +27,23 @@ export default function SupportPage() {
     customerName: "",
     customerEmail: "",
     customerPhone: "",
-    message: ""
+    customerTelegram: "",
+    message: "",
+    contactMethod: "phone" as "phone" | "telegram"
   });
 
   const handleSubmitContact = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      const ticketData: Record<string, string> = {
+      const ticketData: Record<string, string | null> = {
         subject: "Support Request",
         message: contactForm.message,
         priority: "normal",
         customerName: contactForm.customerName,
         customerEmail: contactForm.customerEmail,
-        customerPhone: contactForm.customerPhone,
+        customerPhone: contactForm.contactMethod === "phone" ? contactForm.customerPhone : null,
+        customerTelegram: contactForm.contactMethod === "telegram" ? contactForm.customerTelegram : null,
       };
       if (user?.id) {
         ticketData.userId = user.id;
@@ -64,7 +67,9 @@ export default function SupportPage() {
           customerName: "", 
           customerEmail: "", 
           customerPhone: "", 
-          message: ""
+          customerTelegram: "",
+          message: "",
+          contactMethod: "phone"
         });
       } else {
         throw new Error("Failed to send message");
@@ -131,18 +136,34 @@ export default function SupportPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmitContact} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium mb-1 block">Full Name *</label>
-                      <Input
-                        value={contactForm.customerName}
-                        onChange={(e) => setContactForm(prev => ({ ...prev, customerName: e.target.value }))}
-                        placeholder="Your full name"
-                        required
-                      />
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Full Name *</label>
+                    <Input
+                      value={contactForm.customerName}
+                      onChange={(e) => setContactForm(prev => ({ ...prev, customerName: e.target.value }))}
+                      placeholder="Your full name"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Contact Method *</label>
+                    <div className="flex rounded-lg overflow-hidden border border-input mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setContactForm(prev => ({ ...prev, contactMethod: "phone" }))}
+                        className={`flex-1 py-2 text-sm font-medium transition-colors ${contactForm.contactMethod === "phone" ? "bg-green-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                      >
+                        📞 Phone Number
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setContactForm(prev => ({ ...prev, contactMethod: "telegram" }))}
+                        className={`flex-1 py-2 text-sm font-medium transition-colors ${contactForm.contactMethod === "telegram" ? "bg-green-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                      >
+                        ✈️ Telegram
+                      </button>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium mb-1 block">Phone Number *</label>
+                    {contactForm.contactMethod === "phone" ? (
                       <Input
                         value={contactForm.customerPhone}
                         onChange={(e) => setContactForm(prev => ({ ...prev, customerPhone: e.target.value }))}
@@ -150,7 +171,14 @@ export default function SupportPage() {
                         type="tel"
                         required
                       />
-                    </div>
+                    ) : (
+                      <Input
+                        value={contactForm.customerTelegram}
+                        onChange={(e) => setContactForm(prev => ({ ...prev, customerTelegram: e.target.value }))}
+                        placeholder="@yourusername"
+                        required
+                      />
+                    )}
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-1 block">Email Address *</label>

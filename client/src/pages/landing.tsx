@@ -14,7 +14,9 @@ export default function Landing() {
     customerName: "",
     customerEmail: "",
     customerPhone: "",
-    message: ""
+    customerTelegram: "",
+    message: "",
+    contactMethod: "phone" as "phone" | "telegram"
   });
   const { toast } = useToast();
 
@@ -32,7 +34,8 @@ export default function Landing() {
         priority: "normal",
         customerName: supportForm.customerName,
         customerEmail: supportForm.customerEmail,
-        customerPhone: supportForm.customerPhone,
+        customerPhone: supportForm.contactMethod === "phone" ? supportForm.customerPhone : null,
+        customerTelegram: supportForm.contactMethod === "telegram" ? supportForm.customerTelegram : null,
         userId: null
       };
 
@@ -459,16 +462,43 @@ export default function Landing() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-white mb-2 block">Phone Number *</label>
-              <Input
-                value={supportForm.customerPhone}
-                onChange={(e) => setSupportForm(prev => ({ ...prev, customerPhone: e.target.value }))}
-                placeholder="Your phone number"
-                type="tel"
-                required
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
-                data-testid="input-support-phone"
-              />
+              <label className="text-sm font-medium text-white mb-2 block">Contact Method *</label>
+              <div className="flex rounded-lg overflow-hidden border border-slate-600 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setSupportForm(prev => ({ ...prev, contactMethod: "phone" }))}
+                  className={`flex-1 py-2 text-sm font-medium transition-colors ${supportForm.contactMethod === "phone" ? "bg-green-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
+                >
+                  📞 Phone Number
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSupportForm(prev => ({ ...prev, contactMethod: "telegram" }))}
+                  className={`flex-1 py-2 text-sm font-medium transition-colors ${supportForm.contactMethod === "telegram" ? "bg-green-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
+                >
+                  ✈️ Telegram
+                </button>
+              </div>
+              {supportForm.contactMethod === "phone" ? (
+                <Input
+                  value={supportForm.customerPhone}
+                  onChange={(e) => setSupportForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                  placeholder="Your phone number"
+                  type="tel"
+                  required
+                  className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
+                  data-testid="input-support-phone"
+                />
+              ) : (
+                <Input
+                  value={supportForm.customerTelegram}
+                  onChange={(e) => setSupportForm(prev => ({ ...prev, customerTelegram: e.target.value }))}
+                  placeholder="@yourusername"
+                  required
+                  className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
+                  data-testid="input-support-telegram"
+                />
+              )}
             </div>
             <div>
               <label className="text-sm font-medium text-white mb-2 block">Email Address *</label>

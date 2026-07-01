@@ -758,6 +758,11 @@ export default function AdminPage() {
                                 📞 {item.ticket.customerPhone}
                               </div>
                             )}
+                            {(item.ticket as any).customerTelegram && (
+                              <div className="text-xs text-gray-400 mt-0.5">
+                                ✈️ {(item.ticket as any).customerTelegram}
+                              </div>
+                            )}
                           </div>
                           <Badge className={getStatusColor(item.ticket.status)}>
                             {item.ticket.status === 'in_progress' ? 'In Progress' : item.ticket.status === 'closed' ? 'Closed' : item.ticket.status.charAt(0).toUpperCase() + item.ticket.status.slice(1)}
@@ -821,6 +826,11 @@ export default function AdminPage() {
                                 {item.ticket.customerPhone && (
                                   <div className="text-xs text-gray-400 mt-0.5">
                                     📞 {item.ticket.customerPhone}
+                                  </div>
+                                )}
+                                {(item.ticket as any).customerTelegram && (
+                                  <div className="text-xs text-gray-400 mt-0.5">
+                                    ✈️ {(item.ticket as any).customerTelegram}
                                   </div>
                                 )}
                               </div>

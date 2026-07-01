@@ -183,6 +183,7 @@ export const supportTickets = pgTable("support_tickets", {
   customerName: varchar("customer_name"),
   customerEmail: varchar("customer_email"),
   customerPhone: varchar("customer_phone"),
+  customerTelegram: varchar("customer_telegram"),
   subject: varchar("subject").notNull(),
   message: text("message").notNull(),
   priority: varchar("priority").notNull().default('normal'),
@@ -415,7 +416,8 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 export const insertSupportTicketSchema = createInsertSchema(supportTickets).extend({
   customerName: z.string().min(1, "Customer name is required"),
   customerEmail: z.string().email("Valid email is required"),
-  customerPhone: z.string().min(1, "Phone number is required"),
+  customerPhone: z.string().optional().nullable(),
+  customerTelegram: z.string().optional().nullable(),
   userId: z.string().nullable().optional(),
 });
 
