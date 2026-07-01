@@ -434,44 +434,41 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80 sm:w-96">
-                  <div className="p-2">
-                    <h3 className="font-semibold text-sm mb-3">Notifications</h3>
+                <DropdownMenuContent align="end" className="w-[min(320px,calc(100vw-16px))]">
+                  <div className="p-3">
+                    <h3 className="font-semibold text-base mb-3">Notifications</h3>
                     <Tabs value={notificationTab} onValueChange={setNotificationTab} className="w-full">
-                      <TabsList className={`grid w-full ${user.role === 'customer' ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-4'} mb-3 gap-1`}>
-                        <TabsTrigger value="all" className="text-xs flex items-center gap-1.5 relative">
-                          All
+                      <TabsList className={`grid w-full ${user.role === 'customer' ? 'grid-cols-3' : 'grid-cols-4'} mb-3 h-auto gap-0.5`}>
+                        <TabsTrigger value="all" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0 h-auto">
+                          <span className="text-[11px] font-medium">All</span>
                           {unreadCount > 0 && (
-                            <Badge className="h-5 w-5 p-0 text-[10px] bg-red-500 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto">
+                            <Badge className="h-4 min-w-4 px-1 text-[9px] bg-red-500 text-white rounded-full flex items-center justify-center font-medium border-0">
                               {unreadCount > 99 ? '99+' : unreadCount}
                             </Badge>
                           )}
                         </TabsTrigger>
-                        <TabsTrigger value="orders" className="text-xs flex items-center gap-1.5 relative">
-                          <Package className="h-3 w-3" />
-                          <span className="hidden sm:inline">Orders</span>
+                        <TabsTrigger value="orders" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0 h-auto">
+                          <Package className="h-3.5 w-3.5 shrink-0" />
                           {getUnreadCount('orders') > 0 && (
-                            <Badge className="h-5 w-5 p-0 text-[10px] bg-blue-500 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto">
+                            <Badge className="h-4 min-w-4 px-1 text-[9px] bg-blue-500 text-white rounded-full flex items-center justify-center font-medium border-0">
                               {getUnreadCount('orders') > 99 ? '99+' : getUnreadCount('orders')}
                             </Badge>
                           )}
                         </TabsTrigger>
                         {user.role !== 'customer' && (
-                          <TabsTrigger value="users" className="text-xs flex items-center gap-1.5 relative">
-                            <UserPlus className="h-3 w-3" />
-                            <span className="hidden sm:inline">Users</span>
+                          <TabsTrigger value="users" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0 h-auto">
+                            <UserPlus className="h-3.5 w-3.5 shrink-0" />
                             {getUnreadCount('users') > 0 && (
-                              <Badge className="h-5 w-5 p-0 text-[10px] bg-green-500 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto">
+                              <Badge className="h-4 min-w-4 px-1 text-[9px] bg-green-500 text-white rounded-full flex items-center justify-center font-medium border-0">
                                 {getUnreadCount('users') > 99 ? '99+' : getUnreadCount('users')}
                               </Badge>
                             )}
                           </TabsTrigger>
                         )}
-                        <TabsTrigger value="support" className="text-xs flex items-center gap-1.5 relative">
-                          <HeadphonesIcon className="h-3 w-3" />
-                          <span className="hidden sm:inline">Support</span>
+                        <TabsTrigger value="support" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0 h-auto">
+                          <HeadphonesIcon className="h-3.5 w-3.5 shrink-0" />
                           {getUnreadCount('support') > 0 && (
-                            <Badge className="h-5 w-5 p-0 text-[10px] bg-red-600 text-white rounded-full flex items-center justify-center font-medium border-0 ml-auto animate-pulse">
+                            <Badge className="h-4 min-w-4 px-1 text-[9px] bg-red-600 text-white rounded-full flex items-center justify-center font-medium border-0 animate-pulse">
                               {getUnreadCount('support') > 99 ? '99+' : getUnreadCount('support')}
                             </Badge>
                           )}
@@ -494,10 +491,9 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="text-xs h-6 px-2"
+                                    className="text-xs h-7 px-2"
                                     onClick={async () => {
                                       try {
-                                        // Delete all notifications for the current tab
                                         const notificationsToDelete = getFilteredNotifications();
                                         for (const notification of notificationsToDelete) {
                                           await fetch(`/api/notifications/${notification.id}`, {
@@ -505,7 +501,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                             credentials: 'include',
                                           });
                                         }
-                                        refetch(); // Refresh notifications
+                                        refetch();
                                         toast({
                                           title: "Notifications cleared",
                                           description: `Cleared ${notificationsToDelete.length} ${tabValue === 'all' ? '' : tabValue + ' '}notifications.`,
@@ -524,27 +520,27 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                   </Button>
                                 )}
                               </div>
-                              <div className="space-y-2 max-h-64 overflow-y-auto">
+                              <div className="space-y-2 max-h-72 overflow-y-auto -mx-1 px-1">
                                 {getFilteredNotifications().map((notification: any) => (
-                                  <div
+                                  <button
                                     key={notification.id}
-                                    className={`p-2 rounded-md text-sm cursor-pointer transition-colors hover:bg-accent ${
+                                    className={`w-full text-left p-3 rounded-md text-sm cursor-pointer transition-colors hover:bg-accent block ${
                                       notification.isRead
-                                        ? "bg-background"
+                                        ? "bg-background border border-border/50"
                                         : notification.type === 'new_support_ticket' || notification.type === 'support_ticket_response'
-                                        ? "bg-red-50 dark:bg-red-950/20"
+                                        ? "bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900"
                                         : "bg-muted"
                                     }`}
                                     onClick={() => handleNotificationClick(notification)}
                                   >
-                                    <div className="font-medium">{notification.title}</div>
-                                    <div className="text-muted-foreground text-xs">
+                                    <div className="font-semibold text-sm leading-snug mb-0.5">{notification.title}</div>
+                                    <div className="text-muted-foreground text-xs leading-snug mb-1">
                                       {notification.message}
                                     </div>
-                                    <div className="text-xs text-muted-foreground mt-1">
+                                    <div className="text-[10px] text-muted-foreground/70">
                                       {new Date(notification.createdAt).toLocaleString()}
                                     </div>
-                                  </div>
+                                  </button>
                                 ))}
                               </div>
                             </>
