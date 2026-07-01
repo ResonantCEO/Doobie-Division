@@ -9,9 +9,6 @@ import ProductCard from "@/components/product-card";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, Category } from "@shared/schema";
 
-// Logo image from public directory
-import newLogoImage from '@assets/Remove_White_Background_(1)_1782586580039.png';
-const logoImage = newLogoImage;
 
 function ScrollableProductRow({ products, onCategoryFilter }: { products: (Product & { category: Category | null })[], onCategoryFilter?: (id: number) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -323,22 +320,6 @@ export default function StorefrontPage() {
   if (productsLoading || categoriesLoading) {
     return (
       <div className="space-y-8 relative min-h-screen">
-        {/* Background Image with Transparency - Fixed and centered, offset down */}
-        <img
-          src={logoImage}
-          alt=""
-          className="fixed pointer-events-none select-none"
-          style={{
-            opacity: 0.2,
-            zIndex: 0,
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -40%)',
-            width: '120vmin',
-            height: '120vmin',
-            objectFit: 'contain',
-          }}
-        />
         <div className="relative z-10">
         {/* Hero Section Skeleton */}
         <div className="hero-gradient rounded-2xl p-16">
@@ -376,22 +357,6 @@ export default function StorefrontPage() {
 
   return (
     <div className="space-y-8 relative min-h-screen">
-      {/* Background Image with Transparency - Fixed and centered, offset down */}
-      <img
-        src={logoImage}
-        alt=""
-        className="fixed pointer-events-none select-none"
-        style={{
-          opacity: 0.2,
-          zIndex: 0,
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -40%)',
-          width: '120vmin',
-          height: '120vmin',
-          objectFit: 'contain',
-        }}
-      />
       <div className="relative z-10">
       
       {/* Hero Section - Only show if there are discounted products */}

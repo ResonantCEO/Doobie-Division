@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/navigation";
+import logoImage from '@assets/Remove_White_Background_(1)_1782586580039.png';
 import StorefrontPage from "./storefront";
 import InventoryPage from "./inventory";
 import OrdersPage from "./orders";
@@ -69,6 +70,22 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Background logo - fixed to viewport, never scrolls */}
+      <img
+        src={logoImage}
+        alt=""
+        className="fixed pointer-events-none select-none"
+        style={{
+          opacity: 0.2,
+          zIndex: 0,
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -40%)',
+          width: '120vmin',
+          height: '120vmin',
+          objectFit: 'contain',
+        }}
+      />
       <Navigation user={user} currentTab={tab} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderTabContent()}

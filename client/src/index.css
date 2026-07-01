@@ -219,7 +219,6 @@
     @apply font-sans antialiased text-foreground;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%);
     background-size: 400% 400%;
-    background-attachment: fixed;
     animation: gradient 15s ease infinite;
     min-height: 100vh;
   }
@@ -227,7 +226,6 @@
   .dark body {
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #0f3460 50%, #1a1a2e 75%, #16213e 100%);
     background-size: 400% 400%;
-    background-attachment: fixed;
     animation: gradient 15s ease infinite;
   }
 
