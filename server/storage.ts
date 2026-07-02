@@ -13,6 +13,8 @@ import {
   supportTicketResponses,
   passwordResetTokens,
   cityPurchaseLimits,
+  accessPasswords,
+  type AccessPassword,
   type User,
   type UpsertUser,
   type Category,
@@ -174,6 +176,14 @@ export interface IStorage {
   createCityPurchaseLimit(data: any): Promise<any>;
   updateCityPurchaseLimit(id: number, data: any): Promise<any>;
   deleteCityPurchaseLimit(id: number): Promise<void>;
+
+  // Access passwords
+  getAccessPasswords(): Promise<AccessPassword[]>;
+  getAccessPassword(id: number): Promise<AccessPassword | undefined>;
+  createAccessPassword(data: any): Promise<AccessPassword>;
+  updateAccessPassword(id: number, data: any): Promise<AccessPassword | undefined>;
+  deleteAccessPassword(id: number): Promise<void>;
+  verifyAccessPassword(password: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3340,6 +3350,57 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCityPurchaseLimit(id: number): Promise<void> {
     await retryQuery(() => db.delete(cityPurchaseLimits).where(eq(cityPurchaseLimits.id, id)));
+  }
+
+  // Access passwords
+  async getAccessPasswords(): Promise<AccessPassword[]> {
+    return retryQuery(() => db.select().from(accessPasswords).orderBy(desc(accessPasswords.createdAt)));
+  }
+
+  async getAccessPassword(id: number): Promise<AccessPassword | undefined> {
+    const results = await retryQuery(() => db.select().from(accessPasswords).where(eq(accessPasswords.id, id)));
+    return results[0];
+  }
+
+  async createAccessPassword(data: any): Promise<AccessPassword> {
+    const toInsert: any = {
+      label: data.label,
+      password: data.password,
+      isActive: data.isActive !== undefined ? data.isActive : true,
+    };
+    if (data.validFrom) toInsert.validFrom = new Date(data.validFrom);
+    if (data.validTo) toInsert.validTo = new Date(data.validTo);
+    const results = await retryQuery(() => db.insert(accessPasswords).values(toInsert).returning());
+    return results[0];
+  }
+
+  async updateAccessPassword(id: number, data: any): Promise<AccessPassword | undefined> {
+    const existing = await this.getAccessPassword(id);
+    if (!existing) return undefined;
+    const toUpdate: any = { updatedAt: new Date() };
+    if (data.label !== undefined) toUpdate.label = data.label;
+    if (data.password !== undefined) toUpdate.password = data.password;
+    if (data.isActive !== undefined) toUpdate.isActive = data.isActive;
+    if ('validFrom' in data) toUpdate.validFrom = data.validFrom ? new Date(data.validFrom) : null;
+    if ('validTo' in data) toUpdate.validTo = data.validTo ? new Date(data.validTo) : null;
+    const results = await retryQuery(() => db.update(accessPasswords).set(toUpdate).where(eq(accessPasswords.id, id)).returning());
+    return results[0];
+  }
+
+  async deleteAccessPassword(id: number): Promise<void> {
+    await retryQuery(() => db.delete(accessPasswords).where(eq(accessPasswords.id, id)));
+  }
+
+  async verifyAccessPassword(password: string): Promise<boolean> {
+    const now = new Date();
+    const all = await retryQuery(() => db.select().from(accessPasswords).where(eq(accessPasswords.isActive, true)));
+    for (const ap of all) {
+      if (ap.password !== password) continue;
+      if (ap.validFrom && now < ap.validFrom) continue;
+      if (ap.validTo && now > ap.validTo) continue;
+      return true;
+    }
+    return false;
   }
 }
 

@@ -1,6 +1,6 @@
 import { Switch, Route, Redirect } from "wouter";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "./lib/queryClient";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { queryClient, getQueryFn } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { CartProvider } from "@/contexts/cart-context";
@@ -18,9 +18,19 @@ import ProfilePage from "@/pages/profile";
 import ScannerPage from "./pages/scanner";
 import CustomerOrdersWrapper from "@/pages/customer-orders-wrapper";
 import SupportPage from "@/pages/support";
+import AccessGate from "@/components/AccessGate";
+import { useState } from "react";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const [accessGrantedLocally, setAccessGrantedLocally] = useState(false);
+
+  const { data: accessStatus, isLoading: isLoadingAccess } = useQuery<{ granted: boolean }>({
+    queryKey: ["/api/access/status"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: isAuthenticated && user?.role === "customer",
+    retry: false,
+  });
 
   if (isLoading) {
     return (
@@ -28,6 +38,23 @@ function Router() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
+  }
+
+  // Show access gate for customers who haven't been granted access yet
+  if (isAuthenticated && user?.role === "customer") {
+    const accessGranted = accessGrantedLocally || accessStatus?.granted;
+    if (!accessGranted && !isLoadingAccess) {
+      return (
+        <AccessGate onGranted={() => setAccessGrantedLocally(true)} />
+      );
+    }
+    if (isLoadingAccess) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
   }
 
   return (

@@ -13,8 +13,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash } from "lucide-react";
-import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit } from "@shared/schema";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff } from "lucide-react";
+import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 interface InventoryLogWithDetails extends InventoryLog {
   product: Product | null;
@@ -77,6 +78,14 @@ export default function AdminPage() {
   const [limitToDelete, setLimitToDelete] = useState<CityPurchaseLimit | null>(null);
   const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
 
+  // Access passwords state
+  const [showAccessModal, setShowAccessModal] = useState(false);
+  const [editingPassword, setEditingPassword] = useState<AccessPassword | null>(null);
+  const [accessForm, setAccessForm] = useState({ label: "", password: "", validFrom: "", validTo: "" });
+  const [deletePasswordConfirmOpen, setDeletePasswordConfirmOpen] = useState(false);
+  const [passwordToDelete, setPasswordToDelete] = useState<AccessPassword | null>(null);
+  const [showAccessPasswordText, setShowAccessPasswordText] = useState(false);
+
 
   // Redirect if not admin
   if (!user || user.role !== 'admin') {
@@ -102,6 +111,77 @@ export default function AdminPage() {
       if (!response.ok) throw new Error('Failed to fetch inventory logs');
       return response.json();
     }
+  });
+
+  const { data: accessPasswords = [], isLoading: isLoadingPasswords } = useQuery<AccessPassword[]>({
+    queryKey: ["/api/admin/access-passwords"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/access-passwords", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch access passwords");
+      return res.json();
+    },
+  });
+
+  const createPasswordMutation = useMutation({
+    mutationFn: async (data: typeof accessForm) => {
+      const res = await apiRequest("POST", "/api/admin/access-passwords", {
+        label: data.label,
+        password: data.password,
+        validFrom: data.validFrom || null,
+        validTo: data.validTo || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/access-passwords"] });
+      setShowAccessModal(false);
+      setAccessForm({ label: "", password: "", validFrom: "", validTo: "" });
+      toast({ title: "Access password created" });
+    },
+    onError: () => toast({ title: "Failed to create access password", variant: "destructive" }),
+  });
+
+  const updatePasswordMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: typeof accessForm }) => {
+      const res = await apiRequest("PUT", `/api/admin/access-passwords/${id}`, {
+        label: data.label,
+        password: data.password,
+        validFrom: data.validFrom || null,
+        validTo: data.validTo || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/access-passwords"] });
+      setShowAccessModal(false);
+      setEditingPassword(null);
+      setAccessForm({ label: "", password: "", validFrom: "", validTo: "" });
+      toast({ title: "Access password updated" });
+    },
+    onError: () => toast({ title: "Failed to update access password", variant: "destructive" }),
+  });
+
+  const togglePasswordActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
+      const res = await apiRequest("PUT", `/api/admin/access-passwords/${id}`, { isActive });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/access-passwords"] }),
+    onError: () => toast({ title: "Failed to update access password", variant: "destructive" }),
+  });
+
+  const deletePasswordMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/admin/access-passwords/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/access-passwords"] });
+      setDeletePasswordConfirmOpen(false);
+      setPasswordToDelete(null);
+      toast({ title: "Access password deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete access password", variant: "destructive" }),
   });
 
   const { data: cityLimits = [], isLoading: isLoadingLimits } = useQuery<CityPurchaseLimit[]>({
@@ -490,10 +570,11 @@ export default function AdminPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="support">Support Tickets</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="purchase-limits">Purchase Limits</TabsTrigger>
+          <TabsTrigger value="access">Access</TabsTrigger>
         </TabsList>
 
         <TabsContent value="logs">
@@ -1128,6 +1209,165 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Access Passwords Tab */}
+        <TabsContent value="access">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <KeyRound className="h-5 w-5" />
+                    Access Passwords
+                  </CardTitle>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Manage passwords required for customer login. Customers must enter a valid password before accessing the store.
+                  </p>
+                </div>
+                <Button onClick={() => {
+                  setEditingPassword(null);
+                  setAccessForm({ label: "", password: "", validFrom: "", validTo: "" });
+                  setShowAccessModal(true);
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Password
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingPasswords ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-14 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  ))}
+                </div>
+              ) : accessPasswords.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                  <KeyRound className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                  <p className="font-medium">No access passwords set</p>
+                  <p className="text-sm mt-1">Add a password so customers can access the store.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Mobile card view */}
+                  <div className="md:hidden space-y-3">
+                    {accessPasswords.map((ap) => (
+                      <div key={ap.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{ap.label}</span>
+                          <Badge variant={ap.isActive ? "default" : "secondary"}>
+                            {ap.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                          ••••••••
+                        </div>
+                        {(ap.validFrom || ap.validTo) && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {ap.validFrom ? format(new Date(ap.validFrom), 'MMM dd, yyyy') : 'Any time'} → {ap.validTo ? format(new Date(ap.validTo), 'MMM dd, yyyy') : 'No expiry'}
+                          </div>
+                        )}
+                        <div className="flex gap-2 pt-1">
+                          <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                            togglePasswordActiveMutation.mutate({ id: ap.id, isActive: !ap.isActive });
+                          }}>
+                            {ap.isActive ? "Disable" : "Enable"}
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => {
+                            setEditingPassword(ap);
+                            setAccessForm({
+                              label: ap.label,
+                              password: ap.password,
+                              validFrom: ap.validFrom ? new Date(ap.validFrom).toISOString().slice(0, 16) : "",
+                              validTo: ap.validTo ? new Date(ap.validTo).toISOString().slice(0, 16) : "",
+                            });
+                            setShowAccessModal(true);
+                          }}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => {
+                            setPasswordToDelete(ap);
+                            setDeletePasswordConfirmOpen(true);
+                          }}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop table view */}
+                  <div className="hidden md:block border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-gray-800">
+                        <tr>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Label</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Password</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Valid Period</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Status</th>
+                          <th className="text-right px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y dark:divide-gray-700">
+                        {accessPasswords.map((ap) => (
+                          <tr key={ap.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="px-4 py-3 text-sm font-medium">{ap.label}</td>
+                            <td className="px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400">
+                              {ap.password}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {ap.validFrom || ap.validTo ? (
+                                <span className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
+                                  <Calendar className="h-3 w-3" />
+                                  {ap.validFrom ? format(new Date(ap.validFrom), 'MMM dd, yyyy HH:mm') : 'Any'} – {ap.validTo ? format(new Date(ap.validTo), 'MMM dd, yyyy HH:mm') : 'No expiry'}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-xs">Always valid</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <Badge variant={ap.isActive ? "default" : "secondary"}>
+                                {ap.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button variant="outline" size="sm" onClick={() => {
+                                  togglePasswordActiveMutation.mutate({ id: ap.id, isActive: !ap.isActive });
+                                }}>
+                                  {ap.isActive ? "Disable" : "Enable"}
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => {
+                                  setEditingPassword(ap);
+                                  setAccessForm({
+                                    label: ap.label,
+                                    password: ap.password,
+                                    validFrom: ap.validFrom ? new Date(ap.validFrom).toISOString().slice(0, 16) : "",
+                                    validTo: ap.validTo ? new Date(ap.validTo).toISOString().slice(0, 16) : "",
+                                  });
+                                  setShowAccessModal(true);
+                                }}>
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button variant="destructive" size="sm" onClick={() => {
+                                  setPasswordToDelete(ap);
+                                  setDeletePasswordConfirmOpen(true);
+                                }}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Add/Edit City Purchase Limit Dialog */}
@@ -1291,6 +1531,116 @@ export default function AdminPage() {
               disabled={clearAllTicketsMutation.isPending}
             >
               {clearAllTicketsMutation.isPending ? "Clearing..." : "Clear All"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Add/Edit Access Password Dialog */}
+      <Dialog open={showAccessModal} onOpenChange={(open) => {
+        setShowAccessModal(open);
+        if (!open) {
+          setEditingPassword(null);
+          setAccessForm({ label: "", password: "", validFrom: "", validTo: "" });
+          setShowAccessPasswordText(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>{editingPassword ? "Edit" : "Add"} Access Password</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Label</Label>
+              <Input
+                placeholder="e.g. Summer 2025, VIP Access"
+                value={accessForm.label}
+                onChange={(e) => setAccessForm({ ...accessForm, label: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <div className="relative">
+                <Input
+                  type={showAccessPasswordText ? "text" : "password"}
+                  placeholder="Enter access password"
+                  value={accessForm.password}
+                  onChange={(e) => setAccessForm({ ...accessForm, password: e.target.value })}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  onClick={() => setShowAccessPasswordText(!showAccessPasswordText)}
+                  tabIndex={-1}
+                >
+                  {showAccessPasswordText ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Valid From (optional)</Label>
+                <Input
+                  type="datetime-local"
+                  value={accessForm.validFrom}
+                  onChange={(e) => setAccessForm({ ...accessForm, validFrom: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Valid To (optional)</Label>
+                <Input
+                  type="datetime-local"
+                  value={accessForm.validTo}
+                  onChange={(e) => setAccessForm({ ...accessForm, validTo: e.target.value })}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Leave date fields empty for a password that never expires.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowAccessModal(false);
+              setEditingPassword(null);
+              setAccessForm({ label: "", password: "", validFrom: "", validTo: "" });
+              setShowAccessPasswordText(false);
+            }}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!accessForm.label || !accessForm.password || createPasswordMutation.isPending || updatePasswordMutation.isPending}
+              onClick={() => {
+                if (editingPassword) {
+                  updatePasswordMutation.mutate({ id: editingPassword.id, data: accessForm });
+                } else {
+                  createPasswordMutation.mutate(accessForm);
+                }
+              }}
+            >
+              {(createPasswordMutation.isPending || updatePasswordMutation.isPending) ? "Saving..." : editingPassword ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Access Password Confirmation */}
+      <Dialog open={deletePasswordConfirmOpen} onOpenChange={setDeletePasswordConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Access Password</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Are you sure you want to delete <strong>"{passwordToDelete?.label}"</strong>? Customers using this password will lose access immediately.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletePasswordConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => {
+              if (passwordToDelete) deletePasswordMutation.mutate(passwordToDelete.id);
+            }} disabled={deletePasswordMutation.isPending}>
+              {deletePasswordMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

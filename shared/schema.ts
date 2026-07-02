@@ -221,6 +221,32 @@ export const cityPurchaseLimits = pgTable("city_purchase_limits", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const accessPasswords = pgTable("access_passwords", {
+  id: serial("id").primaryKey(),
+  label: varchar("label").notNull(),
+  password: varchar("password").notNull(),
+  validFrom: timestamp("valid_from"),
+  validTo: timestamp("valid_to"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAccessPasswordSchema = createInsertSchema(accessPasswords).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  label: z.string().min(1, "Label is required"),
+  password: z.string().min(1, "Password is required"),
+  validFrom: z.string().nullable().optional(),
+  validTo: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type AccessPassword = typeof accessPasswords.$inferSelect;
+export type InsertAccessPassword = z.infer<typeof insertAccessPasswordSchema>;
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   orders: many(orders),

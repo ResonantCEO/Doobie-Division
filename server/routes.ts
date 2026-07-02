@@ -2013,6 +2013,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =====================
+  // Access Password Routes
+  // =====================
+
+  // Verify access password (customer-facing, requires auth)
+  app.post("/api/access/verify", isAuthenticated, async (req: any, res) => {
+    try {
+      const { password } = req.body;
+      if (!password) return res.status(400).json({ message: "Password is required" });
+      const valid = await storage.verifyAccessPassword(password);
+      if (valid) {
+        req.session.accessGranted = true;
+        return res.json({ success: true });
+      }
+      return res.status(401).json({ success: false, message: "Invalid access password" });
+    } catch (error) {
+      console.error("Error verifying access password:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Check if access is already granted in this session
+  app.get("/api/access/status", isAuthenticated, async (req: any, res) => {
+    res.json({ granted: !!req.session.accessGranted });
+  });
+
+  // Admin: list all access passwords
+  app.get("/api/admin/access-passwords", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const passwords = await storage.getAccessPasswords();
+      res.json(passwords);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch access passwords" });
+    }
+  });
+
+  // Admin: create access password
+  app.post("/api/admin/access-passwords", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const { label, password, validFrom, validTo, isActive } = req.body;
+      if (!label || !password) return res.status(400).json({ message: "Label and password are required" });
+      const created = await storage.createAccessPassword({ label, password, validFrom: validFrom || null, validTo: validTo || null, isActive: isActive !== false });
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create access password" });
+    }
+  });
+
+  // Admin: update access password
+  app.put("/api/admin/access-passwords/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updated = await storage.updateAccessPassword(id, req.body);
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update access password" });
+    }
+  });
+
+  // Admin: delete access password
+  app.delete("/api/admin/access-passwords/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteAccessPassword(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete access password" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Setup WebSocket server
