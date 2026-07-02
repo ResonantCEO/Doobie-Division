@@ -689,6 +689,12 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   <span>Total</span>
                   <span>${state.total.toFixed(2)}</span>
                 </div>
+                {appliedPromo && (
+                  <div className="flex justify-between font-semibold text-green-600 dark:text-green-400 mt-1">
+                    <span>Total after promo</span>
+                    <span>${Math.max(0, state.total - appliedPromo.discountAmount).toFixed(2)}</span>
+                  </div>
+                )}
               </div>
             </div>
 
