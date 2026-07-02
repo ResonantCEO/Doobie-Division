@@ -320,6 +320,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         paymentMethod: "cod",
         notes: shippingForm.notes,
       };
+      orderData.originalTotal = state.total.toFixed(2);
       if (appliedPromo) {
         orderData.promoCodeId = appliedPromo.promoId;
         orderData.promoCode = appliedPromo.code;

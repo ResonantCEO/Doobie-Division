@@ -785,6 +785,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let allowed = true;
           let minimumAmount: number | null = null;
 
+          // Use the pre-promo original total for city minimum check
+          const checkTotal = parseFloat(orderData.originalTotal || orderData.total || "0");
+
           if (orderData.customerId) {
             const userRows = await rawSql`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = ${orderData.customerId}`;
             if (userRows && userRows.length > 0) {
@@ -794,32 +797,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 allowed = true;
               } else if (userRow.min_purchase_override !== null && userRow.min_purchase_override !== undefined) {
                 minimumAmount = parseFloat(String(userRow.min_purchase_override));
-                allowed = parseFloat(orderData.total || "0") >= minimumAmount;
+                allowed = checkTotal >= minimumAmount;
               } else {
                 const cityLimit = await storage.getCityPurchaseLimitByCity(city);
                 if (cityLimit) {
                   minimumAmount = parseFloat(cityLimit.minimumAmount);
-                  allowed = parseFloat(orderData.total || "0") >= minimumAmount;
+                  allowed = checkTotal >= minimumAmount;
                 }
               }
             } else {
               const cityLimit = await storage.getCityPurchaseLimitByCity(city);
               if (cityLimit) {
                 minimumAmount = parseFloat(cityLimit.minimumAmount);
-                allowed = parseFloat(orderData.total || "0") >= minimumAmount;
+                allowed = checkTotal >= minimumAmount;
               }
             }
           } else {
             const cityLimit = await storage.getCityPurchaseLimitByCity(city);
             if (cityLimit) {
               minimumAmount = parseFloat(cityLimit.minimumAmount);
-              allowed = parseFloat(orderData.total || "0") >= minimumAmount;
+              allowed = checkTotal >= minimumAmount;
             }
           }
 
           if (!allowed && minimumAmount !== null) {
             return res.status(400).json({
-              message: `Orders shipping to ${city} require a minimum of $${minimumAmount.toFixed(2)}. Your order total is $${parseFloat(orderData.total || "0").toFixed(2)}.`,
+              message: `Orders shipping to ${city} require a minimum of $${minimumAmount.toFixed(2)}. Your pre-discount order total of $${checkTotal.toFixed(2)} does not meet this minimum.`,
             });
           }
         }
