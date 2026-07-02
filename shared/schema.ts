@@ -222,6 +222,44 @@ export const cityPurchaseLimits = pgTable("city_purchase_limits", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const promotionalAds = pgTable("promotional_ads", {
+  id: serial("id").primaryKey(),
+  title: varchar("title").notNull(),
+  subtitle: text("subtitle"),
+  buttonText: varchar("button_text").default("Shop Now"),
+  buttonLink: varchar("button_link"),
+  backgroundImageUrl: text("background_image_url"),
+  backgroundColor: varchar("background_color").default("#1a1a2e"),
+  textColor: varchar("text_color").default("white"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  validFrom: timestamp("valid_from"),
+  validTo: timestamp("valid_to"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPromotionalAdSchema = createInsertSchema(promotionalAds).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  title: z.string().min(1, "Title is required"),
+  subtitle: z.string().nullable().optional(),
+  buttonText: z.string().nullable().optional(),
+  buttonLink: z.string().nullable().optional(),
+  backgroundImageUrl: z.string().nullable().optional(),
+  backgroundColor: z.string().nullable().optional(),
+  textColor: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+  validFrom: z.string().nullable().optional(),
+  validTo: z.string().nullable().optional(),
+});
+
+export type PromotionalAd = typeof promotionalAds.$inferSelect;
+export type InsertPromotionalAd = z.infer<typeof insertPromotionalAdSchema>;
+
 export const discounts = pgTable("discounts", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),

@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductCard from "@/components/product-card";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
-import type { Product, Category } from "@shared/schema";
+import type { Product, Category, PromotionalAd } from "@shared/schema";
+import { useLocation } from "wouter";
 
 
 function ScrollableProductRow({ products, onCategoryFilter }: { products: (Product & { category: Category | null })[], onCategoryFilter?: (id: number) => void }) {
@@ -73,19 +74,20 @@ function ScrollableProductRow({ products, onCategoryFilter }: { products: (Produ
 }
 
 export default function StorefrontPage() {
+  const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showDealsOnly, setShowDealsOnly] = useState(false);
   const [currentParentCategory, setCurrentParentCategory] = useState<number | null>(null);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [navigationHistory, setNavigationHistory] = useState<Array<{
     parentCategory: number | null;
     selectedCategory: number | null;
     showDealsOnly: boolean;
   }>>([]);
 
-    // Fetch all discounted products for hero section (independent of filters)
+  // Fetch all discounted products for hero section (independent of filters)
   const { data: allDiscountedProducts = [] } = useQuery({
     queryKey: ["/api/products", "discounted"],
     queryFn: async () => {
@@ -93,36 +95,59 @@ export default function StorefrontPage() {
       if (!response.ok) throw new Error('Failed to fetch products');
       const products = await response.json();
       return products.filter((product: Product) => {
-        // Check if product has a valid discount percentage > 0
         const discount = product.discountPercentage;
         if (!discount || discount === "0" || discount === 0) return false;
-        
-        // Handle both string and number types
-        const discountValue = typeof discount === 'number' 
-          ? discount 
-          : parseFloat(String(discount));
-        
+        const discountValue = typeof discount === 'number' ? discount : parseFloat(String(discount));
         if (isNaN(discountValue) || discountValue <= 0) return false;
-        
-        // Also check that product is in stock
         return product.stock > 0;
       });
     },
-    staleTime: 60000, // Cache for 1 minute
-    gcTime: 300000, // Keep in cache for 5 minutes
-    refetchOnMount: true, // Always refetch when component mounts to get latest deals
+    staleTime: 60000,
+    gcTime: 300000,
+    refetchOnMount: true,
   });
 
-  // Image rotation timer for hero section
+  // Fetch active promotional ads
+  const { data: activeAds = [] } = useQuery<PromotionalAd[]>({
+    queryKey: ["/api/ads"],
+    queryFn: async () => {
+      const res = await fetch('/api/ads');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60000,
+  });
+
+  // Build merged slides array: deals slide first (if any), then ad slides
+  type DealsSlide = { type: 'deals' };
+  type AdSlide = { type: 'ad'; ad: PromotionalAd };
+  type Slide = DealsSlide | AdSlide;
+
+  const slides: Slide[] = useMemo(() => {
+    const result: Slide[] = [];
+    if (allDiscountedProducts.length > 0) result.push({ type: 'deals' });
+    activeAds.forEach(ad => result.push({ type: 'ad', ad }));
+    return result;
+  }, [allDiscountedProducts.length, activeAds]);
+
+  // Current image index within the deals slide (for background rotation)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Rotate through slides
+  useEffect(() => {
+    if (slides.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentSlideIndex(prev => (prev >= slides.length - 1 ? 0 : prev + 1));
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [slides.length]);
+
+  // Rotate background images within the deals slide
   useEffect(() => {
     if (allDiscountedProducts.length <= 1) return;
-
     const interval = setInterval(() => {
-      setCurrentImageIndex((prevIndex) => 
-        prevIndex >= allDiscountedProducts.length - 1 ? 0 : prevIndex + 1
-      );
+      setCurrentImageIndex(prev => (prev >= allDiscountedProducts.length - 1 ? 0 : prev + 1));
     }, 3000);
-
     return () => clearInterval(interval);
   }, [allDiscountedProducts.length]);
 
@@ -359,54 +384,111 @@ export default function StorefrontPage() {
     <div className="space-y-8 relative min-h-screen">
       <div className="relative z-10">
       
-      {/* Hero Section - Only show if there are discounted products */}
-      {allDiscountedProducts.length > 0 && (
-        <div className="relative rounded-2xl mb-12 overflow-hidden">
-          {/* Background Image Carousel */}
-          <div className="absolute inset-0">
-            <div className="relative w-full h-full">
-              {allDiscountedProducts.map((product, index) => (
+      {/* Hero Carousel - show if there are deals or active ads */}
+      {slides.length > 0 && (
+        <div className="relative rounded-2xl mb-12 overflow-hidden" style={{ minHeight: '260px' }}>
+          {/* Slides */}
+          {slides.map((slide, slideIdx) => {
+            const isActive = currentSlideIndex === slideIdx;
+            if (slide.type === 'deals') {
+              return (
                 <div
-                  key={product.id}
-                  className={`absolute inset-0 transition-opacity duration-1000 ${
-                    currentImageIndex === index ? 'opacity-100' : 'opacity-0'
-                  }`}
+                  key="deals"
+                  className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
                 >
-                  <img
-                    src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=1200&h=400&fit=crop"}
-                    alt={product.name}
-                    className="w-full h-full object-cover object-center"
-                  />
-                  <div className="absolute inset-0 bg-black/50"></div>
+                  {/* Rotating product background images */}
+                  {allDiscountedProducts.map((product: Product, imgIdx: number) => (
+                    <div
+                      key={product.id}
+                      className={`absolute inset-0 transition-opacity duration-1000 ${currentImageIndex === imgIdx ? 'opacity-100' : 'opacity-0'}`}
+                    >
+                      <img
+                        src={(product as any).imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=1200&h=400&fit=crop"}
+                        alt={product.name}
+                        className="w-full h-full object-cover object-center"
+                      />
+                      <div className="absolute inset-0 bg-black/50" />
+                    </div>
+                  ))}
+                  {/* Content */}
+                  <div className="relative z-10 py-16 px-8">
+                    <div className="max-w-2xl">
+                      <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-lg">Today's Amazing Deals!</h2>
+                      <p className="text-xl mb-6 text-white/90 drop-shadow-md">
+                        Check out our special discounts on selected products every day!
+                      </p>
+                      <Button
+                        className="bg-white text-primary hover:bg-white/90 drop-shadow-md"
+                        onClick={() => {
+                          const currentState = { parentCategory: currentParentCategory, selectedCategory, showDealsOnly };
+                          setNavigationHistory(prev => [...prev, currentState]);
+                          setShowDealsOnly(true);
+                        }}
+                      >
+                        Shop Now
+                      </Button>
+                    </div>
+                  </div>
                 </div>
+              );
+            } else {
+              // Promotional ad slide
+              const { ad } = slide;
+              return (
+                <div
+                  key={`ad-${ad.id}`}
+                  className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                  style={{ background: ad.backgroundImageUrl ? undefined : (ad.backgroundColor || '#1a1a2e') }}
+                >
+                  {ad.backgroundImageUrl && (
+                    <>
+                      <img src={ad.backgroundImageUrl} alt={ad.title} className="absolute inset-0 w-full h-full object-cover object-center" />
+                      <div className="absolute inset-0 bg-black/45" />
+                    </>
+                  )}
+                  <div className="relative z-10 py-16 px-8">
+                    <div className="max-w-2xl">
+                      <h2
+                        className="text-4xl font-bold mb-4 drop-shadow-lg"
+                        style={{ color: ad.textColor || 'white' }}
+                      >
+                        {ad.title}
+                      </h2>
+                      {ad.subtitle && (
+                        <p className="text-xl mb-6 drop-shadow-md" style={{ color: ad.textColor ? `${ad.textColor}cc` : 'rgba(255,255,255,0.9)' }}>
+                          {ad.subtitle}
+                        </p>
+                      )}
+                      {ad.buttonText && (
+                        <Button
+                          className="bg-white text-primary hover:bg-white/90 drop-shadow-md"
+                          onClick={() => {
+                            if (ad.buttonLink) navigate(ad.buttonLink);
+                          }}
+                        >
+                          {ad.buttonText}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+          })}
+
+          {/* Slide dots */}
+          {slides.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+              {slides.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentSlideIndex(idx)}
+                  className={`w-2 h-2 rounded-full transition-all ${currentSlideIndex === idx ? 'bg-white w-5' : 'bg-white/50'}`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
               ))}
             </div>
-          </div>
-
-          {/* Content Overlay */}
-          <div className="relative py-16 px-8">
-            <div className="max-w-2xl">
-              <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-lg">Today's Amazing Deals!</h2>
-              <p className="text-xl mb-6 text-white/90 drop-shadow-md">
-                Check out our special discounts on selected products every day!
-              </p>
-              <Button 
-                className="bg-white text-primary hover:bg-white/90 drop-shadow-md"
-                onClick={() => {
-                  // Save current state before showing deals
-                  const currentState = {
-                    parentCategory: currentParentCategory,
-                    selectedCategory: selectedCategory,
-                    showDealsOnly: showDealsOnly
-                  };
-                  setNavigationHistory(prev => [...prev, currentState]);
-                  setShowDealsOnly(true);
-                }}
-              >
-                Shop Now
-              </Button>
-            </div>
-          </div>
+          )}
         </div>
       )}
 

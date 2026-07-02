@@ -13,9 +13,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift } from "lucide-react";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift, Megaphone, Image as ImageIcon, Link as LinkIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount } from "@shared/schema";
+import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount, PromotionalAd } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
 interface InventoryLogWithDetails extends InventoryLog {
@@ -86,6 +86,25 @@ export default function AdminPage() {
   const [deletePasswordConfirmOpen, setDeletePasswordConfirmOpen] = useState(false);
   const [passwordToDelete, setPasswordToDelete] = useState<AccessPassword | null>(null);
   const [showAccessPasswordText, setShowAccessPasswordText] = useState(false);
+
+  // Promotional Ads state
+  const [showAdModal, setShowAdModal] = useState(false);
+  const [editingAd, setEditingAd] = useState<PromotionalAd | null>(null);
+  const [deleteAdConfirmOpen, setDeleteAdConfirmOpen] = useState(false);
+  const [adToDelete, setAdToDelete] = useState<PromotionalAd | null>(null);
+  const [adForm, setAdForm] = useState({
+    title: "",
+    subtitle: "",
+    buttonText: "Shop Now",
+    buttonLink: "",
+    backgroundImageUrl: "",
+    backgroundColor: "#1a1a2e",
+    textColor: "white",
+    isActive: true,
+    sortOrder: "0",
+    validFrom: "",
+    validTo: "",
+  });
 
   // Discounts state
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -205,6 +224,102 @@ export default function AdminPage() {
       toast({ title: "Access password deleted" });
     },
     onError: () => toast({ title: "Failed to delete access password", variant: "destructive" }),
+  });
+
+  // Promotional Ads queries & mutations
+  const { data: allAds = [], isLoading: isLoadingAds } = useQuery<PromotionalAd[]>({
+    queryKey: ["/api/admin/ads"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/ads", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch ads");
+      return res.json();
+    },
+  });
+
+  const resetAdForm = () => setAdForm({
+    title: "", subtitle: "", buttonText: "Shop Now", buttonLink: "",
+    backgroundImageUrl: "", backgroundColor: "#1a1a2e", textColor: "white",
+    isActive: true, sortOrder: "0", validFrom: "", validTo: "",
+  });
+
+  const openEditAd = (ad: PromotionalAd) => {
+    setEditingAd(ad);
+    setAdForm({
+      title: ad.title,
+      subtitle: ad.subtitle || "",
+      buttonText: ad.buttonText || "Shop Now",
+      buttonLink: ad.buttonLink || "",
+      backgroundImageUrl: ad.backgroundImageUrl || "",
+      backgroundColor: ad.backgroundColor || "#1a1a2e",
+      textColor: ad.textColor || "white",
+      isActive: ad.isActive,
+      sortOrder: ad.sortOrder?.toString() || "0",
+      validFrom: ad.validFrom ? new Date(ad.validFrom).toISOString().slice(0, 10) : "",
+      validTo: ad.validTo ? new Date(ad.validTo).toISOString().slice(0, 10) : "",
+    });
+    setShowAdModal(true);
+  };
+
+  const createAdMutation = useMutation({
+    mutationFn: async (data: typeof adForm) => {
+      const res = await apiRequest("POST", "/api/admin/ads", {
+        ...data,
+        sortOrder: parseInt(data.sortOrder) || 0,
+        validFrom: data.validFrom || null,
+        validTo: data.validTo || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ads"] });
+      setShowAdModal(false);
+      resetAdForm();
+      toast({ title: "Ad created" });
+    },
+    onError: () => toast({ title: "Failed to create ad", variant: "destructive" }),
+  });
+
+  const updateAdMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: typeof adForm }) => {
+      const res = await apiRequest("PUT", `/api/admin/ads/${id}`, {
+        ...data,
+        sortOrder: parseInt(data.sortOrder) || 0,
+        validFrom: data.validFrom || null,
+        validTo: data.validTo || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ads"] });
+      setShowAdModal(false);
+      setEditingAd(null);
+      resetAdForm();
+      toast({ title: "Ad updated" });
+    },
+    onError: () => toast({ title: "Failed to update ad", variant: "destructive" }),
+  });
+
+  const toggleAdMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
+      const res = await apiRequest("PUT", `/api/admin/ads/${id}`, { isActive });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/ads"] }),
+    onError: () => toast({ title: "Failed to toggle ad", variant: "destructive" }),
+  });
+
+  const deleteAdMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/admin/ads/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ads"] });
+      setDeleteAdConfirmOpen(false);
+      setAdToDelete(null);
+      toast({ title: "Ad deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete ad", variant: "destructive" }),
   });
 
   // Discount queries & mutations
@@ -762,12 +877,13 @@ export default function AdminPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="support">Support Tickets</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="purchase-limits">Purchase Limits</TabsTrigger>
           <TabsTrigger value="access">Access</TabsTrigger>
           <TabsTrigger value="discounts">Discounts</TabsTrigger>
+          <TabsTrigger value="ads">Ads</TabsTrigger>
         </TabsList>
 
         <TabsContent value="logs">
@@ -1639,7 +1755,213 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Ads Tab */}
+        <TabsContent value="ads">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Megaphone className="h-5 w-5" />
+                  Promotional Ads
+                </CardTitle>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Create banner ads that rotate in the storefront carousel alongside "Today's Amazing Deals".
+                </p>
+              </div>
+              <Button onClick={() => { resetAdForm(); setEditingAd(null); setShowAdModal(true); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Ad
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingAds ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />)}
+              </div>
+            ) : allAds.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                <Megaphone className="h-12 w-12 mb-3 opacity-30" />
+                <p className="font-medium">No ads created yet</p>
+                <p className="text-sm">Ads will appear in the storefront carousel alongside Today's Amazing Deals.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {allAds.map((ad) => (
+                  <div key={ad.id} className="flex items-center gap-4 p-4 border rounded-lg dark:border-gray-700">
+                    {/* Mini preview */}
+                    <div
+                      className="flex-shrink-0 w-24 h-14 rounded-md overflow-hidden flex items-center justify-center text-center relative"
+                      style={{ background: ad.backgroundImageUrl ? undefined : (ad.backgroundColor || '#1a1a2e') }}
+                    >
+                      {ad.backgroundImageUrl ? (
+                        <>
+                          <img src={ad.backgroundImageUrl} alt="" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40" />
+                        </>
+                      ) : null}
+                      <span className="relative z-10 text-xs font-bold px-1 leading-tight" style={{ color: ad.textColor || 'white' }}>
+                        {ad.title.length > 30 ? ad.title.slice(0, 30) + '…' : ad.title}
+                      </span>
+                    </div>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium truncate">{ad.title}</span>
+                        <Badge variant={ad.isActive ? "default" : "secondary"} className="text-xs">
+                          {ad.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                        {ad.sortOrder > 0 && <Badge variant="outline" className="text-xs">Order: {ad.sortOrder}</Badge>}
+                      </div>
+                      {ad.subtitle && <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">{ad.subtitle}</p>}
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                        {ad.buttonText && <span className="flex items-center gap-1"><LinkIcon className="h-3 w-3" />{ad.buttonText}{ad.buttonLink ? ` → ${ad.buttonLink}` : ''}</span>}
+                        {(ad.validFrom || ad.validTo) && (
+                          <span>
+                            {ad.validFrom ? `From ${format(new Date(ad.validFrom), 'MMM d')}` : ''}
+                            {ad.validFrom && ad.validTo ? ' – ' : ''}
+                            {ad.validTo ? `Until ${format(new Date(ad.validTo), 'MMM d, yyyy')}` : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Switch
+                        checked={ad.isActive}
+                        onCheckedChange={(checked) => toggleAdMutation.mutate({ id: ad.id, isActive: checked })}
+                      />
+                      <Button variant="ghost" size="sm" onClick={() => openEditAd(ad)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setAdToDelete(ad); setDeleteAdConfirmOpen(true); }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
       </Tabs>
+
+      {/* Add/Edit Ad Dialog */}
+      <Dialog open={showAdModal} onOpenChange={(open) => { setShowAdModal(open); if (!open) { setEditingAd(null); resetAdForm(); } }}>
+        <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingAd ? "Edit" : "New"} Promotional Ad</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Title *</Label>
+              <Input placeholder="e.g. Summer Sale — 20% Off Everything!" value={adForm.title} onChange={e => setAdForm(f => ({ ...f, title: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Subtitle</Label>
+              <Input placeholder="e.g. Limited time offer on all products" value={adForm.subtitle} onChange={e => setAdForm(f => ({ ...f, subtitle: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Button Text</Label>
+                <Input placeholder="Shop Now" value={adForm.buttonText} onChange={e => setAdForm(f => ({ ...f, buttonText: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Button Link (path)</Label>
+                <Input placeholder="e.g. /storefront or leave blank" value={adForm.buttonLink} onChange={e => setAdForm(f => ({ ...f, buttonLink: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2"><ImageIcon className="h-4 w-4" />Background Image URL (optional)</Label>
+              <Input placeholder="https://..." value={adForm.backgroundImageUrl} onChange={e => setAdForm(f => ({ ...f, backgroundImageUrl: e.target.value }))} />
+              {adForm.backgroundImageUrl && (
+                <div className="mt-2 h-20 rounded overflow-hidden relative">
+                  <img src={adForm.backgroundImageUrl} alt="preview" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">{adForm.title || 'Preview'}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Background Color (if no image)</Label>
+                <div className="flex gap-2">
+                  <input type="color" value={adForm.backgroundColor} onChange={e => setAdForm(f => ({ ...f, backgroundColor: e.target.value }))} className="h-10 w-12 rounded border cursor-pointer" />
+                  <Input value={adForm.backgroundColor} onChange={e => setAdForm(f => ({ ...f, backgroundColor: e.target.value }))} placeholder="#1a1a2e" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Text Color</Label>
+                <Select value={adForm.textColor} onValueChange={v => setAdForm(f => ({ ...f, textColor: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="white">White</SelectItem>
+                    <SelectItem value="black">Black</SelectItem>
+                    <SelectItem value="#ffdd00">Yellow</SelectItem>
+                    <SelectItem value="#a3e635">Green</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Sort Order (lower = earlier in carousel)</Label>
+              <Input type="number" min="0" placeholder="0" value={adForm.sortOrder} onChange={e => setAdForm(f => ({ ...f, sortOrder: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Valid From (optional)</Label>
+                <Input type="date" value={adForm.validFrom} onChange={e => setAdForm(f => ({ ...f, validFrom: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Valid Until (optional)</Label>
+                <Input type="date" value={adForm.validTo} onChange={e => setAdForm(f => ({ ...f, validTo: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={adForm.isActive} onCheckedChange={v => setAdForm(f => ({ ...f, isActive: v }))} />
+              <Label>Active</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowAdModal(false); setEditingAd(null); resetAdForm(); }}>Cancel</Button>
+            <Button
+              disabled={!adForm.title || createAdMutation.isPending || updateAdMutation.isPending}
+              onClick={() => {
+                if (editingAd) {
+                  updateAdMutation.mutate({ id: editingAd.id, data: adForm });
+                } else {
+                  createAdMutation.mutate(adForm);
+                }
+              }}
+            >
+              {(createAdMutation.isPending || updateAdMutation.isPending) ? "Saving..." : editingAd ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Ad Confirmation */}
+      <Dialog open={deleteAdConfirmOpen} onOpenChange={setDeleteAdConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader><DialogTitle>Delete Ad</DialogTitle></DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Are you sure you want to delete <strong>"{adToDelete?.title}"</strong>? It will be removed from the storefront carousel immediately.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteAdConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { if (adToDelete) deleteAdMutation.mutate(adToDelete.id); }} disabled={deleteAdMutation.isPending}>
+              {deleteAdMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add/Edit Discount Dialog */}
       <Dialog open={showDiscountModal} onOpenChange={(open) => { setShowDiscountModal(open); if (!open) { setEditingDiscount(null); resetDiscountForm(); } }}>

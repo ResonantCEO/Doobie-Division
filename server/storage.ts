@@ -15,7 +15,9 @@ import {
   cityPurchaseLimits,
   accessPasswords,
   discounts,
+  promotionalAds,
   type Discount,
+  type PromotionalAd,
   type AccessPassword,
   type User,
   type UpsertUser,
@@ -3419,6 +3421,62 @@ export class DatabaseStorage implements IStorage {
 
   async setUserGrantedAccessPassword(userId: string, passwordId: number | null): Promise<void> {
     await retryQuery(() => db.update(users).set({ grantedAccessPasswordId: passwordId, updatedAt: new Date() }).where(eq(users.id, userId)));
+  }
+
+  // Promotional Ads
+  async getPromotionalAds(): Promise<PromotionalAd[]> {
+    return retryQuery(() => db.select().from(promotionalAds).orderBy(asc(promotionalAds.sortOrder), desc(promotionalAds.createdAt)));
+  }
+
+  async getActivePromotionalAds(): Promise<PromotionalAd[]> {
+    const now = new Date();
+    const all = await retryQuery(() => db.select().from(promotionalAds).where(eq(promotionalAds.isActive, true)).orderBy(asc(promotionalAds.sortOrder)));
+    return all.filter(ad => {
+      if (ad.validFrom && now < ad.validFrom) return false;
+      if (ad.validTo && now > ad.validTo) return false;
+      return true;
+    });
+  }
+
+  async createPromotionalAd(data: any): Promise<PromotionalAd> {
+    const toInsert: any = {
+      title: data.title,
+      isActive: data.isActive !== false,
+      sortOrder: data.sortOrder ?? 0,
+    };
+    if (data.subtitle) toInsert.subtitle = data.subtitle;
+    if (data.buttonText) toInsert.buttonText = data.buttonText;
+    if (data.buttonLink) toInsert.buttonLink = data.buttonLink;
+    if (data.backgroundImageUrl) toInsert.backgroundImageUrl = data.backgroundImageUrl;
+    if (data.backgroundColor) toInsert.backgroundColor = data.backgroundColor;
+    if (data.textColor) toInsert.textColor = data.textColor;
+    if (data.validFrom) toInsert.validFrom = new Date(data.validFrom);
+    if (data.validTo) toInsert.validTo = new Date(data.validTo);
+    const results = await retryQuery(() => db.insert(promotionalAds).values(toInsert).returning());
+    return results[0];
+  }
+
+  async updatePromotionalAd(id: number, data: any): Promise<PromotionalAd | undefined> {
+    const existing = await retryQuery(() => db.select().from(promotionalAds).where(eq(promotionalAds.id, id)));
+    if (!existing[0]) return undefined;
+    const toUpdate: any = { updatedAt: new Date() };
+    if (data.title !== undefined) toUpdate.title = data.title;
+    if (data.subtitle !== undefined) toUpdate.subtitle = data.subtitle;
+    if (data.buttonText !== undefined) toUpdate.buttonText = data.buttonText;
+    if (data.buttonLink !== undefined) toUpdate.buttonLink = data.buttonLink;
+    if (data.backgroundImageUrl !== undefined) toUpdate.backgroundImageUrl = data.backgroundImageUrl;
+    if (data.backgroundColor !== undefined) toUpdate.backgroundColor = data.backgroundColor;
+    if (data.textColor !== undefined) toUpdate.textColor = data.textColor;
+    if (data.isActive !== undefined) toUpdate.isActive = data.isActive;
+    if (data.sortOrder !== undefined) toUpdate.sortOrder = data.sortOrder;
+    if ('validFrom' in data) toUpdate.validFrom = data.validFrom ? new Date(data.validFrom) : null;
+    if ('validTo' in data) toUpdate.validTo = data.validTo ? new Date(data.validTo) : null;
+    const results = await retryQuery(() => db.update(promotionalAds).set(toUpdate).where(eq(promotionalAds.id, id)).returning());
+    return results[0];
+  }
+
+  async deletePromotionalAd(id: number): Promise<void> {
+    await retryQuery(() => db.delete(promotionalAds).where(eq(promotionalAds.id, id)));
   }
 
   // Discounts

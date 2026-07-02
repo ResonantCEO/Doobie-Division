@@ -2100,6 +2100,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Promotional Ads - public (for storefront carousel)
+  app.get("/api/ads", async (req, res) => {
+    try {
+      const ads = await storage.getActivePromotionalAds();
+      res.json(ads);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch ads" });
+    }
+  });
+
+  // Admin: list all ads
+  app.get("/api/admin/ads", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const ads = await storage.getPromotionalAds();
+      res.json(ads);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch ads" });
+    }
+  });
+
+  // Admin: create ad
+  app.post("/api/admin/ads", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const created = await storage.createPromotionalAd(req.body);
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create ad" });
+    }
+  });
+
+  // Admin: update ad
+  app.put("/api/admin/ads/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updated = await storage.updatePromotionalAd(id, req.body);
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update ad" });
+    }
+  });
+
+  // Admin: delete ad
+  app.delete("/api/admin/ads/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deletePromotionalAd(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete ad" });
+    }
+  });
+
   // Discounts - public endpoint for cart evaluation (authenticated)
   app.get("/api/discounts", isAuthenticated, async (req, res) => {
     try {
