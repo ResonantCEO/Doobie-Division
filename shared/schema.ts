@@ -224,6 +224,7 @@ export const cityPurchaseLimits = pgTable("city_purchase_limits", {
 
 export const promotionalAds = pgTable("promotional_ads", {
   id: serial("id").primaryKey(),
+  discountId: integer("discount_id").unique(), // auto-linked to a discount if set
   title: varchar("title").notNull(),
   subtitle: text("subtitle"),
   buttonText: varchar("button_text").default("Shop Now"),

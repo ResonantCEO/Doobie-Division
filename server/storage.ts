@@ -3438,12 +3438,22 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async getAdByDiscountId(discountId: number): Promise<PromotionalAd | undefined> {
+    const results = await retryQuery(() => db.select().from(promotionalAds).where(eq(promotionalAds.discountId, discountId)));
+    return results[0];
+  }
+
+  async deleteAdByDiscountId(discountId: number): Promise<void> {
+    await retryQuery(() => db.delete(promotionalAds).where(eq(promotionalAds.discountId, discountId)));
+  }
+
   async createPromotionalAd(data: any): Promise<PromotionalAd> {
     const toInsert: any = {
       title: data.title,
       isActive: data.isActive !== false,
       sortOrder: data.sortOrder ?? 0,
     };
+    if (data.discountId !== undefined) toInsert.discountId = data.discountId;
     if (data.subtitle) toInsert.subtitle = data.subtitle;
     if (data.buttonText) toInsert.buttonText = data.buttonText;
     if (data.buttonLink) toInsert.buttonLink = data.buttonLink;

@@ -2242,10 +2242,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper: build auto-ad content from a discount
+  function discountToAdData(discount: any, discountId: number) {
+    const bgColors: Record<string, string> = {
+      quantity: "#14532d",
+      bundle: "#1e3a5f",
+      spend: "#5c1a1a",
+      bogo: "#3b1054",
+    };
+    const subtitleMap: Record<string, string> = {
+      quantity: discount.minQuantity
+        ? `Buy ${discount.minQuantity}+ items and save${discount.discountPercent ? ` ${discount.discountPercent}%` : ''}!`
+        : discount.description || "",
+      bundle: `Bundle deals — save${discount.discountPercent ? ` ${discount.discountPercent}%` : ''}!`,
+      spend: discount.minSpend
+        ? `Spend $${Number(discount.minSpend).toFixed(0)}+ and${discount.discountPercent ? ` save ${discount.discountPercent}%` : ' save'}!`
+        : discount.description || "",
+      bogo: "Buy one, get one free on select items!",
+    };
+    return {
+      discountId,
+      title: discount.name,
+      subtitle: discount.description || subtitleMap[discount.type] || "",
+      buttonText: "Shop Deals",
+      buttonLink: "",
+      backgroundColor: bgColors[discount.type] || "#1a1a2e",
+      textColor: "white",
+      isActive: discount.isActive !== false,
+      sortOrder: 0,
+      validFrom: discount.validFrom || null,
+      validTo: discount.validTo || null,
+    };
+  }
+
   // Admin: create discount
   app.post("/api/admin/discounts", isAuthenticated, requireRole(["admin"]), async (req, res) => {
     try {
       const created = await storage.createDiscount(req.body);
+      // Auto-create a carousel ad for this discount
+      try {
+        await storage.createPromotionalAd(discountToAdData(created, created.id));
+      } catch (e) {
+        console.error("Failed to auto-create ad for discount", e);
+      }
       res.status(201).json(created);
     } catch (error) {
       res.status(500).json({ message: "Failed to create discount" });
@@ -2258,6 +2297,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const updated = await storage.updateDiscount(id, req.body);
       if (!updated) return res.status(404).json({ message: "Not found" });
+      // Sync the auto-generated ad
+      try {
+        const existingAd = await storage.getAdByDiscountId(id);
+        if (existingAd) {
+          await storage.updatePromotionalAd(existingAd.id, discountToAdData(updated, id));
+        } else {
+          await storage.createPromotionalAd(discountToAdData(updated, id));
+        }
+      } catch (e) {
+        console.error("Failed to sync ad for discount", e);
+      }
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update discount" });
@@ -2269,6 +2319,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteDiscount(id);
+      // Remove the auto-generated ad too
+      try { await storage.deleteAdByDiscountId(id); } catch (e) {}
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete discount" });
