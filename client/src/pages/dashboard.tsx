@@ -70,7 +70,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       {/* Render logo directly into document.body via portal so no ancestor
           CSS can interfere with position:fixed on iOS Safari */}
-      {createPortal(
+      {tab === "storefront" && createPortal(
         <img
           src={logoImage}
           alt=""
