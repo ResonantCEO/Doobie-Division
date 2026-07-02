@@ -1,0 +1,1 @@
+- [Neon DB driver fix](neon-pool-fix.md) — HTTP mode collapses under concurrent admin queries; switch to WebSocket Pool mode.

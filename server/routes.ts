@@ -9,7 +9,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema, insertSupportTicketSchema, insertCityPurchaseLimitSchema } from "@shared/schema";
 import { z } from "zod";
-import { db, sql as rawSql } from "./db";
+import { db, sql as rawPool } from "./db";
 import { orders, products, orderItems, users, supportTickets, notifications } from "@shared/schema";
 import { eq, sql, desc, and, gte, lt, inArray } from "drizzle-orm";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
@@ -789,7 +789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const checkTotal = parseFloat(orderData.originalTotal || orderData.total || "0");
 
           if (orderData.customerId) {
-            const userRows = await rawSql`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = ${orderData.customerId}`;
+            const { rows: userRows } = await rawPool.query(`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = $1`, [orderData.customerId]);
             if (userRows && userRows.length > 0) {
               const userRow = userRows[0];
               const isExempt = userRow.exempt_text === 'true' || userRow.exempt_text === 't';
@@ -1974,7 +1974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (userId) {
-        const userRows = await rawSql`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = ${userId}`;
+        const { rows: userRows } = await rawPool.query(`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = $1`, [userId]);
         console.log('[check-purchase-limit] Raw SQL user result:', JSON.stringify(userRows));
         if (userRows && userRows.length > 0) {
           const userRow = userRows[0];

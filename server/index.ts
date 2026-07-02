@@ -180,13 +180,9 @@ app.use((req, res, next) => {
   // Ensure image_urls column exists (migration)
   try {
     const { sql } = await import("./db");
-    await sql`
-      ALTER TABLE products 
-      ADD COLUMN IF NOT EXISTS image_urls TEXT;
-    `;
+    await sql.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_urls TEXT`);
     console.log("✓ Verified image_urls column exists");
   } catch (error: any) {
-    // Column might already exist, or there's a permission issue
     if (error?.message?.includes("already exists") || error?.message?.includes("duplicate")) {
       console.log("✓ image_urls column already exists");
     } else {
@@ -197,15 +193,14 @@ app.use((req, res, next) => {
   // Ensure fractional ounce pricing columns exist (migration)
   try {
     const { sql } = await import("./db");
-    await sql`
-      ALTER TABLE products 
+    await sql.query(`
+      ALTER TABLE products
       ADD COLUMN IF NOT EXISTS price_per_eighth DECIMAL(10, 2),
       ADD COLUMN IF NOT EXISTS price_per_quarter DECIMAL(10, 2),
-      ADD COLUMN IF NOT EXISTS price_per_half DECIMAL(10, 2);
-    `;
+      ADD COLUMN IF NOT EXISTS price_per_half DECIMAL(10, 2)
+    `);
     console.log("✓ Verified fractional ounce pricing columns exist");
   } catch (error: any) {
-    // Columns might already exist, or there's a permission issue
     if (error?.message?.includes("already exists") || error?.message?.includes("duplicate")) {
       console.log("✓ Fractional ounce pricing columns already exist");
     } else {

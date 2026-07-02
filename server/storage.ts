@@ -44,20 +44,17 @@ import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, 
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
-async function retryQuery<T>(fn: () => Promise<T>, retries = 8): Promise<T> {
+async function retryQuery<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await fn();
     } catch (error: any) {
       const errorMsg = error?.cause?.message || error?.message || '';
-      const isRetryable = errorMsg.includes("Cannot read properties of null") ||
-        errorMsg.includes("fetch failed") ||
-        errorMsg.includes("ECONNRESET") ||
-        errorMsg.includes("socket hang up");
+      const isRetryable = errorMsg.includes("ECONNRESET") ||
+        errorMsg.includes("socket hang up") ||
+        errorMsg.includes("Connection terminated");
       if (isRetryable && attempt < retries) {
-        const delay = Math.min(150 * Math.pow(2, attempt), 3000);
-        if (attempt >= 2) console.warn(`[retryQuery] Retryable error (attempt ${attempt + 1}/${retries}), waiting ${delay}ms: ${errorMsg.substring(0, 80)}`);
-        await new Promise(r => setTimeout(r, delay));
+        await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
         continue;
       }
       throw error;

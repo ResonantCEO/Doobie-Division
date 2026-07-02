@@ -1756,6 +1756,9 @@ export default function AdminPage() {
                             <Badge variant="outline" className="text-xs">
                               {p.discountType === 'percent' ? `${p.discountValue}% off` : `$${Number(p.discountValue).toFixed(2)} off`}
                             </Badge>
+                            {p.minOrderAmount && (
+                              <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">Min. ${Number(p.minOrderAmount).toFixed(2)}</Badge>
+                            )}
                             {p.bypassPurchaseMinimum && (
                               <Badge variant="outline" className="text-xs text-blue-600 border-blue-400">Bypasses min. purchase</Badge>
                             )}

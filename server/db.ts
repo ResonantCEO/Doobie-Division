@@ -1,5 +1,6 @@
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon, neonConfig } from "@neondatabase/serverless";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import ws from "ws";
 import * as schema from "../shared/schema";
 
 if (!process.env.DATABASE_URL) {
@@ -8,34 +9,33 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const sql = neon(process.env.DATABASE_URL!, {
-  fetchOptions: { cache: 'no-store' },
-});
+// Use WebSocket mode so the Pool can handle concurrent queries without collapsing.
+// neon-http (HTTP mode) returns null rows when multiple requests fire simultaneously;
+// the WebSocket Pool serializes queries through real connections and doesn't have that problem.
+neonConfig.webSocketConstructor = ws;
 
-export const db = drizzle(sql, { 
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+export const db = drizzle(pool, {
   schema,
-  logger: process.env.NODE_ENV === "development"
+  logger: process.env.NODE_ENV === "development",
 });
 
-// Warm up the Neon connection and pre-validate tables on startup.
-// Neon serverless uses HTTP - first request(s) after idle can return null rows.
-// Running a simple query early ensures the connection is ready before clients hit it.
+// Keep sql export for raw queries used in startup migrations
+export const sql = pool;
+
 export async function warmupDatabase() {
-  const attempts = 6;
-  for (let i = 0; i < attempts; i++) {
-    try {
-      await sql`SELECT 1`;
-      return true;
-    } catch {
-      await new Promise(r => setTimeout(r, 300 * (i + 1)));
-    }
+  try {
+    await pool.query("SELECT 1");
+    return true;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 export async function checkDatabaseConnection() {
   try {
-    await sql`SELECT 1`;
+    await pool.query("SELECT 1");
     return true;
   } catch {
     return false;
