@@ -99,11 +99,11 @@ export default function AdminPage() {
     isActive: true,
     minQuantity: "",
     minSpend: "",
-    requiredProductIds: "",
+    requiredProductSkus: "",
     discountPercent: "",
-    freeProductId: "",
+    freeProductSku: "",
     freeProductQuantity: "1",
-    applyToProductId: "",
+    applyToProductSku: "",
     applyToCategoryId: "",
     validFrom: "",
     validTo: "",
@@ -240,9 +240,9 @@ export default function AdminPage() {
       };
       if (data.minQuantity) payload.minQuantity = parseInt(data.minQuantity);
       if (data.minSpend) payload.minSpend = data.minSpend;
-      if (data.requiredProductIds) payload.requiredProductIds = data.requiredProductIds;
-      if (data.freeProductId) payload.freeProductId = parseInt(data.freeProductId);
-      if (data.applyToProductId) payload.applyToProductId = parseInt(data.applyToProductId);
+      if (data.requiredProductSkus) payload.requiredProductSkus = data.requiredProductSkus;
+      if (data.freeProductSku) payload.freeProductSku = data.freeProductSku;
+      if (data.applyToProductSku) payload.applyToProductSku = data.applyToProductSku;
       if (data.applyToCategoryId) payload.applyToCategoryId = parseInt(data.applyToCategoryId);
       const res = await apiRequest("POST", "/api/admin/discounts", payload);
       return res.json();
@@ -266,10 +266,10 @@ export default function AdminPage() {
         discountPercent: data.discountPercent || null,
         minQuantity: data.minQuantity ? parseInt(data.minQuantity) : null,
         minSpend: data.minSpend || null,
-        requiredProductIds: data.requiredProductIds || null,
-        freeProductId: data.freeProductId ? parseInt(data.freeProductId) : null,
+        requiredProductSkus: data.requiredProductSkus || null,
+        freeProductSku: data.freeProductSku || null,
         freeProductQuantity: data.freeProductQuantity ? parseInt(data.freeProductQuantity) : 1,
-        applyToProductId: data.applyToProductId ? parseInt(data.applyToProductId) : null,
+        applyToProductSku: data.applyToProductSku || null,
         applyToCategoryId: data.applyToCategoryId ? parseInt(data.applyToCategoryId) : null,
         validFrom: data.validFrom || null,
         validTo: data.validTo || null,
@@ -312,13 +312,23 @@ export default function AdminPage() {
 
   const resetDiscountForm = () => setDiscountForm({
     name: "", description: "", type: "quantity", isActive: true,
-    minQuantity: "", minSpend: "", requiredProductIds: "", discountPercent: "",
-    freeProductId: "", freeProductQuantity: "1", applyToProductId: "", applyToCategoryId: "",
+    minQuantity: "", minSpend: "", requiredProductSkus: "", discountPercent: "",
+    freeProductSku: "", freeProductQuantity: "1", applyToProductSku: "", applyToCategoryId: "",
     validFrom: "", validTo: "",
   });
 
   const openEditDiscount = (d: Discount) => {
     setEditingDiscount(d);
+    // Convert stored product IDs back to SKUs for display
+    const findSku = (id: number | null | undefined) =>
+      id ? (allProducts.find(p => p.id === id)?.sku || id.toString()) : "";
+    const requiredSkus = (() => {
+      if (!d.requiredProductIds) return "";
+      try {
+        const ids: number[] = JSON.parse(d.requiredProductIds);
+        return ids.map(id => allProducts.find(p => p.id === id)?.sku || id.toString()).join(", ");
+      } catch { return d.requiredProductIds; }
+    })();
     setDiscountForm({
       name: d.name,
       description: d.description || "",
@@ -326,11 +336,11 @@ export default function AdminPage() {
       isActive: d.isActive,
       minQuantity: d.minQuantity?.toString() || "",
       minSpend: d.minSpend?.toString() || "",
-      requiredProductIds: d.requiredProductIds || "",
+      requiredProductSkus: requiredSkus,
       discountPercent: d.discountPercent?.toString() || "",
-      freeProductId: d.freeProductId?.toString() || "",
+      freeProductSku: findSku(d.freeProductId),
       freeProductQuantity: d.freeProductQuantity?.toString() || "1",
-      applyToProductId: d.applyToProductId?.toString() || "",
+      applyToProductSku: findSku(d.applyToProductId),
       applyToCategoryId: d.applyToCategoryId?.toString() || "",
       validFrom: d.validFrom ? new Date(d.validFrom).toISOString().slice(0, 10) : "",
       validTo: d.validTo ? new Date(d.validTo).toISOString().slice(0, 10) : "",
@@ -1682,8 +1692,8 @@ export default function AdminPage() {
                   <Input type="number" min="1" max="100" placeholder="e.g. 25" value={discountForm.discountPercent} onChange={e => setDiscountForm(f => ({ ...f, discountPercent: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Limit to Product ID (optional – leave blank for any product)</Label>
-                  <Input type="number" placeholder="Product ID" value={discountForm.applyToProductId} onChange={e => setDiscountForm(f => ({ ...f, applyToProductId: e.target.value }))} />
+                  <Label>Limit to Product SKU (optional – leave blank for any product)</Label>
+                  <Input type="text" placeholder="e.g. PROD-001" value={discountForm.applyToProductSku} onChange={e => setDiscountForm(f => ({ ...f, applyToProductSku: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
                   <Label>Limit to Category ID (optional)</Label>
@@ -1695,26 +1705,21 @@ export default function AdminPage() {
             {discountForm.type === 'bundle' && (
               <>
                 <div className="space-y-2">
-                  <Label>Required Product IDs (comma-separated) *</Label>
-                  <Input placeholder="e.g. 1,5,12" value={discountForm.requiredProductIds} onChange={e => {
-                    const raw = e.target.value;
-                    const ids = raw.split(',').map(s => s.trim()).filter(Boolean);
-                    const asJson = ids.length > 0 ? JSON.stringify(ids.map(Number).filter(n => !isNaN(n))) : '';
-                    setDiscountForm(f => ({ ...f, requiredProductIds: raw.includes('[') ? raw : (ids.length ? asJson : raw) }));
-                  }} />
-                  <p className="text-xs text-gray-400">Enter the IDs of products that must all be in the cart to trigger this deal.</p>
+                  <Label>Required Product SKUs (comma-separated) *</Label>
+                  <Input placeholder="e.g. PROD-001, PROD-005, PROD-012" value={discountForm.requiredProductSkus} onChange={e => setDiscountForm(f => ({ ...f, requiredProductSkus: e.target.value }))} />
+                  <p className="text-xs text-gray-400">Enter the SKUs of products that must all be in the cart to trigger this deal.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Free Product ID (leave blank to give % off instead)</Label>
-                  <Input type="number" placeholder="Product ID to give for free" value={discountForm.freeProductId} onChange={e => setDiscountForm(f => ({ ...f, freeProductId: e.target.value }))} />
+                  <Label>Free Product SKU (leave blank to give % off instead)</Label>
+                  <Input type="text" placeholder="SKU of product to give for free" value={discountForm.freeProductSku} onChange={e => setDiscountForm(f => ({ ...f, freeProductSku: e.target.value }))} />
                 </div>
-                {discountForm.freeProductId && (
+                {discountForm.freeProductSku && (
                   <div className="space-y-2">
                     <Label>Free Product Quantity</Label>
                     <Input type="number" min="1" placeholder="1" value={discountForm.freeProductQuantity} onChange={e => setDiscountForm(f => ({ ...f, freeProductQuantity: e.target.value }))} />
                   </div>
                 )}
-                {!discountForm.freeProductId && (
+                {!discountForm.freeProductSku && (
                   <div className="space-y-2">
                     <Label>Discount Percentage (if no free product) *</Label>
                     <Input type="number" min="1" max="100" placeholder="e.g. 15" value={discountForm.discountPercent} onChange={e => setDiscountForm(f => ({ ...f, discountPercent: e.target.value }))} />
@@ -1738,8 +1743,8 @@ export default function AdminPage() {
 
             {discountForm.type === 'bogo' && (
               <div className="space-y-2">
-                <Label>Limit to Product ID (optional – leave blank for any product)</Label>
-                <Input type="number" placeholder="Product ID" value={discountForm.applyToProductId} onChange={e => setDiscountForm(f => ({ ...f, applyToProductId: e.target.value }))} />
+                <Label>Limit to Product SKU (optional – leave blank for any product)</Label>
+                <Input type="text" placeholder="e.g. PROD-001" value={discountForm.applyToProductSku} onChange={e => setDiscountForm(f => ({ ...f, applyToProductSku: e.target.value }))} />
               </div>
             )}
 

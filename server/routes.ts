@@ -2242,8 +2242,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper: build auto-ad content from a discount
-  function discountToAdData(discount: any, discountId: number) {
+  // Helper: resolve SKU → product ID, storing result back into body
+  async function resolveSkusToIds(body: any): Promise<any> {
+    const resolved = { ...body };
+    if (body.applyToProductSku) {
+      const p = await storage.getProductBySku(body.applyToProductSku.trim());
+      resolved.applyToProductId = p ? p.id : null;
+      delete resolved.applyToProductSku;
+    }
+    if (body.freeProductSku) {
+      const p = await storage.getProductBySku(body.freeProductSku.trim());
+      resolved.freeProductId = p ? p.id : null;
+      delete resolved.freeProductSku;
+    }
+    if (body.requiredProductSkus) {
+      const skus: string[] = body.requiredProductSkus.split(',').map((s: string) => s.trim()).filter(Boolean);
+      const ids: number[] = [];
+      for (const sku of skus) {
+        const p = await storage.getProductBySku(sku);
+        if (p) ids.push(p.id);
+      }
+      resolved.requiredProductIds = ids.length ? JSON.stringify(ids) : null;
+      delete resolved.requiredProductSkus;
+    }
+    return resolved;
+  }
+
+  // Helper: build auto-ad content from a discount (with image lookup)
+  async function discountToAdData(discount: any, discountId: number) {
     const bgColors: Record<string, string> = {
       quantity: "#14532d",
       bundle: "#1e3a5f",
@@ -2260,12 +2286,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : discount.description || "",
       bogo: "Buy one, get one free on select items!",
     };
+
+    // Try to find a product image from the linked product IDs
+    let backgroundImageUrl: string | null = null;
+    const productIdToCheck = discount.applyToProductId || discount.freeProductId;
+    if (productIdToCheck) {
+      try {
+        const product = await storage.getProduct(productIdToCheck);
+        if (product?.imageUrl) backgroundImageUrl = product.imageUrl;
+      } catch (e) { /* ignore */ }
+    }
+
     return {
       discountId,
       title: discount.name,
       subtitle: discount.description || subtitleMap[discount.type] || "",
       buttonText: "Shop Deals",
       buttonLink: "",
+      backgroundImageUrl,
       backgroundColor: bgColors[discount.type] || "#1a1a2e",
       textColor: "white",
       isActive: discount.isActive !== false,
@@ -2278,10 +2316,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin: create discount
   app.post("/api/admin/discounts", isAuthenticated, requireRole(["admin"]), async (req, res) => {
     try {
-      const created = await storage.createDiscount(req.body);
+      const body = await resolveSkusToIds(req.body);
+      const created = await storage.createDiscount(body);
       // Auto-create a carousel ad for this discount
       try {
-        await storage.createPromotionalAd(discountToAdData(created, created.id));
+        await storage.createPromotionalAd(await discountToAdData(created, created.id));
       } catch (e) {
         console.error("Failed to auto-create ad for discount", e);
       }
@@ -2295,15 +2334,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/discounts/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const updated = await storage.updateDiscount(id, req.body);
+      const body = await resolveSkusToIds(req.body);
+      const updated = await storage.updateDiscount(id, body);
       if (!updated) return res.status(404).json({ message: "Not found" });
       // Sync the auto-generated ad
       try {
+        const adData = await discountToAdData(updated, id);
         const existingAd = await storage.getAdByDiscountId(id);
         if (existingAd) {
-          await storage.updatePromotionalAd(existingAd.id, discountToAdData(updated, id));
+          await storage.updatePromotionalAd(existingAd.id, adData);
         } else {
-          await storage.createPromotionalAd(discountToAdData(updated, id));
+          await storage.createPromotionalAd(adData);
         }
       } catch (e) {
         console.error("Failed to sync ad for discount", e);

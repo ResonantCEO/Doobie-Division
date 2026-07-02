@@ -80,6 +80,7 @@ export interface IStorage {
 
   // Product operations
   getProducts(filters?: { categoryId?: number; categoryIds?: number[]; search?: string; status?: string; isActive?: boolean }): Promise<(Product & { category: Category | null; sizes?: ProductSize[] })[]>;
+  getProductBySku(sku: string): Promise<(Product & { category: Category | null }) | undefined>;
   getProduct(id: number): Promise<(Product & { category: Category | null; sizes?: ProductSize[] }) | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
@@ -623,6 +624,14 @@ export class DatabaseStorage implements IStorage {
       }));
       return result;
     }
+  }
+
+  async getProductBySku(sku: string): Promise<(Product & { category: Category | null }) | undefined> {
+    const results = await retryQuery(() =>
+      db.select().from(products).where(eq(products.sku, sku))
+    );
+    if (!results[0]) return undefined;
+    return { ...results[0], category: null };
   }
 
   async getProduct(id: number): Promise<(Product & { category: Category | null; sizes?: ProductSize[] }) | undefined> {
