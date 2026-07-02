@@ -14,6 +14,8 @@ import {
   passwordResetTokens,
   cityPurchaseLimits,
   accessPasswords,
+  discounts,
+  type Discount,
   type AccessPassword,
   type User,
   type UpsertUser,
@@ -3417,6 +3419,68 @@ export class DatabaseStorage implements IStorage {
 
   async setUserGrantedAccessPassword(userId: string, passwordId: number | null): Promise<void> {
     await retryQuery(() => db.update(users).set({ grantedAccessPasswordId: passwordId, updatedAt: new Date() }).where(eq(users.id, userId)));
+  }
+
+  // Discounts
+  async getDiscounts(): Promise<Discount[]> {
+    return retryQuery(() => db.select().from(discounts).orderBy(desc(discounts.createdAt)));
+  }
+
+  async getActiveDiscounts(): Promise<Discount[]> {
+    const now = new Date();
+    const all = await retryQuery(() => db.select().from(discounts).where(eq(discounts.isActive, true)));
+    return all.filter(d => {
+      if (d.validFrom && now < d.validFrom) return false;
+      if (d.validTo && now > d.validTo) return false;
+      return true;
+    });
+  }
+
+  async createDiscount(data: any): Promise<Discount> {
+    const toInsert: any = {
+      name: data.name,
+      type: data.type,
+      isActive: data.isActive !== false,
+    };
+    if (data.description) toInsert.description = data.description;
+    if (data.minQuantity != null) toInsert.minQuantity = data.minQuantity;
+    if (data.minSpend != null) toInsert.minSpend = data.minSpend;
+    if (data.requiredProductIds) toInsert.requiredProductIds = data.requiredProductIds;
+    if (data.discountPercent != null) toInsert.discountPercent = data.discountPercent;
+    if (data.freeProductId != null) toInsert.freeProductId = data.freeProductId;
+    if (data.freeProductQuantity != null) toInsert.freeProductQuantity = data.freeProductQuantity;
+    if (data.applyToProductId != null) toInsert.applyToProductId = data.applyToProductId;
+    if (data.applyToCategoryId != null) toInsert.applyToCategoryId = data.applyToCategoryId;
+    if (data.validFrom) toInsert.validFrom = new Date(data.validFrom);
+    if (data.validTo) toInsert.validTo = new Date(data.validTo);
+    const results = await retryQuery(() => db.insert(discounts).values(toInsert).returning());
+    return results[0];
+  }
+
+  async updateDiscount(id: number, data: any): Promise<Discount | undefined> {
+    const existing = await retryQuery(() => db.select().from(discounts).where(eq(discounts.id, id)));
+    if (!existing[0]) return undefined;
+    const toUpdate: any = { updatedAt: new Date() };
+    if (data.name !== undefined) toUpdate.name = data.name;
+    if (data.type !== undefined) toUpdate.type = data.type;
+    if (data.description !== undefined) toUpdate.description = data.description;
+    if (data.isActive !== undefined) toUpdate.isActive = data.isActive;
+    if ('minQuantity' in data) toUpdate.minQuantity = data.minQuantity;
+    if ('minSpend' in data) toUpdate.minSpend = data.minSpend;
+    if ('requiredProductIds' in data) toUpdate.requiredProductIds = data.requiredProductIds;
+    if ('discountPercent' in data) toUpdate.discountPercent = data.discountPercent;
+    if ('freeProductId' in data) toUpdate.freeProductId = data.freeProductId;
+    if ('freeProductQuantity' in data) toUpdate.freeProductQuantity = data.freeProductQuantity;
+    if ('applyToProductId' in data) toUpdate.applyToProductId = data.applyToProductId;
+    if ('applyToCategoryId' in data) toUpdate.applyToCategoryId = data.applyToCategoryId;
+    if ('validFrom' in data) toUpdate.validFrom = data.validFrom ? new Date(data.validFrom) : null;
+    if ('validTo' in data) toUpdate.validTo = data.validTo ? new Date(data.validTo) : null;
+    const results = await retryQuery(() => db.update(discounts).set(toUpdate).where(eq(discounts.id, id)).returning());
+    return results[0];
+  }
+
+  async deleteDiscount(id: number): Promise<void> {
+    await retryQuery(() => db.delete(discounts).where(eq(discounts.id, id)));
   }
 }
 

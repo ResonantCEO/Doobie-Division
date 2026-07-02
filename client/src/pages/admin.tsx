@@ -13,8 +13,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff } from "lucide-react";
-import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword } from "@shared/schema";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
 interface InventoryLogWithDetails extends InventoryLog {
@@ -85,6 +86,28 @@ export default function AdminPage() {
   const [deletePasswordConfirmOpen, setDeletePasswordConfirmOpen] = useState(false);
   const [passwordToDelete, setPasswordToDelete] = useState<AccessPassword | null>(null);
   const [showAccessPasswordText, setShowAccessPasswordText] = useState(false);
+
+  // Discounts state
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [editingDiscount, setEditingDiscount] = useState<Discount | null>(null);
+  const [deleteDiscountConfirmOpen, setDeleteDiscountConfirmOpen] = useState(false);
+  const [discountToDelete, setDiscountToDelete] = useState<Discount | null>(null);
+  const [discountForm, setDiscountForm] = useState({
+    name: "",
+    description: "",
+    type: "quantity" as "quantity" | "bundle" | "spend" | "bogo",
+    isActive: true,
+    minQuantity: "",
+    minSpend: "",
+    requiredProductIds: "",
+    discountPercent: "",
+    freeProductId: "",
+    freeProductQuantity: "1",
+    applyToProductId: "",
+    applyToCategoryId: "",
+    validFrom: "",
+    validTo: "",
+  });
 
 
   // Redirect if not admin
@@ -183,6 +206,175 @@ export default function AdminPage() {
     },
     onError: () => toast({ title: "Failed to delete access password", variant: "destructive" }),
   });
+
+  // Discount queries & mutations
+  const { data: allDiscounts = [], isLoading: isLoadingDiscounts } = useQuery<Discount[]>({
+    queryKey: ["/api/admin/discounts"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/discounts", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch discounts");
+      return res.json();
+    },
+  });
+
+  const { data: allProducts = [] } = useQuery<Product[]>({
+    queryKey: ["/api/products"],
+    queryFn: async () => {
+      const res = await fetch("/api/products", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch products");
+      return res.json();
+    },
+  });
+
+  const createDiscountMutation = useMutation({
+    mutationFn: async (data: typeof discountForm) => {
+      const payload: any = {
+        name: data.name,
+        type: data.type,
+        description: data.description || null,
+        isActive: data.isActive,
+        discountPercent: data.discountPercent || null,
+        validFrom: data.validFrom || null,
+        validTo: data.validTo || null,
+        freeProductQuantity: data.freeProductQuantity ? parseInt(data.freeProductQuantity) : 1,
+      };
+      if (data.minQuantity) payload.minQuantity = parseInt(data.minQuantity);
+      if (data.minSpend) payload.minSpend = data.minSpend;
+      if (data.requiredProductIds) payload.requiredProductIds = data.requiredProductIds;
+      if (data.freeProductId) payload.freeProductId = parseInt(data.freeProductId);
+      if (data.applyToProductId) payload.applyToProductId = parseInt(data.applyToProductId);
+      if (data.applyToCategoryId) payload.applyToCategoryId = parseInt(data.applyToCategoryId);
+      const res = await apiRequest("POST", "/api/admin/discounts", payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/discounts"] });
+      setShowDiscountModal(false);
+      resetDiscountForm();
+      toast({ title: "Discount created" });
+    },
+    onError: () => toast({ title: "Failed to create discount", variant: "destructive" }),
+  });
+
+  const updateDiscountMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: typeof discountForm }) => {
+      const payload: any = {
+        name: data.name,
+        type: data.type,
+        description: data.description || null,
+        isActive: data.isActive,
+        discountPercent: data.discountPercent || null,
+        minQuantity: data.minQuantity ? parseInt(data.minQuantity) : null,
+        minSpend: data.minSpend || null,
+        requiredProductIds: data.requiredProductIds || null,
+        freeProductId: data.freeProductId ? parseInt(data.freeProductId) : null,
+        freeProductQuantity: data.freeProductQuantity ? parseInt(data.freeProductQuantity) : 1,
+        applyToProductId: data.applyToProductId ? parseInt(data.applyToProductId) : null,
+        applyToCategoryId: data.applyToCategoryId ? parseInt(data.applyToCategoryId) : null,
+        validFrom: data.validFrom || null,
+        validTo: data.validTo || null,
+      };
+      const res = await apiRequest("PUT", `/api/admin/discounts/${id}`, payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/discounts"] });
+      setShowDiscountModal(false);
+      setEditingDiscount(null);
+      resetDiscountForm();
+      toast({ title: "Discount updated" });
+    },
+    onError: () => toast({ title: "Failed to update discount", variant: "destructive" }),
+  });
+
+  const toggleDiscountMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
+      const res = await apiRequest("PUT", `/api/admin/discounts/${id}`, { isActive });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/discounts"] }),
+    onError: () => toast({ title: "Failed to toggle discount", variant: "destructive" }),
+  });
+
+  const deleteDiscountMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/admin/discounts/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/discounts"] });
+      setDeleteDiscountConfirmOpen(false);
+      setDiscountToDelete(null);
+      toast({ title: "Discount deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete discount", variant: "destructive" }),
+  });
+
+  const resetDiscountForm = () => setDiscountForm({
+    name: "", description: "", type: "quantity", isActive: true,
+    minQuantity: "", minSpend: "", requiredProductIds: "", discountPercent: "",
+    freeProductId: "", freeProductQuantity: "1", applyToProductId: "", applyToCategoryId: "",
+    validFrom: "", validTo: "",
+  });
+
+  const openEditDiscount = (d: Discount) => {
+    setEditingDiscount(d);
+    setDiscountForm({
+      name: d.name,
+      description: d.description || "",
+      type: d.type as "quantity" | "bundle" | "spend" | "bogo",
+      isActive: d.isActive,
+      minQuantity: d.minQuantity?.toString() || "",
+      minSpend: d.minSpend?.toString() || "",
+      requiredProductIds: d.requiredProductIds || "",
+      discountPercent: d.discountPercent?.toString() || "",
+      freeProductId: d.freeProductId?.toString() || "",
+      freeProductQuantity: d.freeProductQuantity?.toString() || "1",
+      applyToProductId: d.applyToProductId?.toString() || "",
+      applyToCategoryId: d.applyToCategoryId?.toString() || "",
+      validFrom: d.validFrom ? new Date(d.validFrom).toISOString().slice(0, 10) : "",
+      validTo: d.validTo ? new Date(d.validTo).toISOString().slice(0, 10) : "",
+    });
+    setShowDiscountModal(true);
+  };
+
+  const getDiscountTypeIcon = (type: string) => {
+    switch(type) {
+      case 'quantity': return <ShoppingBag className="h-4 w-4" />;
+      case 'bundle': return <Package className="h-4 w-4" />;
+      case 'spend': return <DollarSign className="h-4 w-4" />;
+      case 'bogo': return <Gift className="h-4 w-4" />;
+      default: return <Tag className="h-4 w-4" />;
+    }
+  };
+
+  const getDiscountTypeLabel = (type: string) => {
+    switch(type) {
+      case 'quantity': return 'Quantity Discount';
+      case 'bundle': return 'Bundle Pack';
+      case 'spend': return 'Spend Discount';
+      case 'bogo': return 'Buy One Get One';
+      default: return type;
+    }
+  };
+
+  const getDiscountSummary = (d: Discount) => {
+    switch(d.type) {
+      case 'quantity':
+        return `Buy ${d.minQuantity}+ items → ${d.discountPercent}% off`;
+      case 'bundle': {
+        let ids: number[] = [];
+        try { ids = JSON.parse(d.requiredProductIds || '[]'); } catch {}
+        const reward = d.freeProductId ? 'free item' : `${d.discountPercent}% off`;
+        return `Buy ${ids.length} specific item${ids.length !== 1 ? 's' : ''} → get ${reward}`;
+      }
+      case 'spend':
+        return `Spend $${d.minSpend}+ → ${d.discountPercent}% off`;
+      case 'bogo':
+        return `Buy one, get one free`;
+      default: return '';
+    }
+  };
 
   const { data: cityLimits = [], isLoading: isLoadingLimits } = useQuery<CityPurchaseLimit[]>({
     queryKey: ["/api/city-purchase-limits"],
@@ -570,11 +762,12 @@ export default function AdminPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="support">Support Tickets</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="purchase-limits">Purchase Limits</TabsTrigger>
           <TabsTrigger value="access">Access</TabsTrigger>
+          <TabsTrigger value="discounts">Discounts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="logs">
@@ -1368,7 +1561,239 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Discounts Tab */}
+        <TabsContent value="discounts">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Tag className="h-5 w-5" />
+                    Discounts
+                  </CardTitle>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Create quantity deals, bundle packs, spend thresholds, and buy-one-get-one offers.
+                  </p>
+                </div>
+                <Button onClick={() => { resetDiscountForm(); setEditingDiscount(null); setShowDiscountModal(true); }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Discount
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingDiscounts ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => <div key={i} className="h-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />)}
+                </div>
+              ) : allDiscounts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <Tag className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="font-medium">No discounts set up yet</p>
+                  <p className="text-sm">Click "Add Discount" to create your first offer.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {allDiscounts.map((d) => (
+                    <div key={d.id} className="flex items-center justify-between p-4 border rounded-lg dark:border-gray-700">
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 p-2 rounded-md ${d.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                          {getDiscountTypeIcon(d.type)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{d.name}</span>
+                            <Badge variant={d.isActive ? "default" : "secondary"} className="text-xs">
+                              {d.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">{getDiscountTypeLabel(d.type)}</Badge>
+                          </div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{getDiscountSummary(d)}</p>
+                          {d.description && <p className="text-xs text-gray-400 mt-0.5">{d.description}</p>}
+                          {(d.validFrom || d.validTo) && (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {d.validFrom ? `From ${format(new Date(d.validFrom), 'MMM d, yyyy')}` : ''}
+                              {d.validFrom && d.validTo ? ' – ' : ''}
+                              {d.validTo ? `Until ${format(new Date(d.validTo), 'MMM d, yyyy')}` : ''}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={d.isActive}
+                          onCheckedChange={(checked) => toggleDiscountMutation.mutate({ id: d.id, isActive: checked })}
+                        />
+                        <Button variant="ghost" size="sm" onClick={() => openEditDiscount(d)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setDiscountToDelete(d); setDeleteDiscountConfirmOpen(true); }}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Add/Edit Discount Dialog */}
+      <Dialog open={showDiscountModal} onOpenChange={(open) => { setShowDiscountModal(open); if (!open) { setEditingDiscount(null); resetDiscountForm(); } }}>
+        <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingDiscount ? "Edit" : "New"} Discount</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Name *</Label>
+              <Input placeholder="e.g. 4-for-25% Deal" value={discountForm.name} onChange={e => setDiscountForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Description (optional)</Label>
+              <Input placeholder="Short description shown to staff" value={discountForm.description} onChange={e => setDiscountForm(f => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Discount Type *</Label>
+              <Select value={discountForm.type} onValueChange={(v) => setDiscountForm(f => ({ ...f, type: v as any }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="quantity">Quantity Discount – Buy X+ items → % off</SelectItem>
+                  <SelectItem value="bundle">Bundle Pack – Specific items together → free item or % off</SelectItem>
+                  <SelectItem value="spend">Spend Discount – Spend $X+ → % off</SelectItem>
+                  <SelectItem value="bogo">BOGO – Buy one, get one free</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Type-specific fields */}
+            {discountForm.type === 'quantity' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Minimum Items in Cart *</Label>
+                  <Input type="number" min="1" placeholder="e.g. 4" value={discountForm.minQuantity} onChange={e => setDiscountForm(f => ({ ...f, minQuantity: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Discount Percentage *</Label>
+                  <Input type="number" min="1" max="100" placeholder="e.g. 25" value={discountForm.discountPercent} onChange={e => setDiscountForm(f => ({ ...f, discountPercent: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Limit to Product ID (optional – leave blank for any product)</Label>
+                  <Input type="number" placeholder="Product ID" value={discountForm.applyToProductId} onChange={e => setDiscountForm(f => ({ ...f, applyToProductId: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Limit to Category ID (optional)</Label>
+                  <Input type="number" placeholder="Category ID" value={discountForm.applyToCategoryId} onChange={e => setDiscountForm(f => ({ ...f, applyToCategoryId: e.target.value }))} />
+                </div>
+              </>
+            )}
+
+            {discountForm.type === 'bundle' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Required Product IDs (comma-separated) *</Label>
+                  <Input placeholder="e.g. 1,5,12" value={discountForm.requiredProductIds} onChange={e => {
+                    const raw = e.target.value;
+                    const ids = raw.split(',').map(s => s.trim()).filter(Boolean);
+                    const asJson = ids.length > 0 ? JSON.stringify(ids.map(Number).filter(n => !isNaN(n))) : '';
+                    setDiscountForm(f => ({ ...f, requiredProductIds: raw.includes('[') ? raw : (ids.length ? asJson : raw) }));
+                  }} />
+                  <p className="text-xs text-gray-400">Enter the IDs of products that must all be in the cart to trigger this deal.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Free Product ID (leave blank to give % off instead)</Label>
+                  <Input type="number" placeholder="Product ID to give for free" value={discountForm.freeProductId} onChange={e => setDiscountForm(f => ({ ...f, freeProductId: e.target.value }))} />
+                </div>
+                {discountForm.freeProductId && (
+                  <div className="space-y-2">
+                    <Label>Free Product Quantity</Label>
+                    <Input type="number" min="1" placeholder="1" value={discountForm.freeProductQuantity} onChange={e => setDiscountForm(f => ({ ...f, freeProductQuantity: e.target.value }))} />
+                  </div>
+                )}
+                {!discountForm.freeProductId && (
+                  <div className="space-y-2">
+                    <Label>Discount Percentage (if no free product) *</Label>
+                    <Input type="number" min="1" max="100" placeholder="e.g. 15" value={discountForm.discountPercent} onChange={e => setDiscountForm(f => ({ ...f, discountPercent: e.target.value }))} />
+                  </div>
+                )}
+              </>
+            )}
+
+            {discountForm.type === 'spend' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Minimum Spend ($) *</Label>
+                  <Input type="number" min="0" step="0.01" placeholder="e.g. 100.00" value={discountForm.minSpend} onChange={e => setDiscountForm(f => ({ ...f, minSpend: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Discount Percentage *</Label>
+                  <Input type="number" min="1" max="100" placeholder="e.g. 10" value={discountForm.discountPercent} onChange={e => setDiscountForm(f => ({ ...f, discountPercent: e.target.value }))} />
+                </div>
+              </>
+            )}
+
+            {discountForm.type === 'bogo' && (
+              <div className="space-y-2">
+                <Label>Limit to Product ID (optional – leave blank for any product)</Label>
+                <Input type="number" placeholder="Product ID" value={discountForm.applyToProductId} onChange={e => setDiscountForm(f => ({ ...f, applyToProductId: e.target.value }))} />
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Valid From (optional)</Label>
+                <Input type="date" value={discountForm.validFrom} onChange={e => setDiscountForm(f => ({ ...f, validFrom: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Valid Until (optional)</Label>
+                <Input type="date" value={discountForm.validTo} onChange={e => setDiscountForm(f => ({ ...f, validTo: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={discountForm.isActive} onCheckedChange={(v) => setDiscountForm(f => ({ ...f, isActive: v }))} />
+              <Label>Active</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowDiscountModal(false); setEditingDiscount(null); resetDiscountForm(); }}>Cancel</Button>
+            <Button
+              disabled={!discountForm.name || createDiscountMutation.isPending || updateDiscountMutation.isPending}
+              onClick={() => {
+                if (editingDiscount) {
+                  updateDiscountMutation.mutate({ id: editingDiscount.id, data: discountForm });
+                } else {
+                  createDiscountMutation.mutate(discountForm);
+                }
+              }}
+            >
+              {(createDiscountMutation.isPending || updateDiscountMutation.isPending) ? "Saving..." : editingDiscount ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Discount Confirmation */}
+      <Dialog open={deleteDiscountConfirmOpen} onOpenChange={setDeleteDiscountConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Discount</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Are you sure you want to delete <strong>"{discountToDelete?.name}"</strong>? This cannot be undone.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDiscountConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { if (discountToDelete) deleteDiscountMutation.mutate(discountToDelete.id); }} disabled={deleteDiscountMutation.isPending}>
+              {deleteDiscountMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add/Edit City Purchase Limit Dialog */}
       <Dialog open={showAddLimitModal} onOpenChange={(open) => {

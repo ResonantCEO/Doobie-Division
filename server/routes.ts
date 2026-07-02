@@ -2100,6 +2100,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Discounts - public endpoint for cart evaluation (authenticated)
+  app.get("/api/discounts", isAuthenticated, async (req, res) => {
+    try {
+      const activeDiscounts = await storage.getActiveDiscounts();
+      res.json(activeDiscounts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch discounts" });
+    }
+  });
+
+  // Discounts - evaluate cart
+  app.post("/api/discounts/evaluate", isAuthenticated, async (req, res) => {
+    try {
+      const { items } = req.body;
+      if (!items || !Array.isArray(items)) return res.json({ applied: [], totalSavings: 0 });
+
+      const activeDiscounts = await storage.getActiveDiscounts();
+      const applied: any[] = [];
+
+      const totalItems = items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
+      const cartTotal = items.reduce((sum: number, item: any) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
+      const cartProductIds = items.map((i: any) => i.productId);
+      const cartCategoryIds = items.map((i: any) => i.categoryId).filter(Boolean);
+
+      for (const discount of activeDiscounts) {
+        if (discount.type === 'quantity') {
+          const minQty = discount.minQuantity || 0;
+          let qualifyingItems = items;
+          if (discount.applyToProductId) {
+            qualifyingItems = items.filter((i: any) => i.productId === discount.applyToProductId);
+          } else if (discount.applyToCategoryId) {
+            qualifyingItems = items.filter((i: any) => i.categoryId === discount.applyToCategoryId);
+          }
+          const qualifyingQty = qualifyingItems.reduce((s: number, i: any) => s + (i.quantity || 1), 0);
+          if (qualifyingQty >= minQty) {
+            const savingsBase = qualifyingItems.reduce((s: number, i: any) => s + ((i.price || 0) * (i.quantity || 1)), 0);
+            const savings = savingsBase * (Number(discount.discountPercent) / 100);
+            applied.push({ discount, savings: Math.round(savings * 100) / 100, description: `${discount.discountPercent}% off (${qualifyingQty} items)` });
+          }
+        } else if (discount.type === 'bundle') {
+          let reqIds: number[] = [];
+          try { reqIds = JSON.parse(discount.requiredProductIds || '[]'); } catch {}
+          const allPresent = reqIds.every((id: number) => cartProductIds.includes(id));
+          if (allPresent && reqIds.length > 0) {
+            if (discount.freeProductId) {
+              applied.push({ discount, savings: 0, freeProductId: discount.freeProductId, freeProductQuantity: discount.freeProductQuantity || 1, description: `Free item added to your order` });
+            } else if (discount.discountPercent) {
+              const savings = cartTotal * (Number(discount.discountPercent) / 100);
+              applied.push({ discount, savings: Math.round(savings * 100) / 100, description: `${discount.discountPercent}% off bundle` });
+            }
+          }
+        } else if (discount.type === 'spend') {
+          const minSpend = Number(discount.minSpend) || 0;
+          if (cartTotal >= minSpend) {
+            const savings = cartTotal * (Number(discount.discountPercent) / 100);
+            applied.push({ discount, savings: Math.round(savings * 100) / 100, description: `${discount.discountPercent}% off for spending $${minSpend.toFixed(2)}+` });
+          }
+        } else if (discount.type === 'bogo') {
+          let bogoItems = items;
+          if (discount.applyToProductId) {
+            bogoItems = items.filter((i: any) => i.productId === discount.applyToProductId);
+          }
+          const bogoQty = bogoItems.reduce((s: number, i: any) => s + (i.quantity || 1), 0);
+          if (bogoQty >= 2) {
+            const freeCount = Math.floor(bogoQty / 2);
+            const unitPrice = bogoItems[0]?.price || 0;
+            const savings = freeCount * unitPrice;
+            applied.push({ discount, savings: Math.round(savings * 100) / 100, description: `Buy one get one free (${freeCount} free item${freeCount > 1 ? 's' : ''})` });
+          }
+        }
+      }
+
+      const totalSavings = applied.reduce((s, a) => s + (a.savings || 0), 0);
+      res.json({ applied, totalSavings: Math.round(totalSavings * 100) / 100 });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to evaluate discounts" });
+    }
+  });
+
+  // Admin: list discounts
+  app.get("/api/admin/discounts", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const all = await storage.getDiscounts();
+      res.json(all);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch discounts" });
+    }
+  });
+
+  // Admin: create discount
+  app.post("/api/admin/discounts", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const created = await storage.createDiscount(req.body);
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create discount" });
+    }
+  });
+
+  // Admin: update discount
+  app.put("/api/admin/discounts/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updated = await storage.updateDiscount(id, req.body);
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update discount" });
+    }
+  });
+
+  // Admin: delete discount
+  app.delete("/api/admin/discounts/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteDiscount(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete discount" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Setup WebSocket server

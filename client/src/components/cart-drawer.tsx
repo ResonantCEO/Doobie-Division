@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -24,10 +24,23 @@ import {
 import { useCart } from "@/contexts/cart-context";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { ShoppingCart, Minus, Plus, Trash2, CreditCard } from "lucide-react";
+import { ShoppingCart, Minus, Plus, Trash2, CreditCard, Tag, Gift } from "lucide-react";
 
 interface CartDrawerProps {
   children: React.ReactNode;
+}
+
+interface AppliedDiscount {
+  discount: { id: number; name: string; type: string };
+  savings: number;
+  description: string;
+  freeProductId?: number;
+  freeProductQuantity?: number;
+}
+
+interface DiscountEvalResult {
+  applied: AppliedDiscount[];
+  totalSavings: number;
 }
 
 export default function CartDrawer({ children }: CartDrawerProps) {
@@ -36,7 +49,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [isCheckingOut, setIsCheckingOut] = useState(false); // Added state for checkout process
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [discountResult, setDiscountResult] = useState<DiscountEvalResult | null>(null);
   const [shippingForm, setShippingForm] = useState({
     customerName: "",
     customerPhone: "",
@@ -47,6 +61,31 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     notes: "",
   });
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
+
+  // Evaluate discounts whenever cart items change (debounced)
+  useEffect(() => {
+    if (!user || state.items.length === 0) {
+      setDiscountResult(null);
+      return;
+    }
+    const cartItems = state.items.map(item => ({
+      productId: item.product.id,
+      categoryId: item.product.categoryId,
+      quantity: item.quantity,
+      price: item.product.sellingMethod === 'weight'
+        ? Number(item.product.pricePerGram) || 0
+        : Number(item.product.price) || 0,
+    }));
+    fetch('/api/discounts/evaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ items: cartItems }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setDiscountResult(data); })
+      .catch(() => {});
+  }, [state.items, user]);
 
   // Auto-fill form with user data when confirmation modal opens
   useEffect(() => {
@@ -502,6 +541,20 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   <span>Items ({state.itemCount})</span>
                   <span>${state.total.toFixed(2)}</span>
                 </div>
+                {/* Applied discounts */}
+                {discountResult && discountResult.applied.length > 0 && (
+                  <div className="space-y-1">
+                    {discountResult.applied.map((a, i) => (
+                      <div key={i} className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                        <span className="flex items-center gap-1">
+                          {a.freeProductId ? <Gift className="h-3 w-3" /> : <Tag className="h-3 w-3" />}
+                          {a.discount.name}
+                        </span>
+                        <span>{a.savings > 0 ? `-$${a.savings.toFixed(2)}` : a.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span>Shipping</span>
                   <span className="text-primary">Free! Tips for our drivers are always appreciated.</span>
@@ -509,8 +562,18 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 <Separator />
                 <div className="flex justify-between font-semibold">
                   <span>Total</span>
-                  <span>${state.total.toFixed(2)}</span>
+                  <span>
+                    {discountResult && discountResult.totalSavings > 0 ? (
+                      <span className="flex items-center gap-2">
+                        <span className="line-through text-gray-400 text-sm font-normal">${state.total.toFixed(2)}</span>
+                        <span className="text-green-600 dark:text-green-400">${Math.max(0, state.total - discountResult.totalSavings).toFixed(2)}</span>
+                      </span>
+                    ) : `$${state.total.toFixed(2)}`}
+                  </span>
                 </div>
+                {discountResult && discountResult.totalSavings > 0 && (
+                  <div className="text-xs text-green-600 dark:text-green-400 text-right">You save ${discountResult.totalSavings.toFixed(2)}!</div>
+                )}
               </div>
 
               <div className="space-y-2">

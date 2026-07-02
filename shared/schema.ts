@@ -222,6 +222,31 @@ export const cityPurchaseLimits = pgTable("city_purchase_limits", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const discounts = pgTable("discounts", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  type: varchar("type").notNull(), // 'quantity', 'bundle', 'spend', 'bogo'
+  isActive: boolean("is_active").notNull().default(true),
+
+  minQuantity: integer("min_quantity"),
+  minSpend: decimal("min_spend", { precision: 10, scale: 2 }),
+  requiredProductIds: text("required_product_ids"),
+
+  discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }),
+  freeProductId: integer("free_product_id"),
+  freeProductQuantity: integer("free_product_quantity").default(1),
+
+  applyToProductId: integer("apply_to_product_id"),
+  applyToCategoryId: integer("apply_to_category_id"),
+
+  validFrom: timestamp("valid_from"),
+  validTo: timestamp("valid_to"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const accessPasswords = pgTable("access_passwords", {
   id: serial("id").primaryKey(),
   label: varchar("label").notNull(),
@@ -497,3 +522,27 @@ export type InsertSupportTicketResponse = z.infer<typeof insertSupportTicketResp
 export type SupportTicketResponse = typeof supportTicketResponses.$inferSelect;
 export type InsertCityPurchaseLimit = z.infer<typeof insertCityPurchaseLimitSchema>;
 export type CityPurchaseLimit = typeof cityPurchaseLimits.$inferSelect;
+
+export const insertDiscountSchema = createInsertSchema(discounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  name: z.string().min(1, "Name is required"),
+  type: z.enum(["quantity", "bundle", "spend", "bogo"]),
+  description: z.string().nullable().optional(),
+  minQuantity: z.number().int().nullable().optional(),
+  minSpend: z.string().nullable().optional(),
+  requiredProductIds: z.string().nullable().optional(),
+  discountPercent: z.string().nullable().optional(),
+  freeProductId: z.number().int().nullable().optional(),
+  freeProductQuantity: z.number().int().nullable().optional(),
+  applyToProductId: z.number().int().nullable().optional(),
+  applyToCategoryId: z.number().int().nullable().optional(),
+  validFrom: z.string().nullable().optional(),
+  validTo: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type Discount = typeof discounts.$inferSelect;
+export type InsertDiscount = z.infer<typeof insertDiscountSchema>;
