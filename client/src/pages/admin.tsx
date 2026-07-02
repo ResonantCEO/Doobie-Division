@@ -777,7 +777,6 @@ export default function AdminPage() {
           <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="purchase-limits">Purchase Limits</TabsTrigger>
           <TabsTrigger value="access">Access</TabsTrigger>
-          <TabsTrigger value="discounts">Discounts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="logs">
