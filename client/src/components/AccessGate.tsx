@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Lock, Eye, EyeOff } from "lucide-react";
+import { Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 
 interface AccessGateProps {
   onGranted: () => void;
@@ -16,6 +17,7 @@ export default function AccessGate({ onGranted }: AccessGateProps) {
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   const verifyMutation = useMutation({
     mutationFn: async (pw: string) => {
@@ -40,6 +42,17 @@ export default function AccessGate({ onGranted }: AccessGateProps) {
     if (password.trim()) {
       verifyMutation.mutate(password.trim());
     }
+  };
+
+  const handleBack = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      queryClient.clear();
+    } catch {
+      // ignore
+    }
+    setLocation("/");
+    window.location.href = "/";
   };
 
   return (
@@ -82,6 +95,16 @@ export default function AccessGate({ onGranted }: AccessGateProps) {
               {verifyMutation.isPending ? "Verifying..." : "Enter"}
             </Button>
           </form>
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back to home
+            </button>
+          </div>
         </CardContent>
       </Card>
     </div>
