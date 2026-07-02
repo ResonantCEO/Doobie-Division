@@ -2022,9 +2022,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { password } = req.body;
       if (!password) return res.status(400).json({ message: "Password is required" });
-      const valid = await storage.verifyAccessPassword(password);
-      if (valid) {
-        req.session.accessGranted = true;
+      const passwordId = await storage.verifyAccessPassword(password);
+      if (passwordId !== null) {
+        const userId = req.currentUser?.id;
+        if (userId) {
+          await storage.setUserGrantedAccessPassword(userId, passwordId);
+        }
         return res.json({ success: true });
       }
       return res.status(401).json({ success: false, message: "Invalid access password" });
@@ -2034,9 +2037,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Check if access is already granted in this session
+  // Check if access is still valid for this user
   app.get("/api/access/status", isAuthenticated, async (req: any, res) => {
-    res.json({ granted: !!req.session.accessGranted });
+    try {
+      const userId = req.currentUser?.id;
+      if (!userId) return res.json({ granted: false });
+      const user = await storage.getUser(userId);
+      if (!user?.grantedAccessPasswordId) return res.json({ granted: false });
+      const valid = await storage.isAccessPasswordStillValid(user.grantedAccessPasswordId);
+      if (!valid) {
+        // Password no longer valid — clear the grant
+        await storage.setUserGrantedAccessPassword(userId, null);
+      }
+      res.json({ granted: valid });
+    } catch (error) {
+      res.json({ granted: false });
+    }
   });
 
   // Admin: list all access passwords

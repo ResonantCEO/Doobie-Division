@@ -50,6 +50,7 @@ export const users = pgTable("users", {
   telegramUsername: varchar("telegram_username"),
   minPurchaseExempt: boolean("min_purchase_exempt").notNull().default(false),
   minPurchaseOverride: decimal("min_purchase_override", { precision: 10, scale: 2 }),
+  grantedAccessPasswordId: integer("granted_access_password_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

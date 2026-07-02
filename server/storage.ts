@@ -183,7 +183,9 @@ export interface IStorage {
   createAccessPassword(data: any): Promise<AccessPassword>;
   updateAccessPassword(id: number, data: any): Promise<AccessPassword | undefined>;
   deleteAccessPassword(id: number): Promise<void>;
-  verifyAccessPassword(password: string): Promise<boolean>;
+  verifyAccessPassword(password: string): Promise<number | null>;
+  isAccessPasswordStillValid(passwordId: number): Promise<boolean>;
+  setUserGrantedAccessPassword(userId: string, passwordId: number | null): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3391,16 +3393,30 @@ export class DatabaseStorage implements IStorage {
     await retryQuery(() => db.delete(accessPasswords).where(eq(accessPasswords.id, id)));
   }
 
-  async verifyAccessPassword(password: string): Promise<boolean> {
+  async verifyAccessPassword(password: string): Promise<number | null> {
     const now = new Date();
     const all = await retryQuery(() => db.select().from(accessPasswords).where(eq(accessPasswords.isActive, true)));
     for (const ap of all) {
       if (ap.password !== password) continue;
       if (ap.validFrom && now < ap.validFrom) continue;
       if (ap.validTo && now > ap.validTo) continue;
-      return true;
+      return ap.id;
     }
-    return false;
+    return null;
+  }
+
+  async isAccessPasswordStillValid(passwordId: number): Promise<boolean> {
+    const now = new Date();
+    const results = await retryQuery(() => db.select().from(accessPasswords).where(and(eq(accessPasswords.id, passwordId), eq(accessPasswords.isActive, true))));
+    if (!results[0]) return false;
+    const ap = results[0];
+    if (ap.validFrom && now < ap.validFrom) return false;
+    if (ap.validTo && now > ap.validTo) return false;
+    return true;
+  }
+
+  async setUserGrantedAccessPassword(userId: string, passwordId: number | null): Promise<void> {
+    await retryQuery(() => db.update(users).set({ grantedAccessPasswordId: passwordId, updatedAt: new Date() }).where(eq(users.id, userId)));
   }
 }
 
