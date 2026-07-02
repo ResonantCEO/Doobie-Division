@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
+import { neon, neonConfig } from "@neondatabase/serverless";
 import * as schema from "../shared/schema";
 
 if (!process.env.DATABASE_URL) {
@@ -17,13 +17,27 @@ export const db = drizzle(sql, {
   logger: process.env.NODE_ENV === "development"
 });
 
-// Add connection health check
+// Warm up the Neon connection and pre-validate tables on startup.
+// Neon serverless uses HTTP - first request(s) after idle can return null rows.
+// Running a simple query early ensures the connection is ready before clients hit it.
+export async function warmupDatabase() {
+  const attempts = 6;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await sql`SELECT 1`;
+      return true;
+    } catch {
+      await new Promise(r => setTimeout(r, 300 * (i + 1)));
+    }
+  }
+  return false;
+}
+
 export async function checkDatabaseConnection() {
   try {
     await sql`SELECT 1`;
     return true;
-  } catch (error) {
-    console.error("Database connection failed:", error);
+  } catch {
     return false;
   }
 }

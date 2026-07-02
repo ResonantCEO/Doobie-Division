@@ -291,7 +291,8 @@ export const promoCodes = pgTable("promo_codes", {
   code: varchar("code").notNull().unique(),
   description: text("description"),
   discountType: varchar("discount_type").notNull().default("percent"), // 'percent' | 'fixed'
-  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull().default("0"),
+  discountValue: text("discount_value").notNull().default("0"),
+  minOrderAmount: text("min_order_amount"),
   bypassPurchaseMinimum: boolean("bypass_purchase_minimum").notNull().default(false),
   usageLimitType: varchar("usage_limit_type").notNull().default("unlimited"), // 'unlimited' | 'once_per_user'
   maxTotalUses: integer("max_total_uses"),
@@ -317,6 +318,7 @@ export const insertPromoCodeSchema = createInsertSchema(promoCodes).omit({
   code: z.string().min(1, "Code is required"),
   discountType: z.enum(["percent", "fixed"]),
   discountValue: z.string().min(1, "Discount value is required"),
+  minOrderAmount: z.string().nullable().optional(),
   bypassPurchaseMinimum: z.boolean().optional(),
   usageLimitType: z.enum(["unlimited", "once_per_user"]),
   maxTotalUses: z.number().int().nullable().optional(),

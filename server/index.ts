@@ -3,7 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, log } from "./vite";
 import path from "path";
 import { fileURLToPath } from "url";
-import { checkDatabaseConnection } from "./db";
+import { checkDatabaseConnection, warmupDatabase } from "./db";
 
 // Separate rate limiting stores for different endpoint types to prevent cross-contamination
 const rateLimitStores = {
@@ -140,19 +140,6 @@ app.use('/api/objects/upload', createRateLimit(rateLimitStores.upload, 100, 15 *
 // General API routes - applied last to catch everything else
 app.use('/api/', createRateLimit(rateLimitStores.general, 500, 15 * 60 * 1000)); // 500 requests per 15 minutes
 
-// Database connection middleware
-app.use(async (req, res, next) => {
-  if (req.path.startsWith("/api") && req.path !== "/api/health") {
-    const isConnected = await checkDatabaseConnection();
-    if (!isConnected) {
-      return res.status(503).json({ 
-        error: "Database connection unavailable",
-        message: "Please try again in a moment" 
-      });
-    }
-  }
-  next();
-});
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -185,6 +172,11 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Warm up the Neon connection before accepting any requests.
+  // Neon serverless HTTP can return null rows on cold-start concurrent requests.
+  // A single warmup query serializes startup and prevents the null-map crash.
+  await warmupDatabase();
+
   // Ensure image_urls column exists (migration)
   try {
     const { sql } = await import("./db");

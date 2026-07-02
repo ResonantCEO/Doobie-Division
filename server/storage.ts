@@ -44,7 +44,7 @@ import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, 
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
-async function retryQuery<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+async function retryQuery<T>(fn: () => Promise<T>, retries = 8): Promise<T> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await fn();
@@ -55,8 +55,8 @@ async function retryQuery<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
         errorMsg.includes("ECONNRESET") ||
         errorMsg.includes("socket hang up");
       if (isRetryable && attempt < retries) {
-        const delay = 150 * Math.pow(2, attempt);
-        console.warn(`[retryQuery] Retryable error (attempt ${attempt + 1}/${retries}), waiting ${delay}ms: ${errorMsg.substring(0, 80)}`);
+        const delay = Math.min(150 * Math.pow(2, attempt), 3000);
+        if (attempt >= 2) console.warn(`[retryQuery] Retryable error (attempt ${attempt + 1}/${retries}), waiting ${delay}ms: ${errorMsg.substring(0, 80)}`);
         await new Promise(r => setTimeout(r, delay));
         continue;
       }
@@ -3600,6 +3600,7 @@ export class DatabaseStorage implements IStorage {
       isActive: data.isActive !== false,
     };
     if (data.description) toInsert.description = data.description;
+    if (data.minOrderAmount != null && data.minOrderAmount !== "") toInsert.minOrderAmount = data.minOrderAmount;
     if (data.maxTotalUses != null) toInsert.maxTotalUses = data.maxTotalUses;
     if (data.validFrom) toInsert.validFrom = new Date(data.validFrom);
     if (data.validTo) toInsert.validTo = new Date(data.validTo);
@@ -3615,6 +3616,7 @@ export class DatabaseStorage implements IStorage {
     if (data.description !== undefined) toUpdate.description = data.description;
     if (data.discountType !== undefined) toUpdate.discountType = data.discountType;
     if (data.discountValue !== undefined) toUpdate.discountValue = data.discountValue;
+    if ('minOrderAmount' in data) toUpdate.minOrderAmount = (data.minOrderAmount != null && data.minOrderAmount !== "") ? data.minOrderAmount : null;
     if (data.bypassPurchaseMinimum !== undefined) toUpdate.bypassPurchaseMinimum = data.bypassPurchaseMinimum;
     if (data.usageLimitType !== undefined) toUpdate.usageLimitType = data.usageLimitType;
     if ('maxTotalUses' in data) toUpdate.maxTotalUses = data.maxTotalUses;

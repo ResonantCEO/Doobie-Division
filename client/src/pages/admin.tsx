@@ -322,6 +322,7 @@ export default function AdminPage() {
     code: "", description: "",
     discountType: "percent" as "percent" | "fixed",
     discountValue: "",
+    minOrderAmount: "",
     bypassPurchaseMinimum: false,
     usageLimitType: "unlimited" as "unlimited" | "once_per_user",
     maxTotalUses: "",
@@ -348,6 +349,7 @@ export default function AdminPage() {
     code: "", description: "",
     discountType: "percent",
     discountValue: "",
+    minOrderAmount: "",
     bypassPurchaseMinimum: false,
     usageLimitType: "unlimited",
     maxTotalUses: "",
@@ -362,6 +364,7 @@ export default function AdminPage() {
       description: p.description || "",
       discountType: (p.discountType as "percent" | "fixed") || "percent",
       discountValue: p.discountValue?.toString() || "",
+      minOrderAmount: p.minOrderAmount?.toString() || "",
       bypassPurchaseMinimum: p.bypassPurchaseMinimum || false,
       usageLimitType: (p.usageLimitType as "unlimited" | "once_per_user") || "unlimited",
       maxTotalUses: p.maxTotalUses?.toString() || "",
@@ -379,6 +382,7 @@ export default function AdminPage() {
         description: data.description || null,
         discountType: data.discountType,
         discountValue: data.discountValue,
+        minOrderAmount: data.minOrderAmount || null,
         bypassPurchaseMinimum: data.bypassPurchaseMinimum,
         usageLimitType: data.usageLimitType,
         isActive: data.isActive,
@@ -406,6 +410,7 @@ export default function AdminPage() {
         description: data.description || null,
         discountType: data.discountType,
         discountValue: data.discountValue,
+        minOrderAmount: data.minOrderAmount || null,
         bypassPurchaseMinimum: data.bypassPurchaseMinimum,
         usageLimitType: data.usageLimitType,
         maxTotalUses: data.maxTotalUses ? parseInt(data.maxTotalUses) : null,
@@ -1860,6 +1865,14 @@ export default function AdminPage() {
             <div className="space-y-2">
               <Label>Max Total Uses (optional)</Label>
               <Input type="number" min="1" placeholder="Leave blank for unlimited" value={promoCodeForm.maxTotalUses} onChange={e => setPromoCodeForm(f => ({ ...f, maxTotalUses: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Minimum Order Amount (optional)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                <Input type="number" min="0" step="0.01" placeholder="e.g. 200.00 — leave blank for no minimum" className="pl-7" value={promoCodeForm.minOrderAmount} onChange={e => setPromoCodeForm(f => ({ ...f, minOrderAmount: e.target.value }))} />
+              </div>
+              <p className="text-xs text-muted-foreground">Customer's cart must reach this amount before the code can be applied.</p>
             </div>
             <div className="flex items-center gap-3">
               <Switch checked={promoCodeForm.bypassPurchaseMinimum} onCheckedChange={v => setPromoCodeForm(f => ({ ...f, bypassPurchaseMinimum: v }))} />

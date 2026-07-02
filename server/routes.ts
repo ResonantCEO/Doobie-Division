@@ -2439,6 +2439,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (promo.validFrom && now < promo.validFrom) return res.json({ valid: false, message: "This code isn't valid yet" });
       if (promo.validTo && now > promo.validTo) return res.json({ valid: false, message: "This code has expired" });
 
+      // Minimum order amount check
+      if (promo.minOrderAmount != null) {
+        const minAmt = parseFloat(promo.minOrderAmount);
+        const cartAmt = parseFloat(cartTotal || "0");
+        if (cartAmt < minAmt) {
+          return res.json({
+            valid: false,
+            message: `This code requires a minimum order of $${minAmt.toFixed(2)}. Your cart total is $${cartAmt.toFixed(2)}.`,
+            minOrderAmount: minAmt,
+            cartTotal: cartAmt,
+          });
+        }
+      }
+
       // Total uses cap
       if (promo.maxTotalUses != null && promo.totalUses >= promo.maxTotalUses) {
         return res.json({ valid: false, message: "This code has reached its usage limit" });
