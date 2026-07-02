@@ -340,6 +340,8 @@ export default function AdminPage() {
       if (!res.ok) throw new Error("Failed to fetch promo codes");
       return res.json();
     },
+    retry: 5,
+    retryDelay: attempt => Math.min(1000 * 2 ** attempt, 8000),
   });
 
   const resetPromoCodeForm = () => setPromoCodeForm({

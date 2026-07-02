@@ -2385,9 +2385,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const created = await storage.createPromoCode(req.body);
       res.status(201).json(created);
     } catch (e: any) {
-      if (e?.message?.includes("unique") || e?.code === "23505") {
-        return res.status(409).json({ message: "A promo code with that name already exists." });
+      const isDupe = e?.code === "23505" || e?.cause?.code === "23505" ||
+        e?.message?.toLowerCase().includes("unique") || e?.cause?.message?.toLowerCase().includes("unique");
+      if (isDupe) {
+        return res.status(409).json({ message: "A promo code with that code already exists." });
       }
+      console.error("Failed to create promo code:", e);
       res.status(500).json({ message: "Failed to create promo code" });
     }
   });
@@ -2399,8 +2402,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updated) return res.status(404).json({ message: "Not found" });
       res.json(updated);
     } catch (e: any) {
-      if (e?.message?.includes("unique") || e?.code === "23505") {
-        return res.status(409).json({ message: "A promo code with that name already exists." });
+      const isDupe = e?.code === "23505" || e?.cause?.code === "23505" ||
+        e?.message?.toLowerCase().includes("unique") || e?.cause?.message?.toLowerCase().includes("unique");
+      if (isDupe) {
+        return res.status(409).json({ message: "A promo code with that code already exists." });
       }
       res.status(500).json({ message: "Failed to update promo code" });
     }
