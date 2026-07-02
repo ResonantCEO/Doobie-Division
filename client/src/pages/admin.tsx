@@ -904,11 +904,11 @@ export default function AdminPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="discounts">Discounts</TabsTrigger>
           <TabsTrigger value="support">Support Tickets</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="purchase-limits">Purchase Limits</TabsTrigger>
           <TabsTrigger value="access">Access</TabsTrigger>
+          <TabsTrigger value="discounts">Discounts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="logs">
