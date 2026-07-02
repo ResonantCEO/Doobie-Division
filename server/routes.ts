@@ -2368,6 +2368,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Promo Codes ────────────────────────────────────────────────────────────
+
+  // Admin: list all promo codes
+  app.get("/api/admin/promo-codes", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      res.json(await storage.getPromoCodes());
+    } catch (e) {
+      res.status(500).json({ message: "Failed to fetch promo codes" });
+    }
+  });
+
+  // Admin: create promo code
+  app.post("/api/admin/promo-codes", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const created = await storage.createPromoCode(req.body);
+      res.status(201).json(created);
+    } catch (e: any) {
+      if (e?.message?.includes("unique") || e?.code === "23505") {
+        return res.status(409).json({ message: "A promo code with that name already exists." });
+      }
+      res.status(500).json({ message: "Failed to create promo code" });
+    }
+  });
+
+  // Admin: update promo code
+  app.put("/api/admin/promo-codes/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const updated = await storage.updatePromoCode(parseInt(req.params.id), req.body);
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (e: any) {
+      if (e?.message?.includes("unique") || e?.code === "23505") {
+        return res.status(409).json({ message: "A promo code with that name already exists." });
+      }
+      res.status(500).json({ message: "Failed to update promo code" });
+    }
+  });
+
+  // Admin: delete promo code
+  app.delete("/api/admin/promo-codes/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      await storage.deletePromoCode(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ message: "Failed to delete promo code" });
+    }
+  });
+
+  // Public (authenticated): validate a promo code
+  app.post("/api/promo-codes/validate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { code, cartTotal } = req.body;
+      if (!code) return res.status(400).json({ valid: false, message: "No code provided" });
+
+      const promo = await storage.getPromoCodeByCode(code.trim());
+      if (!promo) return res.json({ valid: false, message: "Code not found" });
+      if (!promo.isActive) return res.json({ valid: false, message: "This code is no longer active" });
+
+      // Date validation
+      const now = new Date();
+      if (promo.validFrom && now < promo.validFrom) return res.json({ valid: false, message: "This code isn't valid yet" });
+      if (promo.validTo && now > promo.validTo) return res.json({ valid: false, message: "This code has expired" });
+
+      // Total uses cap
+      if (promo.maxTotalUses != null && promo.totalUses >= promo.maxTotalUses) {
+        return res.json({ valid: false, message: "This code has reached its usage limit" });
+      }
+
+      // Per-user limit
+      const userId = req.user?.claims?.sub;
+      if (promo.usageLimitType === "once_per_user" && userId) {
+        const uses = await storage.getPromoCodeUsesForUser(promo.id, userId);
+        if (uses > 0) return res.json({ valid: false, message: "You've already used this code" });
+      }
+
+      // Calculate discount amount
+      const total = parseFloat(cartTotal || "0");
+      const discountValue = parseFloat(promo.discountValue);
+      const discountAmount = promo.discountType === "percent"
+        ? Math.min(total, total * discountValue / 100)
+        : Math.min(total, discountValue);
+
+      res.json({
+        valid: true,
+        promoId: promo.id,
+        code: promo.code,
+        description: promo.description,
+        discountType: promo.discountType,
+        discountValue: promo.discountValue,
+        discountAmount: parseFloat(discountAmount.toFixed(2)),
+        bypassPurchaseMinimum: promo.bypassPurchaseMinimum,
+      });
+    } catch (e) {
+      res.status(500).json({ valid: false, message: "Error validating code" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Setup WebSocket server

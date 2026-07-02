@@ -51,6 +51,9 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [discountResult, setDiscountResult] = useState<DiscountEvalResult | null>(null);
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<{ promoId: number; code: string; description?: string; discountType: string; discountValue: string; discountAmount: number; bypassPurchaseMinimum: boolean } | null>(null);
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
   const [shippingForm, setShippingForm] = useState({
     customerName: "",
     customerPhone: "",
@@ -219,6 +222,31 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   };
 
 
+  const applyPromoCode = async () => {
+    if (!promoInput.trim()) return;
+    setIsValidatingPromo(true);
+    try {
+      const effectiveTotal = state.total - (discountResult?.totalSavings || 0);
+      const res = await fetch('/api/promo-codes/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ code: promoInput.trim(), cartTotal: effectiveTotal.toString() }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setAppliedPromo(data);
+        toast({ title: `Promo code applied!`, description: data.discountType === 'percent' ? `${data.discountValue}% off your order` : `$${Number(data.discountAmount).toFixed(2)} off your order` });
+      } else {
+        toast({ title: "Invalid code", description: data.message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Could not apply promo code.", variant: "destructive" });
+    } finally {
+      setIsValidatingPromo(false);
+    }
+  };
+
   const handleConfirmOrder = async () => {
     const { customerName, customerPhone, street, city, state: shippingState, zipCode } = shippingForm;
 
@@ -229,8 +257,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     setIsCheckingOut(true);
 
     try {
-      // Check purchase limit for city
-      if (city.trim()) {
+      // Check purchase limit for city (skipped if promo code bypasses minimum)
+      if (city.trim() && !appliedPromo?.bypassPurchaseMinimum) {
         const limitCheck = await fetch('/api/check-purchase-limit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -278,18 +306,25 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       // Generate order number
       const orderNumber = `ORD-${Date.now()}`;
 
-      // Prepare order data
-      const orderData = {
+      // Prepare order data (apply promo discount if any)
+      const promoSavings = appliedPromo?.discountAmount || 0;
+      const finalTotal = Math.max(0, state.total - (discountResult?.totalSavings || 0) - promoSavings);
+      const orderData: any = {
         orderNumber,
         customerId: user?.id,
         customerName,
         customerEmail: user?.email || "",
         customerPhone,
         shippingAddress,
-        total: state.total.toString(),
+        total: finalTotal.toFixed(2),
         paymentMethod: "cod",
         notes: shippingForm.notes,
       };
+      if (appliedPromo) {
+        orderData.promoCodeId = appliedPromo.promoId;
+        orderData.promoCode = appliedPromo.code;
+        orderData.promoDiscount = promoSavings.toFixed(2);
+      }
 
       // Helper function to get price based on weight option size
       const getWeightOptionPrice = (product: typeof state.items[0]['product'], size?: string): number => {
@@ -351,17 +386,11 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         clearCart();
         setIsOpen(false);
         setShowConfirmation(false);
-        setShippingForm({
-          customerName: "",
-          customerPhone: "",
-          street: "",
-          city: "",
-          state: "",
-          zipCode: "",
-          notes: "",
-        });
-        setFormErrors({}); // Clear form errors on successful order
-        setIsCheckingOut(false); // Reset checkout state after successful order
+        setShippingForm({ customerName: "", customerPhone: "", street: "", city: "", state: "", zipCode: "", notes: "" });
+        setFormErrors({});
+        setPromoInput("");
+        setAppliedPromo(null);
+        setIsCheckingOut(false);
 
         toast({
           title: "Order placed successfully!",
@@ -541,7 +570,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   <span>Items ({state.itemCount})</span>
                   <span>${state.total.toFixed(2)}</span>
                 </div>
-                {/* Applied discounts */}
+                {/* Applied automatic discounts */}
                 {discountResult && discountResult.applied.length > 0 && (
                   <div className="space-y-1">
                     {discountResult.applied.map((a, i) => (
@@ -555,25 +584,45 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                     ))}
                   </div>
                 )}
+                {/* Applied promo code */}
+                {appliedPromo && (
+                  <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                    <span className="flex items-center gap-1">
+                      <Tag className="h-3 w-3" />
+                      Promo: <span className="font-mono font-bold ml-1">{appliedPromo.code}</span>
+                    </span>
+                    <span>-${appliedPromo.discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span>Shipping</span>
                   <span className="text-primary">Free! Tips for our drivers are always appreciated.</span>
                 </div>
                 <Separator />
-                <div className="flex justify-between font-semibold">
-                  <span>Total</span>
-                  <span>
-                    {discountResult && discountResult.totalSavings > 0 ? (
-                      <span className="flex items-center gap-2">
-                        <span className="line-through text-gray-400 text-sm font-normal">${state.total.toFixed(2)}</span>
-                        <span className="text-green-600 dark:text-green-400">${Math.max(0, state.total - discountResult.totalSavings).toFixed(2)}</span>
-                      </span>
-                    ) : `$${state.total.toFixed(2)}`}
-                  </span>
-                </div>
-                {discountResult && discountResult.totalSavings > 0 && (
-                  <div className="text-xs text-green-600 dark:text-green-400 text-right">You save ${discountResult.totalSavings.toFixed(2)}!</div>
-                )}
+                {(() => {
+                  const autoSavings = discountResult?.totalSavings || 0;
+                  const promoSavings = appliedPromo?.discountAmount || 0;
+                  const totalSavings = autoSavings + promoSavings;
+                  const finalTotal = Math.max(0, state.total - totalSavings);
+                  return (
+                    <>
+                      <div className="flex justify-between font-semibold">
+                        <span>Total</span>
+                        <span>
+                          {totalSavings > 0 ? (
+                            <span className="flex items-center gap-2">
+                              <span className="line-through text-gray-400 text-sm font-normal">${state.total.toFixed(2)}</span>
+                              <span className="text-green-600 dark:text-green-400">${finalTotal.toFixed(2)}</span>
+                            </span>
+                          ) : `$${state.total.toFixed(2)}`}
+                        </span>
+                      </div>
+                      {totalSavings > 0 && (
+                        <div className="text-xs text-green-600 dark:text-green-400 text-right">You save ${totalSavings.toFixed(2)}!</div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="space-y-2">
@@ -641,6 +690,35 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   <span>${state.total.toFixed(2)}</span>
                 </div>
               </div>
+            </div>
+
+            {/* Promo Code */}
+            <div className="space-y-2">
+              {appliedPromo ? (
+                <div className="flex items-center justify-between p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                  <span className="text-sm text-green-700 dark:text-green-400 flex items-center gap-2">
+                    <Tag className="h-4 w-4" />
+                    <span className="font-mono font-bold">{appliedPromo.code}</span> applied — saves ${appliedPromo.discountAmount.toFixed(2)}
+                    {appliedPromo.bypassPurchaseMinimum && <span className="text-xs opacity-70">(min. bypassed)</span>}
+                  </span>
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => { setAppliedPromo(null); setPromoInput(""); }}>
+                    Remove
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Promo code"
+                    value={promoInput}
+                    onChange={e => setPromoInput(e.target.value.toUpperCase())}
+                    onKeyDown={e => e.key === "Enter" && applyPromoCode()}
+                    className="font-mono uppercase text-sm"
+                  />
+                  <Button variant="outline" size="sm" onClick={applyPromoCode} disabled={isValidatingPromo || !promoInput.trim()}>
+                    {isValidatingPromo ? "..." : "Apply"}
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Shipping Information Form */}

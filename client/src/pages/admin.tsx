@@ -15,7 +15,7 @@ import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount } from "@shared/schema";
+import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount, PromoCode } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
 interface InventoryLogWithDetails extends InventoryLog {
@@ -315,6 +315,137 @@ export default function AdminPage() {
     minQuantity: "", minSpend: "", requiredProductSkus: "", discountPercent: "",
     freeProductSku: "", freeProductQuantity: "1", applyToProductSku: "", applyToCategoryId: "",
     validFrom: "", validTo: "",
+  });
+
+  // ── Promo Codes ──────────────────────────────────────────────────────────
+  const [promoCodeForm, setPromoCodeForm] = useState({
+    code: "", description: "",
+    discountType: "percent" as "percent" | "fixed",
+    discountValue: "",
+    bypassPurchaseMinimum: false,
+    usageLimitType: "unlimited" as "unlimited" | "once_per_user",
+    maxTotalUses: "",
+    isActive: true,
+    validFrom: "", validTo: "",
+  });
+  const [showPromoCodeModal, setShowPromoCodeModal] = useState(false);
+  const [editingPromoCode, setEditingPromoCode] = useState<PromoCode | null>(null);
+  const [promoCodeToDelete, setPromoCodeToDelete] = useState<PromoCode | null>(null);
+  const [deletePromoCodeConfirmOpen, setDeletePromoCodeConfirmOpen] = useState(false);
+
+  const { data: allPromoCodes = [], isLoading: isLoadingPromoCodes } = useQuery<PromoCode[]>({
+    queryKey: ["/api/admin/promo-codes"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/promo-codes", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch promo codes");
+      return res.json();
+    },
+  });
+
+  const resetPromoCodeForm = () => setPromoCodeForm({
+    code: "", description: "",
+    discountType: "percent",
+    discountValue: "",
+    bypassPurchaseMinimum: false,
+    usageLimitType: "unlimited",
+    maxTotalUses: "",
+    isActive: true,
+    validFrom: "", validTo: "",
+  });
+
+  const openEditPromoCode = (p: PromoCode) => {
+    setEditingPromoCode(p);
+    setPromoCodeForm({
+      code: p.code,
+      description: p.description || "",
+      discountType: (p.discountType as "percent" | "fixed") || "percent",
+      discountValue: p.discountValue?.toString() || "",
+      bypassPurchaseMinimum: p.bypassPurchaseMinimum || false,
+      usageLimitType: (p.usageLimitType as "unlimited" | "once_per_user") || "unlimited",
+      maxTotalUses: p.maxTotalUses?.toString() || "",
+      isActive: p.isActive,
+      validFrom: p.validFrom ? new Date(p.validFrom).toISOString().slice(0, 10) : "",
+      validTo: p.validTo ? new Date(p.validTo).toISOString().slice(0, 10) : "",
+    });
+    setShowPromoCodeModal(true);
+  };
+
+  const createPromoCodeMutation = useMutation({
+    mutationFn: async (data: typeof promoCodeForm) => {
+      const payload: any = {
+        code: data.code.toUpperCase().trim(),
+        description: data.description || null,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        bypassPurchaseMinimum: data.bypassPurchaseMinimum,
+        usageLimitType: data.usageLimitType,
+        isActive: data.isActive,
+        validFrom: data.validFrom || null,
+        validTo: data.validTo || null,
+      };
+      if (data.maxTotalUses) payload.maxTotalUses = parseInt(data.maxTotalUses);
+      const res = await apiRequest("POST", "/api/admin/promo-codes", payload);
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
+      setShowPromoCodeModal(false);
+      resetPromoCodeForm();
+      toast({ title: "Promo code created" });
+    },
+    onError: (e: any) => toast({ title: e.message || "Failed to create promo code", variant: "destructive" }),
+  });
+
+  const updatePromoCodeMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: typeof promoCodeForm }) => {
+      const payload: any = {
+        code: data.code.toUpperCase().trim(),
+        description: data.description || null,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        bypassPurchaseMinimum: data.bypassPurchaseMinimum,
+        usageLimitType: data.usageLimitType,
+        maxTotalUses: data.maxTotalUses ? parseInt(data.maxTotalUses) : null,
+        isActive: data.isActive,
+        validFrom: data.validFrom || null,
+        validTo: data.validTo || null,
+      };
+      const res = await apiRequest("PUT", `/api/admin/promo-codes/${id}`, payload);
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
+      setShowPromoCodeModal(false);
+      setEditingPromoCode(null);
+      resetPromoCodeForm();
+      toast({ title: "Promo code updated" });
+    },
+    onError: (e: any) => toast({ title: e.message || "Failed to update promo code", variant: "destructive" }),
+  });
+
+  const togglePromoCodeMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
+      const res = await apiRequest("PUT", `/api/admin/promo-codes/${id}`, { isActive });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] }),
+    onError: () => toast({ title: "Failed to toggle promo code", variant: "destructive" }),
+  });
+
+  const deletePromoCodeMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/admin/promo-codes/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
+      setDeletePromoCodeConfirmOpen(false);
+      setPromoCodeToDelete(null);
+      toast({ title: "Promo code deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete promo code", variant: "destructive" }),
   });
 
   const openEditDiscount = (d: Discount) => {
@@ -1572,7 +1703,7 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
 
-        {/* Discounts Tab */}
+        {/* Promo Codes Tab */}
         <TabsContent value="discounts">
           <Card>
             <CardHeader>
@@ -1580,65 +1711,67 @@ export default function AdminPage() {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Tag className="h-5 w-5" />
-                    Discounts
+                    Promo Codes
                   </CardTitle>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Create quantity deals, bundle packs, spend thresholds, and buy-one-get-one offers.
+                    Create discount codes customers enter at checkout — % off, flat amounts, or minimum bypasses.
                   </p>
                 </div>
-                <Button onClick={() => { resetDiscountForm(); setEditingDiscount(null); setShowDiscountModal(true); }}>
+                <Button onClick={() => { resetPromoCodeForm(); setEditingPromoCode(null); setShowPromoCodeModal(true); }}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Discount
+                  Create Code
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
-              {isLoadingDiscounts ? (
+              {isLoadingPromoCodes ? (
                 <div className="space-y-3">
                   {[...Array(3)].map((_, i) => <div key={i} className="h-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />)}
                 </div>
-              ) : allDiscounts.length === 0 ? (
+              ) : allPromoCodes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                   <Tag className="h-12 w-12 mb-3 opacity-30" />
-                  <p className="font-medium">No discounts set up yet</p>
-                  <p className="text-sm">Click "Add Discount" to create your first offer.</p>
+                  <p className="font-medium">No promo codes yet</p>
+                  <p className="text-sm">Click "Create Code" to add your first promo code.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {allDiscounts.map((d) => (
-                    <div key={d.id} className="flex items-center justify-between p-4 border rounded-lg dark:border-gray-700">
+                  {allPromoCodes.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between p-4 border rounded-lg dark:border-gray-700">
                       <div className="flex items-start gap-3">
-                        <div className={`mt-0.5 p-2 rounded-md ${d.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
-                          {getDiscountTypeIcon(d.type)}
+                        <div className={`mt-0.5 p-2 rounded-md ${p.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                          <Tag className="h-4 w-4" />
                         </div>
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{d.name}</span>
-                            <Badge variant={d.isActive ? "default" : "secondary"} className="text-xs">
-                              {d.isActive ? 'Active' : 'Inactive'}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono font-bold tracking-wider text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{p.code}</span>
+                            <Badge variant={p.isActive ? "default" : "secondary"} className="text-xs">{p.isActive ? 'Active' : 'Inactive'}</Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {p.discountType === 'percent' ? `${p.discountValue}% off` : `$${Number(p.discountValue).toFixed(2)} off`}
                             </Badge>
-                            <Badge variant="outline" className="text-xs">{getDiscountTypeLabel(d.type)}</Badge>
+                            {p.bypassPurchaseMinimum && (
+                              <Badge variant="outline" className="text-xs text-blue-600 border-blue-400">Bypasses min. purchase</Badge>
+                            )}
                           </div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{getDiscountSummary(d)}</p>
-                          {d.description && <p className="text-xs text-gray-400 mt-0.5">{d.description}</p>}
-                          {(d.validFrom || d.validTo) && (
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              {d.validFrom ? `From ${format(new Date(d.validFrom), 'MMM d, yyyy')}` : ''}
-                              {d.validFrom && d.validTo ? ' – ' : ''}
-                              {d.validTo ? `Until ${format(new Date(d.validTo), 'MMM d, yyyy')}` : ''}
-                            </p>
-                          )}
+                          {p.description && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{p.description}</p>}
+                          <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
+                            <span>{p.usageLimitType === 'once_per_user' ? 'Once per customer' : 'Unlimited uses'}</span>
+                            {p.maxTotalUses && <span>· Max {p.maxTotalUses} total uses</span>}
+                            <span>· Used {p.totalUses} time{p.totalUses !== 1 ? 's' : ''}</span>
+                            {(p.validFrom || p.validTo) && (
+                              <span>
+                                · {p.validFrom ? `From ${format(new Date(p.validFrom), 'MMM d, yyyy')}` : ''}
+                                {p.validFrom && p.validTo ? ' – ' : ''}
+                                {p.validTo ? `Until ${format(new Date(p.validTo), 'MMM d, yyyy')}` : ''}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Switch
-                          checked={d.isActive}
-                          onCheckedChange={(checked) => toggleDiscountMutation.mutate({ id: d.id, isActive: checked })}
-                        />
-                        <Button variant="ghost" size="sm" onClick={() => openEditDiscount(d)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setDiscountToDelete(d); setDeleteDiscountConfirmOpen(true); }}>
+                        <Switch checked={p.isActive} onCheckedChange={(checked) => togglePromoCodeMutation.mutate({ id: p.id, isActive: checked })} />
+                        <Button variant="ghost" size="sm" onClick={() => openEditPromoCode(p)}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setPromoCodeToDelete(p); setDeletePromoCodeConfirmOpen(true); }}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -1651,6 +1784,120 @@ export default function AdminPage() {
         </TabsContent>
 
       </Tabs>
+
+      {/* Delete Promo Code Confirmation */}
+      <Dialog open={deletePromoCodeConfirmOpen} onOpenChange={setDeletePromoCodeConfirmOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Promo Code</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Are you sure you want to delete the code <span className="font-mono font-bold">{promoCodeToDelete?.code}</span>? This cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletePromoCodeConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => promoCodeToDelete && deletePromoCodeMutation.mutate(promoCodeToDelete.id)} disabled={deletePromoCodeMutation.isPending}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create / Edit Promo Code Dialog */}
+      <Dialog open={showPromoCodeModal} onOpenChange={(open) => { setShowPromoCodeModal(open); if (!open) { setEditingPromoCode(null); resetPromoCodeForm(); } }}>
+        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingPromoCode ? "Edit" : "New"} Promo Code</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Code *</Label>
+              <Input
+                placeholder="e.g. SAVE20"
+                value={promoCodeForm.code}
+                onChange={e => setPromoCodeForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                className="font-mono uppercase tracking-widest"
+              />
+              <p className="text-xs text-gray-400">Customers enter this at checkout. Automatically uppercased.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Description (optional)</Label>
+              <Input placeholder="e.g. 20% off for VIP customers" value={promoCodeForm.description} onChange={e => setPromoCodeForm(f => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Discount Type *</Label>
+                <Select value={promoCodeForm.discountType} onValueChange={v => setPromoCodeForm(f => ({ ...f, discountType: v as any }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percent">Percentage off (%)</SelectItem>
+                    <SelectItem value="fixed">Fixed amount ($)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{promoCodeForm.discountType === 'percent' ? 'Percent Off *' : 'Dollar Amount Off *'}</Label>
+                <Input
+                  type="number" min="0" step={promoCodeForm.discountType === 'percent' ? "1" : "0.01"}
+                  placeholder={promoCodeForm.discountType === 'percent' ? "e.g. 20" : "e.g. 10.00"}
+                  value={promoCodeForm.discountValue}
+                  onChange={e => setPromoCodeForm(f => ({ ...f, discountValue: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Usage Limit</Label>
+              <Select value={promoCodeForm.usageLimitType} onValueChange={v => setPromoCodeForm(f => ({ ...f, usageLimitType: v as any }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unlimited">Unlimited — any customer can use it any number of times</SelectItem>
+                  <SelectItem value="once_per_user">Once per customer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Max Total Uses (optional)</Label>
+              <Input type="number" min="1" placeholder="Leave blank for unlimited" value={promoCodeForm.maxTotalUses} onChange={e => setPromoCodeForm(f => ({ ...f, maxTotalUses: e.target.value }))} />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={promoCodeForm.bypassPurchaseMinimum} onCheckedChange={v => setPromoCodeForm(f => ({ ...f, bypassPurchaseMinimum: v }))} />
+              <div>
+                <Label>Bypass purchase minimum</Label>
+                <p className="text-xs text-gray-400">When enabled, this code lets customers skip city purchase minimums.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Valid From (optional)</Label>
+                <Input type="date" value={promoCodeForm.validFrom} onChange={e => setPromoCodeForm(f => ({ ...f, validFrom: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Valid Until (optional)</Label>
+                <Input type="date" value={promoCodeForm.validTo} onChange={e => setPromoCodeForm(f => ({ ...f, validTo: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={promoCodeForm.isActive} onCheckedChange={v => setPromoCodeForm(f => ({ ...f, isActive: v }))} />
+              <Label>Active</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowPromoCodeModal(false); setEditingPromoCode(null); resetPromoCodeForm(); }}>Cancel</Button>
+            <Button
+              disabled={!promoCodeForm.code || !promoCodeForm.discountValue || createPromoCodeMutation.isPending || updatePromoCodeMutation.isPending}
+              onClick={() => {
+                if (editingPromoCode) {
+                  updatePromoCodeMutation.mutate({ id: editingPromoCode.id, data: promoCodeForm });
+                } else {
+                  createPromoCodeMutation.mutate(promoCodeForm);
+                }
+              }}
+            >
+              {editingPromoCode ? "Save Changes" : "Create Code"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add/Edit Discount Dialog */}
       <Dialog open={showDiscountModal} onOpenChange={(open) => { setShowDiscountModal(open); if (!open) { setEditingDiscount(null); resetDiscountForm(); } }}>

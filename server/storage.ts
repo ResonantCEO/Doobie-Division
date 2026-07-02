@@ -16,9 +16,12 @@ import {
   accessPasswords,
   discounts,
   promotionalAds,
+  promoCodes,
+  promoCodeUses,
   type Discount,
   type PromotionalAd,
   type AccessPassword,
+  type PromoCode,
   type User,
   type UpsertUser,
   type Category,
@@ -186,6 +189,18 @@ export interface IStorage {
   getAccessPasswords(): Promise<AccessPassword[]>;
   getAccessPassword(id: number): Promise<AccessPassword | undefined>;
   createAccessPassword(data: any): Promise<AccessPassword>;
+
+  // Promo code operations
+  getPromoCodes(): Promise<PromoCode[]>;
+  getPromoCode(id: number): Promise<PromoCode | undefined>;
+  getPromoCodeByCode(code: string): Promise<PromoCode | undefined>;
+  createPromoCode(data: any): Promise<PromoCode>;
+  updatePromoCode(id: number, data: any): Promise<PromoCode | undefined>;
+  deletePromoCode(id: number): Promise<void>;
+  getPromoCodeUsesForUser(promoCodeId: number, userId: string): Promise<number>;
+  recordPromoCodeUse(promoCodeId: number, userId: string): Promise<void>;
+  incrementPromoCodeTotalUses(promoCodeId: number): Promise<void>;
+
   updateAccessPassword(id: number, data: any): Promise<AccessPassword | undefined>;
   deleteAccessPassword(id: number): Promise<void>;
   verifyAccessPassword(password: string): Promise<number | null>;
@@ -3558,6 +3573,80 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDiscount(id: number): Promise<void> {
     await retryQuery(() => db.delete(discounts).where(eq(discounts.id, id)));
+  }
+
+  // Promo code implementation
+  async getPromoCodes(): Promise<PromoCode[]> {
+    return retryQuery(() => db.select().from(promoCodes).orderBy(promoCodes.createdAt));
+  }
+
+  async getPromoCode(id: number): Promise<PromoCode | undefined> {
+    const results = await retryQuery(() => db.select().from(promoCodes).where(eq(promoCodes.id, id)));
+    return results[0];
+  }
+
+  async getPromoCodeByCode(code: string): Promise<PromoCode | undefined> {
+    const results = await retryQuery(() => db.select().from(promoCodes).where(eq(promoCodes.code, code.toUpperCase())));
+    return results[0];
+  }
+
+  async createPromoCode(data: any): Promise<PromoCode> {
+    const toInsert: any = {
+      code: data.code.toUpperCase().trim(),
+      discountType: data.discountType,
+      discountValue: data.discountValue,
+      bypassPurchaseMinimum: data.bypassPurchaseMinimum || false,
+      usageLimitType: data.usageLimitType || 'unlimited',
+      isActive: data.isActive !== false,
+    };
+    if (data.description) toInsert.description = data.description;
+    if (data.maxTotalUses != null) toInsert.maxTotalUses = data.maxTotalUses;
+    if (data.validFrom) toInsert.validFrom = new Date(data.validFrom);
+    if (data.validTo) toInsert.validTo = new Date(data.validTo);
+    const results = await retryQuery(() => db.insert(promoCodes).values(toInsert).returning());
+    return results[0];
+  }
+
+  async updatePromoCode(id: number, data: any): Promise<PromoCode | undefined> {
+    const existing = await this.getPromoCode(id);
+    if (!existing) return undefined;
+    const toUpdate: any = {};
+    if (data.code !== undefined) toUpdate.code = data.code.toUpperCase().trim();
+    if (data.description !== undefined) toUpdate.description = data.description;
+    if (data.discountType !== undefined) toUpdate.discountType = data.discountType;
+    if (data.discountValue !== undefined) toUpdate.discountValue = data.discountValue;
+    if (data.bypassPurchaseMinimum !== undefined) toUpdate.bypassPurchaseMinimum = data.bypassPurchaseMinimum;
+    if (data.usageLimitType !== undefined) toUpdate.usageLimitType = data.usageLimitType;
+    if ('maxTotalUses' in data) toUpdate.maxTotalUses = data.maxTotalUses;
+    if (data.isActive !== undefined) toUpdate.isActive = data.isActive;
+    if ('validFrom' in data) toUpdate.validFrom = data.validFrom ? new Date(data.validFrom) : null;
+    if ('validTo' in data) toUpdate.validTo = data.validTo ? new Date(data.validTo) : null;
+    const results = await retryQuery(() => db.update(promoCodes).set(toUpdate).where(eq(promoCodes.id, id)).returning());
+    return results[0];
+  }
+
+  async deletePromoCode(id: number): Promise<void> {
+    await retryQuery(() => db.delete(promoCodes).where(eq(promoCodes.id, id)));
+  }
+
+  async getPromoCodeUsesForUser(promoCodeId: number, userId: string): Promise<number> {
+    const results = await retryQuery(() =>
+      db.select().from(promoCodeUses)
+        .where(eq(promoCodeUses.promoCodeId, promoCodeId))
+    );
+    return results.filter(r => r.userId === userId).length;
+  }
+
+  async recordPromoCodeUse(promoCodeId: number, userId: string): Promise<void> {
+    await retryQuery(() => db.insert(promoCodeUses).values({ promoCodeId, userId }));
+  }
+
+  async incrementPromoCodeTotalUses(promoCodeId: number): Promise<void> {
+    await retryQuery(() =>
+      db.update(promoCodes)
+        .set({ totalUses: sql`${promoCodes.totalUses} + 1` })
+        .where(eq(promoCodes.id, promoCodeId))
+    );
   }
 }
 

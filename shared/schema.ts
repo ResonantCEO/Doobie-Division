@@ -286,6 +286,48 @@ export const discounts = pgTable("discounts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const promoCodes = pgTable("promo_codes", {
+  id: serial("id").primaryKey(),
+  code: varchar("code").notNull().unique(),
+  description: text("description"),
+  discountType: varchar("discount_type").notNull().default("percent"), // 'percent' | 'fixed'
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull().default("0"),
+  bypassPurchaseMinimum: boolean("bypass_purchase_minimum").notNull().default(false),
+  usageLimitType: varchar("usage_limit_type").notNull().default("unlimited"), // 'unlimited' | 'once_per_user'
+  maxTotalUses: integer("max_total_uses"),
+  totalUses: integer("total_uses").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  validFrom: timestamp("valid_from"),
+  validTo: timestamp("valid_to"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const promoCodeUses = pgTable("promo_code_uses", {
+  id: serial("id").primaryKey(),
+  promoCodeId: integer("promo_code_id").notNull().references(() => promoCodes.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull(),
+  usedAt: timestamp("used_at").defaultNow(),
+});
+
+export const insertPromoCodeSchema = createInsertSchema(promoCodes).omit({
+  id: true,
+  totalUses: true,
+  createdAt: true,
+}).extend({
+  code: z.string().min(1, "Code is required"),
+  discountType: z.enum(["percent", "fixed"]),
+  discountValue: z.string().min(1, "Discount value is required"),
+  bypassPurchaseMinimum: z.boolean().optional(),
+  usageLimitType: z.enum(["unlimited", "once_per_user"]),
+  maxTotalUses: z.number().int().nullable().optional(),
+  isActive: z.boolean().optional(),
+  validFrom: z.string().nullable().optional(),
+  validTo: z.string().nullable().optional(),
+});
+
+export type PromoCode = typeof promoCodes.$inferSelect;
+export type InsertPromoCode = z.infer<typeof insertPromoCodeSchema>;
+
 export const accessPasswords = pgTable("access_passwords", {
   id: serial("id").primaryKey(),
   label: varchar("label").notNull(),
