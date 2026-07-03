@@ -1246,6 +1246,24 @@ export default function UsersPage() {
             <div className="lg:col-span-2">
               <Card className="h-full">
                 <CardContent className="p-4">
+                  {/* Referral Count */}
+                  {selectedUser && (
+                    <div className="flex items-center justify-between p-3 mb-4 rounded-lg bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border border-orange-200/50 dark:border-orange-700/50">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-orange-500/20 rounded-lg">
+                          <UsersIcon className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Referrals</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Users who signed up using this user's code and were verified</p>
+                        </div>
+                      </div>
+                      <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                        {(selectedUser as any).referralCount ?? 0}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="font-medium text-sm text-gray-700 uppercase tracking-wide">Activity Timeline</h4>
                     <div className="flex space-x-2">

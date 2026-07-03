@@ -182,14 +182,7 @@ export async function setupAuth(app: Express) {
         referredBy: referrerId,
       });
 
-      // Increment referrer's count if a valid code was used
-      if (referrerId) {
-        try {
-          await storage.incrementReferralCount(referrerId);
-        } catch (err) {
-          console.error("Failed to increment referral count:", err);
-        }
-      }
+      // Note: referral count is incremented only when the referred user is verified/activated, not at signup
 
       // Create session for first user only
       const user = await storage.getUser(userId);

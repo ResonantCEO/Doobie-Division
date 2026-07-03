@@ -1690,6 +1690,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If activating an account, also mark ID verification as verified
       if (status === 'active') {
         await storage.updateUserIdVerification(id, 'verified');
+        // Increment referrer's count now that the referred user is verified
+        if (user.referredBy) {
+          try {
+            await storage.incrementReferralCount(user.referredBy);
+          } catch (err) {
+            console.error("Failed to increment referral count:", err);
+          }
+        }
       }
 
       res.json(user);
@@ -1816,11 +1824,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Status must be 'verified' or 'rejected'" });
       }
 
+      const targetUser = await storage.getUser(id);
       const user = await storage.updateUserIdVerification(id, status);
 
       // If verified, also activate the user account
       if (status === 'verified') {
         await storage.updateUserStatus(id, 'active');
+        // Increment referrer's count now that the referred user is verified
+        if (targetUser?.referredBy) {
+          try {
+            await storage.incrementReferralCount(targetUser.referredBy);
+          } catch (err) {
+            console.error("Failed to increment referral count:", err);
+          }
+        }
       }
 
       res.json(user);
