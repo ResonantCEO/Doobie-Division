@@ -126,6 +126,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       toast({ title: "Order Packed", description: "Order has been marked as packed." });
       queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      onClose();
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to mark order as packed.", variant: "destructive" });
