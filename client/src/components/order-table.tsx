@@ -58,33 +58,33 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
     gcTime: Infinity,
   });
 
-  const updateItemFulfilledCache = (productId: number, fulfilled: boolean) => {
-    setLocalFulfilled(prev => ({ ...prev, [productId]: fulfilled }));
+  const updateItemFulfilledCache = (itemId: number, fulfilled: boolean) => {
+    setLocalFulfilled(prev => ({ ...prev, [itemId]: fulfilled }));
     queryClient.setQueryData<OrderWithItems>(['/api/order-detail', orderId], (old) => {
       if (!old) return old;
       return {
         ...old,
         items: old.items.map(item =>
-          item.productId === productId ? { ...item, fulfilled } : item
+          item.id === itemId ? { ...item, fulfilled } : item
         ),
       };
     });
   };
 
   const isItemFulfilled = (item: OrderItem & { product: Product | null }) => {
-    if (item.productId && item.productId in localFulfilled) {
-      return localFulfilled[item.productId];
+    if (item.id in localFulfilled) {
+      return localFulfilled[item.id];
     }
     return item.fulfilled || false;
   };
 
   const fulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ productId, quantity })
+        body: JSON.stringify({ productId, quantity, orderItemId })
       });
       if (!response.ok) {
         const error = await response.json();
@@ -92,10 +92,10 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       }
       return response.json();
     },
-    onMutate: async ({ productId }) => {
+    onMutate: async ({ orderItemId }) => {
       await queryClient.cancelQueries({ queryKey: ['/api/order-detail', orderId] });
       const previousData = queryClient.getQueryData<OrderWithItems>(['/api/order-detail', orderId]);
-      updateItemFulfilledCache(productId, true);
+      updateItemFulfilledCache(orderItemId, true);
       return { previousData };
     },
     onSuccess: () => {
@@ -108,9 +108,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(['/api/order-detail', orderId], context.previousData);
-        if (_variables.productId) {
-          setLocalFulfilled(prev => ({ ...prev, [_variables.productId]: false }));
-        }
+        setLocalFulfilled(prev => ({ ...prev, [_variables.orderItemId]: false }));
       }
       toast({
         title: "Error",
@@ -121,19 +119,19 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
     onSettled: (_, __, variables) => {
       setFulfillingItems(prev => {
         const newSet = new Set(prev);
-        newSet.delete(variables.productId);
+        newSet.delete(variables.orderItemId);
         return newSet;
       });
     }
   });
 
   const unfulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/unfulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ productId, quantity })
+        body: JSON.stringify({ productId, quantity, orderItemId })
       });
       if (!response.ok) {
         const error = await response.json();
@@ -141,10 +139,10 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       }
       return response.json();
     },
-    onMutate: async ({ productId }) => {
+    onMutate: async ({ orderItemId }) => {
       await queryClient.cancelQueries({ queryKey: ['/api/order-detail', orderId] });
       const previousData = queryClient.getQueryData<OrderWithItems>(['/api/order-detail', orderId]);
-      updateItemFulfilledCache(productId, false);
+      updateItemFulfilledCache(orderItemId, false);
       return { previousData };
     },
     onSuccess: () => {
@@ -157,9 +155,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(['/api/order-detail', orderId], context.previousData);
-        if (_variables.productId) {
-          setLocalFulfilled(prev => ({ ...prev, [_variables.productId]: true }));
-        }
+        setLocalFulfilled(prev => ({ ...prev, [_variables.orderItemId]: true }));
       }
       toast({
         title: "Error",
@@ -170,20 +166,20 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
     onSettled: (_, __, variables) => {
       setFulfillingItems(prev => {
         const newSet = new Set(prev);
-        newSet.delete(variables.productId);
+        newSet.delete(variables.orderItemId);
         return newSet;
       });
     }
   });
 
-  const handleFulfillItem = (productId: number, quantity: number) => {
-    setFulfillingItems(prev => new Set(prev).add(productId));
-    fulfillItemMutation.mutate({ orderId, productId, quantity });
+  const handleFulfillItem = (itemId: number, productId: number, quantity: number) => {
+    setFulfillingItems(prev => new Set(prev).add(itemId));
+    fulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
 
-  const handleUnfulfillItem = (productId: number, quantity: number) => {
-    setFulfillingItems(prev => new Set(prev).add(productId));
-    unfulfillItemMutation.mutate({ orderId, productId, quantity });
+  const handleUnfulfillItem = (itemId: number, productId: number, quantity: number) => {
+    setFulfillingItems(prev => new Set(prev).add(itemId));
+    unfulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
 
   if (isLoading) {
@@ -223,7 +219,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                 className={`flex items-center justify-between bg-white dark:bg-gray-800 rounded-md px-4 py-2 border ${fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'}`}
               >
                 <div className="flex items-center gap-3">
-                  {fulfillingItems.has(item.productId!) ? (
+                  {fulfillingItems.has(item.id) ? (
                     <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                   ) : (
                     <Checkbox
@@ -231,9 +227,9 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                       onCheckedChange={(checked) => {
                         if (item.productId) {
                           if (checked) {
-                            handleFulfillItem(item.productId, item.quantity);
+                            handleFulfillItem(item.id, item.productId, item.quantity);
                           } else {
-                            handleUnfulfillItem(item.productId, item.quantity);
+                            handleUnfulfillItem(item.id, item.productId, item.quantity);
                           }
                         }
                       }}
@@ -288,33 +284,33 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
     gcTime: Infinity,
   });
 
-  const updateItemFulfilledCache = (productId: number, fulfilled: boolean) => {
-    setLocalFulfilled(prev => ({ ...prev, [productId]: fulfilled }));
+  const updateItemFulfilledCache = (itemId: number, fulfilled: boolean) => {
+    setLocalFulfilled(prev => ({ ...prev, [itemId]: fulfilled }));
     queryClient.setQueryData<OrderWithItems>(['/api/order-detail', orderId], (old) => {
       if (!old) return old;
       return {
         ...old,
         items: old.items.map(item =>
-          item.productId === productId ? { ...item, fulfilled } : item
+          item.id === itemId ? { ...item, fulfilled } : item
         ),
       };
     });
   };
 
   const isItemFulfilled = (item: OrderItem & { product: Product | null }) => {
-    if (item.productId && item.productId in localFulfilled) {
-      return localFulfilled[item.productId];
+    if (item.id in localFulfilled) {
+      return localFulfilled[item.id];
     }
     return item.fulfilled || false;
   };
 
   const fulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ productId, quantity })
+        body: JSON.stringify({ productId, quantity, orderItemId })
       });
       if (!response.ok) {
         const error = await response.json();
@@ -322,10 +318,10 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       }
       return response.json();
     },
-    onMutate: async ({ productId }) => {
+    onMutate: async ({ orderItemId }) => {
       await queryClient.cancelQueries({ queryKey: ['/api/order-detail', orderId] });
       const previousData = queryClient.getQueryData<OrderWithItems>(['/api/order-detail', orderId]);
-      updateItemFulfilledCache(productId, true);
+      updateItemFulfilledCache(orderItemId, true);
       return { previousData };
     },
     onSuccess: () => {
@@ -338,9 +334,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(['/api/order-detail', orderId], context.previousData);
-        if (_variables.productId) {
-          setLocalFulfilled(prev => ({ ...prev, [_variables.productId]: false }));
-        }
+        setLocalFulfilled(prev => ({ ...prev, [_variables.orderItemId]: false }));
       }
       toast({
         title: "Error",
@@ -351,19 +345,19 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
     onSettled: (_, __, variables) => {
       setFulfillingItems(prev => {
         const newSet = new Set(prev);
-        newSet.delete(variables.productId);
+        newSet.delete(variables.orderItemId);
         return newSet;
       });
     }
   });
 
   const unfulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/unfulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ productId, quantity })
+        body: JSON.stringify({ productId, quantity, orderItemId })
       });
       if (!response.ok) {
         const error = await response.json();
@@ -371,10 +365,10 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       }
       return response.json();
     },
-    onMutate: async ({ productId }) => {
+    onMutate: async ({ orderItemId }) => {
       await queryClient.cancelQueries({ queryKey: ['/api/order-detail', orderId] });
       const previousData = queryClient.getQueryData<OrderWithItems>(['/api/order-detail', orderId]);
-      updateItemFulfilledCache(productId, false);
+      updateItemFulfilledCache(orderItemId, false);
       return { previousData };
     },
     onSuccess: () => {
@@ -387,9 +381,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(['/api/order-detail', orderId], context.previousData);
-        if (_variables.productId) {
-          setLocalFulfilled(prev => ({ ...prev, [_variables.productId]: true }));
-        }
+        setLocalFulfilled(prev => ({ ...prev, [_variables.orderItemId]: true }));
       }
       toast({
         title: "Error",
@@ -400,20 +392,20 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
     onSettled: (_, __, variables) => {
       setFulfillingItems(prev => {
         const newSet = new Set(prev);
-        newSet.delete(variables.productId);
+        newSet.delete(variables.orderItemId);
         return newSet;
       });
     }
   });
 
-  const handleFulfillItem = (productId: number, quantity: number) => {
-    setFulfillingItems(prev => new Set(prev).add(productId));
-    fulfillItemMutation.mutate({ orderId, productId, quantity });
+  const handleFulfillItem = (itemId: number, productId: number, quantity: number) => {
+    setFulfillingItems(prev => new Set(prev).add(itemId));
+    fulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
 
-  const handleUnfulfillItem = (productId: number, quantity: number) => {
-    setFulfillingItems(prev => new Set(prev).add(productId));
-    unfulfillItemMutation.mutate({ orderId, productId, quantity });
+  const handleUnfulfillItem = (itemId: number, productId: number, quantity: number) => {
+    setFulfillingItems(prev => new Set(prev).add(itemId));
+    unfulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
 
   if (isLoading) {
@@ -445,7 +437,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
           key={item.id} 
           className={`flex items-center gap-3 bg-white dark:bg-gray-800 rounded-md px-3 py-2 border ${fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'}`}
         >
-          {fulfillingItems.has(item.productId!) ? (
+          {fulfillingItems.has(item.id) ? (
             <Loader2 className="h-5 w-5 animate-spin text-gray-400 flex-shrink-0" />
           ) : (
             <Checkbox
@@ -453,9 +445,9 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
               onCheckedChange={(checked) => {
                 if (item.productId) {
                   if (checked) {
-                    handleFulfillItem(item.productId, item.quantity);
+                    handleFulfillItem(item.id, item.productId, item.quantity);
                   } else {
-                    handleUnfulfillItem(item.productId, item.quantity);
+                    handleUnfulfillItem(item.id, item.productId, item.quantity);
                   }
                 }
               }}
