@@ -1122,8 +1122,8 @@ export default function UsersPage() {
 
       {/* User Activity Modal */}
       <Dialog open={activityModalOpen} onOpenChange={setActivityModalOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0 sm:p-6">
-          <DialogHeader className="px-4 sm:px-0 pt-4 sm:pt-0">
+        <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 sm:p-6">
+          <DialogHeader className="px-4 sm:px-0 pt-4 sm:pt-0 flex-shrink-0">
             <DialogTitle>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div className="flex items-center">
@@ -1137,7 +1137,7 @@ export default function UsersPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 h-full px-4 sm:px-0 overflow-y-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 px-4 sm:px-0 overflow-y-auto flex-1 min-h-0">
             {/* User Information Panel */}
             <div className="lg:col-span-1 space-y-4">
               {selectedUser && (
