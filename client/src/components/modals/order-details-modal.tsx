@@ -88,6 +88,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         description: "Order item fulfilled and inventory updated",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       isFulfillingRef.current = false;
       setPendingFulfillment(null);
