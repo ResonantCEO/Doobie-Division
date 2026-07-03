@@ -27,7 +27,8 @@ import {
   AlertTriangle,
   Package,
   TrendingUp,
-  Star
+  Star,
+  MessageCircle
 } from "lucide-react";
 import { format } from "date-fns";
 import type { User as UserType } from "@shared/schema";
@@ -46,6 +47,7 @@ export default function ProfilePage() {
     state: user?.state || "",
     postalCode: user?.postalCode || "",
     country: user?.country || "",
+    phoneNumber: (user as any)?.phoneNumber || "",
   });
 
   // Fetch user orders for profile stats
@@ -101,6 +103,7 @@ export default function ProfilePage() {
       state: user?.state || "",
       postalCode: user?.postalCode || "",
       country: user?.country || "",
+      phoneNumber: (user as any)?.phoneNumber || "",
     });
     setIsEditing(false);
   };
@@ -389,6 +392,54 @@ export default function ProfilePage() {
                         <p className="text-gray-900 dark:text-gray-100">{user.country || "Not provided"}</p>
                       </div>
                     )}
+                  </div>
+                </div>
+
+                <Separator className="bg-gray-200/50 dark:bg-gray-700/50" />
+
+                {/* Contact Information */}
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4 text-blue-500" />
+                    Contact Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Telegram Username
+                      </Label>
+                      <div className="p-3 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50 flex items-center gap-2">
+                        <MessageCircle className="h-4 w-4 text-blue-400 shrink-0" />
+                        <p className="text-gray-900 dark:text-gray-100">
+                          {(user as any).telegramUsername
+                            ? `@${(user as any).telegramUsername}`
+                            : "Not linked"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label htmlFor="phoneNumber" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Phone Number
+                      </Label>
+                      {isEditing ? (
+                        <Input
+                          id="phoneNumber"
+                          type="tel"
+                          value={editData.phoneNumber}
+                          onChange={(e) => setEditData({ ...editData, phoneNumber: e.target.value })}
+                          placeholder="e.g. +1 555 000 0000"
+                          className="glass-input"
+                        />
+                      ) : (
+                        <div className="p-3 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50 flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-green-400 shrink-0" />
+                          <p className="text-gray-900 dark:text-gray-100">
+                            {(user as any).phoneNumber || "Not provided"}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>

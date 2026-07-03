@@ -863,6 +863,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const newOrder = await storage.createOrder(orderData, itemsData);
 
+      // If the order has a phone number and the customer is logged in, save it to their profile if not already set
+      if (orderData.customerId && orderData.customerPhone) {
+        try {
+          const customer = await storage.getUser(orderData.customerId);
+          if (customer && !(customer as any).phoneNumber) {
+            await storage.updateUser(orderData.customerId, { phoneNumber: orderData.customerPhone });
+          }
+        } catch (phoneError) {
+          console.error('Failed to save phone number to user profile:', phoneError);
+        }
+      }
+
       // Create notifications for staff, managers, and admins about the new order
       try {
         const staffUsers = await storage.getStaffUsers();

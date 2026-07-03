@@ -3153,6 +3153,7 @@ export class DatabaseStorage implements IStorage {
     if (userData.state !== undefined) updateFields.state = userData.state;
     if (userData.postalCode !== undefined) updateFields.postalCode = userData.postalCode;
     if (userData.country !== undefined) updateFields.country = userData.country;
+    if (userData.phoneNumber !== undefined) updateFields.phoneNumber = userData.phoneNumber;
     if (userData.minPurchaseExempt !== undefined) updateFields.minPurchaseExempt = userData.minPurchaseExempt;
     if (userData.minPurchaseOverride !== undefined) {
       const val = userData.minPurchaseOverride;
