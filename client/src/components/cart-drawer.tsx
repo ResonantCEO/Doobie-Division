@@ -656,7 +656,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
       {/* Order Confirmation Dialog */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Confirm Your Order</DialogTitle>
             <DialogDescription>
@@ -664,7 +664,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto flex-1 pr-1">
             {/* Order Summary */}
             <div className="bg-muted/50 p-4 rounded-lg">
               <h4 className="font-medium mb-2">Order Summary</h4>
