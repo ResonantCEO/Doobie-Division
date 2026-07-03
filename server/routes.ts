@@ -345,6 +345,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Upload payment photo (pre-pay orders)
+  app.post('/api/upload/payment-photo', isAuthenticated, upload.single('photo'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No photo file provided' });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const uniqueId = uuidv4();
+      const extension = path.extname(req.file.originalname) || '.jpg';
+      const objectName = `payment-photos/${uniqueId}${extension}`;
+      const fullPath = `${privateDir}/${objectName}`;
+
+      const parts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join('/');
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectKey);
+
+      await file.save(req.file.buffer, {
+        metadata: { contentType: req.file.mimetype },
+      });
+
+      const photoUrl = `/api/payment-photos/${uniqueId}${extension}`;
+      res.json({ photoUrl });
+    } catch (error) {
+      console.error('Payment photo upload error:', error);
+      res.status(500).json({ message: 'Failed to upload photo' });
+    }
+  });
+
+  // Serve payment photos (staff/manager/admin only)
+  app.get('/api/payment-photos/:filename', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const fullPath = `${privateDir}/payment-photos/${req.params.filename}`;
+
+      const parts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join('/');
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectKey);
+
+      const [exists] = await file.exists();
+      if (!exists) {
+        return res.status(404).json({ message: 'Photo not found' });
+      }
+
+      const [metadata] = await file.getMetadata();
+      res.set({
+        'Content-Type': metadata.contentType || 'image/jpeg',
+        'Cache-Control': 'private, max-age=3600',
+      });
+
+      const stream = file.createReadStream();
+      stream.on('error', (err) => {
+        console.error('Stream error:', err);
+        if (!res.headersSent) res.status(500).json({ message: 'Error streaming photo' });
+      });
+      stream.pipe(res);
+    } catch (error) {
+      console.error('Payment photo serve error:', error);
+      if (!res.headersSent) res.status(500).json({ message: 'Error serving photo' });
+    }
+  });
+
   // Auth routes are handled in setupAuth
 
   // Category routes

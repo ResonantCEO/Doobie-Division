@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive } from "lucide-react";
+import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive, ImageIcon, ShoppingBag } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Order } from "@shared/schema";
 
@@ -539,6 +539,44 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                 </div>
               </>
             )}
+
+            {/* Payment Info */}
+            <Separator />
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Payment</h3>
+              </div>
+              <div className="flex items-center gap-3">
+                {(displayOrder.paymentMethod === "prepay" || (displayOrder as any).payment_method === "prepay") ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                    <CreditCard className="h-3 w-3" /> Pre-Paid
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                    <ShoppingBag className="h-3 w-3" /> Pay Upon Arrival
+                  </span>
+                )}
+              </div>
+              {(displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Payment Photo</p>
+                  <a
+                    href={(displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block"
+                  >
+                    <img
+                      src={(displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url}
+                      alt="Payment photo"
+                      className="max-h-48 rounded-lg border object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                    />
+                  </a>
+                  <p className="text-xs text-muted-foreground">Click to open full size</p>
+                </div>
+              ) : null}
+            </div>
 
             {/* Order Items */}
             <Separator />

@@ -129,6 +129,7 @@ export const orders = pgTable("orders", {
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   status: varchar("status").notNull().default("pending"), // pending, processing, shipped, delivered, cancelled
   paymentMethod: varchar("payment_method").notNull().default("cod"),
+  paymentPhotoUrl: text("payment_photo_url"),
   assignedUserId: varchar("assigned_user_id").references(() => users.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),

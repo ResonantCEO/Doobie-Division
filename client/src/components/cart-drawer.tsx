@@ -24,7 +24,7 @@ import {
 import { useCart } from "@/contexts/cart-context";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { ShoppingCart, Minus, Plus, Trash2, CreditCard, Tag, Gift } from "lucide-react";
+import { ShoppingCart, Minus, Plus, Trash2, CreditCard, Tag, Gift, Upload, X, ImageIcon } from "lucide-react";
 
 interface CartDrawerProps {
   children: React.ReactNode;
@@ -64,6 +64,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     notes: "",
   });
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
+  const [prePayPhotoFile, setPrePayPhotoFile] = useState<File | null>(null);
+  const [prePayPhotoPreview, setPrePayPhotoPreview] = useState<string | null>(null);
 
   // Evaluate discounts whenever cart items change (debounced)
   useEffect(() => {
@@ -247,7 +249,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     }
   };
 
-  const handleConfirmOrder = async () => {
+  const handleConfirmOrder = async (paymentMethod: "cod" | "prepay" = "cod", paymentPhotoUrl?: string) => {
     const { customerName, customerPhone, street, city, state: shippingState, zipCode } = shippingForm;
 
     if (!validateForm()) {
@@ -317,7 +319,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         customerPhone,
         shippingAddress,
         total: finalTotal.toFixed(2),
-        paymentMethod: "cod",
+        paymentMethod,
+        paymentPhotoUrl: paymentPhotoUrl || null,
         notes: shippingForm.notes,
       };
       orderData.originalTotal = state.total.toFixed(2);
@@ -416,6 +419,40 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         variant: "destructive",
       });
     }
+  };
+
+  const handlePrePayOrder = async () => {
+    if (!prePayPhotoFile) {
+      toast({ title: "Photo Required", description: "Please attach a payment photo to pre-pay.", variant: "destructive" });
+      return;
+    }
+    setIsCheckingOut(true);
+    try {
+      const formData = new FormData();
+      formData.append("photo", prePayPhotoFile);
+      const uploadRes = await fetch("/api/upload/payment-photo", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!uploadRes.ok) throw new Error("Failed to upload payment photo");
+      const { photoUrl } = await uploadRes.json();
+      setIsCheckingOut(false);
+      await handleConfirmOrder("prepay", photoUrl);
+    } catch (error) {
+      console.error("Pre-pay photo upload failed:", error);
+      toast({ title: "Upload Failed", description: "Could not upload payment photo. Please try again.", variant: "destructive" });
+      setIsCheckingOut(false);
+    }
+  };
+
+  const handlePrePayPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPrePayPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setPrePayPhotoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -864,17 +901,61 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 />
               </div>
             </div>
+
+            {/* Pre-Pay Photo Upload Section */}
+            <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-medium">Pre-Pay Photo (optional)</p>
+              </div>
+              <p className="text-xs text-muted-foreground">Attach a payment photo if you'd like to pre-pay your order.</p>
+              {prePayPhotoPreview ? (
+                <div className="relative inline-block">
+                  <img src={prePayPhotoPreview} alt="Payment" className="h-32 w-auto rounded-md object-cover border" />
+                  <button
+                    type="button"
+                    onClick={() => { setPrePayPhotoFile(null); setPrePayPhotoPreview(null); }}
+                    className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground border border-dashed rounded-md p-3 transition-colors">
+                  <Upload className="h-4 w-4" />
+                  <span>Click to attach photo</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePrePayPhotoChange} />
+                </label>
+              )}
+            </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirmation(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
+            <Button variant="outline" onClick={() => setShowConfirmation(false)} disabled={isCheckingOut}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmOrder} disabled={isCheckingOut}>
+            <Button
+              variant="outline"
+              onClick={() => handleConfirmOrder("cod")}
+              disabled={isCheckingOut}
+              className="flex-1"
+            >
               {isCheckingOut ? "Processing..." : (
                 <>
                   <ShoppingCart className="h-4 w-4 mr-2" />
-                  Confirm Order
+                  Pay Upon Arrival
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handlePrePayOrder}
+              disabled={isCheckingOut || !prePayPhotoFile}
+              className="flex-1"
+            >
+              {isCheckingOut ? "Processing..." : (
+                <>
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Pre-Pay
                 </>
               )}
             </Button>
