@@ -119,6 +119,8 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isDuplicateSku, setIsDuplicateSku] = useState(false);
+  const [stockInputUnit, setStockInputUnit] = useState<"grams" | "ounces" | "pounds">("grams");
+  const [minStockInputUnit, setMinStockInputUnit] = useState<"grams" | "ounces" | "pounds">("grams");
 
   const isAdmin = user?.role === "admin";
 
@@ -244,13 +246,26 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         imageUrl = uploadedUrls[0] || ""; // First image as primary
       }
 
+      const toGrams = (value: string, unit: "grams" | "ounces" | "pounds") => {
+        const num = parseFloat(value || "0");
+        if (unit === "ounces") return Math.round(num * 28);
+        if (unit === "pounds") return Math.round(num * 448);
+        return Math.round(num);
+      };
+
       // Calculate total stock if sizes are enabled
       let totalStock = 0;
       if (data.enableSizes && data.sizes && data.sizes.length > 0) {
         totalStock = data.sizes.reduce((sum, size) => sum + parseInt(size.quantity || "0"), 0);
+      } else if (data.sellingMethod === "weight") {
+        totalStock = toGrams(data.stock || "0", stockInputUnit);
       } else {
         totalStock = parseInt(data.stock || "0");
       }
+
+      const minStockGrams = data.sellingMethod === "weight"
+        ? toGrams(data.minStockThreshold, minStockInputUnit)
+        : parseInt(data.minStockThreshold);
 
       const payload = {
         name: data.name,
@@ -259,8 +274,8 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         sku: data.sku,
         categoryId: data.categoryId ? Number(data.categoryId) : null,
         price: data.sellingMethod === "units" && data.price ? parseFloat(data.price).toFixed(2) : null,
-        stock: totalStock, // Already a number from calculation
-        minStockThreshold: parseInt(data.minStockThreshold),
+        stock: totalStock,
+        minStockThreshold: minStockGrams,
         sellingMethod: data.sellingMethod,
         weightUnit: data.weightUnit,
         pricePerGram: data.pricePerGram ? parseFloat(data.pricePerGram).toFixed(4) : null,
@@ -831,11 +846,23 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                     name="stock"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Stock Quantity (grams)</FormLabel>
+                        <FormLabel>Stock Quantity</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.1" placeholder="0" {...field} />
+                          <div className="flex gap-2">
+                            <Input type="number" step="0.01" placeholder="0" {...field} className="flex-1" />
+                            <Select value={stockInputUnit} onValueChange={(v) => setStockInputUnit(v as "grams" | "ounces" | "pounds")}>
+                              <SelectTrigger className="w-[110px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="grams">Grams</SelectItem>
+                                <SelectItem value="ounces">Ounces</SelectItem>
+                                <SelectItem value="pounds">Pounds</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </FormControl>
-                        <p className="text-xs text-muted-foreground">Enter total grams on hand. Stock automatically displays as lb / oz / g (e.g. 56 g → 2 oz, 448 g → 1 lb). Orders deduct grams based on weight ordered (1/8 oz = 3.5 g, 1/4 oz = 7 g, 1/2 oz = 14 g, 1 oz = 28 g, 1 lb = 448 g).</p>
+                        <p className="text-xs text-muted-foreground">Enter total stock on hand. Stored as grams internally (1 oz = 28 g, 1 lb = 448 g). Stock automatically displays as lb / oz / g.</p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -849,14 +876,30 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
               name="minStockThreshold"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Minimum Stock Threshold</FormLabel>
+                  <FormLabel>Min Stock Threshold</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="5" {...field} />
+                    {form.watch("sellingMethod") === "weight" ? (
+                      <div className="flex gap-2">
+                        <Input type="number" step="0.01" placeholder="5" {...field} className="flex-1" />
+                        <Select value={minStockInputUnit} onValueChange={(v) => setMinStockInputUnit(v as "grams" | "ounces" | "pounds")}>
+                          <SelectTrigger className="w-[110px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="grams">Grams</SelectItem>
+                            <SelectItem value="ounces">Ounces</SelectItem>
+                            <SelectItem value="pounds">Pounds</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <Input type="number" placeholder="5" {...field} />
+                    )}
                   </FormControl>
                   <p className="text-xs text-muted-foreground">
                     {form.watch("enableSizes")
                       ? "This threshold will apply to each option individually"
-                      : "Alert when stock falls below this number"}
+                      : "Alert when stock falls below this amount"}
                   </p>
                   <FormMessage />
                 </FormItem>

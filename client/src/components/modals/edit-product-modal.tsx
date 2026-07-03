@@ -106,6 +106,8 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [stockInputUnit, setStockInputUnit] = useState<"grams" | "ounces" | "pounds">("grams");
+  const [minStockInputUnit, setMinStockInputUnit] = useState<"grams" | "ounces" | "pounds">("grams");
 
   const isAdmin = user?.role === "admin";
 
@@ -226,10 +228,25 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         imageUrl: imageUrl
       });
 
-      let totalStock = parseInt(data.stock);
+      const toGrams = (value: string, unit: "grams" | "ounces" | "pounds") => {
+        const num = parseFloat(value || "0");
+        if (unit === "ounces") return Math.round(num * 28);
+        if (unit === "pounds") return Math.round(num * 448);
+        return Math.round(num);
+      };
+
+      let totalStock: number;
       if (data.enableSizes && data.sizes && data.sizes.length > 0) {
         totalStock = data.sizes.reduce((sum: number, s: { quantity: string }) => sum + parseInt(s.quantity || "0"), 0);
+      } else if (data.sellingMethod === "weight") {
+        totalStock = toGrams(data.stock, stockInputUnit);
+      } else {
+        totalStock = parseInt(data.stock);
       }
+
+      const minStockValue = data.sellingMethod === "weight"
+        ? toGrams(data.minStockThreshold, minStockInputUnit)
+        : parseInt(data.minStockThreshold);
 
       // Handle discountPercentage - convert empty string, null, or undefined to "0"
       // Also handle the case where user wants to remove discount (set to 0)
@@ -255,7 +272,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         sku: data.sku,
         categoryId: data.categoryId ? parseInt(data.categoryId) : null,
         stock: totalStock,
-        minStockThreshold: parseInt(data.minStockThreshold),
+        minStockThreshold: minStockValue,
         sellingMethod: data.sellingMethod,
         weightUnit: data.weightUnit,
         imageUrl,
@@ -821,14 +838,28 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                 name="stock"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Stock Quantity{sellingMethod === "weight" ? " (grams)" : ""}
-                    </FormLabel>
+                    <FormLabel>Stock Quantity</FormLabel>
                     <FormControl>
-                      <Input type="number" step={sellingMethod === "weight" ? "0.1" : "1"} placeholder="0" {...field} />
+                      {sellingMethod === "weight" ? (
+                        <div className="flex gap-2">
+                          <Input type="number" step="0.01" placeholder="0" {...field} className="flex-1" />
+                          <Select value={stockInputUnit} onValueChange={(v) => setStockInputUnit(v as "grams" | "ounces" | "pounds")}>
+                            <SelectTrigger className="w-[110px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="grams">Grams</SelectItem>
+                              <SelectItem value="ounces">Ounces</SelectItem>
+                              <SelectItem value="pounds">Pounds</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <Input type="number" step="1" placeholder="0" {...field} />
+                      )}
                     </FormControl>
                     {sellingMethod === "weight" && (
-                      <p className="text-xs text-muted-foreground">Enter total grams on hand. Stock automatically displays as lb / oz / g (e.g. 56 g → 2 oz, 448 g → 1 lb). Orders deduct grams based on weight ordered (1/8 oz = 3.5 g, 1/4 oz = 7 g, 1/2 oz = 14 g, 1 oz = 28 g, 1 lb = 448 g).</p>
+                      <p className="text-xs text-muted-foreground">Enter stock in your chosen unit. Stored as grams internally (1 oz = 28 g, 1 lb = 448 g). Stock automatically displays as lb / oz / g.</p>
                     )}
                     <FormMessage />
                   </FormItem>
@@ -843,7 +874,23 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                 <FormItem>
                   <FormLabel>Min Stock Threshold</FormLabel>
                   <FormControl>
-                    <Input type="number" min="1" placeholder="5" {...field} />
+                    {sellingMethod === "weight" ? (
+                      <div className="flex gap-2">
+                        <Input type="number" step="0.01" placeholder="5" {...field} className="flex-1" />
+                        <Select value={minStockInputUnit} onValueChange={(v) => setMinStockInputUnit(v as "grams" | "ounces" | "pounds")}>
+                          <SelectTrigger className="w-[110px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="grams">Grams</SelectItem>
+                            <SelectItem value="ounces">Ounces</SelectItem>
+                            <SelectItem value="pounds">Pounds</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <Input type="number" min="1" placeholder="5" {...field} />
+                    )}
                   </FormControl>
                   <FormMessage />
                 </FormItem>
