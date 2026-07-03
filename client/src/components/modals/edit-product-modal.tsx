@@ -828,7 +828,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                       <Input type="number" step={sellingMethod === "weight" ? "0.1" : "1"} placeholder="0" {...field} />
                     </FormControl>
                     {sellingMethod === "weight" && (
-                      <p className="text-xs text-muted-foreground">Enter total grams on hand. Orders deduct grams automatically based on weight selected (e.g. 1/8 oz = 3.5g, 1/4 oz = 7g, 1/2 oz = 14g, 1 oz = 28g).</p>
+                      <p className="text-xs text-muted-foreground">Enter total grams on hand. Stock automatically displays as lb / oz / g (e.g. 56 g → 2 oz, 448 g → 1 lb). Orders deduct grams based on weight ordered (1/8 oz = 3.5 g, 1/4 oz = 7 g, 1/2 oz = 14 g, 1 oz = 28 g, 1 lb = 448 g).</p>
                     )}
                     <FormMessage />
                   </FormItem>

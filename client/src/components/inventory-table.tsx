@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatWeight } from "@/lib/weightUtils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -143,12 +144,14 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
     return product.sellingMethod === "weight" ? "g" : "units";
   };
 
+  const displayStock = (product: Product, value: number) => {
+    return product.sellingMethod === "weight" ? formatWeight(value) : `${value} units`;
+  };
+
   const renderStockDisplay = (product: Product & { sizes?: ProductSize[] }) => {
     const hasSizes = product.sizes && product.sizes.length > 0;
-    const stockUnit = getStockUnit(product);
     
     if (hasSizes) {
-      // Show size breakdown
       return (
         <div className="flex flex-col space-y-1 min-w-[120px]">
           <div className={`text-xs font-medium mb-1 ${
@@ -156,7 +159,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
             product.stock <= product.minStockThreshold ? "text-orange-600" : 
             "text-gray-600 dark:text-gray-400"
           }`}>
-            Total: {product.stock} {stockUnit}
+            Total: {displayStock(product, product.stock)}
           </div>
           <div className="space-y-0.5 border-t border-gray-200 dark:border-gray-700 pt-1">
             {product.sizes!.map((size) => (
@@ -175,14 +178,13 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
         </div>
       );
     } else {
-      // Show regular stock display
       return (
         <span className={`font-medium text-sm ${
           product.stock === 0 ? "text-red-600" : 
           product.stock <= product.minStockThreshold ? "text-orange-600" : 
           "text-gray-900 dark:text-white"
         }`}>
-          {product.stock} {stockUnit}
+          {displayStock(product, product.stock)}
         </span>
       );
     }
@@ -191,18 +193,13 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
   const renderPhysicalDisplay = (product: Product & { sizes?: ProductSize[] }) => {
     const hasSizes = product.sizes && product.sizes.length > 0;
     const physicalTotal = product.physicalInventory || 0;
-    const stockUnit = getStockUnit(product);
     
     if (hasSizes && product.sizes) {
-      // Use actual physicalQuantity per size from the database
       const physicalPerSize = product.sizes.map(size => ({
         size: size.size,
         physical: size.physicalQuantity || 0,
         stock: size.quantity || 0
       }));
-      
-      // Calculate total physical from sizes (should match product.physicalInventory)
-      const calculatedPhysicalTotal = physicalPerSize.reduce((sum, item) => sum + item.physical, 0);
       
       return (
         <div className="flex flex-col space-y-1 min-w-[120px]">
@@ -211,11 +208,11 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
             physicalTotal !== product.stock ? "text-orange-600" : 
             "text-gray-600 dark:text-gray-400"
           }`}>
-            Total: {physicalTotal} {stockUnit}
+            Total: {displayStock(product, physicalTotal)}
           </div>
           {physicalTotal !== product.stock && (
             <div className="text-xs text-orange-600 mb-1">
-              Variance: {physicalTotal - product.stock} {stockUnit}
+              Variance: {displayStock(product, physicalTotal - product.stock)}
             </div>
           )}
           <div className="space-y-0.5 border-t border-gray-200 dark:border-gray-700 pt-1">
@@ -238,13 +235,12 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
         </div>
       );
     } else {
-      // Show regular physical inventory display
       return (
         <div className="flex flex-col">
-          <span className="font-medium text-gray-900 dark:text-white">{physicalTotal} {stockUnit}</span>
+          <span className="font-medium text-gray-900 dark:text-white">{displayStock(product, physicalTotal)}</span>
           {physicalTotal !== product.stock && (
             <span className="text-xs text-orange-600">
-              Variance: {physicalTotal - product.stock} {stockUnit}
+              Variance: {displayStock(product, physicalTotal - product.stock)}
             </span>
           )}
         </div>

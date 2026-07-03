@@ -831,10 +831,11 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                     name="stock"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Stock Quantity ({form.watch("weightUnit")})</FormLabel>
+                        <FormLabel>Stock Quantity (grams)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="1" placeholder="0" {...field} />
+                          <Input type="number" step="0.1" placeholder="0" {...field} />
                         </FormControl>
+                        <p className="text-xs text-muted-foreground">Enter total grams on hand. Stock automatically displays as lb / oz / g (e.g. 56 g → 2 oz, 448 g → 1 lb). Orders deduct grams based on weight ordered (1/8 oz = 3.5 g, 1/4 oz = 7 g, 1/2 oz = 14 g, 1 oz = 28 g, 1 lb = 448 g).</p>
                         <FormMessage />
                       </FormItem>
                     )}
