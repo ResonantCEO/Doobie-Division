@@ -66,7 +66,7 @@ export async function setupAuth(app: Express) {
   // Register endpoint
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { email, password, firstName, lastName, address, city, state, postalCode, country, idImageUrl, verificationPhotoUrl, telegramUsername } = req.body;
+      const { email, password, firstName, lastName, address, city, state, postalCode, country, idImageUrl, verificationPhotoUrl, telegramUsername, referralCode } = req.body;
 
       // Only check for essential fields that are actually sent from frontend
       if (!email || !password || !firstName || !lastName) {
@@ -152,6 +152,16 @@ export async function setupAuth(app: Express) {
         }
       }
 
+      // Validate referral code if provided
+      let referrerId: string | null = null;
+      if (referralCode && referralCode.trim()) {
+        const referrer = await storage.getUserByReferralCode(referralCode.trim());
+        if (!referrer) {
+          return res.status(400).json({ message: "Invalid referral code. Please check the code and try again." });
+        }
+        referrerId = referrer.id;
+      }
+
       await storage.createUserWithPassword({
         id: userId,
         email: normalizedEmail,
@@ -168,8 +178,18 @@ export async function setupAuth(app: Express) {
         telegramUsername: telegramUsername || null,
         idVerificationStatus: isFirstUser ? "verified" : (processedIdImageUrl ? "pending" : "not_provided"),
         role: isFirstUser ? "admin" : "customer",
-        status: isFirstUser ? "active" : "pending"
+        status: isFirstUser ? "active" : "pending",
+        referredBy: referrerId,
       });
+
+      // Increment referrer's count if a valid code was used
+      if (referrerId) {
+        try {
+          await storage.incrementReferralCount(referrerId);
+        } catch (err) {
+          console.error("Failed to increment referral count:", err);
+        }
+      }
 
       // Create session for first user only
       const user = await storage.getUser(userId);

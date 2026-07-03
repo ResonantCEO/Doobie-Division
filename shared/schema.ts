@@ -52,6 +52,9 @@ export const users = pgTable("users", {
   minPurchaseExempt: boolean("min_purchase_exempt").notNull().default(false),
   minPurchaseOverride: decimal("min_purchase_override", { precision: 10, scale: 2 }),
   grantedAccessPasswordId: integer("granted_access_password_id"),
+  referralCode: varchar("referral_code").unique(),
+  referredBy: varchar("referred_by"),
+  referralCount: integer("referral_count").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

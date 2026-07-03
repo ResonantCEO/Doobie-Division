@@ -28,7 +28,10 @@ import {
   Package,
   TrendingUp,
   Star,
-  MessageCircle
+  MessageCircle,
+  Copy,
+  Gift,
+  Users
 } from "lucide-react";
 import { format } from "date-fns";
 import type { User as UserType } from "@shared/schema";
@@ -397,6 +400,38 @@ export default function ProfilePage() {
 
                 <Separator className="bg-gray-200/50 dark:bg-gray-700/50" />
 
+                {/* Referral Code */}
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <Gift className="h-4 w-4 text-purple-500" />
+                    Referral Code
+                  </h3>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200/50 dark:border-purple-700/50">
+                    <span className="text-xl font-mono font-bold tracking-widest text-purple-700 dark:text-purple-300">
+                      {(user as any).referralCode || "—"}
+                    </span>
+                    {(user as any).referralCode && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-auto text-purple-600 hover:text-purple-800 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900/30"
+                        onClick={() => {
+                          navigator.clipboard.writeText((user as any).referralCode);
+                          toast({ title: "Copied!", description: "Referral code copied to clipboard." });
+                        }}
+                      >
+                        <Copy className="h-4 w-4 mr-1" />
+                        Copy
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    Share this code with friends. When they sign up using your code, it counts toward your referral total.
+                  </p>
+                </div>
+
+                <Separator className="bg-gray-200/50 dark:bg-gray-700/50" />
+
                 {/* Contact Information */}
                 <div>
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -492,6 +527,18 @@ export default function ProfilePage() {
                     </div>
                     <span className="text-sm font-semibold text-purple-600 dark:text-purple-400">
                       {user.createdAt ? format(new Date(user.createdAt), "MMM yyyy") : "Unknown"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-orange-500/20 rounded-lg">
+                        <Users className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Referrals</span>
+                    </div>
+                    <span className="text-xl font-bold text-orange-600 dark:text-orange-400">
+                      {(user as any).referralCount ?? 0}
                     </span>
                   </div>
                 </div>

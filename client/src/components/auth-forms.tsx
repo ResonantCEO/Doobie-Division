@@ -25,6 +25,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
     firstName: "",
     lastName: "",
     telegramUsername: "",
+    referralCode: "",
     address: "",
     city: "",
     state: "Virginia",
@@ -164,6 +165,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
       firstName: string;
       lastName: string;
       telegramUsername: string;
+      referralCode: string;
       address: string;
       city: string;
       state: string;
@@ -475,6 +477,23 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Not required, but providing your Telegram username helps us reach you faster for order updates and support.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="referralCode">
+                        Referral Code <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <Input
+                        id="referralCode"
+                        type="text"
+                        placeholder="e.g. ABC12345"
+                        value={registerData.referralCode}
+                        onChange={(e) => setRegisterData({ ...registerData, referralCode: e.target.value.toUpperCase() })}
+                        maxLength={8}
+                        className="uppercase"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Have a referral code from a friend? Enter it here.
                       </p>
                     </div>
                     <div className="space-y-2">

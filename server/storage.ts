@@ -68,9 +68,11 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByReferralCode(code: string): Promise<User | undefined>;
   createUserWithPassword(userData: any): Promise<User>;
   updateUserPassword(id: string, hashedPassword: string): Promise<void>;
   getUserCount(): Promise<number>;
+  incrementReferralCount(userId: string): Promise<void>;
 
   // Category operations
   getCategories(): Promise<(Category & { children?: Category[] })[]>;
@@ -279,6 +281,30 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByReferralCode(code: string): Promise<User | undefined> {
+    const [result] = await db
+      .select()
+      .from(users)
+      .where(eq(users.referralCode, code.toUpperCase()));
+    return result;
+  }
+
+  async incrementReferralCount(userId: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ referralCount: sql`${users.referralCount} + 1`, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+  }
+
+  generateReferralCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
+  }
+
   async createUserWithPassword(userData: {
     id: string;
     email: string;
@@ -296,6 +322,7 @@ export class DatabaseStorage implements IStorage {
     idVerificationStatus?: string;
     role: string;
     status: string;
+    referredBy?: string | null;
   }) {
     const userCount = await this.getUserCount();
     let status = 'pending';
@@ -306,6 +333,14 @@ export class DatabaseStorage implements IStorage {
       role = 'admin';
     }
 
+    // Generate a unique referral code
+    let referralCode = this.generateReferralCode();
+    let codeExists = await this.getUserByReferralCode(referralCode);
+    while (codeExists) {
+      referralCode = this.generateReferralCode();
+      codeExists = await this.getUserByReferralCode(referralCode);
+    }
+
     userData = {
       ...userData,
       status,
@@ -314,7 +349,7 @@ export class DatabaseStorage implements IStorage {
 
     const [newUser] = await db
       .insert(users)
-      .values(userData)
+      .values({ ...userData, referralCode })
       .returning();
 
     // Create notification for admins about new user registration
