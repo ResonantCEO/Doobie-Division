@@ -703,6 +703,13 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
     },
   });
 
+  const getPaymentBadge = (paymentMethod: string) => {
+    if (paymentMethod === "prepay") {
+      return <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700">Pre-Pay</Badge>;
+    }
+    return <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700">PUA</Badge>;
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
@@ -827,7 +834,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                         ${Number(order.total).toFixed(2)}
                       </div>
                       <div className="mt-1">
-                        {getStatusBadge(order.status)}
+                        {getPaymentBadge(order.paymentMethod || "cod")}
                       </div>
                     </div>
                   </div>
@@ -953,7 +960,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                 </TableHead>
                 <TableHead className="text-gray-300">Customer</TableHead>
                 <TableHead className="text-gray-300">Total</TableHead>
-                <TableHead className="text-gray-300">Status</TableHead>
+                <TableHead className="text-gray-300">Payment</TableHead>
                 <TableHead className="text-gray-300">Date</TableHead>
                 {(user?.role === 'admin' || user?.role === 'manager') && (
                   <TableHead className="text-gray-300">Assigned To</TableHead>
@@ -1014,7 +1021,7 @@ export default function OrderTable({ orders, user, staffUsers }: OrderTableProps
                     <TableCell className="font-medium text-gray-900 dark:text-white">
                       ${Number(order.total).toFixed(2)}
                     </TableCell>
-                    <TableCell>{getStatusBadge(order.status)}</TableCell>
+                    <TableCell>{getPaymentBadge(order.paymentMethod || "cod")}</TableCell>
                     <TableCell className="text-gray-900 dark:text-white">
                       {order.createdAt ? format(new Date(order.createdAt), "MMM dd, yyyy") : "N/A"}
                     </TableCell>
