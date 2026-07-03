@@ -139,8 +139,13 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
     }
   };
 
+  const getStockUnit = (product: Product) => {
+    return product.sellingMethod === "weight" ? "g" : "units";
+  };
+
   const renderStockDisplay = (product: Product & { sizes?: ProductSize[] }) => {
     const hasSizes = product.sizes && product.sizes.length > 0;
+    const stockUnit = getStockUnit(product);
     
     if (hasSizes) {
       // Show size breakdown
@@ -151,7 +156,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
             product.stock <= product.minStockThreshold ? "text-orange-600" : 
             "text-gray-600 dark:text-gray-400"
           }`}>
-            Total: {product.stock} units
+            Total: {product.stock} {stockUnit}
           </div>
           <div className="space-y-0.5 border-t border-gray-200 dark:border-gray-700 pt-1">
             {product.sizes!.map((size) => (
@@ -177,7 +182,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
           product.stock <= product.minStockThreshold ? "text-orange-600" : 
           "text-gray-900 dark:text-white"
         }`}>
-          {product.stock} units
+          {product.stock} {stockUnit}
         </span>
       );
     }
@@ -186,6 +191,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
   const renderPhysicalDisplay = (product: Product & { sizes?: ProductSize[] }) => {
     const hasSizes = product.sizes && product.sizes.length > 0;
     const physicalTotal = product.physicalInventory || 0;
+    const stockUnit = getStockUnit(product);
     
     if (hasSizes && product.sizes) {
       // Use actual physicalQuantity per size from the database
@@ -205,11 +211,11 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
             physicalTotal !== product.stock ? "text-orange-600" : 
             "text-gray-600 dark:text-gray-400"
           }`}>
-            Total: {physicalTotal} units
+            Total: {physicalTotal} {stockUnit}
           </div>
           {physicalTotal !== product.stock && (
             <div className="text-xs text-orange-600 mb-1">
-              Variance: {physicalTotal - product.stock}
+              Variance: {physicalTotal - product.stock} {stockUnit}
             </div>
           )}
           <div className="space-y-0.5 border-t border-gray-200 dark:border-gray-700 pt-1">
@@ -235,10 +241,10 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
       // Show regular physical inventory display
       return (
         <div className="flex flex-col">
-          <span className="font-medium text-gray-900 dark:text-white">{physicalTotal} units</span>
+          <span className="font-medium text-gray-900 dark:text-white">{physicalTotal} {stockUnit}</span>
           {physicalTotal !== product.stock && (
             <span className="text-xs text-orange-600">
-              Variance: {physicalTotal - product.stock}
+              Variance: {physicalTotal - product.stock} {stockUnit}
             </span>
           )}
         </div>

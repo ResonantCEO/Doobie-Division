@@ -131,7 +131,7 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
         <DialogHeader>
           <DialogTitle>Adjust Stock - {product?.name}</DialogTitle>
           <DialogDescription>
-            Adjust the stock level for this product. Current stock: {product?.stock || 0} units
+            Adjust the stock level for this product. Current stock: {product?.stock || 0} {product?.sellingMethod === "weight" ? "g" : "units"}
           </DialogDescription>
         </DialogHeader>
 
@@ -141,13 +141,13 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
             <p className="text-sm text-muted-foreground mb-1">SKU: {product.sku}</p>
             {hasSizes ? (
               <div className="text-sm text-muted-foreground">
-                <p className="font-medium mb-1">Total Stock: {product.stock}</p>
+                <p className="font-medium mb-1">Total Stock: {product.stock} {product.sellingMethod === "weight" ? "g" : "units"}</p>
                 {product.sizes!.map(s => (
                   <p key={s.id} className="ml-2">{s.size}: {s.quantity}</p>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Current Stock: <span className="font-medium">{product.stock}</span></p>
+              <p className="text-sm text-muted-foreground">Current Stock: <span className="font-medium">{product.stock} {product.sellingMethod === "weight" ? "g" : "units"}</span></p>
             )}
           </div>
 
