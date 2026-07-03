@@ -495,6 +495,18 @@ Please manually send this reset URL to the user via their preferred communicatio
         user = { ...user, idVerificationStatus: 'verified' };
       }
 
+      // Auto-generate a referral code for existing users who don't have one
+      if (!user.referralCode) {
+        let code = storage.generateReferralCode();
+        let codeExists = await storage.getUserByReferralCode(code);
+        while (codeExists) {
+          code = storage.generateReferralCode();
+          codeExists = await storage.getUserByReferralCode(code);
+        }
+        await storage.updateUser(req.userId, { referralCode: code });
+        user = { ...user, referralCode: code };
+      }
+
       const { password: _, ...userResponse } = user;
       res.json(userResponse);
     } catch (error) {
