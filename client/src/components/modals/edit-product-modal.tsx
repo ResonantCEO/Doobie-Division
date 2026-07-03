@@ -106,8 +106,12 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
-  const [stockInputUnit, setStockInputUnit] = useState<"grams" | "ounces" | "pounds">("grams");
-  const [minStockInputUnit, setMinStockInputUnit] = useState<"grams" | "ounces" | "pounds">("grams");
+  const [stockLbs, setStockLbs] = useState("");
+  const [stockOz, setStockOz] = useState("");
+  const [stockG, setStockG] = useState("");
+  const [minStockLbs, setMinStockLbs] = useState("");
+  const [minStockOz, setMinStockOz] = useState("");
+  const [minStockG, setMinStockG] = useState("");
 
   const isAdmin = user?.role === "admin";
 
@@ -187,6 +191,30 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       setExistingImages(existing);
       setImagePreviews([]);
       setSelectedFiles([]);
+
+      // Pre-populate lb/oz/g fields from grams for weight-based products
+      if (product.sellingMethod === "weight") {
+        const totalG = product.stock;
+        const lbs = Math.floor(totalG / 448);
+        const remaining = totalG - lbs * 448;
+        const oz = Math.floor(remaining / 28);
+        const g = remaining - oz * 28;
+        setStockLbs(lbs > 0 ? lbs.toString() : "");
+        setStockOz(oz > 0 ? oz.toString() : "");
+        setStockG(g > 0 ? g.toString() : "");
+
+        const minG = product.minStockThreshold;
+        const mLbs = Math.floor(minG / 448);
+        const mRemaining = minG - mLbs * 448;
+        const mOz = Math.floor(mRemaining / 28);
+        const mGrams = mRemaining - mOz * 28;
+        setMinStockLbs(mLbs > 0 ? mLbs.toString() : "");
+        setMinStockOz(mOz > 0 ? mOz.toString() : "");
+        setMinStockG(mGrams > 0 ? mGrams.toString() : "");
+      } else {
+        setStockLbs(""); setStockOz(""); setStockG("");
+        setMinStockLbs(""); setMinStockOz(""); setMinStockG("");
+      }
     }
   }, [product, open, form]);
 
@@ -228,24 +256,25 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         imageUrl: imageUrl
       });
 
-      const toGrams = (value: string, unit: "grams" | "ounces" | "pounds") => {
-        const num = parseFloat(value || "0");
-        if (unit === "ounces") return Math.round(num * 28);
-        if (unit === "pounds") return Math.round(num * 448);
-        return Math.round(num);
+      const combineToGrams = (lbs: string, oz: string, g: string) => {
+        return (
+          Math.round(parseFloat(lbs || "0") * 448) +
+          Math.round(parseFloat(oz || "0") * 28) +
+          Math.round(parseFloat(g || "0"))
+        );
       };
 
       let totalStock: number;
       if (data.enableSizes && data.sizes && data.sizes.length > 0) {
         totalStock = data.sizes.reduce((sum: number, s: { quantity: string }) => sum + parseInt(s.quantity || "0"), 0);
       } else if (data.sellingMethod === "weight") {
-        totalStock = toGrams(data.stock, stockInputUnit);
+        totalStock = combineToGrams(stockLbs, stockOz, stockG);
       } else {
         totalStock = parseInt(data.stock);
       }
 
       const minStockValue = data.sellingMethod === "weight"
-        ? toGrams(data.minStockThreshold, minStockInputUnit)
+        ? combineToGrams(minStockLbs, minStockOz, minStockG)
         : parseInt(data.minStockThreshold);
 
       // Handle discountPercentage - convert empty string, null, or undefined to "0"
@@ -833,69 +862,120 @@ export default function EditProductModal({ open, onOpenChange, product, categori
             />
 
             {!enableSizes && (
+              sellingMethod === "weight" ? (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Stock Quantity</label>
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1 relative">
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={stockLbs}
+                        onChange={(e) => setStockLbs(e.target.value)}
+                        className="pr-8"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">lb</span>
+                    </div>
+                    <div className="flex-1 relative">
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={stockOz}
+                        onChange={(e) => setStockOz(e.target.value)}
+                        className="pr-8"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">oz</span>
+                    </div>
+                    <div className="flex-1 relative">
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        placeholder="0"
+                        value={stockG}
+                        onChange={(e) => setStockG(e.target.value)}
+                        className="pr-6"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">g</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Enter any combination of lbs, oz, and grams. Stored as grams (1 oz = 28 g, 1 lb = 448 g).</p>
+                </div>
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="stock"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stock Quantity</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="1" placeholder="0" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )
+            )}
+
+            {sellingMethod === "weight" ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Min Stock Threshold</label>
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1 relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={minStockLbs}
+                      onChange={(e) => setMinStockLbs(e.target.value)}
+                      className="pr-8"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">lb</span>
+                  </div>
+                  <div className="flex-1 relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={minStockOz}
+                      onChange={(e) => setMinStockOz(e.target.value)}
+                      className="pr-8"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">oz</span>
+                  </div>
+                  <div className="flex-1 relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder="5"
+                      value={minStockG}
+                      onChange={(e) => setMinStockG(e.target.value)}
+                      className="pr-6"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">g</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">Alert when stock falls below this amount</p>
+              </div>
+            ) : (
               <FormField
                 control={form.control}
-                name="stock"
+                name="minStockThreshold"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Stock Quantity</FormLabel>
+                    <FormLabel>Min Stock Threshold</FormLabel>
                     <FormControl>
-                      {sellingMethod === "weight" ? (
-                        <div className="flex gap-2">
-                          <Input type="number" step="0.01" placeholder="0" {...field} className="flex-1" />
-                          <Select value={stockInputUnit} onValueChange={(v) => setStockInputUnit(v as "grams" | "ounces" | "pounds")}>
-                            <SelectTrigger className="w-[110px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="grams">Grams</SelectItem>
-                              <SelectItem value="ounces">Ounces</SelectItem>
-                              <SelectItem value="pounds">Pounds</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      ) : (
-                        <Input type="number" step="1" placeholder="0" {...field} />
-                      )}
+                      <Input type="number" min="1" placeholder="5" {...field} />
                     </FormControl>
-                    {sellingMethod === "weight" && (
-                      <p className="text-xs text-muted-foreground">Enter stock in your chosen unit. Stored as grams internally (1 oz = 28 g, 1 lb = 448 g). Stock automatically displays as lb / oz / g.</p>
-                    )}
                     <FormMessage />
                   </FormItem>
                 )}
               />
             )}
-
-            <FormField
-              control={form.control}
-              name="minStockThreshold"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Min Stock Threshold</FormLabel>
-                  <FormControl>
-                    {sellingMethod === "weight" ? (
-                      <div className="flex gap-2">
-                        <Input type="number" step="0.01" placeholder="5" {...field} className="flex-1" />
-                        <Select value={minStockInputUnit} onValueChange={(v) => setMinStockInputUnit(v as "grams" | "ounces" | "pounds")}>
-                          <SelectTrigger className="w-[110px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="grams">Grams</SelectItem>
-                            <SelectItem value="ounces">Ounces</SelectItem>
-                            <SelectItem value="pounds">Pounds</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : (
-                      <Input type="number" min="1" placeholder="5" {...field} />
-                    )}
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             {isAdmin && (
               <div className="border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 rounded-lg p-4 space-y-4">

@@ -119,8 +119,12 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isDuplicateSku, setIsDuplicateSku] = useState(false);
-  const [stockInputUnit, setStockInputUnit] = useState<"grams" | "ounces" | "pounds">("grams");
-  const [minStockInputUnit, setMinStockInputUnit] = useState<"grams" | "ounces" | "pounds">("grams");
+  const [stockLbs, setStockLbs] = useState("");
+  const [stockOz, setStockOz] = useState("");
+  const [stockG, setStockG] = useState("");
+  const [minStockLbs, setMinStockLbs] = useState("");
+  const [minStockOz, setMinStockOz] = useState("");
+  const [minStockG, setMinStockG] = useState("5");
 
   const isAdmin = user?.role === "admin";
 
@@ -246,11 +250,12 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         imageUrl = uploadedUrls[0] || ""; // First image as primary
       }
 
-      const toGrams = (value: string, unit: "grams" | "ounces" | "pounds") => {
-        const num = parseFloat(value || "0");
-        if (unit === "ounces") return Math.round(num * 28);
-        if (unit === "pounds") return Math.round(num * 448);
-        return Math.round(num);
+      const combineToGrams = (lbs: string, oz: string, g: string) => {
+        return (
+          Math.round(parseFloat(lbs || "0") * 448) +
+          Math.round(parseFloat(oz || "0") * 28) +
+          Math.round(parseFloat(g || "0"))
+        );
       };
 
       // Calculate total stock if sizes are enabled
@@ -258,13 +263,13 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       if (data.enableSizes && data.sizes && data.sizes.length > 0) {
         totalStock = data.sizes.reduce((sum, size) => sum + parseInt(size.quantity || "0"), 0);
       } else if (data.sellingMethod === "weight") {
-        totalStock = toGrams(data.stock || "0", stockInputUnit);
+        totalStock = combineToGrams(stockLbs, stockOz, stockG);
       } else {
         totalStock = parseInt(data.stock || "0");
       }
 
       const minStockGrams = data.sellingMethod === "weight"
-        ? toGrams(data.minStockThreshold, minStockInputUnit)
+        ? combineToGrams(minStockLbs, minStockOz, minStockG)
         : parseInt(data.minStockThreshold);
 
       const payload = {
@@ -841,70 +846,111 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                 </div>
 
                 {!form.watch("enableSizes") && (
-                  <FormField
-                    control={form.control}
-                    name="stock"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Stock Quantity</FormLabel>
-                        <FormControl>
-                          <div className="flex gap-2">
-                            <Input type="number" step="0.01" placeholder="0" {...field} className="flex-1" />
-                            <Select value={stockInputUnit} onValueChange={(v) => setStockInputUnit(v as "grams" | "ounces" | "pounds")}>
-                              <SelectTrigger className="w-[110px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="grams">Grams</SelectItem>
-                                <SelectItem value="ounces">Ounces</SelectItem>
-                                <SelectItem value="pounds">Pounds</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </FormControl>
-                        <p className="text-xs text-muted-foreground">Enter total stock on hand. Stored as grams internally (1 oz = 28 g, 1 lb = 448 g). Stock automatically displays as lb / oz / g.</p>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Stock Quantity</label>
+                    <div className="flex gap-2 items-center">
+                      <div className="flex-1 relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={stockLbs}
+                          onChange={(e) => setStockLbs(e.target.value)}
+                          className="pr-8"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">lb</span>
+                      </div>
+                      <div className="flex-1 relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={stockOz}
+                          onChange={(e) => setStockOz(e.target.value)}
+                          className="pr-8"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">oz</span>
+                      </div>
+                      <div className="flex-1 relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          placeholder="0"
+                          value={stockG}
+                          onChange={(e) => setStockG(e.target.value)}
+                          className="pr-6"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">g</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Enter any combination of lbs, oz, and grams. Stored as grams (1 oz = 28 g, 1 lb = 448 g).</p>
+                  </div>
                 )}
               </>
             )}
 
-            <FormField
-              control={form.control}
-              name="minStockThreshold"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Min Stock Threshold</FormLabel>
-                  <FormControl>
-                    {form.watch("sellingMethod") === "weight" ? (
-                      <div className="flex gap-2">
-                        <Input type="number" step="0.01" placeholder="5" {...field} className="flex-1" />
-                        <Select value={minStockInputUnit} onValueChange={(v) => setMinStockInputUnit(v as "grams" | "ounces" | "pounds")}>
-                          <SelectTrigger className="w-[110px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="grams">Grams</SelectItem>
-                            <SelectItem value="ounces">Ounces</SelectItem>
-                            <SelectItem value="pounds">Pounds</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : (
+            {form.watch("sellingMethod") === "weight" ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Min Stock Threshold</label>
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1 relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={minStockLbs}
+                      onChange={(e) => setMinStockLbs(e.target.value)}
+                      className="pr-8"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">lb</span>
+                  </div>
+                  <div className="flex-1 relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={minStockOz}
+                      onChange={(e) => setMinStockOz(e.target.value)}
+                      className="pr-8"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">oz</span>
+                  </div>
+                  <div className="flex-1 relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder="5"
+                      value={minStockG}
+                      onChange={(e) => setMinStockG(e.target.value)}
+                      className="pr-6"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">g</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">Alert when stock falls below this amount</p>
+              </div>
+            ) : (
+              <FormField
+                control={form.control}
+                name="minStockThreshold"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Min Stock Threshold</FormLabel>
+                    <FormControl>
                       <Input type="number" placeholder="5" {...field} />
-                    )}
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground">
-                    {form.watch("enableSizes")
-                      ? "This threshold will apply to each option individually"
-                      : "Alert when stock falls below this amount"}
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      {form.watch("enableSizes")
+                        ? "This threshold will apply to each option individually"
+                        : "Alert when stock falls below this number"}
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Image Upload Section */}
             <div className="space-y-2">
