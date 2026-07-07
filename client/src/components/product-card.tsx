@@ -271,24 +271,41 @@ export default function ProductCard({ product }: ProductCardProps) {
                       { label: "½ oz", price: (product as any).pricePerHalf },
                       { label: "1 oz", price: product.pricePerOunce },
                     ].filter(o => Number(o.price) > 0);
+                    const renderOpt = (opt: { label: string; price: any }) => {
+                      const base = Number(opt.price);
+                      const final = discount > 0 ? base * (1 - discount / 100) : base;
+                      return (
+                        <div key={opt.label} className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                          {discount > 0 ? (
+                            <span className="text-green-600 dark:text-green-400">${final.toFixed(2)}</span>
+                          ) : (
+                            <span>${base.toFixed(2)}</span>
+                          )}
+                          <span className="text-gray-500 dark:text-gray-400 font-normal">/{opt.label}</span>
+                        </div>
+                      );
+                    };
+                    const isOdd = weightOpts.length % 2 !== 0;
+                    const mainOpts = isOdd ? weightOpts.slice(0, -1) : weightOpts;
+                    const lastOpt = isOdd ? weightOpts[weightOpts.length - 1] : null;
+                    const rows: (typeof weightOpts)[] = [];
+                    for (let i = 0; i < mainOpts.length; i += 2) {
+                      rows.push(mainOpts.slice(i, i + 2));
+                    }
                     return (
-                      <div className="flex flex-wrap justify-center gap-x-2 gap-y-0.5">
-                        {weightOpts.map(opt => {
-                          const base = Number(opt.price);
-                          const final = discount > 0 ? base * (1 - discount / 100) : base;
-                          return (
-                            <div key={opt.label} className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
-                              {discount > 0 ? (
-                                <span className="text-green-600 dark:text-green-400">${final.toFixed(2)}</span>
-                              ) : (
-                                <span>${base.toFixed(2)}</span>
-                              )}
-                              <span className="text-gray-500 dark:text-gray-400 font-normal">/{opt.label}</span>
-                            </div>
-                          );
-                        })}
+                      <div className="space-y-0.5">
+                        {rows.map((row, i) => (
+                          <div key={i} className="flex justify-center gap-x-2">
+                            {row.map(renderOpt)}
+                          </div>
+                        ))}
+                        {lastOpt && (
+                          <div className="flex justify-center">
+                            {renderOpt(lastOpt)}
+                          </div>
+                        )}
                         {discount > 0 && (
-                          <div className="w-full flex justify-center mt-0.5">
+                          <div className="flex justify-center mt-0.5">
                             <span className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">
                               {product.discountPercentage}% OFF
                             </span>
