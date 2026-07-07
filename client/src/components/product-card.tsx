@@ -262,45 +262,41 @@ export default function ProductCard({ product }: ProductCardProps) {
               )}
               <div className="text-center">
                 {product.sellingMethod === "weight" ? (
-                  <div className="space-y-0.5">
-                    {product.pricePerGram && Number(product.pricePerGram) > 0 && (
-                      <div>
-                        {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                          <div className="space-y-0.5">
-                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                              <div className="text-xs sm:text-sm line-through text-gray-500 dark:text-gray-400">
-                                ${Number(product.pricePerGram).toFixed(2)}/g
-                              </div>
-                              <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">
-                                {product.discountPercentage}% OFF
-                              </div>
+                  (() => {
+                    const discount = product.discountPercentage ? parseFloat(product.discountPercentage) : 0;
+                    const weightOpts = [
+                      { label: "g", price: product.pricePerGram },
+                      { label: "⅛ oz", price: (product as any).pricePerEighth },
+                      { label: "¼ oz", price: (product as any).pricePerQuarter },
+                      { label: "½ oz", price: (product as any).pricePerHalf },
+                      { label: "1 oz", price: product.pricePerOunce },
+                    ].filter(o => Number(o.price) > 0);
+                    return (
+                      <div className="flex flex-wrap justify-center gap-x-2 gap-y-0.5">
+                        {weightOpts.map(opt => {
+                          const base = Number(opt.price);
+                          const final = discount > 0 ? base * (1 - discount / 100) : base;
+                          return (
+                            <div key={opt.label} className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                              {discount > 0 ? (
+                                <span className="text-green-600 dark:text-green-400">${final.toFixed(2)}</span>
+                              ) : (
+                                <span>${base.toFixed(2)}</span>
+                              )}
+                              <span className="text-gray-500 dark:text-gray-400 font-normal">/{opt.label}</span>
                             </div>
-                            <div className="text-lg sm:text-xl font-bold text-green-600 dark:text-green-400">
-                              ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
-                            ${Number(product.pricePerGram).toFixed(2)}/g
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {product.pricePerOunce && Number(product.pricePerOunce) > 0 && (
-                      <div>
-                        {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
-                          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                            <span className="line-through">${product.pricePerOunce}/oz</span>
-                            <span className="ml-2 text-green-600 dark:text-green-400 font-semibold">
-                              ${(parseFloat(product.pricePerOunce) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/oz
+                          );
+                        })}
+                        {discount > 0 && (
+                          <div className="w-full flex justify-center mt-0.5">
+                            <span className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">
+                              {product.discountPercentage}% OFF
                             </span>
                           </div>
-                        ) : (
-                          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium">${product.pricePerOunce}/oz</div>
                         )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()
                 ) : (
                   <div>
                     {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
