@@ -332,12 +332,6 @@ export default function UsersPage() {
     });
   };
 
-  const handleReviewPending = () => {
-    toast({
-      title: "Review Pending Users",
-      description: "Pending user review modal would be opened here",
-    });
-  };
 
   const handlePhotoClick = (user: User, type: 'id' | 'verification') => {
     setSelectedUser(user);
@@ -411,12 +405,6 @@ export default function UsersPage() {
                   </p>
                 </div>
               </div>
-              <Button 
-                onClick={handleReviewPending}
-                className="bg-yellow-600 text-white hover:bg-yellow-700 w-full sm:w-auto"
-              >
-                Review
-              </Button>
             </div>
           </CardContent>
         </Card>
