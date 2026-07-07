@@ -412,7 +412,11 @@ export default function ProductCard({ product }: ProductCardProps) {
               </h4>
             </div>
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-              <div className="bg-gray-50 dark:bg-gray-800 p-2 sm:p-3 rounded-lg overflow-y-auto max-h-28 sm:max-h-32">
+              <div
+                className="bg-gray-50 dark:bg-gray-800 p-2 sm:p-3 rounded-lg overflow-y-auto max-h-28 sm:max-h-32"
+                onClick={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+              >
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
                   {product.description || "No description available"}
                 </p>
