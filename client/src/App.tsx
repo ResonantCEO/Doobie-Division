@@ -1,5 +1,5 @@
 import { Switch, Route, Redirect } from "wouter";
-import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryClient, getQueryFn } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/contexts/theme-context";
@@ -19,17 +19,35 @@ import ScannerPage from "./pages/scanner";
 import CustomerOrdersWrapper from "@/pages/customer-orders-wrapper";
 import SupportPage from "@/pages/support";
 import AccessGate from "@/components/AccessGate";
-import { useState } from "react";
+import InactivityWarning from "@/components/InactivityWarning";
+import { useInactivityTimer } from "@/hooks/useInactivityTimer";
+import { useCallback, useState } from "react";
 
 function Router() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [accessGrantedLocally, setAccessGrantedLocally] = useState(false);
+  const qc = useQueryClient();
 
   const { data: accessStatus, isLoading: isLoadingAccess } = useQuery<{ granted: boolean }>({
     queryKey: ["/api/access/status"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: isAuthenticated && user?.role === "customer",
     retry: false,
+  });
+
+  const handleInactivityLogout = useCallback(async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (_) {}
+    qc.clear();
+    window.location.href = "/";
+  }, [qc]);
+
+  const isCustomer = isAuthenticated && user?.role === "customer";
+
+  const { showWarning, secondsLeft, stayLoggedIn } = useInactivityTimer({
+    enabled: isCustomer,
+    onLogout: handleInactivityLogout,
   });
 
   if (isLoading) {
@@ -58,21 +76,29 @@ function Router() {
   }
 
   return (
-    <Switch>
-      <Route path="/" component={isAuthenticated ? Dashboard : Landing} />
-      <Route path="/storefront" component={StorefrontPage} />
-      <Route path="/dashboard/:tab?" component={Dashboard} />
-      <Route path="/inventory" component={InventoryPage} />
-      <Route path="/orders" component={OrdersPage} />
-      <Route path="/scanner" component={ScannerPage} />
-      <Route path="/analytics" component={AnalyticsPage} />
-      <Route path="/users" component={UsersPage} />
-      <Route path="/profile" component={ProfilePage} />
-      <Route path="/wireframe" component={WireframePage} />
-      <Route path="/support" component={SupportPage} />
-      <Route path="/customer-orders" component={CustomerOrdersWrapper} />
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      <InactivityWarning
+        open={showWarning}
+        secondsLeft={secondsLeft}
+        onStayLoggedIn={stayLoggedIn}
+        onLogoutNow={handleInactivityLogout}
+      />
+      <Switch>
+        <Route path="/" component={isAuthenticated ? Dashboard : Landing} />
+        <Route path="/storefront" component={StorefrontPage} />
+        <Route path="/dashboard/:tab?" component={Dashboard} />
+        <Route path="/inventory" component={InventoryPage} />
+        <Route path="/orders" component={OrdersPage} />
+        <Route path="/scanner" component={ScannerPage} />
+        <Route path="/analytics" component={AnalyticsPage} />
+        <Route path="/users" component={UsersPage} />
+        <Route path="/profile" component={ProfilePage} />
+        <Route path="/wireframe" component={WireframePage} />
+        <Route path="/support" component={SupportPage} />
+        <Route path="/customer-orders" component={CustomerOrdersWrapper} />
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 
