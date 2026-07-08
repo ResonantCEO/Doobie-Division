@@ -656,3 +656,39 @@ export const insertDiscountSchema = createInsertSchema(discounts).omit({
 
 export type Discount = typeof discounts.$inferSelect;
 export type InsertDiscount = z.infer<typeof insertDiscountSchema>;
+
+export const priceTemplates = pgTable("price_templates", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  templateType: varchar("template_type").notNull().default("units"), // "units", "weight", "quantity"
+  price: decimal("price", { precision: 10, scale: 2 }),
+  pricePerGram: decimal("price_per_gram", { precision: 10, scale: 4 }),
+  pricePerOunce: decimal("price_per_ounce", { precision: 10, scale: 2 }),
+  pricePerEighth: decimal("price_per_eighth", { precision: 10, scale: 2 }),
+  pricePerQuarter: decimal("price_per_quarter", { precision: 10, scale: 2 }),
+  pricePerHalf: decimal("price_per_half", { precision: 10, scale: 2 }),
+  quantityTiers: text("quantity_tiers"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPriceTemplateSchema = createInsertSchema(priceTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  name: z.string().min(1, "Template name is required"),
+  templateType: z.enum(["units", "weight", "quantity"]),
+  description: z.string().nullable().optional(),
+  price: z.string().nullable().optional(),
+  pricePerGram: z.string().nullable().optional(),
+  pricePerOunce: z.string().nullable().optional(),
+  pricePerEighth: z.string().nullable().optional(),
+  pricePerQuarter: z.string().nullable().optional(),
+  pricePerHalf: z.string().nullable().optional(),
+  quantityTiers: z.string().nullable().optional(),
+});
+
+export type PriceTemplate = typeof priceTemplates.$inferSelect;
+export type InsertPriceTemplate = z.infer<typeof insertPriceTemplateSchema>;

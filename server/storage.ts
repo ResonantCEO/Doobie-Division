@@ -19,6 +19,7 @@ import {
   promotionalAds,
   promoCodes,
   promoCodeUses,
+  priceTemplates,
   type Discount,
   type PromotionalAd,
   type AccessPassword,
@@ -206,6 +207,13 @@ export interface IStorage {
   verifyAccessPassword(password: string): Promise<number | null>;
   isAccessPasswordStillValid(passwordId: number): Promise<boolean>;
   setUserGrantedAccessPassword(userId: string, passwordId: number | null): Promise<void>;
+
+  // Price template operations
+  getPriceTemplates(): Promise<any[]>;
+  getPriceTemplate(id: number): Promise<any | undefined>;
+  createPriceTemplate(data: any): Promise<any>;
+  updatePriceTemplate(id: number, data: any): Promise<any>;
+  deletePriceTemplate(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3765,6 +3773,37 @@ export class DatabaseStorage implements IStorage {
         .set({ totalUses: sql`${promoCodes.totalUses} + 1` })
         .where(eq(promoCodes.id, promoCodeId))
     );
+  }
+
+  async getPriceTemplates(): Promise<any[]> {
+    return retryQuery(() =>
+      db.select().from(priceTemplates).orderBy(asc(priceTemplates.name))
+    );
+  }
+
+  async getPriceTemplate(id: number): Promise<any | undefined> {
+    const results = await retryQuery(() =>
+      db.select().from(priceTemplates).where(eq(priceTemplates.id, id))
+    );
+    return results[0];
+  }
+
+  async createPriceTemplate(data: any): Promise<any> {
+    const results = await retryQuery(() =>
+      db.insert(priceTemplates).values(data).returning()
+    );
+    return results[0];
+  }
+
+  async updatePriceTemplate(id: number, data: any): Promise<any> {
+    const results = await retryQuery(() =>
+      db.update(priceTemplates).set({ ...data, updatedAt: new Date() }).where(eq(priceTemplates.id, id)).returning()
+    );
+    return results[0];
+  }
+
+  async deletePriceTemplate(id: number): Promise<void> {
+    await retryQuery(() => db.delete(priceTemplates).where(eq(priceTemplates.id, id)));
   }
 }
 

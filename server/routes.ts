@@ -77,6 +77,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.warn('[startup] Could not ensure product_quantity_pricing table:', e?.message);
   }
 
+  // Ensure price templates table exists
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS price_templates (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR NOT NULL,
+        description TEXT,
+        template_type VARCHAR NOT NULL DEFAULT 'units',
+        price DECIMAL(10,2),
+        price_per_gram DECIMAL(10,4),
+        price_per_ounce DECIMAL(10,2),
+        price_per_eighth DECIMAL(10,2),
+        price_per_quarter DECIMAL(10,2),
+        price_per_half DECIMAL(10,2),
+        quantity_tiers TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+  } catch (e: any) {
+    console.warn('[startup] Could not ensure price_templates table:', e?.message);
+  }
+
   const verificationUpload = multer({
     storage: multer.memoryStorage(),
     limits: {
@@ -2600,6 +2623,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (e) {
       res.status(500).json({ valid: false, message: "Error validating code" });
+    }
+  });
+
+  // Price Templates CRUD (managers/admins)
+  app.get("/api/price-templates", isAuthenticated, requireRole(["admin", "manager", "staff"]), async (req, res) => {
+    try {
+      const templates = await storage.getPriceTemplates();
+      res.json(templates);
+    } catch (e) {
+      res.status(500).json({ message: "Failed to fetch price templates" });
+    }
+  });
+
+  app.post("/api/price-templates", isAuthenticated, requireRole(["admin", "manager", "staff"]), async (req, res) => {
+    try {
+      const template = await storage.createPriceTemplate(req.body);
+      res.json(template);
+    } catch (e) {
+      res.status(500).json({ message: "Failed to create price template" });
+    }
+  });
+
+  app.put("/api/price-templates/:id", isAuthenticated, requireRole(["admin", "manager", "staff"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const template = await storage.updatePriceTemplate(id, req.body);
+      res.json(template);
+    } catch (e) {
+      res.status(500).json({ message: "Failed to update price template" });
+    }
+  });
+
+  app.delete("/api/price-templates/:id", isAuthenticated, requireRole(["admin", "manager", "staff"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deletePriceTemplate(id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ message: "Failed to delete price template" });
     }
   });
 

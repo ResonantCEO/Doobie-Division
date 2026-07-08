@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -129,6 +129,34 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
   const [quantityTiers, setQuantityTiers] = useState<Array<{minQuantity: string; pricePerItem: string}>>([]);
 
   const isAdmin = user?.role === "admin";
+
+  const { data: priceTemplates = [] } = useQuery<any[]>({
+    queryKey: ["/api/price-templates"],
+  });
+
+  const applyTemplate = (templateId: string) => {
+    if (!templateId || templateId === "__none__") return;
+    const tmpl = priceTemplates.find((t: any) => t.id === parseInt(templateId));
+    if (!tmpl) return;
+    if (tmpl.templateType === "units") {
+      if (tmpl.price) form.setValue("price", tmpl.price);
+    } else if (tmpl.templateType === "weight") {
+      form.setValue("sellingMethod", "weight");
+      if (tmpl.pricePerGram) form.setValue("pricePerGram", tmpl.pricePerGram);
+      if (tmpl.pricePerOunce) form.setValue("pricePerOunce", tmpl.pricePerOunce);
+      if (tmpl.pricePerEighth) form.setValue("pricePerEighth", tmpl.pricePerEighth);
+      if (tmpl.pricePerQuarter) form.setValue("pricePerQuarter", tmpl.pricePerQuarter);
+      if (tmpl.pricePerHalf) form.setValue("pricePerHalf", tmpl.pricePerHalf);
+    } else if (tmpl.templateType === "quantity") {
+      let tiers: Array<{minQuantity: string; pricePerItem: string}> = [];
+      try { tiers = JSON.parse(tmpl.quantityTiers || "[]"); } catch {}
+      if (tiers.length > 0) {
+        setEnableQuantityPricing(true);
+        setQuantityTiers(tiers);
+      }
+    }
+    toast({ title: `Applied template: ${tmpl.name}` });
+  };
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -442,6 +470,25 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Apply Template */}
+            {priceTemplates.length > 0 && (
+              <div className="flex items-center gap-2 p-3 rounded-lg border border-dashed bg-muted/30">
+                <span className="text-sm font-medium shrink-0">Apply Template:</span>
+                <Select onValueChange={applyTemplate}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Select a price template…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {priceTemplates.map((t: any) => (
+                      <SelectItem key={t.id} value={t.id.toString()}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <FormField
               control={form.control}
               name="name"

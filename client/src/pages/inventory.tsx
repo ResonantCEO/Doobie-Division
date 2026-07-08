@@ -15,7 +15,8 @@ import EditProductModal from "@/components/modals/edit-product-modal";
 import StockAdjustmentModal from "@/components/modals/stock-adjustment-modal";
 import CategoryManagementModal from "@/components/modals/category-management-modal";
 import BulkQRModal from "@/components/modals/bulk-qr-modal";
-import { Plus, QrCode, AlertTriangle, Settings } from "lucide-react";
+import PriceTemplatesModal from "@/components/modals/price-templates-modal";
+import { Plus, QrCode, AlertTriangle, Settings, FileText } from "lucide-react";
 import type { Product, Category, ProductSize } from "@shared/schema";
 
 export default function InventoryPage() {
@@ -27,6 +28,7 @@ export default function InventoryPage() {
   const [showStockModal, setShowStockModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showBulkQRModal, setShowBulkQRModal] = useState(false);
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedProductWithCategory, setSelectedProductWithCategory] = useState<(Product & { category: Category | null }) | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
@@ -224,6 +226,11 @@ export default function InventoryPage() {
             <span className="hidden sm:inline">Generate QR Codes</span>
             <span className="sm:hidden">QR Codes</span>
           </Button>
+          <Button onClick={() => setShowTemplatesModal(true)} variant="outline" className="flex-1 sm:flex-initial">
+            <FileText className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Templates</span>
+            <span className="sm:hidden">Templates</span>
+          </Button>
         </div>
       </div>
 
@@ -346,6 +353,11 @@ export default function InventoryPage() {
         onOpenChange={setShowBulkQRModal}
         qrCodes={bulkQRCodes}
         isLoading={bulkQRMutation.isPending}
+      />
+
+      <PriceTemplatesModal
+        open={showTemplatesModal}
+        onOpenChange={setShowTemplatesModal}
       />
     </div>
   );
