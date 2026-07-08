@@ -154,6 +154,13 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         setEnableQuantityPricing(true);
         setQuantityTiers(tiers);
       }
+      if (tmpl.price) {
+        form.setValue("price", tmpl.price);
+      }
+      if (tmpl.pricePerGram) {
+        form.setValue("sellingMethod", "weight");
+        form.setValue("pricePerGram", tmpl.pricePerGram);
+      }
     }
     toast({ title: `Applied template: ${tmpl.name}` });
   };

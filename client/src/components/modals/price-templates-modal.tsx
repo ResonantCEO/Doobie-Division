@@ -45,6 +45,8 @@ interface TemplateForm {
   pricePerQuarter: string;
   pricePerHalf: string;
   quantityTiers: QuantityTier[];
+  quantityBasePrice: string;
+  quantityBasePriceUnit: "unit" | "gram";
 }
 
 const emptyForm = (): TemplateForm => ({
@@ -58,6 +60,8 @@ const emptyForm = (): TemplateForm => ({
   pricePerQuarter: "",
   pricePerHalf: "",
   quantityTiers: [{ minQuantity: "2", pricePerItem: "" }],
+  quantityBasePrice: "",
+  quantityBasePriceUnit: "unit",
 });
 
 function templateFromRecord(t: PriceTemplate): TemplateForm {
@@ -67,6 +71,7 @@ function templateFromRecord(t: PriceTemplate): TemplateForm {
       tiers = JSON.parse(t.quantityTiers);
     } catch {}
   }
+  const isQty = t.templateType === "quantity";
   return {
     name: t.name,
     description: t.description ?? "",
@@ -78,21 +83,32 @@ function templateFromRecord(t: PriceTemplate): TemplateForm {
     pricePerQuarter: t.pricePerQuarter ?? "",
     pricePerHalf: t.pricePerHalf ?? "",
     quantityTiers: tiers,
+    quantityBasePrice: isQty ? (t.price ?? t.pricePerGram ?? "") : "",
+    quantityBasePriceUnit: isQty ? (t.pricePerGram ? "gram" : "unit") : "unit",
   };
 }
 
 function formToPayload(form: TemplateForm) {
+  const isQty = form.templateType === "quantity";
   return {
     name: form.name,
     description: form.description || null,
     templateType: form.templateType,
-    price: form.templateType === "units" && form.price ? form.price : null,
-    pricePerGram: form.templateType === "weight" && form.pricePerGram ? form.pricePerGram : null,
+    price: form.templateType === "units" && form.price
+      ? form.price
+      : (isQty && form.quantityBasePrice && form.quantityBasePriceUnit === "unit"
+          ? form.quantityBasePrice
+          : null),
+    pricePerGram: form.templateType === "weight" && form.pricePerGram
+      ? form.pricePerGram
+      : (isQty && form.quantityBasePrice && form.quantityBasePriceUnit === "gram"
+          ? form.quantityBasePrice
+          : null),
     pricePerOunce: form.templateType === "weight" && form.pricePerOunce ? form.pricePerOunce : null,
     pricePerEighth: form.templateType === "weight" && form.pricePerEighth ? form.pricePerEighth : null,
     pricePerQuarter: form.templateType === "weight" && form.pricePerQuarter ? form.pricePerQuarter : null,
     pricePerHalf: form.templateType === "weight" && form.pricePerHalf ? form.pricePerHalf : null,
-    quantityTiers: form.templateType === "quantity" ? JSON.stringify(form.quantityTiers) : null,
+    quantityTiers: isQty ? JSON.stringify(form.quantityTiers) : null,
   };
 }
 
@@ -141,8 +157,14 @@ function TemplateSummary({ template }: { template: PriceTemplate }) {
   if (t === "quantity") {
     let tiers: QuantityTier[] = [];
     try { tiers = JSON.parse(template.quantityTiers ?? "[]"); } catch {}
+    const basePart = template.price
+      ? `Base $${template.price}/unit`
+      : template.pricePerGram
+        ? `Base $${template.pricePerGram}/g`
+        : null;
     return (
       <span className="text-sm text-muted-foreground">
+        {basePart && <>{basePart} · </>}
         {tiers.length} tier{tiers.length !== 1 ? "s" : ""}
         {tiers.length > 0 && ` · ${tiers.map(t => `${t.minQuantity}+ @ $${t.pricePerItem}`).join(", ")}`}
       </span>
@@ -427,6 +449,35 @@ export default function PriceTemplatesModal({ open, onOpenChange }: PriceTemplat
             {/* Quantity pricing tiers */}
             {form.templateType === "quantity" && (
               <div className="space-y-3">
+                {/* Standard base price */}
+                <div className="rounded-md border bg-muted/20 p-3 space-y-2">
+                  <label className="text-sm font-medium">Standard Price (single unit/gram)</label>
+                  <p className="text-xs text-muted-foreground">The regular price before any quantity discounts apply.</p>
+                  <div className="flex gap-2">
+                    <Select
+                      value={form.quantityBasePriceUnit}
+                      onValueChange={(v) => setField("quantityBasePriceUnit", v as "unit" | "gram")}
+                    >
+                      <SelectTrigger className="w-36">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unit">Per Unit ($)</SelectItem>
+                        <SelectItem value="gram">Per Gram ($)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      step={form.quantityBasePriceUnit === "gram" ? "0.0001" : "0.01"}
+                      min="0"
+                      placeholder={form.quantityBasePriceUnit === "gram" ? "0.0000" : "0.00"}
+                      value={form.quantityBasePrice}
+                      onChange={(e) => setField("quantityBasePrice", e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+
                 <p className="text-xs text-muted-foreground">
                   Define quantity tiers — when a customer orders at least the minimum quantity, they get the lower price per item.
                 </p>
