@@ -112,6 +112,8 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   const [minStockLbs, setMinStockLbs] = useState("");
   const [minStockOz, setMinStockOz] = useState("");
   const [minStockG, setMinStockG] = useState("");
+  const [enableQuantityPricing, setEnableQuantityPricing] = useState(false);
+  const [quantityTiers, setQuantityTiers] = useState<Array<{minQuantity: string; pricePerItem: string}>>([]);
 
   const isAdmin = user?.role === "admin";
 
@@ -191,6 +193,16 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       setExistingImages(existing);
       setImagePreviews([]);
       setSelectedFiles([]);
+
+      // Initialize quantity pricing tiers
+      const existingTiers = (product as any).quantityPricing as Array<{minQuantity: number; pricePerItem: string}> | undefined;
+      if (existingTiers && existingTiers.length > 0) {
+        setEnableQuantityPricing(true);
+        setQuantityTiers(existingTiers.map(t => ({ minQuantity: t.minQuantity.toString(), pricePerItem: t.pricePerItem })));
+      } else {
+        setEnableQuantityPricing(false);
+        setQuantityTiers([]);
+      }
 
       // Pre-populate lb/oz/g fields from grams for weight-based products
       if (product.sellingMethod === "weight") {
@@ -321,6 +333,11 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         isActive: data.isActive,
         sizes: data.enableSizes && data.sizes && data.sizes.length > 0
           ? data.sizes.map(s => ({ size: s.size, quantity: parseInt(s.quantity || "0") }))
+          : [],
+        quantityPricing: enableQuantityPricing
+          ? quantityTiers
+              .filter(t => t.minQuantity && t.pricePerItem)
+              .map(t => ({ minQuantity: parseInt(t.minQuantity), pricePerItem: t.pricePerItem }))
           : [],
       };
       
@@ -522,6 +539,90 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                 </FormItem>
               )}
             />
+
+            {/* Quantity Pricing Section */}
+            <div className="rounded-lg border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <div className="text-base font-medium">Quantity Pricing</div>
+                  <div className="text-sm text-muted-foreground">
+                    Set lower prices when customers order more of this product
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant={enableQuantityPricing ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    const next = !enableQuantityPricing;
+                    setEnableQuantityPricing(next);
+                    if (next && quantityTiers.length === 0) {
+                      setQuantityTiers([{ minQuantity: "2", pricePerItem: "" }]);
+                    }
+                  }}
+                >
+                  Quantity Pricing
+                </Button>
+              </div>
+
+              {enableQuantityPricing && (
+                <div className="space-y-3 pt-1">
+                  <p className="text-xs text-muted-foreground">
+                    When total quantity of this product in an order reaches a tier's minimum, all units of this product get the lower price.
+                  </p>
+                  {quantityTiers.map((tier, index) => (
+                    <div key={index} className="flex gap-2 items-end">
+                      <div className="flex-1 space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Min Qty</label>
+                        <Input
+                          type="number"
+                          min="1"
+                          placeholder="e.g. 3"
+                          value={tier.minQuantity}
+                          onChange={(e) => {
+                            const updated = [...quantityTiers];
+                            updated[index] = { ...updated[index], minQuantity: e.target.value };
+                            setQuantityTiers(updated);
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Price per item ($)</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={tier.pricePerItem}
+                          onChange={(e) => {
+                            const updated = [...quantityTiers];
+                            updated[index] = { ...updated[index], pricePerItem: e.target.value };
+                            setQuantityTiers(updated);
+                          }}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setQuantityTiers(quantityTiers.filter((_, i) => i !== index))}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setQuantityTiers([...quantityTiers, { minQuantity: "", pricePerItem: "" }])}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Tier
+                  </Button>
+                </div>
+              )}
+            </div>
 
             {/* Image Upload */}
             <div className="space-y-2">

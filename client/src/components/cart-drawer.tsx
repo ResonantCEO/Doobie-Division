@@ -354,10 +354,27 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         return Number(product.pricePerGram) || 0;
       };
 
+      // Compute total quantity per product for tier pricing
+      const productQtyMap = new Map<number, number>();
+      for (const item of state.items) {
+        productQtyMap.set(item.product.id, (productQtyMap.get(item.product.id) || 0) + item.quantity);
+      }
+
+      const applyTierPrice = (product: any, basePrice: number): number => {
+        const tiers = product.quantityPricing as Array<{ minQuantity: number; pricePerItem: string }> | undefined;
+        if (!tiers || tiers.length === 0) return basePrice;
+        const totalQty = productQtyMap.get(product.id) || 0;
+        const sorted = [...tiers].sort((a, b) => b.minQuantity - a.minQuantity);
+        const applicable = sorted.find(t => totalQty >= t.minQuantity);
+        if (applicable) return Number(applicable.pricePerItem);
+        return basePrice;
+      };
+
       const orderItems = state.items.map(item => {
-        const itemPrice = item.product.sellingMethod === "weight"
+        const basePrice = item.product.sellingMethod === "weight"
           ? getWeightOptionPrice(item.product, item.size)
           : Number(item.product.price) || 0;
+        const itemPrice = applyTierPrice(item.product, basePrice);
 
         const productName = item.size 
           ? `${item.product.name} (Size: ${item.size})`

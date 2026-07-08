@@ -4,6 +4,7 @@ import {
   categories,
   products,
   productSizes,
+  productQuantityPricing,
   orders,
   orderItems,
   inventoryLogs,
@@ -655,10 +656,35 @@ export class DatabaseStorage implements IStorage {
         sizesByProductId.get(size.productId)!.push(size);
       }
 
-      // Attach sizes to each product (empty array if no sizes)
+      // Fetch quantity pricing tiers for all products
+      let tiersByProductId = new Map<number, any[]>();
+      try {
+        const allTiers = await retryQuery(() =>
+          db.select().from(productQuantityPricing).where(inArray(productQuantityPricing.productId, productIds))
+        );
+        for (const tier of allTiers) {
+          if (!tiersByProductId.has(tier.productId)) {
+            tiersByProductId.set(tier.productId, []);
+          }
+          tiersByProductId.get(tier.productId)!.push({
+            id: tier.id,
+            productId: tier.productId,
+            minQuantity: tier.minQuantity,
+            pricePerItem: tier.pricePerItem,
+          });
+        }
+        for (const tiers of tiersByProductId.values()) {
+          tiers.sort((a, b) => a.minQuantity - b.minQuantity);
+        }
+      } catch (tierErr) {
+        // table may not exist yet, ignore
+      }
+
+      // Attach sizes and tiers to each product
       const result = productsList.map(product => ({
         ...product,
         sizes: sizesByProductId.get(product.id) || [],
+        quantityPricing: tiersByProductId.get(product.id) || [],
       }));
       
       return result;
@@ -668,6 +694,7 @@ export class DatabaseStorage implements IStorage {
       const result = productsList.map(product => ({
         ...product,
         sizes: [] as ProductSize[],
+        quantityPricing: [],
       }));
       return result;
     }
@@ -763,13 +790,30 @@ export class DatabaseStorage implements IStorage {
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       }));
+
+      let quantityPricingTiers: any[] = [];
+      try {
+        const tiersResult = await retryQuery(() =>
+          db.select().from(productQuantityPricing).where(eq(productQuantityPricing.productId, id))
+        );
+        quantityPricingTiers = tiersResult.map(r => ({
+          id: r.id,
+          productId: r.productId,
+          minQuantity: r.minQuantity,
+          pricePerItem: r.pricePerItem,
+        })).sort((a, b) => a.minQuantity - b.minQuantity);
+      } catch (tierErr) {
+        // table may not exist yet
+      }
+
       return {
         ...product,
         sizes: sizes.length > 0 ? sizes : undefined,
+        quantityPricing: quantityPricingTiers,
       };
     } catch (error) {
       console.error('[getProduct] Error fetching product sizes:', error);
-      return { ...product, sizes: [] };
+      return { ...product, sizes: [], quantityPricing: [] };
     }
   }
 
@@ -1055,6 +1099,21 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    // Save quantity pricing tiers
+    const quantityPricingData = (productData as any).quantityPricing;
+    if (quantityPricingData && quantityPricingData.length > 0 && newProduct) {
+      try {
+        const tierRecords = quantityPricingData.map((tier: any) => ({
+          productId: newProduct!.id,
+          minQuantity: tier.minQuantity,
+          pricePerItem: String(tier.pricePerItem),
+        }));
+        await db.insert(productQuantityPricing).values(tierRecords);
+      } catch (tierError) {
+        console.warn('Error creating product quantity pricing tiers:', tierError);
+      }
+    }
+
     return newProduct;
   }
 
@@ -1308,6 +1367,24 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    // Save quantity pricing tiers (always replace on update)
+    const quantityPricingData = (productData as any).quantityPricing;
+    if (quantityPricingData !== undefined) {
+      try {
+        await db.delete(productQuantityPricing).where(eq(productQuantityPricing.productId, id));
+        if (quantityPricingData.length > 0) {
+          const tierRecords = quantityPricingData.map((tier: any) => ({
+            productId: id,
+            minQuantity: tier.minQuantity,
+            pricePerItem: String(tier.pricePerItem),
+          }));
+          await db.insert(productQuantityPricing).values(tierRecords);
+        }
+      } catch (tierError: any) {
+        console.warn('[updateProduct] Error saving quantity pricing tiers:', tierError?.message);
+      }
+    }
+
     return product;
   }
 
@@ -1362,6 +1439,12 @@ export class DatabaseStorage implements IStorage {
       await db.delete(productSizes).where(eq(productSizes.productId, id));
     } catch (error) {
       console.warn('Could not delete product sizes, proceeding:', error);
+    }
+
+    try {
+      await db.delete(productQuantityPricing).where(eq(productQuantityPricing.productId, id));
+    } catch (error) {
+      console.warn('Could not delete product quantity pricing, proceeding:', error);
     }
 
     await db.delete(products).where(eq(products.id, id));

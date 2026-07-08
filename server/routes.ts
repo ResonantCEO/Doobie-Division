@@ -60,6 +60,23 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
+  // Ensure quantity pricing table exists
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS product_quantity_pricing (
+        id SERIAL PRIMARY KEY,
+        product_id INTEGER NOT NULL REFERENCES products(id),
+        min_quantity INTEGER NOT NULL,
+        price_per_item DECIMAL(10,2) NOT NULL
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_pqp_product_id ON product_quantity_pricing(product_id)
+    `);
+  } catch (e: any) {
+    console.warn('[startup] Could not ensure product_quantity_pricing table:', e?.message);
+  }
+
   const verificationUpload = multer({
     storage: multer.memoryStorage(),
     limits: {
