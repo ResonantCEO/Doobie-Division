@@ -67,8 +67,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id SERIAL PRIMARY KEY,
         product_id INTEGER NOT NULL REFERENCES products(id),
         min_quantity INTEGER NOT NULL,
-        price_per_item DECIMAL(10,2) NOT NULL
+        price_per_item DECIMAL(10,4) NOT NULL
       )
+    `);
+    await db.execute(sql`
+      ALTER TABLE product_quantity_pricing ALTER COLUMN price_per_item TYPE DECIMAL(10,4)
     `);
     await db.execute(sql`
       CREATE INDEX IF NOT EXISTS idx_pqp_product_id ON product_quantity_pricing(product_id)

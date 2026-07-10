@@ -125,7 +125,7 @@ export const productQuantityPricing = pgTable("product_quantity_pricing", {
   id: serial("id").primaryKey(),
   productId: integer("product_id").references(() => products.id).notNull(),
   minQuantity: integer("min_quantity").notNull(),
-  pricePerItem: decimal("price_per_item", { precision: 10, scale: 2 }).notNull(),
+  pricePerItem: decimal("price_per_item", { precision: 10, scale: 4 }).notNull(),
 }, (table) => ({
   productIdIdx: index("IDX_pqp_product_id").on(table.productId),
 }));

@@ -645,7 +645,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                             const minQuantity = e.target.value;
                             const qty = parseFloat(minQuantity);
                             const total = parseFloat(updated[index].totalPrice ?? "");
-                            const perItem = qty > 0 && !isNaN(total) ? (total / qty).toFixed(2) : updated[index].pricePerItem;
+                            const perItem = qty > 0 && !isNaN(total) ? (total / qty).toFixed(4) : updated[index].pricePerItem;
                             updated[index] = { ...updated[index], minQuantity, pricePerItem: perItem };
                             setQuantityTiers(updated);
                           }}
@@ -664,7 +664,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                             const totalPrice = e.target.value;
                             const qty = parseFloat(updated[index].minQuantity);
                             const total = parseFloat(totalPrice);
-                            const perItem = qty > 0 && !isNaN(total) ? (total / qty).toFixed(2) : "";
+                            const perItem = qty > 0 && !isNaN(total) ? (total / qty).toFixed(4) : "";
                             updated[index] = { ...updated[index], totalPrice, pricePerItem: perItem };
                             setQuantityTiers(updated);
                           }}
