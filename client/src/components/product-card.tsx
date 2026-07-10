@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, Category, ProductSize } from "@shared/schema";
 
 interface ProductCardProps {
-  product: Product & { category: Category | null; sizes?: ProductSize[] };
+  product: Product & { category: Category | null; sizes?: ProductSize[]; quantityPricing?: Array<{ minQuantity: number; pricePerItem: string }> };
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
@@ -258,6 +258,22 @@ export default function ProductCard({ product }: ProductCardProps) {
                   >
                     {stockStatus.label}
                   </Badge>
+                </div>
+              )}
+              {product.quantityPricing && product.quantityPricing.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-1">
+                  {[...product.quantityPricing]
+                    .sort((a, b) => a.minQuantity - b.minQuantity)
+                    .map((tier) => (
+                      <span
+                        key={tier.minQuantity}
+                        className="text-[10px] sm:text-xs font-semibold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                      >
+                        {tier.minQuantity}+ for ${Number(tier.pricePerItem) * tier.minQuantity % 1 === 0
+                          ? (Number(tier.pricePerItem) * tier.minQuantity).toFixed(0)
+                          : (Number(tier.pricePerItem) * tier.minQuantity).toFixed(2)}
+                      </span>
+                    ))}
                 </div>
               )}
               <div className="text-center">
