@@ -113,7 +113,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   const [minStockOz, setMinStockOz] = useState("");
   const [minStockG, setMinStockG] = useState("");
   const [enableQuantityPricing, setEnableQuantityPricing] = useState(false);
-  const [quantityTiers, setQuantityTiers] = useState<Array<{minQuantity: string; pricePerItem: string}>>([]);
+  const [quantityTiers, setQuantityTiers] = useState<Array<{minQuantity: string; pricePerItem: string; totalPrice?: string}>>([]);
 
   const isAdmin = user?.role === "admin";
 
@@ -141,7 +141,10 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       try { tiers = JSON.parse(tmpl.quantityTiers || "[]"); } catch {}
       if (tiers.length > 0) {
         setEnableQuantityPricing(true);
-        setQuantityTiers(tiers);
+        setQuantityTiers(tiers.map(t => ({
+          ...t,
+          totalPrice: t.pricePerItem && t.minQuantity ? (parseFloat(t.pricePerItem) * parseFloat(t.minQuantity)).toFixed(2) : "",
+        })));
       }
       if (tmpl.price) {
         form.setValue("price", tmpl.price);
@@ -233,7 +236,11 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       const existingTiers = (product as any).quantityPricing as Array<{minQuantity: number; pricePerItem: string}> | undefined;
       if (existingTiers && existingTiers.length > 0) {
         setEnableQuantityPricing(true);
-        setQuantityTiers(existingTiers.map(t => ({ minQuantity: t.minQuantity.toString(), pricePerItem: t.pricePerItem })));
+        setQuantityTiers(existingTiers.map(t => ({
+          minQuantity: t.minQuantity.toString(),
+          pricePerItem: t.pricePerItem,
+          totalPrice: (parseFloat(t.pricePerItem) * t.minQuantity).toFixed(2),
+        })));
       } else {
         setEnableQuantityPricing(false);
         setQuantityTiers([]);
@@ -611,7 +618,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                     const next = !enableQuantityPricing;
                     setEnableQuantityPricing(next);
                     if (next && quantityTiers.length === 0) {
-                      setQuantityTiers([{ minQuantity: "2", pricePerItem: "" }]);
+                      setQuantityTiers([{ minQuantity: "2", pricePerItem: "", totalPrice: "" }]);
                     }
                   }}
                 >
@@ -635,25 +642,38 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                           value={tier.minQuantity}
                           onChange={(e) => {
                             const updated = [...quantityTiers];
-                            updated[index] = { ...updated[index], minQuantity: e.target.value };
+                            const minQuantity = e.target.value;
+                            const qty = parseFloat(minQuantity);
+                            const total = parseFloat(updated[index].totalPrice ?? "");
+                            const perItem = qty > 0 && !isNaN(total) ? (total / qty).toFixed(2) : updated[index].pricePerItem;
+                            updated[index] = { ...updated[index], minQuantity, pricePerItem: perItem };
                             setQuantityTiers(updated);
                           }}
                         />
                       </div>
                       <div className="flex-1 space-y-1">
-                        <label className="text-xs font-medium text-muted-foreground">Price per item ($)</label>
+                        <label className="text-xs font-medium text-muted-foreground">Total Price ($)</label>
                         <Input
                           type="number"
                           step="0.01"
                           min="0"
                           placeholder="0.00"
-                          value={tier.pricePerItem}
+                          value={tier.totalPrice ?? ""}
                           onChange={(e) => {
                             const updated = [...quantityTiers];
-                            updated[index] = { ...updated[index], pricePerItem: e.target.value };
+                            const totalPrice = e.target.value;
+                            const qty = parseFloat(updated[index].minQuantity);
+                            const total = parseFloat(totalPrice);
+                            const perItem = qty > 0 && !isNaN(total) ? (total / qty).toFixed(2) : "";
+                            updated[index] = { ...updated[index], totalPrice, pricePerItem: perItem };
                             setQuantityTiers(updated);
                           }}
                         />
+                        {tier.pricePerItem && !isNaN(parseFloat(tier.pricePerItem)) && (
+                          <p className="text-xs text-muted-foreground">
+                            ${parseFloat(tier.pricePerItem).toFixed(2)} per item
+                          </p>
+                        )}
                       </div>
                       <Button
                         type="button"
@@ -669,7 +689,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setQuantityTiers([...quantityTiers, { minQuantity: "", pricePerItem: "" }])}
+                    onClick={() => setQuantityTiers([...quantityTiers, { minQuantity: "", pricePerItem: "", totalPrice: "" }])}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Tier

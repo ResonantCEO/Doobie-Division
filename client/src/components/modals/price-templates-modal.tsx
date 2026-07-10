@@ -32,6 +32,7 @@ type TemplateType = "units" | "weight" | "quantity";
 interface QuantityTier {
   minQuantity: string;
   pricePerItem: string;
+  totalPrice?: string;
 }
 
 interface TemplateForm {
@@ -71,6 +72,10 @@ function templateFromRecord(t: PriceTemplate): TemplateForm {
       tiers = JSON.parse(t.quantityTiers);
     } catch {}
   }
+  tiers = tiers.map(tier => ({
+    ...tier,
+    totalPrice: tier.pricePerItem && tier.minQuantity ? (parseFloat(tier.pricePerItem) * parseFloat(tier.minQuantity)).toFixed(2) : "",
+  }));
   const isQty = t.templateType === "quantity";
   return {
     name: t.name,
@@ -492,25 +497,38 @@ export default function PriceTemplatesModal({ open, onOpenChange }: PriceTemplat
                         value={tier.minQuantity}
                         onChange={(e) => {
                           const updated = [...form.quantityTiers];
-                          updated[i] = { ...updated[i], minQuantity: e.target.value };
+                          const minQuantity = e.target.value;
+                          const qty = parseFloat(minQuantity);
+                          const total = parseFloat(updated[i].totalPrice ?? "");
+                          const perItem = qty > 0 && !isNaN(total) ? (total / qty).toFixed(2) : updated[i].pricePerItem;
+                          updated[i] = { ...updated[i], minQuantity, pricePerItem: perItem };
                           setField("quantityTiers", updated);
                         }}
                       />
                     </div>
                     <div className="flex-1 space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Price per item ($)</label>
+                      <label className="text-xs font-medium text-muted-foreground">Total Price ($)</label>
                       <Input
                         type="number"
                         step="0.01"
                         min="0"
                         placeholder="0.00"
-                        value={tier.pricePerItem}
+                        value={tier.totalPrice ?? ""}
                         onChange={(e) => {
                           const updated = [...form.quantityTiers];
-                          updated[i] = { ...updated[i], pricePerItem: e.target.value };
+                          const totalPrice = e.target.value;
+                          const qty = parseFloat(updated[i].minQuantity);
+                          const total = parseFloat(totalPrice);
+                          const perItem = qty > 0 && !isNaN(total) ? (total / qty).toFixed(2) : "";
+                          updated[i] = { ...updated[i], totalPrice, pricePerItem: perItem };
                           setField("quantityTiers", updated);
                         }}
                       />
+                      {tier.pricePerItem && !isNaN(parseFloat(tier.pricePerItem)) && (
+                        <p className="text-xs text-muted-foreground">
+                          ${parseFloat(tier.pricePerItem).toFixed(2)} per item
+                        </p>
+                      )}
                     </div>
                     <Button
                       type="button"
@@ -534,7 +552,7 @@ export default function PriceTemplatesModal({ open, onOpenChange }: PriceTemplat
                   onClick={() =>
                     setField("quantityTiers", [
                       ...form.quantityTiers,
-                      { minQuantity: "", pricePerItem: "" },
+                      { minQuantity: "", pricePerItem: "", totalPrice: "" },
                     ])
                   }
                 >
