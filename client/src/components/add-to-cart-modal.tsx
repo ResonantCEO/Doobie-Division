@@ -205,7 +205,9 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
     
     if (hasSizes) {
       const totalQuantity = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
-      const basePrice = Number(product.price) || 0;
+      const basePrice = isWeightBased
+        ? (Number(product.pricePerGram) || Number(product.price) || 0)
+        : (Number(product.price) || 0);
       totalPrice = basePrice * totalQuantity;
     } else if (hasWeightOptions) {
       // Calculate price based on selected weight options
@@ -234,7 +236,9 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
     
     if (hasSizes) {
       const totalQuantity = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
-      const basePrice = Number(product.price) || 0;
+      const basePrice = isWeightBased
+        ? (Number(product.pricePerGram) || Number(product.price) || 0)
+        : (Number(product.price) || 0);
       totalPrice = basePrice * totalQuantity;
     } else if (hasWeightOptions) {
       // Calculate price based on selected weight options
