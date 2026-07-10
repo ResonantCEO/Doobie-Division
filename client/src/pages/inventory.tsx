@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { Plus, QrCode, AlertTriangle, Settings, FileText } from "lucide-react";
 import type { Product, Category, ProductSize } from "@shared/schema";
 
 export default function InventoryPage() {
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [stockFilter, setStockFilter] = useState<string>("");
@@ -36,6 +37,14 @@ export default function InventoryPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Debounce search input so we don't refetch/re-render on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   // Bulk QR code generation mutation
   const bulkQRMutation = useMutation({
@@ -140,6 +149,7 @@ export default function InventoryPage() {
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    placeholderData: (previousData) => previousData,
   });
 
   // Fetch low stock products for alerts
@@ -149,6 +159,7 @@ export default function InventoryPage() {
   });
 
   const handleResetFilters = () => {
+    setSearchInput("");
     setSearchQuery("");
     setSelectedCategory("");
     setStockFilter("");
@@ -292,8 +303,8 @@ export default function InventoryPage() {
               <Input
                 type="text"
                 placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
 
