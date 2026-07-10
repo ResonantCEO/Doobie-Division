@@ -153,6 +153,22 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   };
 
   const handleNotificationClick = async (notification: any) => {
+    // Low stock alerts should just be removed when clicked
+    if (notification.type === 'low_stock') {
+      try {
+        await fetch(`/api/notifications/${notification.id}`, { method: 'DELETE', credentials: 'include' });
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      } catch (error) {
+        console.error("Failed to remove notification:", error);
+        toast({
+          title: "Error",
+          description: "Could not remove notification.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
     // Mark notification as read
     if (!notification.isRead) {
       try {
