@@ -310,23 +310,40 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                 {isWeightBased ? (
                   <div className="text-sm">
                     {product.pricePerGram && Number(product.pricePerGram) > 0 && (
-                      <span className="font-medium">${product.pricePerGram}/g</span>
+                      <span className="font-medium">${Number(product.pricePerGram).toFixed(2)}/g</span>
                     )}
                     {product.pricePerOunce && Number(product.pricePerOunce) > 0 && (
-                      <span className="text-muted-foreground ml-2">${product.pricePerOunce}/oz</span>
+                      <span className="text-muted-foreground ml-2">${Number(product.pricePerOunce).toFixed(2)}/oz</span>
                     )}
                     {(product as any).pricePerEighth && (
-                      <span className="text-muted-foreground ml-2">${(product as any).pricePerEighth}/⅛ oz</span>
+                      <span className="text-muted-foreground ml-2">${Number((product as any).pricePerEighth).toFixed(2)}/⅛ oz</span>
                     )}
                     {(product as any).pricePerQuarter && (
-                      <span className="text-muted-foreground ml-2">${(product as any).pricePerQuarter}/¼ oz</span>
+                      <span className="text-muted-foreground ml-2">${Number((product as any).pricePerQuarter).toFixed(2)}/¼ oz</span>
                     )}
                     {(product as any).pricePerHalf && (
-                      <span className="text-muted-foreground ml-2">${(product as any).pricePerHalf}/½ oz</span>
+                      <span className="text-muted-foreground ml-2">${Number((product as any).pricePerHalf).toFixed(2)}/½ oz</span>
                     )}
                   </div>
                 ) : (
                   <span className="text-sm font-medium">${Number(product.price || 0).toFixed(2)}</span>
+                )}
+                {product.quantityPricing && product.quantityPricing.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {[...product.quantityPricing]
+                      .sort((a, b) => a.minQuantity - b.minQuantity)
+                      .map((tier) => {
+                        const total = Number(tier.pricePerItem) * tier.minQuantity;
+                        return (
+                          <span
+                            key={tier.minQuantity}
+                            className="text-[10px] font-semibold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          >
+                            {tier.minQuantity}+ for ${total % 1 === 0 ? total.toFixed(0) : total.toFixed(2)}
+                          </span>
+                        );
+                      })}
+                  </div>
                 )}
               </div>
             </div>
