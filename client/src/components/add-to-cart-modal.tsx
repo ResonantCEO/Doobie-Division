@@ -15,10 +15,15 @@ import { useCart } from "@/contexts/cart-context";
 import { ShoppingCart, Minus, Plus } from "lucide-react";
 import type { Product, Category, ProductSize } from "@shared/schema";
 
+interface QuantityTier {
+  minQuantity: number;
+  pricePerItem: string;
+}
+
 interface AddToCartModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  product: (Product & { category: Category | null; sizes?: ProductSize[] }) | null;
+  product: (Product & { category: Category | null; sizes?: ProductSize[]; quantityPricing?: QuantityTier[] }) | null;
 }
 
 // Helper function to format price, assuming it exists in your project
@@ -26,6 +31,14 @@ const formatPrice = (price: number | string): string => {
   const numericPrice = Number(price || 0);
   return numericPrice.toFixed(2);
 };
+
+// Returns the per-item price after applying quantity pricing tiers based on total quantity of this product
+function getTieredUnitPrice(basePrice: number, tiers: QuantityTier[] | undefined, totalQty: number): number {
+  if (!tiers || tiers.length === 0) return basePrice;
+  const sorted = [...tiers].sort((a, b) => b.minQuantity - a.minQuantity);
+  const applicable = sorted.find(t => totalQty >= t.minQuantity);
+  return applicable ? Number(applicable.pricePerItem) : basePrice;
+}
 
 export default function AddToCartModal({ open, onOpenChange, product }: AddToCartModalProps) {
   const [quantity, setQuantity] = useState(1);
@@ -200,61 +213,46 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
     onOpenChange(false);
   };
 
-  const getPrice = () => {
+  const getOriginalPrice = () => {
     let totalPrice = 0;
-    
+    const tiers = product.quantityPricing;
+
     if (hasSizes) {
       const totalQuantity = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
       const basePrice = isWeightBased
         ? (Number(product.pricePerGram) || Number(product.price) || 0)
         : (Number(product.price) || 0);
-      totalPrice = basePrice * totalQuantity;
+      const unitPrice = getTieredUnitPrice(basePrice, tiers, totalQuantity);
+      totalPrice = unitPrice * totalQuantity;
     } else if (hasWeightOptions) {
       // Calculate price based on selected weight options
+      const totalQuantity = Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0);
       weightOptions.forEach(opt => {
         const qty = weightOptionQuantities[opt.key] || 0;
-        const price = Number(opt.price) || 0;
-        totalPrice += price * qty;
+        const basePrice = Number(opt.price) || 0;
+        const unitPrice = getTieredUnitPrice(basePrice, tiers, totalQuantity);
+        totalPrice += unitPrice * qty;
       });
     } else if (isWeightBased) {
       const basePrice = Number(product.pricePerGram) || 0;
-      totalPrice = basePrice * weight;
+      const unitPrice = getTieredUnitPrice(basePrice, tiers, weight);
+      totalPrice = unitPrice * weight;
     } else {
       const basePrice = Number(product.price) || 0;
-      totalPrice = basePrice * quantity;
+      const unitPrice = getTieredUnitPrice(basePrice, tiers, quantity);
+      totalPrice = unitPrice * quantity;
     }
+
+    return totalPrice.toFixed(2);
+  };
+
+  const getPrice = () => {
+    const totalPrice = parseFloat(getOriginalPrice());
 
     if (product.discountPercentage && parseFloat(product.discountPercentage) > 0) {
       const discountedPrice = totalPrice * (1 - parseFloat(product.discountPercentage) / 100);
       return discountedPrice.toFixed(2);
     }
-    return totalPrice.toFixed(2);
-  };
-
-  const getOriginalPrice = () => {
-    let totalPrice = 0;
-    
-    if (hasSizes) {
-      const totalQuantity = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
-      const basePrice = isWeightBased
-        ? (Number(product.pricePerGram) || Number(product.price) || 0)
-        : (Number(product.price) || 0);
-      totalPrice = basePrice * totalQuantity;
-    } else if (hasWeightOptions) {
-      // Calculate price based on selected weight options
-      weightOptions.forEach(opt => {
-        const qty = weightOptionQuantities[opt.key] || 0;
-        const price = Number(opt.price) || 0;
-        totalPrice += price * qty;
-      });
-    } else if (isWeightBased) {
-      const basePrice = Number(product.pricePerGram) || 0;
-      totalPrice = basePrice * weight;
-    } else {
-      const basePrice = Number(product.price) || 0;
-      totalPrice = basePrice * quantity;
-    }
-
     return totalPrice.toFixed(2);
   };
 
