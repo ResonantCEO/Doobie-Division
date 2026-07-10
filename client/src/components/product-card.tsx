@@ -413,8 +413,16 @@ export default function ProductCard({ product }: ProductCardProps) {
             </div>
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               <div
-                className="bg-gray-50 dark:bg-gray-800 p-2 sm:p-3 rounded-lg overflow-y-auto max-h-28 sm:max-h-32"
-                style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
+                className="bg-gray-50 dark:bg-gray-800 p-2 sm:p-3 rounded-lg overflow-y-scroll max-h-28 sm:max-h-32"
+                style={{
+                  touchAction: "pan-y",
+                  WebkitOverflowScrolling: "touch",
+                  transform: "translateZ(0)",
+                  WebkitTransform: "translateZ(0)",
+                  WebkitBackfaceVisibility: "visible",
+                  backfaceVisibility: "visible",
+                  willChange: "scroll-position",
+                }}
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
