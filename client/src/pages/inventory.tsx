@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -322,14 +323,43 @@ export default function InventoryPage() {
         </CardContent>
       </Card>
 
-      {/* Inventory Table */}
-      <InventoryTable 
-        products={products} 
-        user={user}
-        selectedProducts={selectedProducts}
-        onSelectionChange={setSelectedProducts}
-        categories={categories}
-      />
+      {/* Inventory Tabs */}
+      <Tabs defaultValue="active">
+        <TabsList className="mb-4">
+          <TabsTrigger value="active">
+            Active
+            <Badge variant="secondary" className="ml-2">
+              {products.filter(p => p.isActive).length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="archived">
+            Archived
+            <Badge variant="secondary" className="ml-2">
+              {products.filter(p => !p.isActive).length}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="active">
+          <InventoryTable 
+            products={products.filter(p => p.isActive)} 
+            user={user}
+            selectedProducts={selectedProducts}
+            onSelectionChange={setSelectedProducts}
+            categories={categories}
+          />
+        </TabsContent>
+
+        <TabsContent value="archived">
+          <InventoryTable 
+            products={products.filter(p => !p.isActive)} 
+            user={user}
+            selectedProducts={selectedProducts}
+            onSelectionChange={setSelectedProducts}
+            categories={categories}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Modals */}
       <AddProductModal 
