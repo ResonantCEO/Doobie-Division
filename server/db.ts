@@ -3,9 +3,13 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import ws from "ws";
 import * as schema from "../shared/schema";
 
-if (!process.env.DATABASE_URL) {
+// Prefer NEON_DATABASE_URL so both dev and production use the same Neon database.
+// Falls back to DATABASE_URL for local development without the secret set.
+const connectionString = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
+
+if (!connectionString) {
   throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
+    "NEON_DATABASE_URL or DATABASE_URL must be set. Did you forget to provision a database?",
   );
 }
 
@@ -14,7 +18,7 @@ if (!process.env.DATABASE_URL) {
 // the WebSocket Pool serializes queries through real connections and doesn't have that problem.
 neonConfig.webSocketConstructor = ws;
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({ connectionString });
 
 export const db = drizzle(pool, {
   schema,
