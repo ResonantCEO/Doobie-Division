@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import ws from "ws";
 import * as schema from "../shared/schema";
 
-const connectionString = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
 
 if (!connectionString) {
   throw new Error(
