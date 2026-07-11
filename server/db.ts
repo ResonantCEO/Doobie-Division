@@ -3,8 +3,6 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import ws from "ws";
 import * as schema from "../shared/schema";
 
-// Prefer NEON_DATABASE_URL so both dev and production use the same Neon database.
-// Falls back to DATABASE_URL for local development without the secret set.
 const connectionString = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
 
 if (!connectionString) {
@@ -25,16 +23,35 @@ export const db = drizzle(pool, {
   logger: process.env.NODE_ENV === "development",
 });
 
-// Keep sql export for raw queries used in startup migrations
 export const sql = pool;
 
-export async function warmupDatabase() {
-  try {
-    await pool.query("SELECT 1");
-    return true;
-  } catch {
-    return false;
+// Neon free-tier endpoints auto-suspend after inactivity. When dev first hits a
+// sleeping endpoint it throws "The endpoint has been disabled". This helper retries
+// with exponential back-off so the endpoint has time to wake up before giving up.
+export async function warmupDatabase(maxAttempts = 10, delayMs = 2000) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await pool.query("SELECT 1");
+      if (attempt > 1) {
+        console.log(`[db] Database endpoint woke up after ${attempt} attempts.`);
+      }
+      return true;
+    } catch (err: any) {
+      const isEndpointSleeping =
+        err?.message?.includes("endpoint has been disabled") ||
+        err?.cause?.message?.includes("endpoint has been disabled");
+      if (isEndpointSleeping && attempt < maxAttempts) {
+        console.log(
+          `[db] Neon endpoint is waking up (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs}ms...`,
+        );
+        await new Promise((r) => setTimeout(r, delayMs));
+        continue;
+      }
+      console.error("[db] Database warmup failed:", err?.message ?? err);
+      return false;
+    }
   }
+  return false;
 }
 
 export async function checkDatabaseConnection() {
