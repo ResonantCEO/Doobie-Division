@@ -1718,24 +1718,19 @@ export class DatabaseStorage implements IStorage {
 
     let nextSequential = 1;
     try {
-      const todayOrdersResult = await retryQuery(() =>
-        db.execute(sql`SELECT order_number FROM orders WHERE order_number LIKE ${datePrefix + '-%'}`)
+      const seqResult = await retryQuery(() =>
+        db.execute(sql`
+          INSERT INTO order_sequences (date_prefix, last_seq)
+          VALUES (${datePrefix}, 1)
+          ON CONFLICT (date_prefix)
+          DO UPDATE SET last_seq = order_sequences.last_seq + 1
+          RETURNING last_seq
+        `)
       );
-      const todayOrders = todayOrdersResult?.rows || [];
-      if (todayOrders.length > 0) {
-        const sequentialNumbers = todayOrders
-          .map((order: any) => {
-            const parts = (order.order_number || '').split('-');
-            return parts.length === 2 ? parseInt(parts[1]) : 0;
-          })
-          .filter((num: number) => !isNaN(num));
-        if (sequentialNumbers.length > 0) {
-          nextSequential = Math.max(...sequentialNumbers) + 1;
-        }
-      }
+      nextSequential = seqResult?.rows?.[0]?.last_seq ?? 1;
     } catch (e) {
-      console.warn('[createOrder] Could not check existing orders, using timestamp fallback');
-      nextSequential = Math.floor(Math.random() * 900) + 100;
+      console.warn('[createOrder] Could not get atomic order sequence, using timestamp fallback');
+      nextSequential = Math.floor(Date.now() % 100000);
     }
 
     const orderNumber = `${datePrefix}-${nextSequential}`;

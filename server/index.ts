@@ -129,9 +129,11 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 // This prevents double rate limiting and ensures proper isolation
 
 // Auth endpoints - separate store to prevent interference from uploads
-app.use('/api/auth/login', createRateLimit(rateLimitStores.auth, 50, 5 * 60 * 1000)); // 50 login attempts per 5 minutes
-app.use('/api/auth/register', createRateLimit(rateLimitStores.auth, 20, 15 * 60 * 1000)); // 20 registration attempts per 15 minutes
-app.use('/api/auth/', createRateLimit(rateLimitStores.auth, 300, 15 * 60 * 1000)); // 300 general auth requests per 15 minutes
+app.use('/api/auth/login', createRateLimit(rateLimitStores.auth, 10, 15 * 60 * 1000)); // 10 login attempts per 15 minutes
+app.use('/api/auth/register', createRateLimit(rateLimitStores.auth, 10, 15 * 60 * 1000)); // 10 registration attempts per 15 minutes
+app.use('/api/auth/forgot-password', createRateLimit(rateLimitStores.auth, 5, 15 * 60 * 1000)); // 5 forgot-password requests per 15 minutes
+app.use('/api/auth/reset-password', createRateLimit(rateLimitStores.auth, 10, 15 * 60 * 1000)); // 10 reset-password attempts per 15 minutes
+app.use('/api/auth/', createRateLimit(rateLimitStores.auth, 100, 15 * 60 * 1000)); // 100 general auth requests per 15 minutes
 
 // Upload endpoints - separate store with higher limits for file operations
 app.use('/api/upload/', createRateLimit(rateLimitStores.upload, 100, 15 * 60 * 1000)); // 100 uploads per 15 minutes
@@ -206,6 +208,20 @@ app.use((req, res, next) => {
     } else {
       console.warn("⚠ Could not verify fractional ounce pricing columns:", error?.message);
     }
+  }
+
+  // Ensure order_sequences table exists for atomic order number generation
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`
+      CREATE TABLE IF NOT EXISTS order_sequences (
+        date_prefix TEXT PRIMARY KEY,
+        last_seq INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+    console.log("✓ Verified order_sequences table exists");
+  } catch (error: any) {
+    console.warn("⚠ Could not verify order_sequences table:", error?.message);
   }
 
   // Add health check endpoint
