@@ -1142,17 +1142,25 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                             )}
                           </div>
                           <p className="text-xs text-gray-600 dark:text-gray-400">SKU: {item.productSku || item.product_sku || "N/A"}</p>
-                          {/* Price per unit — editable by admin */}
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
+                          </p>
+                          {!isRemoved && !item.fulfilled && canScan && (
+                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Click to scan and fulfill item</p>
+                          )}
+                        </div>
+                        <div className="text-right flex flex-col items-end gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+                          {/* Price — editable by admin */}
                           {isAdmin && !isRemoved && !['shipped', 'cancelled'].includes(displayOrder.status) && editingPriceItemId === item.id ? (
-                            <div className="flex items-center gap-1 mt-1" onClick={(e) => e.stopPropagation()}>
-                              <span className="text-xs text-gray-500">$</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm font-medium text-gray-500">$</span>
                               <input
                                 type="number"
                                 min="0"
                                 step="0.01"
                                 value={priceOverride}
                                 onChange={(e) => setPriceOverride(e.target.value)}
-                                className="w-20 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                className="w-20 px-1.5 py-0.5 text-sm font-semibold border border-blue-400 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-right"
                                 autoFocus
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
@@ -1164,7 +1172,6 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                   if (e.key === 'Escape') { setEditingPriceItemId(null); setPriceOverride(""); }
                                 }}
                               />
-                              <span className="text-xs text-gray-500">× {item.quantity || 0}</span>
                               <button
                                 className="text-green-600 hover:text-green-700 disabled:opacity-50"
                                 disabled={overrideItemPriceMutation.isPending}
@@ -1175,20 +1182,20 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                   }
                                 }}
                               >
-                                {overrideItemPriceMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                                {overrideItemPriceMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
                               </button>
                               <button className="text-gray-400 hover:text-gray-600" onClick={() => { setEditingPriceItemId(null); setPriceOverride(""); }}>
-                                <X className="h-3 w-3" />
+                                <X className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1 group/price">
-                              <p className="text-xs text-gray-600 dark:text-gray-400">
-                                ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
+                            <div className="flex items-center gap-1">
+                              <p className={`font-medium text-sm ${isRemoved ? "line-through text-gray-400" : "text-gray-900 dark:text-gray-100"}`}>
+                                ${item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00"}
                               </p>
                               {isAdmin && !isRemoved && !['shipped', 'cancelled'].includes(displayOrder.status) && (
                                 <button
-                                  className="opacity-0 group-hover/price:opacity-100 transition-opacity text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                  className="text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
                                   title="Override price"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1201,14 +1208,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                               )}
                             </div>
                           )}
-                          {!isRemoved && !item.fulfilled && canScan && (
-                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Click to scan and fulfill item</p>
-                          )}
-                        </div>
-                        <div className="text-right flex flex-col items-end gap-1 ml-2">
-                          <p className={`font-medium text-sm ${isRemoved ? "line-through text-gray-400" : "text-gray-900 dark:text-gray-100"}`}>
-                            ${item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00"}
-                          </p>
+                          {/* Status badge + Remove button */}
                           <div className="flex items-center gap-1 flex-wrap justify-end">
                             {isRemoved ? (
                               <Badge variant="destructive" className="text-xs">Removed</Badge>
