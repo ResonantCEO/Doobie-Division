@@ -260,6 +260,13 @@ export default function ProductCard({ product }: ProductCardProps) {
                   </Badge>
                 </div>
               )}
+              {(product as any).bogoEnabled === true && (
+                <div className="flex justify-center">
+                  <span className="text-[10px] sm:text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30 border border-purple-300 dark:border-purple-700 px-2 py-0.5 rounded-full">
+                    🎁 BOGO – Buy One Get One
+                  </span>
+                </div>
+              )}
               {product.quantityPricing && product.quantityPricing.length > 0 && (
                 <div className="flex flex-wrap justify-center gap-1">
                   {[...product.quantityPricing]
