@@ -18,6 +18,10 @@ import { Switch } from "@/components/ui/switch";
 import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount, PromoCode } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
+function toLocalDateTimeString(date: Date): string {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
 interface InventoryLogWithDetails extends InventoryLog {
   product: Product | null;
   user: User | null;
@@ -1650,8 +1654,8 @@ export default function AdminPage() {
                             setAccessForm({
                               label: ap.label,
                               password: ap.password,
-                              validFrom: ap.validFrom ? new Date(ap.validFrom).toISOString().slice(0, 16) : "",
-                              validTo: ap.validTo ? new Date(ap.validTo).toISOString().slice(0, 16) : "",
+                              validFrom: ap.validFrom ? toLocalDateTimeString(new Date(ap.validFrom)) : "",
+                              validTo: ap.validTo ? toLocalDateTimeString(new Date(ap.validTo)) : "",
                             });
                             setShowAccessModal(true);
                           }}>
@@ -1714,8 +1718,8 @@ export default function AdminPage() {
                                   setAccessForm({
                                     label: ap.label,
                                     password: ap.password,
-                                    validFrom: ap.validFrom ? new Date(ap.validFrom).toISOString().slice(0, 16) : "",
-                                    validTo: ap.validTo ? new Date(ap.validTo).toISOString().slice(0, 16) : "",
+                                    validFrom: ap.validFrom ? toLocalDateTimeString(new Date(ap.validFrom)) : "",
+                                    validTo: ap.validTo ? toLocalDateTimeString(new Date(ap.validTo)) : "",
                                   });
                                   setShowAccessModal(true);
                                 }}>
