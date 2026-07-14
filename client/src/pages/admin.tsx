@@ -154,8 +154,8 @@ export default function AdminPage() {
       const res = await apiRequest("POST", "/api/admin/access-passwords", {
         label: data.label,
         password: data.password,
-        validFrom: data.validFrom || null,
-        validTo: data.validTo || null,
+        validFrom: data.validFrom ? new Date(data.validFrom).toISOString() : null,
+        validTo: data.validTo ? new Date(data.validTo).toISOString() : null,
       });
       return res.json();
     },
@@ -173,8 +173,8 @@ export default function AdminPage() {
       const res = await apiRequest("PUT", `/api/admin/access-passwords/${id}`, {
         label: data.label,
         password: data.password,
-        validFrom: data.validFrom || null,
-        validTo: data.validTo || null,
+        validFrom: data.validFrom ? new Date(data.validFrom).toISOString() : null,
+        validTo: data.validTo ? new Date(data.validTo).toISOString() : null,
       });
       return res.json();
     },
