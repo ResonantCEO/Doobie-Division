@@ -1371,6 +1371,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Remove order item (admin only)
+  app.post('/api/orders/:id/remove-item', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const { itemId } = req.body;
+      if (!itemId) return res.status(400).json({ message: "itemId is required" });
+
+      const order = await storage.getOrder(orderId);
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (['shipped', 'cancelled'].includes(order.status)) {
+        return res.status(400).json({ message: "Cannot remove items from shipped or cancelled orders" });
+      }
+
+      await storage.removeOrderItem(orderId, itemId, req.currentUser.id);
+      const updatedOrder = await storage.getOrder(orderId);
+      res.status(200).json(updatedOrder);
+    } catch (error: any) {
+      console.error('Remove item error:', error);
+      res.status(500).json({ message: error.message || "Failed to remove item" });
+    }
+  });
+
+  // Add order item (admin only)
+  app.post('/api/orders/:id/add-item', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const { productId, quantity } = req.body;
+      if (!productId || !quantity || quantity <= 0) {
+        return res.status(400).json({ message: "productId and quantity are required" });
+      }
+
+      const order = await storage.getOrder(orderId);
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (['shipped', 'cancelled'].includes(order.status)) {
+        return res.status(400).json({ message: "Cannot add items to shipped or cancelled orders" });
+      }
+
+      await storage.addOrderItem(orderId, productId, quantity, req.currentUser.id);
+      const updatedOrder = await storage.getOrder(orderId);
+      res.status(200).json(updatedOrder);
+    } catch (error: any) {
+      console.error('Add item error:', error);
+      res.status(500).json({ message: error.message || "Failed to add item" });
+    }
+  });
+
   // Substitute order item (admin only)
   app.post('/api/orders/:id/substitute-item', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
     try {

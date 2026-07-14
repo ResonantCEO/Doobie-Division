@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive, ImageIcon, ShoppingBag, Pencil, ArrowLeftRight, Search, Trash2 } from "lucide-react";
+import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive, ImageIcon, ShoppingBag, Pencil, ArrowLeftRight, Search, Trash2, PlusCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import type { Order, Product } from "@shared/schema";
@@ -36,6 +36,11 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [substituteItemId, setSubstituteItemId] = useState<number | null>(null);
   const [productSearch, setProductSearch] = useState("");
   const [substituteQuantity, setSubstituteQuantity] = useState("1");
+
+  // Add item state
+  const [addingItem, setAddingItem] = useState(false);
+  const [addItemSearch, setAddItemSearch] = useState("");
+  const [addItemQuantity, setAddItemQuantity] = useState("1");
 
   const isFulfillingRef = useRef(false);
   const isScanningRef = useRef(false);
@@ -154,6 +159,63 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to mark order as packed.", variant: "destructive" });
+    }
+  });
+
+  // Remove order item mutation
+  const removeItemMutation = useMutation({
+    mutationFn: async ({ orderId, itemId }: { orderId: number; itemId: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/remove-item`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ itemId })
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to remove item');
+      }
+      return response.json();
+    },
+    onSuccess: (updatedOrder) => {
+      toast({ title: "Item Removed", description: "Item removed and stock restored." });
+      setFullOrder(updatedOrder);
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to Remove", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Add order item mutation
+  const addItemMutation = useMutation({
+    mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/add-item`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ productId, quantity })
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to add item');
+      }
+      return response.json();
+    },
+    onSuccess: (updatedOrder) => {
+      toast({ title: "Item Added", description: "Item added to order." });
+      setFullOrder(updatedOrder);
+      setAddingItem(false);
+      setAddItemSearch("");
+      setAddItemQuantity("1");
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to Add Item", description: error.message, variant: "destructive" });
     }
   });
 
@@ -502,11 +564,23 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Order Items</h3>
-                {scanningMode && (
-                  <Button onClick={cancelScanning} variant="outline" size="sm">
-                    <X className="h-4 w-4 mr-1" />Cancel
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {isAdmin && !['shipped', 'cancelled'].includes(displayOrder.status) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs text-green-700 border-green-300 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-900/20"
+                      onClick={() => { setAddingItem(!addingItem); cancelScanning(); setSubstituteItemId(null); }}
+                    >
+                      <PlusCircle className="h-3.5 w-3.5 mr-1" />Add Item
+                    </Button>
+                  )}
+                  {scanningMode && (
+                    <Button onClick={cancelScanning} variant="outline" size="sm">
+                      <X className="h-4 w-4 mr-1" />Cancel
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* QR Scanning panel */}
@@ -694,6 +768,87 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                 </Card>
               )}
 
+              {/* Add Item panel */}
+              {addingItem && isAdmin && (
+                <Card className="border-green-500">
+                  <CardContent className="p-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <PlusCircle className="h-5 w-5 text-green-500" />
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100">Add Product to Order</h4>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => { setAddingItem(false); setAddItemSearch(""); setAddItemQuantity("1"); }}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Search className="h-4 w-4 text-gray-400 shrink-0" />
+                        <Input
+                          placeholder="Search by product name or SKU..."
+                          value={addItemSearch}
+                          onChange={(e) => setAddItemSearch(e.target.value)}
+                          className="flex-1"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto border rounded-lg divide-y dark:divide-gray-700">
+                        {addItemSearch.trim() === "" ? (
+                          <p className="text-sm text-gray-500 text-center py-4">Type to search products</p>
+                        ) : (allProducts || []).filter((p: Product) =>
+                            p.isActive && p.stock > 0 && (
+                              p.name.toLowerCase().includes(addItemSearch.toLowerCase()) ||
+                              p.sku.toLowerCase().includes(addItemSearch.toLowerCase())
+                            )
+                          ).slice(0, 20).length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-4">No products found</p>
+                        ) : (
+                          (allProducts || []).filter((p: Product) =>
+                            p.isActive && p.stock > 0 && (
+                              p.name.toLowerCase().includes(addItemSearch.toLowerCase()) ||
+                              p.sku.toLowerCase().includes(addItemSearch.toLowerCase())
+                            )
+                          ).slice(0, 20).map((p: Product) => (
+                            <button
+                              key={p.id}
+                              className="w-full text-left px-3 py-2 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                              onClick={() => {
+                                const qty = parseInt(addItemQuantity) || 1;
+                                addItemMutation.mutate({ orderId: displayOrder.id, productId: p.id, quantity: qty });
+                              }}
+                              disabled={addItemMutation.isPending}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{p.name}</p>
+                                  <p className="text-xs text-gray-500">SKU: {p.sku} · Stock: {p.stock}</p>
+                                </div>
+                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">${p.price ? parseFloat(p.price).toFixed(2) : "—"}</span>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">Quantity:</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={addItemQuantity}
+                          onChange={(e) => setAddItemQuantity(e.target.value)}
+                          className="w-20"
+                        />
+                      </div>
+                      {addItemMutation.isPending && (
+                        <div className="flex items-center gap-2 text-sm text-green-600">
+                          <Loader2 className="h-4 w-4 animate-spin" />Adding item…
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Items list */}
               {displayOrder.items && displayOrder.items.length > 0 ? (
                 <div className="space-y-3">
@@ -767,12 +922,31 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   cancelScanning();
+                                  setAddingItem(false);
                                   setSubstituteItemId(item.id);
                                   setSubstituteQuantity(String(item.quantity));
                                   setProductSearch("");
                                 }}
                               >
                                 <ArrowLeftRight className="h-3 w-3 mr-1" />Sub
+                              </Button>
+                            )}
+                            {/* Remove button — admin only, non-removed items */}
+                            {isAdmin && !isRemoved && !['shipped', 'cancelled'].includes(displayOrder.status) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 px-2 text-xs text-red-700 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20"
+                                disabled={removeItemMutation.isPending}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`Remove "${item.productName || item.product_name}" from this order?`)) {
+                                    removeItemMutation.mutate({ orderId: displayOrder.id, itemId: item.id });
+                                  }
+                                }}
+                              >
+                                {removeItemMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3 mr-1" />}
+                                {removeItemMutation.isPending ? "" : "Remove"}
                               </Button>
                             )}
                           </div>

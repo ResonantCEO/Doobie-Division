@@ -101,6 +101,8 @@ export interface IStorage {
   fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
   unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
   substituteOrderItem(orderId: number, oldItemId: number, newProductId: number, quantity: number, userId: string): Promise<void>;
+  removeOrderItem(orderId: number, itemId: number, userId: string): Promise<void>;
+  addOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void>;
   markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }>;
   assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order>;
   deleteOrder(id: number): Promise<void>;
@@ -2205,6 +2207,86 @@ export class DatabaseStorage implements IStorage {
         previousStock: newProductUpdated.stock + quantity,
         newStock: newProductUpdated.stock,
         reason: `Item substituted into Order #${orderId}`,
+        createdAt: new Date()
+      });
+    }
+  }
+
+  async removeOrderItem(orderId: number, itemId: number, userId: string): Promise<void> {
+    const [item] = await db.select().from(orderItems).where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId))).limit(1);
+    if (!item) throw new Error("Order item not found");
+    if (item.removed) throw new Error("Item is already removed");
+
+    // Mark item as removed
+    await db.update(orderItems).set({ removed: true }).where(eq(orderItems.id, itemId));
+
+    // Restore stock for this product
+    await db.update(products).set({ stock: sql`${products.stock} + ${item.quantity}`, updatedAt: new Date() }).where(eq(products.id, item.productId!));
+
+    // Recalculate order total from remaining active items
+    const activeItems = await db.select().from(orderItems).where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
+    const newTotal = activeItems.reduce((sum, i) => sum + parseFloat(i.subtotal), 0);
+    await db.update(orders).set({ total: String(newTotal), updatedAt: new Date() }).where(eq(orders.id, orderId));
+
+    // Log inventory change
+    const [updatedProduct] = await db.select().from(products).where(eq(products.id, item.productId!)).limit(1);
+    if (updatedProduct) {
+      await db.insert(inventoryLogs).values({
+        productId: item.productId!,
+        userId,
+        type: 'stock_in',
+        quantity: item.quantity,
+        previousStock: updatedProduct.stock - item.quantity,
+        newStock: updatedProduct.stock,
+        reason: `Item removed from Order #${orderId} - stock restored`,
+        createdAt: new Date()
+      });
+    }
+  }
+
+  async addOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void> {
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (!order) throw new Error("Order not found");
+
+    const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+    if (!product) throw new Error("Product not found");
+    if (product.stock < quantity) throw new Error(`Insufficient stock. Available: ${product.stock}`);
+
+    const unitPrice = product.price ? parseFloat(product.price) : 0;
+    const subtotal = unitPrice * quantity;
+
+    // Insert new order item
+    await db.insert(orderItems).values({
+      orderId,
+      productId,
+      productName: product.name,
+      productSku: product.sku,
+      productPrice: String(unitPrice),
+      quantity,
+      subtotal: String(subtotal),
+      fulfilled: false,
+      removed: false,
+    });
+
+    // Deduct stock
+    await db.update(products).set({ stock: sql`${products.stock} - ${quantity}`, updatedAt: new Date() }).where(eq(products.id, productId));
+
+    // Recalculate order total
+    const activeItems = await db.select().from(orderItems).where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
+    const newTotal = activeItems.reduce((sum, i) => sum + parseFloat(i.subtotal), 0);
+    await db.update(orders).set({ total: String(newTotal), updatedAt: new Date() }).where(eq(orders.id, orderId));
+
+    // Log inventory change
+    const [updatedProduct] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+    if (updatedProduct) {
+      await db.insert(inventoryLogs).values({
+        productId,
+        userId,
+        type: 'stock_out',
+        quantity,
+        previousStock: updatedProduct.stock + quantity,
+        newStock: updatedProduct.stock,
+        reason: `Item added to Order #${orderId}`,
         createdAt: new Date()
       });
     }
