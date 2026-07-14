@@ -584,14 +584,20 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                   );
                 })}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Total: {Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0)} items
-                {isBogoProduct && Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) >= 1 && (
-                  <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
-                    → {Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0)} free!
-                  </span>
-                )}
-              </p>
+              {(() => {
+                const paidQty = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
+                const totalQty = isBogoProduct ? paidQty * 2 : paidQty;
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    Total: {totalQty} items
+                    {isBogoProduct && paidQty >= 1 && (
+                      <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
+                        → {paidQty} free!
+                      </span>
+                    )}
+                  </p>
+                );
+              })()}
             </div>
           ) : hasWeightOptions ? (
             <div className="space-y-3">
@@ -626,9 +632,20 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Total: {Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0)} items
-              </p>
+              {(() => {
+                const paidQty = Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0);
+                const totalQty = isBogoProduct ? paidQty * 2 : paidQty;
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    Total: {totalQty} items
+                    {isBogoProduct && paidQty >= 1 && (
+                      <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
+                        → {paidQty} free!
+                      </span>
+                    )}
+                  </p>
+                );
+              })()}
             </div>
           ) : (
             <div className="space-y-2">
