@@ -173,6 +173,7 @@ export interface IStorage {
   addSupportTicketResponse(ticketId: number, responseData: any): Promise<any>;
   deleteSupportTicket(id: number): Promise<void>;
   archiveSupportTicket(id: number): Promise<any>;
+  unarchiveSupportTicket(id: number): Promise<any>;
   clearAllSupportTickets(): Promise<void>;
   cleanupOldClosedTickets(): Promise<void>;
 
@@ -3367,6 +3368,15 @@ export class DatabaseStorage implements IStorage {
     const [ticket] = await db
       .update(supportTickets)
       .set({ archived: true, updatedAt: new Date() })
+      .where(eq(supportTickets.id, id))
+      .returning();
+    return ticket;
+  }
+
+  async unarchiveSupportTicket(id: number): Promise<any> {
+    const [ticket] = await db
+      .update(supportTickets)
+      .set({ archived: false, updatedAt: new Date() })
       .where(eq(supportTickets.id, id))
       .returning();
     return ticket;

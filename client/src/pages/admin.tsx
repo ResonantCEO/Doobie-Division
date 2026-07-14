@@ -728,6 +728,24 @@ export default function AdminPage() {
     },
   });
 
+  const unarchiveTicketMutation = useMutation({
+    mutationFn: async (ticketId: number) => {
+      const response = await fetch(`/api/support/tickets/${ticketId}/unarchive`, {
+        method: "PUT",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to unarchive ticket");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
+      toast({ title: "Ticket unarchived." });
+    },
+    onError: () => {
+      toast({ title: "Failed to unarchive ticket", variant: "destructive" });
+    },
+  });
+
   const clearAllTicketsMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/support/tickets", {
@@ -1220,10 +1238,16 @@ export default function AdminPage() {
                             </Button>
                           )}
                           {item.ticket.archived && (
-                            <Badge className="bg-amber-100 text-amber-800 text-xs">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => unarchiveTicketMutation.mutate(item.ticket.id)}
+                              disabled={unarchiveTicketMutation.isPending}
+                              className="text-xs text-gray-600 border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                            >
                               <Archive className="h-3 w-3 mr-1" />
-                              Archived
-                            </Badge>
+                              Unarchive
+                            </Button>
                           )}
                         </div>
                       </div>
@@ -1290,10 +1314,16 @@ export default function AdminPage() {
                               </Button>
                             )}
                             {item.ticket.archived && (
-                              <Badge className="bg-amber-100 text-amber-800">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => unarchiveTicketMutation.mutate(item.ticket.id)}
+                                disabled={unarchiveTicketMutation.isPending}
+                                className="text-xs text-gray-600 border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                              >
                                 <Archive className="h-3 w-3 mr-1" />
-                                Archived
-                              </Badge>
+                                Unarchive
+                              </Button>
                             )}
                           </div>
                         </div>

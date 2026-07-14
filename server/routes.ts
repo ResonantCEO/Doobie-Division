@@ -2187,6 +2187,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/support/tickets/:id/unarchive', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ticket ID" });
+      }
+      const ticket = await storage.unarchiveSupportTicket(id);
+      res.json(ticket);
+    } catch (error) {
+      console.error("Failed to unarchive support ticket:", error);
+      res.status(500).json({ message: "Failed to unarchive support ticket" });
+    }
+  });
+
   app.delete('/api/support/tickets', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
     try {
       await storage.clearAllSupportTickets();
