@@ -547,6 +547,8 @@ export class DatabaseStorage implements IStorage {
         pricePerQuarter: products.pricePerQuarter,
         pricePerHalf: products.pricePerHalf,
         discountPercentage: products.discountPercentage,
+        bogoEnabled: products.bogoEnabled,
+        bogoFreeOptionIndex: products.bogoFreeOptionIndex,
         purchasePrice: products.purchasePrice,
         purchasePriceMethod: products.purchasePriceMethod,
         purchasePricePerGram: products.purchasePricePerGram,
@@ -689,9 +691,25 @@ export class DatabaseStorage implements IStorage {
         // table may not exist yet, ignore
       }
 
-      // Attach sizes and tiers to each product
+      // Fetch bogo fields via direct SQL (bypasses Drizzle ORM column caching)
+      const bogoByProductId = new Map<number, { bogoEnabled: boolean; bogoFreeOptionIndex: number | null }>();
+      try {
+        const { sql: rawSql } = await import("./db");
+        const bogoResult = await rawSql`SELECT id, bogo_enabled, bogo_free_option_index FROM products WHERE id = ANY(${productIds})`;
+        for (const row of bogoResult) {
+          bogoByProductId.set(Number(row.id), {
+            bogoEnabled: row.bogo_enabled === true || row.bogo_enabled === 't' || row.bogo_enabled === 'true',
+            bogoFreeOptionIndex: row.bogo_free_option_index != null ? parseInt(String(row.bogo_free_option_index)) : null,
+          });
+        }
+      } catch (bogoErr) {
+        // columns may not exist yet, ignore
+      }
+
+      // Attach sizes, tiers, and bogo to each product
       const result = productsList.map(product => ({
         ...product,
+        ...bogoByProductId.get(product.id),
         sizes: sizesByProductId.get(product.id) || [],
         quantityPricing: tiersByProductId.get(product.id) || [],
       }));
@@ -721,7 +739,7 @@ export class DatabaseStorage implements IStorage {
     let product: any;
     try {
       const rawResult = await retryQuery(() =>
-        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
+        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, bogo_enabled, bogo_free_option_index, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
       );
       
       const row = rawResult?.rows?.[0];
@@ -747,6 +765,8 @@ export class DatabaseStorage implements IStorage {
           pricePerQuarter: row.price_per_quarter,
           pricePerHalf: row.price_per_half,
           discountPercentage: row.discount_percentage,
+          bogoEnabled: row.bogo_enabled === true || row.bogo_enabled === 't' || row.bogo_enabled === 'true',
+          bogoFreeOptionIndex: row.bogo_free_option_index != null ? parseInt(String(row.bogo_free_option_index)) : null,
           purchasePrice: row.purchase_price,
           purchasePriceMethod: row.purchase_price_method,
           purchasePricePerGram: row.purchase_price_per_gram,
