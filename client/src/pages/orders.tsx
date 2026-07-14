@@ -6,13 +6,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import OrderTable, { type OrderTab } from "@/components/order-table";
 import { useOrderNotifications } from "@/hooks/useOrderNotifications";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw, UserCheck, MapPin } from "lucide-react";
+import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw, UserCheck, MapPin, Route } from "lucide-react";
 import type { Order } from "@shared/schema";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/api";
 import OrderDetailsModal from "@/components/modals/order-details-modal";
+import RouteManagementModal from "@/components/route-management-modal";
 
 function extractCity(shippingAddress: string): string {
   const parts = shippingAddress.split(",").map(p => p.trim());
@@ -27,9 +28,12 @@ export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<OrderTab>("new");
   const queryClient = useQueryClient();
 
-  // State for the modal
+  // State for the order details modal
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // State for the route management modal
+  const [isRouteManagementOpen, setIsRouteManagementOpen] = useState(false);
 
   // Set up real-time WebSocket connection for order updates
   useWebSocket();
@@ -228,7 +232,18 @@ export default function OrdersPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="space-y-4">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Order Management</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Order Management</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsRouteManagementOpen(true)}
+            className="gap-1.5"
+          >
+            <Route className="h-4 w-4" />
+            Route Management
+          </Button>
+        </div>
 
         {/* Mobile-first filters and actions */}
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-3 sm:items-center flex-wrap">
@@ -340,6 +355,12 @@ export default function OrdersPage() {
           setSelectedOrder(null);
         }}
         userRole={user?.role}
+      />
+
+      <RouteManagementModal
+        isOpen={isRouteManagementOpen}
+        onClose={() => setIsRouteManagementOpen(false)}
+        orders={orders}
       />
     </div>
   );
