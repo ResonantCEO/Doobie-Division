@@ -282,7 +282,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     try {
       // Check purchase limit for city (skipped if promo code bypasses minimum)
       if (city.trim() && !appliedPromo?.bypassPurchaseMinimum) {
-        const adjustedTotalForLimit = Math.max(0, state.total - (discountResult?.totalSavings || 0) - bogoSavings);
+        const adjustedTotalForLimit = Math.max(0, state.total - (discountResult?.totalSavings || 0));
         const limitCheck = await fetch('/api/check-purchase-limit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -332,7 +332,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
       // Prepare order data (apply promo discount if any)
       const promoSavings = appliedPromo?.discountAmount || 0;
-      const finalTotal = Math.max(0, state.total - (discountResult?.totalSavings || 0) - promoSavings - bogoSavings);
+      const finalTotal = Math.max(0, state.total - (discountResult?.totalSavings || 0) - promoSavings);
       const orderData: any = {
         orderNumber,
         customerId: user?.id,
@@ -715,7 +715,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 {(() => {
                   const autoSavings = discountResult?.totalSavings || 0;
                   const promoSavings = appliedPromo?.discountAmount || 0;
-                  const totalSavings = autoSavings + promoSavings + bogoSavings;
+                  const totalSavings = autoSavings + promoSavings;
                   const finalTotal = Math.max(0, state.total - totalSavings);
                   return (
                     <>
@@ -826,7 +826,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 <div className="flex justify-between font-semibold text-base mt-1">
                   <span>Total</span>
                   <span className="text-green-600 dark:text-green-400">
-                    ${Math.max(0, state.total - bogoSavings - (discountResult?.totalSavings || 0) - (appliedPromo?.discountAmount || 0)).toFixed(2)}
+                    ${Math.max(0, state.total - (discountResult?.totalSavings || 0) - (appliedPromo?.discountAmount || 0)).toFixed(2)}
                   </span>
                 </div>
               </div>
