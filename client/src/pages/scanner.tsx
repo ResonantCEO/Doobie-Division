@@ -392,6 +392,7 @@ export default function ScannerPage() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/order-detail", variables.orderId] });
 
       // Add to fulfillment actions
       const action = {

@@ -1313,8 +1313,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.fulfillOrderItem(orderId, productId, quantity, req.currentUser.id, orderItemId);
 
       res.status(200).json({ message: "Order item fulfilled successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Order fulfillment error:', error);
+      const knownErrors = [
+        'Insufficient physical inventory',
+        'Product not found',
+        'Order item not found',
+      ];
+      if (error?.message && knownErrors.some(msg => error.message.includes(msg))) {
+        return res.status(400).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to fulfill order item" });
     }
   });

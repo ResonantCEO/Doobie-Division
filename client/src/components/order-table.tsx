@@ -56,8 +56,8 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       if (!res.ok) throw new Error('Failed to fetch order');
       return res.json();
     },
-    staleTime: Infinity,
-    gcTime: Infinity,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const updateItemFulfilledCache = (itemId: number, fulfilled: boolean) => {
@@ -282,8 +282,8 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       if (!res.ok) throw new Error('Failed to fetch order');
       return res.json();
     },
-    staleTime: Infinity,
-    gcTime: Infinity,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const updateItemFulfilledCache = (itemId: number, fulfilled: boolean) => {
