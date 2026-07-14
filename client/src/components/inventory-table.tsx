@@ -131,13 +131,23 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
   });
 
   const getStatusBadge = (product: Product) => {
+    let stockBadge: JSX.Element;
     if (product.stock === 0) {
-      return <Badge variant="destructive">Out of Stock</Badge>;
+      stockBadge = <Badge variant="destructive">Out of Stock</Badge>;
     } else if (product.stock <= product.minStockThreshold) {
-      return <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">Low Stock</Badge>;
+      stockBadge = <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">Low Stock</Badge>;
     } else {
-      return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">In Stock</Badge>;
+      stockBadge = <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">In Stock</Badge>;
     }
+    const bogoBadge = (product as any).bogoEnabled
+      ? <Badge className="bg-purple-100 text-purple-800 border border-purple-300 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700">BOGO</Badge>
+      : null;
+    return (
+      <div className="flex flex-col gap-1">
+        {stockBadge}
+        {bogoBadge}
+      </div>
+    );
   };
 
   const getStockUnit = (product: Product) => {
