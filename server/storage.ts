@@ -105,6 +105,7 @@ export interface IStorage {
   substituteOrderItem(orderId: number, oldItemId: number, newProductId: number, quantity: number, userId: string): Promise<void>;
   removeOrderItem(orderId: number, itemId: number, userId: string): Promise<void>;
   addOrderItem(orderId: number, productId: number, quantity: number, userId: string, unitPrice?: number, unitLabel?: string): Promise<void>;
+  updateOrderItemPrice(orderId: number, itemId: number, newPrice: number): Promise<Order>;
   markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }>;
   assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order>;
   deleteOrder(id: number): Promise<void>;
@@ -2246,6 +2247,20 @@ export class DatabaseStorage implements IStorage {
     const remainingItems = await db.select().from(orderItems).where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
     const newTotal = remainingItems.reduce((sum, i) => sum + parseFloat(i.subtotal), 0);
     await db.update(orders).set({ total: String(newTotal), updatedAt: new Date() }).where(eq(orders.id, orderId));
+  }
+
+  async updateOrderItemPrice(orderId: number, itemId: number, newPrice: number): Promise<Order> {
+    const [item] = await db.select().from(orderItems).where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId))).limit(1);
+    if (!item) throw new Error("Order item not found");
+
+    const newSubtotal = newPrice * item.quantity;
+    await db.update(orderItems).set({ productPrice: String(newPrice), subtotal: String(newSubtotal) }).where(eq(orderItems.id, itemId));
+
+    const allItems = await db.select().from(orderItems).where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
+    const newTotal = allItems.reduce((sum, i) => sum + parseFloat(i.subtotal), 0);
+    const [updatedOrder] = await db.update(orders).set({ total: String(newTotal), updatedAt: new Date() }).where(eq(orders.id, orderId)).returning();
+    if (!updatedOrder) throw new Error("Order not found");
+    return updatedOrder;
   }
 
   async addOrderItem(orderId: number, productId: number, quantity: number, userId: string, unitPrice?: number, unitLabel?: string): Promise<void> {

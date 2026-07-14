@@ -37,6 +37,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [productSearch, setProductSearch] = useState("");
   const [substituteQuantity, setSubstituteQuantity] = useState("1");
 
+  // Price override state
+  const [editingPriceItemId, setEditingPriceItemId] = useState<number | null>(null);
+  const [priceOverride, setPriceOverride] = useState<string>("");
+
   // Add item state
   const [addingItem, setAddingItem] = useState(false);
   const [addItemSearch, setAddItemSearch] = useState("");
@@ -139,6 +143,31 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update order total.", variant: "destructive" });
+    }
+  });
+
+  // Override item price
+  const overrideItemPriceMutation = useMutation({
+    mutationFn: async ({ orderId, itemId, price }: { orderId: number; itemId: number; price: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/items/${itemId}/price`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ price })
+      });
+      if (!response.ok) throw new Error('Failed to update item price');
+      return response.json();
+    },
+    onSuccess: (updatedOrder) => {
+      toast({ title: "Price Updated", description: "Item price has been overridden." });
+      setFullOrder(updatedOrder);
+      setEditingPriceItemId(null);
+      setPriceOverride("");
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update item price.", variant: "destructive" });
     }
   });
 
@@ -1113,9 +1142,65 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                             )}
                           </div>
                           <p className="text-xs text-gray-600 dark:text-gray-400">SKU: {item.productSku || item.product_sku || "N/A"}</p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
-                          </p>
+                          {/* Price per unit — editable by admin */}
+                          {isAdmin && !isRemoved && !['shipped', 'cancelled'].includes(displayOrder.status) && editingPriceItemId === item.id ? (
+                            <div className="flex items-center gap-1 mt-1" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-xs text-gray-500">$</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={priceOverride}
+                                onChange={(e) => setPriceOverride(e.target.value)}
+                                className="w-20 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const val = parseFloat(priceOverride);
+                                    if (!isNaN(val) && val >= 0) {
+                                      overrideItemPriceMutation.mutate({ orderId: displayOrder.id, itemId: item.id, price: val });
+                                    }
+                                  }
+                                  if (e.key === 'Escape') { setEditingPriceItemId(null); setPriceOverride(""); }
+                                }}
+                              />
+                              <span className="text-xs text-gray-500">× {item.quantity || 0}</span>
+                              <button
+                                className="text-green-600 hover:text-green-700 disabled:opacity-50"
+                                disabled={overrideItemPriceMutation.isPending}
+                                onClick={() => {
+                                  const val = parseFloat(priceOverride);
+                                  if (!isNaN(val) && val >= 0) {
+                                    overrideItemPriceMutation.mutate({ orderId: displayOrder.id, itemId: item.id, price: val });
+                                  }
+                                }}
+                              >
+                                {overrideItemPriceMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                              </button>
+                              <button className="text-gray-400 hover:text-gray-600" onClick={() => { setEditingPriceItemId(null); setPriceOverride(""); }}>
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 group/price">
+                              <p className="text-xs text-gray-600 dark:text-gray-400">
+                                ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
+                              </p>
+                              {isAdmin && !isRemoved && !['shipped', 'cancelled'].includes(displayOrder.status) && (
+                                <button
+                                  className="opacity-0 group-hover/price:opacity-100 transition-opacity text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                  title="Override price"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingPriceItemId(item.id);
+                                    setPriceOverride((item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00");
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          )}
                           {!isRemoved && !item.fulfilled && canScan && (
                             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Click to scan and fulfill item</p>
                           )}

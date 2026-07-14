@@ -1163,6 +1163,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/orders/:id/items/:itemId/price', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const itemId = parseInt(req.params.itemId);
+      const { price } = req.body;
+
+      if (price === undefined || price === null || isNaN(parseFloat(price))) {
+        return res.status(400).json({ message: "A valid price is required" });
+      }
+      const numericPrice = parseFloat(price);
+      if (numericPrice < 0) {
+        return res.status(400).json({ message: "Price cannot be negative" });
+      }
+
+      const updatedOrder = await storage.updateOrderItemPrice(orderId, itemId, numericPrice);
+      res.json(updatedOrder);
+    } catch (error: any) {
+      console.error('Failed to update item price:', error);
+      res.status(500).json({ message: error.message || "Failed to update item price" });
+    }
+  });
+
   app.patch('/api/orders/:id/total', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
