@@ -20,10 +20,12 @@ import {
   promoCodes,
   promoCodeUses,
   priceTemplates,
+  boardPosts,
   type Discount,
   type PromotionalAd,
   type AccessPassword,
   type PromoCode,
+  type BoardPost,
   type User,
   type UpsertUser,
   type Category,
@@ -4051,6 +4053,31 @@ export class DatabaseStorage implements IStorage {
 
   async deletePriceTemplate(id: number): Promise<void> {
     await retryQuery(() => db.delete(priceTemplates).where(eq(priceTemplates.id, id)));
+  }
+
+  // Board Posts
+  async getBoardPosts(): Promise<BoardPost[]> {
+    return retryQuery(() => db.select().from(boardPosts).where(eq(boardPosts.isActive, true)).orderBy(desc(boardPosts.createdAt)));
+  }
+
+  async getAllBoardPosts(): Promise<BoardPost[]> {
+    return retryQuery(() => db.select().from(boardPosts).orderBy(desc(boardPosts.createdAt)));
+  }
+
+  async createBoardPost(data: { text?: string | null; imageUrl?: string | null; createdBy: string }): Promise<BoardPost> {
+    const results = await retryQuery(() =>
+      db.insert(boardPosts).values({
+        text: data.text ?? null,
+        imageUrl: data.imageUrl ?? null,
+        createdBy: data.createdBy,
+        isActive: true,
+      }).returning()
+    );
+    return results[0];
+  }
+
+  async deleteBoardPost(id: number): Promise<void> {
+    await retryQuery(() => db.delete(boardPosts).where(eq(boardPosts.id, id)));
   }
 }
 

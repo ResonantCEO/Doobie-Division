@@ -1,14 +1,18 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ProductCard from "@/components/product-card";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
-import type { Product, Category, PromotionalAd } from "@shared/schema";
+import { Search, ChevronLeft, ChevronRight, Megaphone, ImagePlus, Trash2, X } from "lucide-react";
+import type { Product, Category, PromotionalAd, BoardPost } from "@shared/schema";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 
 function ScrollableProductRow({ products, onCategoryFilter }: { products: (Product & { category: Category | null })[], onCategoryFilter?: (id: number) => void }) {
@@ -75,6 +79,11 @@ function ScrollableProductRow({ products, onCategoryFilter }: { products: (Produ
 
 export default function StorefrontPage() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const isAdmin = user?.role === "admin";
+
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -86,6 +95,14 @@ export default function StorefrontPage() {
     selectedCategory: number | null;
     showDealsOnly: boolean;
   }>>([]);
+
+  // Advertise modal state
+  const [advertiseOpen, setAdvertiseOpen] = useState(false);
+  const [postText, setPostText] = useState("");
+  const [postImageFile, setPostImageFile] = useState<File | null>(null);
+  const [postImagePreview, setPostImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch all deal products for hero section (independent of filters)
   // Includes: discounted products, BOGO products, quantity-priced products
@@ -121,6 +138,75 @@ export default function StorefrontPage() {
     },
     staleTime: 60000,
   });
+
+  // Fetch board posts (message board)
+  const { data: boardPosts = [] } = useQuery<BoardPost[]>({
+    queryKey: ["/api/board-posts"],
+    queryFn: async () => {
+      const res = await fetch('/api/board-posts');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 30000,
+  });
+
+  // Delete board post mutation
+  const deleteBoardPostMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/board-posts/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete post');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/board-posts"] });
+      toast({ title: "Post removed" });
+    },
+  });
+
+  // Handle image file selection
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPostImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setPostImagePreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  // Submit new board post
+  const handlePostSubmit = async () => {
+    if (!postText.trim() && !postImageFile) {
+      toast({ title: "Add text or an image first", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    try {
+      let imageUrl: string | null = null;
+      if (postImageFile) {
+        const formData = new FormData();
+        formData.append('image', postImageFile);
+        const uploadRes = await fetch('/api/upload/board-image', { method: 'POST', body: formData });
+        if (!uploadRes.ok) throw new Error('Image upload failed');
+        const uploadData = await uploadRes.json();
+        imageUrl = uploadData.imageUrl;
+      }
+      const res = await fetch('/api/board-posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: postText.trim() || null, imageUrl }),
+      });
+      if (!res.ok) throw new Error('Failed to create post');
+      queryClient.invalidateQueries({ queryKey: ["/api/board-posts"] });
+      toast({ title: "Post published!" });
+      setAdvertiseOpen(false);
+      setPostText("");
+      setPostImageFile(null);
+      setPostImagePreview(null);
+    } catch (err: any) {
+      toast({ title: err.message || "Something went wrong", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Build merged slides array: deals slide first (if any), then ad slides
   type DealsSlide = { type: 'deals' };
@@ -390,7 +476,121 @@ export default function StorefrontPage() {
   return (
     <div className="space-y-8 relative min-h-screen">
       <div className="relative z-10">
-      
+
+      {/* Admin: Advertise button + Message Board */}
+      {isAdmin && (
+        <div className="flex justify-end mb-2">
+          <Button
+            variant="outline"
+            className="flex items-center gap-2 border-primary text-primary hover:bg-primary hover:text-white"
+            onClick={() => setAdvertiseOpen(true)}
+          >
+            <Megaphone className="w-4 h-4" />
+            Advertise
+          </Button>
+        </div>
+      )}
+
+      {/* Message Board - board posts shown above daily deals */}
+      {boardPosts.length > 0 && (
+        <div className="space-y-3 mb-4">
+          {boardPosts.map((post) => (
+            <div
+              key={post.id}
+              className="relative rounded-xl border border-border bg-card p-4 shadow-sm"
+            >
+              {isAdmin && (
+                <button
+                  onClick={() => deleteBoardPostMutation.mutate(post.id)}
+                  className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors"
+                  title="Remove post"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+              {post.imageUrl && (
+                <img
+                  src={post.imageUrl}
+                  alt="Board post"
+                  className="rounded-lg max-h-72 w-full object-cover mb-3"
+                />
+              )}
+              {post.text && (
+                <p className="text-sm text-foreground whitespace-pre-wrap">{post.text}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Advertise Dialog */}
+      <Dialog open={advertiseOpen} onOpenChange={(open) => {
+        setAdvertiseOpen(open);
+        if (!open) {
+          setPostText("");
+          setPostImageFile(null);
+          setPostImagePreview(null);
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Megaphone className="w-5 h-5 text-primary" />
+              Create a Post / Advertisement
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <Textarea
+              placeholder="Type your message here... (optional if uploading an image)"
+              value={postText}
+              onChange={(e) => setPostText(e.target.value)}
+              rows={4}
+              className="resize-none"
+            />
+
+            {/* Image upload area */}
+            <div>
+              {postImagePreview ? (
+                <div className="relative">
+                  <img src={postImagePreview} alt="Preview" className="rounded-lg max-h-48 w-full object-cover" />
+                  <button
+                    onClick={() => { setPostImageFile(null); setPostImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                    className="absolute top-2 right-2 bg-black/60 rounded-full p-1 text-white hover:bg-black/80"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full border-2 border-dashed border-border rounded-lg py-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                >
+                  <ImagePlus className="w-6 h-6" />
+                  <span className="text-sm">Click to upload an image (optional)</span>
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageSelect}
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setAdvertiseOpen(false)} disabled={uploading}>
+                Cancel
+              </Button>
+              <Button onClick={handlePostSubmit} disabled={uploading || (!postText.trim() && !postImageFile)}>
+                {uploading ? "Publishing..." : "Publish"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Hero Carousel - show if there are deals or active ads */}
       {slides.length > 0 && (
         <div className="relative rounded-2xl mb-12 overflow-hidden" style={{ minHeight: '260px' }}>

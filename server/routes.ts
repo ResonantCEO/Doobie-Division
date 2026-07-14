@@ -80,6 +80,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.warn('[startup] Could not ensure product_quantity_pricing table:', e?.message);
   }
 
+  // Ensure board_posts table exists
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS board_posts (
+        id SERIAL PRIMARY KEY,
+        text TEXT,
+        image_url TEXT,
+        created_by VARCHAR NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+  } catch (e: any) {
+    console.warn('[startup] Could not ensure board_posts table:', e?.message);
+  }
+
   // Ensure price templates table exists
   try {
     await db.execute(sql`
@@ -2898,6 +2914,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   }, 30000); // Every 30 seconds
+
+  // Board Posts - public read
+  app.get("/api/board-posts", async (req, res) => {
+    try {
+      const posts = await storage.getBoardPosts();
+      res.json(posts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch board posts" });
+    }
+  });
+
+  // Board Posts - admin create
+  app.post("/api/board-posts", isAuthenticated, requireRole(["admin"]), async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const { text, imageUrl } = req.body;
+      if (!text && !imageUrl) {
+        return res.status(400).json({ message: "Post must have text or an image" });
+      }
+      const post = await storage.createBoardPost({ text: text ?? null, imageUrl: imageUrl ?? null, createdBy: userId });
+      res.status(201).json(post);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create board post" });
+    }
+  });
+
+  // Board Posts - admin delete
+  app.delete("/api/board-posts/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteBoardPost(id);
+      res.json({ message: "Deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete board post" });
+    }
+  });
+
+  // Board Posts - upload image (admin only)
+  app.post("/api/upload/board-image", isAuthenticated, requireRole(["admin"]), upload.single("image"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided" });
+      }
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const uniqueId = uuidv4();
+      const extension = path.extname(req.file.originalname) || ".jpg";
+      const objectName = `board-images/${uniqueId}${extension}`;
+      const fullPath = `${privateDir}/${objectName}`;
+      const parts = fullPath.startsWith("/") ? fullPath.slice(1).split("/") : fullPath.split("/");
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join("/");
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectKey);
+      await file.save(req.file.buffer, { metadata: { contentType: req.file.mimetype } });
+      const imageUrl = `/api/board-images/${uniqueId}${extension}`;
+      res.json({ imageUrl });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upload image" });
+    }
+  });
+
+  // Board Images - serve
+  app.get("/api/board-images/:filename", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const fullPath = `${privateDir}/board-images/${req.params.filename}`;
+      const parts = fullPath.startsWith("/") ? fullPath.slice(1).split("/") : fullPath.split("/");
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join("/");
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectKey);
+      const [exists] = await file.exists();
+      if (!exists) return res.status(404).json({ message: "Image not found" });
+      const [metadata] = await file.getMetadata();
+      res.setHeader("Content-Type", (metadata as any).contentType || "image/jpeg");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      file.createReadStream().pipe(res);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to serve image" });
+    }
+  });
 
   return httpServer;
 }
