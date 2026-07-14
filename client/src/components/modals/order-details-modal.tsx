@@ -193,12 +193,12 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
   // Add order item mutation
   const addItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity }: { orderId: number; productId: number; quantity: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, unitPrice, unitLabel }: { orderId: number; productId: number; quantity: number; unitPrice?: number; unitLabel?: string }) => {
       const response = await fetch(`/api/orders/${orderId}/add-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ productId, quantity })
+        body: JSON.stringify({ productId, quantity, unitPrice, unitLabel })
       });
       if (!response.ok) {
         const err = await response.json();
@@ -956,7 +956,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                   quantity: qty,
                                   unitPrice: resolvedUnitPrice,
                                   unitLabel,
-                                } as any);
+                                });
                               }}
                             >
                               {addItemMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Adding…</> : `Add to Order — $${lineTotal.toFixed(2)}`}
