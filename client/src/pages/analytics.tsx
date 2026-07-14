@@ -829,8 +829,8 @@ export default function AnalyticsPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={salesData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" fontSize={12} />
-                        <YAxis fontSize={12} />
+                        <XAxis dataKey="date" fontSize={11} tickFormatter={(v) => { const d = new Date(v + 'T00:00:00'); return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`; }} />
+                        <YAxis fontSize={12} tickFormatter={(v) => `$${v}`} />
                         <ChartTooltip content={<ChartTooltipContent />} />
                         <Area type="monotone" dataKey="sales" stroke="var(--color-sales)" fill="var(--color-sales)" fillOpacity={0.2} />
                       </AreaChart>
@@ -907,8 +907,8 @@ export default function AnalyticsPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={salesData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" fontSize={12} />
-                      <YAxis fontSize={12} />
+                      <XAxis dataKey="date" fontSize={11} tickFormatter={(v) => { const d = new Date(v + 'T00:00:00'); return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`; }} />
+                      <YAxis fontSize={12} tickFormatter={(v) => `$${v}`} />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       <Line type="monotone" dataKey="sales" stroke="var(--color-sales)" />
                     </LineChart>

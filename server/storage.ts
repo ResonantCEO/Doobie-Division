@@ -2464,7 +2464,7 @@ export class DatabaseStorage implements IStorage {
         .orderBy(asc(sql`DATE_TRUNC('day', ${orders.createdAt})`));
 
       return results.map(r => ({
-        date: r.date,
+        date: typeof r.date === 'string' ? r.date.split('T')[0].split(' ')[0] : new Date(r.date as any).toISOString().split('T')[0],
         sales: Number(r.sales),
         orders: Number(r.orders),
         customers: Number(r.customers),
