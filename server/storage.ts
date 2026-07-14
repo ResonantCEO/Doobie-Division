@@ -2013,11 +2013,15 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Insufficient physical inventory");
     }
 
+    // Round to integer before writing to integer DB columns
+    const newPhysicalInventoryInt = Math.round(newPhysicalInventory);
+    const physicalDeltaInt = Math.round(physicalDelta);
+
     // Update only physical inventory (stock is reduced when order is placed, not when fulfilled)
     await db
       .update(products)
       .set({
-        physicalInventory: newPhysicalInventory,
+        physicalInventory: newPhysicalInventoryInt,
         updatedAt: new Date()
       })
       .where(eq(products.id, productId));
@@ -2036,7 +2040,7 @@ export class DatabaseStorage implements IStorage {
     const sizeName = this.extractSizeFromProductName(orderItem.productName);
     if (sizeName) {
       await db.execute(
-        sql`UPDATE product_sizes SET physical_quantity = physical_quantity - ${physicalDelta}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
+        sql`UPDATE product_sizes SET physical_quantity = physical_quantity - ${physicalDeltaInt}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
       );
     }
 
@@ -2045,9 +2049,9 @@ export class DatabaseStorage implements IStorage {
       productId,
       userId,
       type: 'physical_out',
-      quantity: -physicalDelta,
-      previousStock: currentPhysicalInventory,
-      newStock: newPhysicalInventory,
+      quantity: -physicalDeltaInt,
+      previousStock: Math.round(currentPhysicalInventory),
+      newStock: newPhysicalInventoryInt,
       reason: `Order fulfillment - Order #${orderId} (Physical inventory reduced)`,
       createdAt: new Date()
     });
@@ -2093,11 +2097,15 @@ export class DatabaseStorage implements IStorage {
     const currentPhysicalInventory = product[0].physicalInventory || 0;
     const newPhysicalInventory = currentPhysicalInventory + physicalDelta;
 
+    // Round to integer before writing to integer DB columns
+    const newPhysicalInventoryInt = Math.round(newPhysicalInventory);
+    const physicalDeltaInt = Math.round(physicalDelta);
+
     // Update only physical inventory (add back)
     await db
       .update(products)
       .set({
-        physicalInventory: newPhysicalInventory,
+        physicalInventory: newPhysicalInventoryInt,
         updatedAt: new Date()
       })
       .where(eq(products.id, productId));
@@ -2115,7 +2123,7 @@ export class DatabaseStorage implements IStorage {
       const sizeName = this.extractSizeFromProductName(unfulfillItem.productName);
       if (sizeName) {
         await db.execute(
-          sql`UPDATE product_sizes SET physical_quantity = physical_quantity + ${physicalDelta}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
+          sql`UPDATE product_sizes SET physical_quantity = physical_quantity + ${physicalDeltaInt}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
         );
       }
     }
@@ -2125,9 +2133,9 @@ export class DatabaseStorage implements IStorage {
       productId,
       userId,
       type: 'physical_in',
-      quantity: physicalDelta,
-      previousStock: currentPhysicalInventory,
-      newStock: newPhysicalInventory,
+      quantity: physicalDeltaInt,
+      previousStock: Math.round(currentPhysicalInventory),
+      newStock: newPhysicalInventoryInt,
       reason: `Order unfulfillment - Order #${orderId} (Physical inventory restored)`,
       createdAt: new Date()
     });
