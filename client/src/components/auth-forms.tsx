@@ -681,7 +681,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                       <ObjectUploader
                         uploaderId="id-photo-uploader"
                         maxNumberOfFiles={1}
-                        maxFileSize={5 * 1024 * 1024}
+                        maxFileSize={50 * 1024 * 1024}
                         onGetUploadParameters={async (file: any) => {
                           const response = await fetch('/api/objects/upload', {
                             method: 'POST',
@@ -753,7 +753,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                       <ObjectUploader
                         uploaderId="verification-video-uploader"
                         maxNumberOfFiles={1}
-                        maxFileSize={200 * 1024 * 1024}
+                        maxFileSize={500 * 1024 * 1024}
                         allowedFileTypes={['video/*']}
                         onGetUploadParameters={async (file: any) => {
                           const response = await fetch('/api/objects/upload', {
@@ -792,7 +792,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                         <p className="text-sm text-green-600">✓ Verification video uploaded</p>
                       )}
                       <p className="text-sm text-muted-foreground">
-                        Record a short video of yourself enjoying a 420 activity. Make sure your face is clearly visible. Max 200MB.
+                        Record a short video of yourself enjoying a 420 activity. Make sure your face is clearly visible. Max 500MB.
                       </p>
                     </div>
                     <div className="flex gap-2">
