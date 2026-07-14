@@ -111,6 +111,8 @@ export default function OrdersPage() {
       result.sort((a, b) => extractCity(a.shippingAddress).localeCompare(extractCity(b.shippingAddress)));
     } else if (citySort === "desc") {
       result.sort((a, b) => extractCity(b.shippingAddress).localeCompare(extractCity(a.shippingAddress)));
+    } else {
+      result.reverse();
     }
     return result;
   }, [orders, cityFilter, citySort]);
