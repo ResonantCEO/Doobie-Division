@@ -254,7 +254,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
 
   const getOriginalPrice = () => {
     let totalPrice = 0;
-    const tiers = product.quantityPricing;
+    const tiers = isBogoProduct ? undefined : product.quantityPricing;
     if (hasSizes) {
       const totalQuantity = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
       const basePrice = isWeightBased ? (Number(product.pricePerGram) || Number(product.price) || 0) : (Number(product.price) || 0);
@@ -515,7 +515,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
               ) : (
                 <span className="text-sm font-medium">${Number(product.price || 0).toFixed(2)}</span>
               )}
-              {product.quantityPricing && product.quantityPricing.length > 0 && (
+              {!isBogoProduct && product.quantityPricing && product.quantityPricing.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1.5">
                   {[...product.quantityPricing]
                     .sort((a, b) => a.minQuantity - b.minQuantity)

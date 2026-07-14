@@ -267,7 +267,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                   </span>
                 </div>
               )}
-              {product.quantityPricing && product.quantityPricing.length > 0 && (
+              {!(product as any).bogoEnabled && product.quantityPricing && product.quantityPricing.length > 0 && (
                 <div className="flex flex-wrap justify-center gap-1">
                   {[...product.quantityPricing]
                     .sort((a, b) => a.minQuantity - b.minQuantity)

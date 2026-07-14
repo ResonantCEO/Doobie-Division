@@ -64,6 +64,7 @@ function getItemPrice(product: Product & { category: Category | null }, size?: s
 
 function getApplicableTierPrice(product: Product & { category: Category | null; quantityPricing?: QuantityTier[] }, size: string | undefined, totalProductQty: number): number {
   const basePrice = getItemPrice(product, size);
+  if ((product as any).bogoEnabled === true) return basePrice;
   const tiers = (product as any).quantityPricing as QuantityTier[] | undefined;
   if (!tiers || tiers.length === 0) return basePrice;
   const sortedTiers = [...tiers].sort((a, b) => b.minQuantity - a.minQuantity);

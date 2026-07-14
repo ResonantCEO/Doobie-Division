@@ -383,6 +383,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       }
 
       const applyTierPrice = (product: any, basePrice: number): number => {
+        if (product.bogoEnabled === true) return basePrice;
         const tiers = product.quantityPricing as Array<{ minQuantity: number; pricePerItem: string }> | undefined;
         if (!tiers || tiers.length === 0) return basePrice;
         const totalQty = productQtyMap.get(product.id) || 0;
