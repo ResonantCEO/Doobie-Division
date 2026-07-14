@@ -67,13 +67,11 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const [prePayPhotoFile, setPrePayPhotoFile] = useState<File | null>(null);
   const [prePayPhotoPreview, setPrePayPhotoPreview] = useState<string | null>(null);
 
-  // Compute BOGO savings from product-level bogoEnabled flag
+  // Compute BOGO savings: sum the full price value of all isFree items
   const bogoSavings = (() => {
     let total = 0;
     for (const item of state.items) {
-      if ((item.product as any).bogoEnabled !== true) continue;
-      const freeCount = Math.floor(item.quantity / 2);
-      if (freeCount <= 0) continue;
+      if (!item.isFree) continue;
       let unitPrice = 0;
       if (item.product.sellingMethod === "weight") {
         const norm = (item.size || "").toLowerCase().trim();
@@ -85,7 +83,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       } else {
         unitPrice = Number(item.product.price) || 0;
       }
-      total += freeCount * unitPrice;
+      total += item.quantity * unitPrice;
     }
     return Math.round(total * 100) / 100;
   })();
@@ -133,7 +131,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
   const handleQuantityChange = (productId: number, newQuantity: number, size?: string, item?: typeof state.items[0]) => {
     if (newQuantity < 1) {
-      removeItem(productId, size);
+      removeItem(productId, size, item?.isFree);
     } else {
       if (item && size && (item.product as any).sizes) {
         const sizeData = (item.product as any).sizes.find((s: any) => s.size === size);
@@ -153,7 +151,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         });
         return;
       }
-      updateQuantity(productId, newQuantity, size);
+      updateQuantity(productId, newQuantity, size, item?.isFree);
     }
   };
 
@@ -538,14 +536,28 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 {state.items.map((item, index) => {
                   const itemKey = item.size ? `${item.product.id}-${item.size}-${index}` : `${item.product.id}-${index}`;
                   return (
-                  <div key={itemKey} className="flex items-start gap-4 p-4 border rounded-lg">
-                    <img
-                      src={item.product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=100&h=100&fit=crop"}
-                      alt={item.product.name}
-                      className="w-16 h-16 object-cover rounded-md"
-                    />
+                  <div key={itemKey} className={`flex items-start gap-4 p-4 border rounded-lg ${item.isFree ? 'border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10' : ''}`}>
+                    <div className="relative">
+                      <img
+                        src={item.product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=100&h=100&fit=crop"}
+                        alt={item.product.name}
+                        className="w-16 h-16 object-cover rounded-md"
+                      />
+                      {item.isFree && (
+                        <span className="absolute -top-1.5 -right-1.5 bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                          FREE
+                        </span>
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm line-clamp-2">{item.product.name}</h4>
+                      <div className="flex items-start justify-between gap-1">
+                        <h4 className="font-medium text-sm line-clamp-2">{item.product.name}</h4>
+                        {item.isFree && (
+                          <span className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700 px-1.5 py-0.5 rounded-full">
+                            <Gift className="h-2.5 w-2.5" /> BOGO FREE
+                          </span>
+                        )}
+                      </div>
                       {item.size && (
                         <p className="text-xs font-semibold text-primary">Size: {item.size}</p>
                       )}
@@ -553,7 +565,9 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         <p className="text-xs text-muted-foreground">{item.product.category.name}</p>
                       )}
                       <div className="mt-1">
-                        {item.product.sellingMethod === "weight" ? (
+                        {item.isFree ? (
+                          <p className="font-semibold text-green-600 dark:text-green-400">FREE</p>
+                        ) : item.product.sellingMethod === "weight" ? (
                           <div className="space-y-1">
                             {item.product.pricePerGram && (
                               <div className="font-semibold text-primary">${item.product.pricePerGram}/g</div>
@@ -571,39 +585,46 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-2 mt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleQuantityChange(item.product.id, item.quantity - 1, item.size, item)}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => handleQuantityChange(item.product.id, parseInt(e.target.value) || 1, item.size, item)}
-                          className="h-8 w-16 text-center"
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          disabled={
-                            item.size 
-                              ? (item.product as any).sizes?.find((s: any) => s.size === item.size)?.quantity <= item.quantity
-                              : item.quantity >= item.product.stock
-                          }
-                          onClick={() => handleQuantityChange(item.product.id, item.quantity + 1, item.size, item)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
+                        {!item.isFree && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleQuantityChange(item.product.id, item.quantity - 1, item.size, item)}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => handleQuantityChange(item.product.id, parseInt(e.target.value) || 1, item.size, item)}
+                              className="h-8 w-16 text-center"
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              disabled={
+                                item.size
+                                  ? (item.product as any).sizes?.find((s: any) => s.size === item.size)?.quantity <= item.quantity
+                                  : item.quantity >= item.product.stock
+                              }
+                              onClick={() => handleQuantityChange(item.product.id, item.quantity + 1, item.size, item)}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
+                        {item.isFree && (
+                          <span className="text-sm text-muted-foreground">Qty: {item.quantity}</span>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          onClick={() => removeItem(item.product.id, item.size)}
+                          onClick={() => removeItem(item.product.id, item.size, item.isFree)}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -611,27 +632,30 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
                       {/* Subtotal */}
                       <p className="text-sm font-medium mt-2">
-                        Subtotal: ${(() => {
-                          if (item.product.sellingMethod === "weight") {
-                            const normalizedSize = (item.size || '').toLowerCase().trim();
-                            let price = 0;
-                            
-                            if (normalizedSize.includes('1/8') || normalizedSize.includes('⅛')) {
-                              price = Number((item.product as any).pricePerEighth) || 0;
-                            } else if (normalizedSize.includes('1/4') || normalizedSize.includes('¼')) {
-                              price = Number((item.product as any).pricePerQuarter) || 0;
-                            } else if (normalizedSize.includes('1/2') || normalizedSize.includes('½')) {
-                              price = Number((item.product as any).pricePerHalf) || 0;
-                            } else if (normalizedSize.includes('1 oz') || normalizedSize === '1 oz' || normalizedSize === 'ounce') {
-                              price = Number(item.product.pricePerOunce) || 0;
+                        {item.isFree ? (
+                          <span className="text-green-600 dark:text-green-400">Subtotal: FREE</span>
+                        ) : (
+                          <>Subtotal: ${(() => {
+                            if (item.product.sellingMethod === "weight") {
+                              const normalizedSize = (item.size || '').toLowerCase().trim();
+                              let price = 0;
+                              if (normalizedSize.includes('1/8') || normalizedSize.includes('⅛')) {
+                                price = Number((item.product as any).pricePerEighth) || 0;
+                              } else if (normalizedSize.includes('1/4') || normalizedSize.includes('¼')) {
+                                price = Number((item.product as any).pricePerQuarter) || 0;
+                              } else if (normalizedSize.includes('1/2') || normalizedSize.includes('½')) {
+                                price = Number((item.product as any).pricePerHalf) || 0;
+                              } else if (normalizedSize.includes('1 oz') || normalizedSize === '1 oz' || normalizedSize === 'ounce') {
+                                price = Number(item.product.pricePerOunce) || 0;
+                              } else {
+                                price = Number(item.product.pricePerGram) || 0;
+                              }
+                              return (price * item.quantity).toFixed(2);
                             } else {
-                              price = Number(item.product.pricePerGram) || 0;
+                              return ((Number(item.product.price) || 0) * item.quantity).toFixed(2);
                             }
-                            return (price * item.quantity).toFixed(2);
-                          } else {
-                            return ((Number(item.product.price) || 0) * item.quantity).toFixed(2);
-                          }
-                        })()}
+                          })()}</>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -764,12 +788,15 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                     <span>
                       {item.product.name}
                       {item.size && <span className="text-xs text-muted-foreground"> (Size: {item.size})</span>}
+                      {item.isFree && <span className="text-xs font-bold text-green-600 dark:text-green-400"> [FREE]</span>}
                       {' '}x {item.quantity}
                     </span>
-                    <span>${(item.product.sellingMethod === "weight"
-                      ? (Number(item.product.pricePerGram) || 0) * item.quantity
-                      : (Number(item.product.price) || 0) * item.quantity
-                    ).toFixed(2)}</span>
+                    <span className={item.isFree ? "text-green-600 dark:text-green-400 font-semibold" : ""}>
+                      {item.isFree ? "FREE" : `$${(item.product.sellingMethod === "weight"
+                        ? (Number(item.product.pricePerGram) || 0) * item.quantity
+                        : (Number(item.product.price) || 0) * item.quantity
+                      ).toFixed(2)}`}
+                    </span>
                   </div>
                   );
                 })}
