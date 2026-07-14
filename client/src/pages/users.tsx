@@ -298,6 +298,7 @@ export default function UsersPage() {
       city: user.city,
       state: user.state,
       postalCode: user.postalCode,
+      telegramUsername: user.telegramUsername || "",
       minPurchaseExempt: user.minPurchaseExempt || false,
       minPurchaseOverride: user.minPurchaseOverride || "",
     });
@@ -346,6 +347,7 @@ export default function UsersPage() {
       firstName: editData.firstName,
       lastName: editData.lastName,
       email: editData.email,
+      telegramUsername: editData.telegramUsername || null,
       role: editData.role,
       status: editData.status,
       address: editData.address,
@@ -926,9 +928,15 @@ export default function UsersPage() {
                   value={editData.email}
                   onChange={(e) => setEditData({ ...editData, email: e.target.value })}
                 />
-                {selectedUser?.telegramUsername && (
-                  <p className="text-sm text-blue-500 dark:text-blue-400 mt-1">@{selectedUser.telegramUsername}</p>
-                )}
+              </div>
+              <div>
+                <Label htmlFor="telegramUsername">Telegram Username</Label>
+                <Input
+                  id="telegramUsername"
+                  placeholder="@username (optional)"
+                  value={editData.telegramUsername || ""}
+                  onChange={(e) => setEditData({ ...editData, telegramUsername: e.target.value.replace(/^@/, "") })}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
