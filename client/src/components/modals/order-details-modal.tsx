@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive, ImageIcon, ShoppingBag, Pencil, ArrowLeftRight, Search, Trash2, PlusCircle } from "lucide-react";
+import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive, ImageIcon, ShoppingBag, Pencil, ArrowLeftRight, Search, Trash2, PlusCircle, Minus, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import type { Order, Product } from "@shared/schema";
@@ -43,6 +43,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [addItemQuantity, setAddItemQuantity] = useState("1");
   const [selectedAddProduct, setSelectedAddProduct] = useState<Product | null>(null);
   const [selectedAddUnit, setSelectedAddUnit] = useState<string>("units");
+  const [addItemSizeQuantities, setAddItemSizeQuantities] = useState<Record<string, number>>({});
 
   const isFulfillingRef = useRef(false);
   const isScanningRef = useRef(false);
@@ -214,6 +215,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       setAddItemQuantity("1");
       setSelectedAddProduct(null);
       setSelectedAddUnit("units");
+      setAddItemSizeQuantities({});
       queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
@@ -780,11 +782,13 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                   setAddItemQuantity("1");
                   setSelectedAddProduct(null);
                   setSelectedAddUnit("units");
+                  setAddItemSizeQuantities({});
                 };
 
                 const ap = selectedAddProduct as any;
                 const isWeightBased = ap?.sellingMethod === "weight";
-                const weightOptions = !ap ? [] : [
+                const hasSizes = ap?.sizes && ap.sizes.length > 0;
+                const weightOptions = !ap || hasSizes ? [] : [
                   { key: "grams", label: "Grams", price: Number(ap.pricePerGram) || 0 },
                   { key: "eighth", label: "1/8 oz", price: Number(ap.pricePerEighth) || 0 },
                   { key: "quarter", label: "1/4 oz", price: Number(ap.pricePerQuarter) || 0 },
@@ -793,8 +797,13 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                 ].filter(o => o.price > 0);
                 const hasWeightOptions = isWeightBased && weightOptions.length > 0;
 
+                const totalSizeQty = hasSizes
+                  ? Object.values(addItemSizeQuantities).reduce((s, q) => s + q, 0)
+                  : 0;
+
                 const resolvedUnitPrice = (() => {
                   if (!ap) return 0;
+                  if (hasSizes) return Number(ap.price) || 0;
                   if (hasWeightOptions) {
                     const opt = weightOptions.find(o => o.key === selectedAddUnit);
                     return opt ? opt.price : weightOptions[0]?.price || 0;
@@ -807,7 +816,9 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                   : undefined;
 
                 const qty = Math.max(1, parseInt(addItemQuantity) || 1);
-                const lineTotal = resolvedUnitPrice * qty;
+                const lineTotal = hasSizes
+                  ? resolvedUnitPrice * totalSizeQty
+                  : resolvedUnitPrice * qty;
 
                 const searchResults = (allProducts || []).filter((p: Product) =>
                   p.isActive && p.stock > 0 && (
@@ -816,6 +827,43 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                     p.sku.toLowerCase().includes(addItemSearch.toLowerCase())
                   )
                 ).slice(0, 20);
+
+                const handleAddToOrder = async () => {
+                  if (!selectedAddProduct) return;
+                  if (hasSizes) {
+                    const entries = Object.entries(addItemSizeQuantities).filter(([, q]) => q > 0);
+                    if (entries.length === 0) {
+                      toast({ title: "No quantity selected", description: "Please add at least one item.", variant: "destructive" });
+                      return;
+                    }
+                    for (const [sizeName, sizeQty] of entries) {
+                      await fetch(`/api/orders/${displayOrder.id}/add-item`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ productId: selectedAddProduct.id, quantity: sizeQty, unitPrice: resolvedUnitPrice, unitLabel: sizeName }),
+                      });
+                    }
+                    toast({ title: "Items Added", description: `${totalSizeQty} item${totalSizeQty !== 1 ? 's' : ''} added to order.` });
+                    setAddingItem(false);
+                    setAddItemSearch("");
+                    setAddItemQuantity("1");
+                    setSelectedAddProduct(null);
+                    setSelectedAddUnit("units");
+                    setAddItemSizeQuantities({});
+                    queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+                  } else {
+                    addItemMutation.mutate({
+                      orderId: displayOrder.id,
+                      productId: selectedAddProduct.id,
+                      quantity: qty,
+                      unitPrice: resolvedUnitPrice,
+                      unitLabel,
+                    });
+                  }
+                };
 
                 return (
                   <Card className="border-green-500">
@@ -855,23 +903,34 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                               ) : searchResults.map((p: Product) => {
                                 const pa = p as any;
                                 const isWB = pa.sellingMethod === "weight";
-                                const displayPrice = isWB
-                                  ? (pa.pricePerGram ? `$${Number(pa.pricePerGram).toFixed(2)}/g` : pa.pricePerOunce ? `$${Number(pa.pricePerOunce).toFixed(2)}/oz` : "—")
-                                  : (p.price ? `$${parseFloat(p.price).toFixed(2)}` : "—");
+                                const pHasSizes = pa.sizes && pa.sizes.length > 0;
+                                const displayPrice = pHasSizes
+                                  ? `$${parseFloat(p.price).toFixed(2)}`
+                                  : isWB
+                                    ? (pa.pricePerGram ? `$${Number(pa.pricePerGram).toFixed(2)}/g` : pa.pricePerOunce ? `$${Number(pa.pricePerOunce).toFixed(2)}/oz` : "—")
+                                    : (p.price ? `$${parseFloat(p.price).toFixed(2)}` : "—");
                                 return (
                                   <button
                                     key={p.id}
                                     className="w-full text-left px-3 py-2 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
                                     onClick={() => {
                                       setSelectedAddProduct(p);
-                                      const opts = [
-                                        { key: "grams", price: Number(pa.pricePerGram) || 0 },
-                                        { key: "eighth", price: Number(pa.pricePerEighth) || 0 },
-                                        { key: "quarter", price: Number(pa.pricePerQuarter) || 0 },
-                                        { key: "half", price: Number(pa.pricePerHalf) || 0 },
-                                        { key: "ounce", price: Number(pa.pricePerOunce) || 0 },
-                                      ].filter(o => o.price > 0);
-                                      setSelectedAddUnit(pa.sellingMethod === "weight" && opts.length > 0 ? opts[0].key : "units");
+                                      if (pHasSizes) {
+                                        const init: Record<string, number> = {};
+                                        pa.sizes.forEach((s: any) => { init[s.size] = 0; });
+                                        setAddItemSizeQuantities(init);
+                                        setSelectedAddUnit("units");
+                                      } else {
+                                        setAddItemSizeQuantities({});
+                                        const opts = [
+                                          { key: "grams", price: Number(pa.pricePerGram) || 0 },
+                                          { key: "eighth", price: Number(pa.pricePerEighth) || 0 },
+                                          { key: "quarter", price: Number(pa.pricePerQuarter) || 0 },
+                                          { key: "half", price: Number(pa.pricePerHalf) || 0 },
+                                          { key: "ounce", price: Number(pa.pricePerOunce) || 0 },
+                                        ].filter(o => o.price > 0);
+                                        setSelectedAddUnit(pa.sellingMethod === "weight" && opts.length > 0 ? opts[0].key : "units");
+                                      }
                                     }}
                                   >
                                     <div className="flex items-center justify-between">
@@ -896,13 +955,60 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{selectedAddProduct.name}</p>
                                 <p className="text-xs text-gray-500">Stock: {selectedAddProduct.stock}</p>
                               </div>
-                              <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => { setSelectedAddProduct(null); setSelectedAddUnit("units"); }}>
+                              <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => { setSelectedAddProduct(null); setSelectedAddUnit("units"); setAddItemSizeQuantities({}); }}>
                                 Change
                               </Button>
                             </div>
 
+                            {/* Size options (e.g. Lemonade flavors) */}
+                            {hasSizes && (
+                              <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Options</p>
+                                <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+                                  {ap.sizes.map((size: any) => {
+                                    const isOutOfStock = size.quantity <= 0;
+                                    const currentQty = addItemSizeQuantities[size.size] || 0;
+                                    return (
+                                      <div key={size.id ?? size.size} className={`flex items-center justify-between ${isOutOfStock ? 'opacity-40' : ''}`}>
+                                        <div className="flex-1 flex items-center gap-2">
+                                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{size.size}</span>
+                                          {isOutOfStock && <span className="text-xs font-semibold text-red-500">Out of Stock</span>}
+                                        </div>
+                                        {!isOutOfStock && (
+                                          <div className="flex items-center gap-2">
+                                            <Button
+                                              variant="outline"
+                                              size="icon"
+                                              className="h-7 w-7"
+                                              onClick={() => setAddItemSizeQuantities(prev => ({ ...prev, [size.size]: Math.max(0, (prev[size.size] || 0) - 1) }))}
+                                              disabled={currentQty <= 0}
+                                            >
+                                              <Minus className="h-3 w-3" />
+                                            </Button>
+                                            <span className="text-sm font-semibold w-6 text-center">{currentQty}</span>
+                                            <Button
+                                              variant="outline"
+                                              size="icon"
+                                              className="h-7 w-7"
+                                              onClick={() => setAddItemSizeQuantities(prev => ({ ...prev, [size.size]: Math.min(size.quantity, (prev[size.size] || 0) + 1) }))}
+                                              disabled={currentQty >= size.quantity}
+                                            >
+                                              <Plus className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                  Total: {totalSizeQty} item{totalSizeQty !== 1 ? 's' : ''} — ${lineTotal.toFixed(2)}
+                                </p>
+                              </div>
+                            )}
+
                             {/* Weight options */}
-                            {hasWeightOptions && (
+                            {!hasSizes && hasWeightOptions && (
                               <div className="space-y-1">
                                 <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Unit / Size</p>
                                 <div className="flex flex-wrap gap-2">
@@ -923,43 +1029,44 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                               </div>
                             )}
 
-                            {/* Quantity */}
-                            <div className="flex items-center gap-3">
-                              <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">Quantity:</label>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={selectedAddProduct.stock}
-                                value={addItemQuantity}
-                                onChange={(e) => setAddItemQuantity(e.target.value)}
-                                className="w-24"
-                                autoFocus
-                              />
-                              {resolvedUnitPrice > 0 && (
-                                <span className="text-sm text-gray-500">
-                                  ${resolvedUnitPrice.toFixed(2)} × {qty} = <strong className="text-gray-800 dark:text-gray-200">${lineTotal.toFixed(2)}</strong>
-                                </span>
-                              )}
-                              {resolvedUnitPrice === 0 && (
-                                <span className="text-xs text-amber-600">No price available for this unit</span>
-                              )}
-                            </div>
+                            {/* Quantity (plain products only) */}
+                            {!hasSizes && (
+                              <div className="flex items-center gap-3">
+                                <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">Quantity:</label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={selectedAddProduct.stock}
+                                  value={addItemQuantity}
+                                  onChange={(e) => setAddItemQuantity(e.target.value)}
+                                  className="w-24"
+                                  autoFocus
+                                />
+                                {resolvedUnitPrice > 0 && (
+                                  <span className="text-sm text-gray-500">
+                                    ${resolvedUnitPrice.toFixed(2)} × {qty} = <strong className="text-gray-800 dark:text-gray-200">${lineTotal.toFixed(2)}</strong>
+                                  </span>
+                                )}
+                                {resolvedUnitPrice === 0 && (
+                                  <span className="text-xs text-amber-600">No price available for this unit</span>
+                                )}
+                              </div>
+                            )}
 
                             {/* Confirm */}
                             <Button
                               className="w-full bg-green-600 hover:bg-green-700 text-white"
-                              disabled={addItemMutation.isPending || resolvedUnitPrice === 0 || qty < 1}
-                              onClick={() => {
-                                addItemMutation.mutate({
-                                  orderId: displayOrder.id,
-                                  productId: selectedAddProduct.id,
-                                  quantity: qty,
-                                  unitPrice: resolvedUnitPrice,
-                                  unitLabel,
-                                });
-                              }}
+                              disabled={addItemMutation.isPending || (hasSizes ? totalSizeQty < 1 : (resolvedUnitPrice === 0 || qty < 1))}
+                              onClick={handleAddToOrder}
                             >
-                              {addItemMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Adding…</> : `Add to Order — $${lineTotal.toFixed(2)}`}
+                              {addItemMutation.isPending
+                                ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Adding…</>
+                                : hasSizes
+                                  ? totalSizeQty > 0
+                                    ? `Add to Order — $${lineTotal.toFixed(2)}`
+                                    : 'Select Options Above'
+                                  : `Add to Order — $${lineTotal.toFixed(2)}`
+                              }
                             </Button>
                           </>
                         )}
