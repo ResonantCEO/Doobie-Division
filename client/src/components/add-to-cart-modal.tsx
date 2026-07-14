@@ -44,7 +44,6 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
   const [sizeQuantities, setSizeQuantities] = useState<Record<string, number>>({});
   const [weightOptionQuantities, setWeightOptionQuantities] = useState<Record<string, number>>({});
 
-  // Step 2: free item selection state
   const [step, setStep] = useState<'paid' | 'free'>('paid');
   const [freeQuantities, setFreeQuantities] = useState<Record<string, number>>({});
   const [paidQtyForBogo, setPaidQtyForBogo] = useState(0);
@@ -134,6 +133,10 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
       setWeightOptionQuantities(reset);
     }
     onOpenChange(false);
+  };
+
+  const handleDialogOpenChange = (v: boolean) => {
+    if (!v) resetAndClose();
   };
 
   const handleAddToCart = () => {
@@ -280,476 +283,473 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
 
   const hasDiscount = product.discountPercentage && parseFloat(product.discountPercentage) > 0;
 
-  // ── Step 2: Free Item Selection ──────────────────────────────────────────
-  if (step === 'free') {
-    const freeTotal = getFreeQuantityTotal();
-    const remaining = paidQtyForBogo - freeTotal;
+  // ── Free Step Content ────────────────────────────────────────────────────
+  const freeTotal = getFreeQuantityTotal();
+  const remaining = paidQtyForBogo - freeTotal;
 
-    return (
-      <Dialog open={open} onOpenChange={(v) => { if (!v) resetAndClose(); }}>
-        <DialogContent className="sm:max-w-[400px] max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Gift className="h-5 w-5 text-green-500" />
-              Select Your Free Items
-            </DialogTitle>
-            <DialogDescription>
-              You get <span className="font-semibold text-green-600 dark:text-green-400">{paidQtyForBogo} free {paidQtyForBogo === 1 ? 'item' : 'items'}</span> with your purchase! Choose which {paidQtyForBogo === 1 ? 'one' : 'ones'} you'd like.
-            </DialogDescription>
-          </DialogHeader>
+  const freeStepContent = (
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Gift className="h-5 w-5 text-green-500" />
+          Select Your Free Items
+        </DialogTitle>
+        <DialogDescription>
+          You get <span className="font-semibold text-green-600 dark:text-green-400">{paidQtyForBogo} free {paidQtyForBogo === 1 ? 'item' : 'items'}</span> with your purchase! Choose which {paidQtyForBogo === 1 ? 'one' : 'ones'} you'd like.
+        </DialogDescription>
+      </DialogHeader>
 
-          <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
-            {/* Product Info */}
-            <div className="flex gap-3 p-3 border rounded-lg bg-muted/50">
-              <img
-                src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=100&h=100&fit=crop"}
-                alt={product.name}
-                className="w-16 h-16 object-cover rounded-md"
-              />
-              <div className="flex-1">
-                <h4 className="font-medium text-sm">{product.name}</h4>
-                {product.category && <p className="text-xs text-muted-foreground">{product.category.name}</p>}
-                <div className="mt-1.5">
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 px-2 py-0.5 rounded-full">
-                    <Gift className="h-3 w-3" /> BOGO Free
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Free item selector */}
-            {hasSizes ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Choose Your Free Options</Label>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${remaining === 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-muted text-muted-foreground'}`}>
-                    {freeTotal}/{paidQtyForBogo} selected
-                  </span>
-                </div>
-                <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-                  {product.sizes!.map((size) => {
-                    const isOutOfStock = size.quantity <= 0;
-                    const currentFree = freeQuantities[size.size] || 0;
-                    return (
-                      <div key={size.id} className={`flex items-center justify-between ${isOutOfStock ? 'opacity-40' : ''}`}>
-                        <div className="flex-1 flex items-center gap-2">
-                          <Label className="text-sm font-medium">{size.size}</Label>
-                          {isOutOfStock && <span className="text-xs font-semibold text-red-500">Out of Stock</span>}
-                          {currentFree > 0 && (
-                            <span className="text-xs font-semibold text-green-600 dark:text-green-400">FREE</span>
-                          )}
-                        </div>
-                        {!isOutOfStock && (
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => setFreeQuantities({ ...freeQuantities, [size.size]: Math.max(0, currentFree - 1) })}
-                              disabled={currentFree <= 0}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <span className="text-sm font-semibold w-8 text-center">{currentFree}</span>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => {
-                                if (freeTotal >= paidQtyForBogo) return;
-                                setFreeQuantities({ ...freeQuantities, [size.size]: currentFree + 1 });
-                              }}
-                              disabled={freeTotal >= paidQtyForBogo}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className={`text-xs font-medium ${remaining === 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
-                  {remaining === 0 ? '✓ All free items selected!' : `${remaining} more free ${remaining === 1 ? 'item' : 'items'} to select`}
-                </p>
-              </div>
-            ) : hasWeightOptions ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Choose Your Free Options</Label>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${remaining === 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-muted text-muted-foreground'}`}>
-                    {freeTotal}/{paidQtyForBogo} selected
-                  </span>
-                </div>
-                <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-                  {weightOptions.map((opt) => {
-                    const currentFree = freeQuantities[opt.key] || 0;
-                    return (
-                      <div key={opt.key} className="flex items-center justify-between">
-                        <div className="flex-1 flex items-center gap-2">
-                          <Label className="text-sm font-medium">{opt.label}</Label>
-                          <span className="text-xs text-muted-foreground">${Number(opt.price || 0).toFixed(2)}</span>
-                          {currentFree > 0 && <span className="text-xs font-semibold text-green-600 dark:text-green-400">FREE</span>}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setFreeQuantities({ ...freeQuantities, [opt.key]: Math.max(0, currentFree - 1) })}
-                            disabled={currentFree <= 0}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="text-sm font-semibold w-8 text-center">{currentFree}</span>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => {
-                              if (freeTotal >= paidQtyForBogo) return;
-                              setFreeQuantities({ ...freeQuantities, [opt.key]: currentFree + 1 });
-                            }}
-                            disabled={freeTotal >= paidQtyForBogo}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className={`text-xs font-medium ${remaining === 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
-                  {remaining === 0 ? '✓ All free items selected!' : `${remaining} more free ${remaining === 1 ? 'item' : 'items'} to select`}
-                </p>
-              </div>
-            ) : (
-              // No sizes/options — free items are the same product
-              <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-center space-y-1">
-                <Gift className="h-8 w-8 text-green-500 mx-auto" />
-                <p className="text-sm font-semibold text-green-700 dark:text-green-300">
-                  {paidQtyForBogo} free {paidQtyForBogo === 1 ? 'item' : 'items'} of {product.name} will be added!
-                </p>
-                <p className="text-xs text-muted-foreground">Click "Add Free Items" to claim them.</p>
-              </div>
-            )}
-
-            {/* Value summary */}
-            <div className="p-3 border rounded-lg bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-              <div className="flex justify-between text-sm font-medium text-green-700 dark:text-green-300">
-                <span className="flex items-center gap-1"><Gift className="h-3.5 w-3.5" /> You save:</span>
-                <span>
-                  ${(Number(product.price || 0) * paidQtyForBogo).toFixed(2)}
-                </span>
-              </div>
+      <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
+        <div className="flex gap-3 p-3 border rounded-lg bg-muted/50">
+          <img
+            src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=100&h=100&fit=crop"}
+            alt={product.name}
+            className="w-16 h-16 object-cover rounded-md"
+          />
+          <div className="flex-1">
+            <h4 className="font-medium text-sm">{product.name}</h4>
+            {product.category && <p className="text-xs text-muted-foreground">{product.category.name}</p>}
+            <div className="mt-1.5">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 px-2 py-0.5 rounded-full">
+                <Gift className="h-3 w-3" /> BOGO Free
+              </span>
             </div>
           </div>
+        </div>
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={handleSkipFreeItems} className="text-xs">
-              Skip Free Items
-            </Button>
-            <Button
-              onClick={handleAddFreeItems}
-              className="bg-green-600 hover:bg-green-700 text-white flex-1"
-            >
-              <Gift className="h-4 w-4 mr-2" />
-              {hasSizes || hasWeightOptions
-                ? freeTotal > 0
-                  ? `Add ${freeTotal} Free ${freeTotal === 1 ? 'Item' : 'Items'}`
-                  : 'Select Items Above'
-                : `Add ${paidQtyForBogo} Free ${paidQtyForBogo === 1 ? 'Item' : 'Items'}`
-              }
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  // ── Step 1: Normal Add to Cart ────────────────────────────────────────────
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px] max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" />
-            Add to Cart
-          </DialogTitle>
-          <DialogDescription>
-            Select the {isWeightBased ? 'weight' : 'quantity'} you want to add to your cart.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
-          {/* Product Info */}
-          <div className="flex gap-3 p-3 border rounded-lg bg-muted/50">
-            <img
-              src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=100&h=100&fit=crop"}
-              alt={product.name}
-              className="w-16 h-16 object-cover rounded-md"
-            />
-            <div className="flex-1">
-              <h4 className="font-medium text-sm">{product.name}</h4>
-              {product.category && (
-                <p className="text-xs text-muted-foreground">{product.category.name}</p>
-              )}
-              <div className="mt-1">
-                {isWeightBased ? (
-                  <div className="text-sm">
-                    {product.pricePerGram && Number(product.pricePerGram) > 0 && (
-                      <span className="font-medium">${Number(product.pricePerGram).toFixed(2)}/g</span>
-                    )}
-                    {product.pricePerOunce && Number(product.pricePerOunce) > 0 && (
-                      <span className="text-muted-foreground ml-2">${Number(product.pricePerOunce).toFixed(2)}/oz</span>
-                    )}
-                    {(product as any).pricePerEighth && (
-                      <span className="text-muted-foreground ml-2">${Number((product as any).pricePerEighth).toFixed(2)}/⅛ oz</span>
-                    )}
-                    {(product as any).pricePerQuarter && (
-                      <span className="text-muted-foreground ml-2">${Number((product as any).pricePerQuarter).toFixed(2)}/¼ oz</span>
-                    )}
-                    {(product as any).pricePerHalf && (
-                      <span className="text-muted-foreground ml-2">${Number((product as any).pricePerHalf).toFixed(2)}/½ oz</span>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-sm font-medium">${Number(product.price || 0).toFixed(2)}</span>
-                )}
-                {product.quantityPricing && product.quantityPricing.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {[...product.quantityPricing]
-                      .sort((a, b) => a.minQuantity - b.minQuantity)
-                      .map((tier) => {
-                        const total = Number(tier.pricePerItem) * tier.minQuantity;
-                        return (
-                          <span
-                            key={tier.minQuantity}
-                            className="text-[10px] font-semibold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                          >
-                            {tier.minQuantity}+ for ${total % 1 === 0 ? total.toFixed(0) : total.toFixed(2)}
-                          </span>
-                        );
-                      })}
-                  </div>
-                )}
-                {isBogoProduct && (
-                  <div className="mt-1.5">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 px-1.5 py-0.5 rounded-full">
-                      <Gift className="h-2.5 w-2.5" /> Buy 1 Get 1 FREE
-                    </span>
-                  </div>
-                )}
-              </div>
+        {hasSizes ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Choose Your Free Options</Label>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${remaining === 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-muted text-muted-foreground'}`}>
+                {freeTotal}/{paidQtyForBogo} selected
+              </span>
             </div>
-          </div>
-
-          {/* Size Selection or Quantity/Weight Input */}
-          {hasSizes ? (
-            <div className="space-y-3">
-              <Label>Options</Label>
-              <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-                {product.sizes!.map((size) => {
-                  const isOutOfStock = size.quantity <= 0;
-                  return (
-                    <div key={size.id} className={`flex items-center justify-between ${isOutOfStock ? 'opacity-50' : ''}`}>
-                      <div className="flex-1 flex items-center gap-2">
-                        <Label className="text-sm font-medium">{size.size}</Label>
-                        {isOutOfStock && <span className="text-xs font-semibold text-red-500">Out of Stock</span>}
-                      </div>
-                      {!isOutOfStock && (
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setSizeQuantities({ ...sizeQuantities, [size.size]: Math.max(0, (sizeQuantities[size.size] || 0) - 1) })}
-                            disabled={(sizeQuantities[size.size] || 0) <= 0}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="text-sm font-semibold w-8 text-center">{sizeQuantities[size.size] || 0}</span>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setSizeQuantities({ ...sizeQuantities, [size.size]: Math.min(size.quantity, (sizeQuantities[size.size] || 0) + 1) })}
-                            disabled={(sizeQuantities[size.size] || 0) >= size.quantity}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
+            <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+              {product.sizes!.map((size) => {
+                const isOutOfStock = size.quantity <= 0;
+                const currentFree = freeQuantities[size.size] || 0;
+                return (
+                  <div key={size.id} className={`flex items-center justify-between ${isOutOfStock ? 'opacity-40' : ''}`}>
+                    <div className="flex-1 flex items-center gap-2">
+                      <Label className="text-sm font-medium">{size.size}</Label>
+                      {isOutOfStock && <span className="text-xs font-semibold text-red-500">Out of Stock</span>}
+                      {currentFree > 0 && (
+                        <span className="text-xs font-semibold text-green-600 dark:text-green-400">FREE</span>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-              {(() => {
-                const paidQty = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
-                const totalQty = isBogoProduct ? paidQty * 2 : paidQty;
-                return (
-                  <p className="text-xs text-muted-foreground">
-                    Total: {totalQty} items
-                    {isBogoProduct && paidQty >= 1 && (
-                      <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
-                        → {paidQty} free!
-                      </span>
+                    {!isOutOfStock && (
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setFreeQuantities({ ...freeQuantities, [size.size]: Math.max(0, currentFree - 1) })}
+                          disabled={currentFree <= 0}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="text-sm font-semibold w-8 text-center">{currentFree}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            if (freeTotal >= paidQtyForBogo) return;
+                            setFreeQuantities({ ...freeQuantities, [size.size]: currentFree + 1 });
+                          }}
+                          disabled={freeTotal >= paidQtyForBogo}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
                     )}
-                  </p>
+                  </div>
                 );
-              })()}
+              })}
             </div>
-          ) : hasWeightOptions ? (
-            <div className="space-y-3">
-              <Label>Weight Options</Label>
-              <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-                {weightOptions.map((opt) => (
+            <p className={`text-xs font-medium ${remaining === 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+              {remaining === 0 ? '✓ All free items selected!' : `${remaining} more free ${remaining === 1 ? 'item' : 'items'} to select`}
+            </p>
+          </div>
+        ) : hasWeightOptions ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Choose Your Free Options</Label>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${remaining === 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-muted text-muted-foreground'}`}>
+                {freeTotal}/{paidQtyForBogo} selected
+              </span>
+            </div>
+            <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+              {weightOptions.map((opt) => {
+                const currentFree = freeQuantities[opt.key] || 0;
+                return (
                   <div key={opt.key} className="flex items-center justify-between">
                     <div className="flex-1 flex items-center gap-2">
                       <Label className="text-sm font-medium">{opt.label}</Label>
                       <span className="text-xs text-muted-foreground">${Number(opt.price || 0).toFixed(2)}</span>
+                      {currentFree > 0 && <span className="text-xs font-semibold text-green-600 dark:text-green-400">FREE</span>}
                     </div>
                     <div className="flex items-center space-x-2">
                       <Button
                         variant="outline"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => setWeightOptionQuantities({ ...weightOptionQuantities, [opt.key]: Math.max(0, (weightOptionQuantities[opt.key] || 0) - 1) })}
-                        disabled={(weightOptionQuantities[opt.key] || 0) <= 0}
+                        onClick={() => setFreeQuantities({ ...freeQuantities, [opt.key]: Math.max(0, currentFree - 1) })}
+                        disabled={currentFree <= 0}
                       >
                         <Minus className="h-3 w-3" />
                       </Button>
-                      <span className="text-sm font-semibold w-8 text-center">{weightOptionQuantities[opt.key] || 0}</span>
+                      <span className="text-sm font-semibold w-8 text-center">{currentFree}</span>
                       <Button
                         variant="outline"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => setWeightOptionQuantities({ ...weightOptionQuantities, [opt.key]: (weightOptionQuantities[opt.key] || 0) + 1 })}
+                        onClick={() => {
+                          if (freeTotal >= paidQtyForBogo) return;
+                          setFreeQuantities({ ...freeQuantities, [opt.key]: currentFree + 1 });
+                        }}
+                        disabled={freeTotal >= paidQtyForBogo}
                       >
                         <Plus className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
-                ))}
-              </div>
-              {(() => {
-                const paidQty = Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0);
-                const totalQty = isBogoProduct ? paidQty * 2 : paidQty;
-                return (
-                  <p className="text-xs text-muted-foreground">
-                    Total: {totalQty} items
-                    {isBogoProduct && paidQty >= 1 && (
-                      <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
-                        → {paidQty} free!
-                      </span>
-                    )}
-                  </p>
                 );
-              })()}
+              })}
             </div>
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="amount">
-                {isWeightBased ? `Weight (${product.weightUnit || 'grams'})` : 'Quantity (units)'}
-              </Label>
+            <p className={`text-xs font-medium ${remaining === 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+              {remaining === 0 ? '✓ All free items selected!' : `${remaining} more free ${remaining === 1 ? 'item' : 'items'} to select`}
+            </p>
+          </div>
+        ) : (
+          <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-center space-y-1">
+            <Gift className="h-8 w-8 text-green-500 mx-auto" />
+            <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+              {paidQtyForBogo} free {paidQtyForBogo === 1 ? 'item' : 'items'} of {product.name} will be added!
+            </p>
+            <p className="text-xs text-muted-foreground">Click "Add Free Items" to claim them.</p>
+          </div>
+        )}
+
+        <div className="p-3 border rounded-lg bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+          <div className="flex justify-between text-sm font-medium text-green-700 dark:text-green-300">
+            <span className="flex items-center gap-1"><Gift className="h-3.5 w-3.5" /> You save:</span>
+            <span>${(Number(product.price || 0) * paidQtyForBogo).toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
+
+      <DialogFooter className="gap-2">
+        <Button variant="outline" onClick={handleSkipFreeItems} className="text-xs">
+          Skip Free Items
+        </Button>
+        <Button
+          onClick={handleAddFreeItems}
+          className="bg-green-600 hover:bg-green-700 text-white flex-1"
+        >
+          <Gift className="h-4 w-4 mr-2" />
+          {hasSizes || hasWeightOptions
+            ? freeTotal > 0
+              ? `Add ${freeTotal} Free ${freeTotal === 1 ? 'Item' : 'Items'}`
+              : 'Select Items Above'
+            : `Add ${paidQtyForBogo} Free ${paidQtyForBogo === 1 ? 'Item' : 'Items'}`
+          }
+        </Button>
+      </DialogFooter>
+    </>
+  );
+
+  // ── Paid Step Content ────────────────────────────────────────────────────
+  const paidStepContent = (
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <ShoppingCart className="h-5 w-5" />
+          Add to Cart
+        </DialogTitle>
+        <DialogDescription>
+          Select the {isWeightBased ? 'weight' : 'quantity'} you want to add to your cart.
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
+        {/* Product Info */}
+        <div className="flex gap-3 p-3 border rounded-lg bg-muted/50">
+          <img
+            src={product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=100&h=100&fit=crop"}
+            alt={product.name}
+            className="w-16 h-16 object-cover rounded-md"
+          />
+          <div className="flex-1">
+            <h4 className="font-medium text-sm">{product.name}</h4>
+            {product.category && (
+              <p className="text-xs text-muted-foreground">{product.category.name}</p>
+            )}
+            <div className="mt-1">
               {isWeightBased ? (
-                <Input
-                  id="amount"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={weight}
-                  onChange={(e) => setWeight(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="text-center"
-                  disabled={maxStock === 0}
-                />
+                <div className="text-sm">
+                  {product.pricePerGram && Number(product.pricePerGram) > 0 && (
+                    <span className="font-medium">${Number(product.pricePerGram).toFixed(2)}/g</span>
+                  )}
+                  {product.pricePerOunce && Number(product.pricePerOunce) > 0 && (
+                    <span className="text-muted-foreground ml-2">${Number(product.pricePerOunce).toFixed(2)}/oz</span>
+                  )}
+                  {(product as any).pricePerEighth && (
+                    <span className="text-muted-foreground ml-2">${Number((product as any).pricePerEighth).toFixed(2)}/⅛ oz</span>
+                  )}
+                  {(product as any).pricePerQuarter && (
+                    <span className="text-muted-foreground ml-2">${Number((product as any).pricePerQuarter).toFixed(2)}/¼ oz</span>
+                  )}
+                  {(product as any).pricePerHalf && (
+                    <span className="text-muted-foreground ml-2">${Number((product as any).pricePerHalf).toFixed(2)}/½ oz</span>
+                  )}
+                </div>
               ) : (
-                <div className="flex items-center space-x-4">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    disabled={quantity <= 1 || maxStock === 0}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <span className="text-xl font-semibold w-12 text-center">{quantity}</span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                    disabled={quantity >= product.stock || maxStock === 0}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                <span className="text-sm font-medium">${Number(product.price || 0).toFixed(2)}</span>
+              )}
+              {product.quantityPricing && product.quantityPricing.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {[...product.quantityPricing]
+                    .sort((a, b) => a.minQuantity - b.minQuantity)
+                    .map((tier) => {
+                      const total = Number(tier.pricePerItem) * tier.minQuantity;
+                      return (
+                        <span
+                          key={tier.minQuantity}
+                          className="text-[10px] font-semibold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                        >
+                          {tier.minQuantity}+ for ${total % 1 === 0 ? total.toFixed(0) : total.toFixed(2)}
+                        </span>
+                      );
+                    })}
                 </div>
               )}
               {isBogoProduct && (
-                <p className="text-xs text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
-                  <Gift className="h-3 w-3" />
-                  You'll get {isWeightBased ? weight : quantity} free {(isWeightBased ? weight : quantity) === 1 ? 'item' : 'items'} after adding to cart!
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Price Calculation */}
-          <div className="p-3 border rounded-lg bg-muted/50">
-            <div className="space-y-1">
-              {hasDiscount ? (
-                <>
-                  <div className="flex justify-between text-sm">
-                    <span>Original Total:</span>
-                    <span className="line-through text-muted-foreground">${getOriginalPrice()}</span>
-                  </div>
-                  <div className="flex justify-between font-medium text-green-600">
-                    <span>Discounted Total:</span>
-                    <span>${getPrice()}</span>
-                  </div>
-                  <div className="text-xs text-green-600 font-medium">{product.discountPercentage}% OFF</div>
-                </>
-              ) : (
-                <div className="flex justify-between font-medium">
-                  <span>Total:</span>
-                  <span>${getPrice()}</span>
+                <div className="mt-1.5">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 px-1.5 py-0.5 rounded-full">
+                    <Gift className="h-2.5 w-2.5" /> Buy 1 Get 1 FREE
+                  </span>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button
-            onClick={handleAddToCart}
-            disabled={
-              allSizesOutOfStock ||
-              (hasSizes
-                ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
-                : hasWeightOptions
-                  ? Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
-                  : ((isWeightBased ? weight : quantity) <= 0 ||
-                    (isWeightBased ? weight : quantity) > maxStock ||
-                    maxStock === 0))
-            }
-          >
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            {(maxStock === 0 || allSizesOutOfStock)
-              ? "Out of Stock"
-              : hasSizes
-                ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
+        {/* Size Selection or Quantity/Weight Input */}
+        {hasSizes ? (
+          <div className="space-y-3">
+            <Label>Options</Label>
+            <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+              {product.sizes!.map((size) => {
+                const isOutOfStock = size.quantity <= 0;
+                return (
+                  <div key={size.id} className={`flex items-center justify-between ${isOutOfStock ? 'opacity-50' : ''}`}>
+                    <div className="flex-1 flex items-center gap-2">
+                      <Label className="text-sm font-medium">{size.size}</Label>
+                      {isOutOfStock && <span className="text-xs font-semibold text-red-500">Out of Stock</span>}
+                    </div>
+                    {!isOutOfStock && (
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setSizeQuantities({ ...sizeQuantities, [size.size]: Math.max(0, (sizeQuantities[size.size] || 0) - 1) })}
+                          disabled={(sizeQuantities[size.size] || 0) <= 0}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="text-sm font-semibold w-8 text-center">{sizeQuantities[size.size] || 0}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setSizeQuantities({ ...sizeQuantities, [size.size]: Math.min(size.quantity, (sizeQuantities[size.size] || 0) + 1) })}
+                          disabled={(sizeQuantities[size.size] || 0) >= size.quantity}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {(() => {
+              const paidQty = Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
+              const totalQty = isBogoProduct ? paidQty * 2 : paidQty;
+              return (
+                <p className="text-xs text-muted-foreground">
+                  Total: {totalQty} items
+                  {isBogoProduct && paidQty >= 1 && (
+                    <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
+                      → {paidQty} free!
+                    </span>
+                  )}
+                </p>
+              );
+            })()}
+          </div>
+        ) : hasWeightOptions ? (
+          <div className="space-y-3">
+            <Label>Weight Options</Label>
+            <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+              {weightOptions.map((opt) => (
+                <div key={opt.key} className="flex items-center justify-between">
+                  <div className="flex-1 flex items-center gap-2">
+                    <Label className="text-sm font-medium">{opt.label}</Label>
+                    <span className="text-xs text-muted-foreground">${Number(opt.price || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setWeightOptionQuantities({ ...weightOptionQuantities, [opt.key]: Math.max(0, (weightOptionQuantities[opt.key] || 0) - 1) })}
+                      disabled={(weightOptionQuantities[opt.key] || 0) <= 0}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <span className="text-sm font-semibold w-8 text-center">{weightOptionQuantities[opt.key] || 0}</span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setWeightOptionQuantities({ ...weightOptionQuantities, [opt.key]: (weightOptionQuantities[opt.key] || 0) + 1 })}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {(() => {
+              const paidQty = Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0);
+              const totalQty = isBogoProduct ? paidQty * 2 : paidQty;
+              return (
+                <p className="text-xs text-muted-foreground">
+                  Total: {totalQty} items
+                  {isBogoProduct && paidQty >= 1 && (
+                    <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
+                      → {paidQty} free!
+                    </span>
+                  )}
+                </p>
+              );
+            })()}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="amount">
+              {isWeightBased ? `Weight (${product.weightUnit || 'grams'})` : 'Quantity (units)'}
+            </Label>
+            {isWeightBased ? (
+              <Input
+                id="amount"
+                type="number"
+                min="1"
+                step="1"
+                value={weight}
+                onChange={(e) => setWeight(Math.max(1, parseInt(e.target.value) || 1))}
+                className="text-center"
+                disabled={maxStock === 0}
+              />
+            ) : (
+              <div className="flex items-center space-x-4">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  disabled={quantity <= 1 || maxStock === 0}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <span className="text-xl font-semibold w-12 text-center">{quantity}</span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                  disabled={quantity >= product.stock || maxStock === 0}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            {isBogoProduct && (
+              <p className="text-xs text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
+                <Gift className="h-3 w-3" />
+                You'll get {isWeightBased ? weight : quantity} free {(isWeightBased ? weight : quantity) === 1 ? 'item' : 'items'} after adding to cart!
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Price Calculation */}
+        <div className="p-3 border rounded-lg bg-muted/50">
+          <div className="space-y-1">
+            {hasDiscount ? (
+              <>
+                <div className="flex justify-between text-sm">
+                  <span>Original Total:</span>
+                  <span className="line-through text-muted-foreground">${getOriginalPrice()}</span>
+                </div>
+                <div className="flex justify-between font-medium text-green-600">
+                  <span>Discounted Total:</span>
+                  <span>${getPrice()}</span>
+                </div>
+                <div className="text-xs text-green-600 font-medium">{product.discountPercentage}% OFF</div>
+              </>
+            ) : (
+              <div className="flex justify-between font-medium">
+                <span>Total:</span>
+                <span>${getPrice()}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+        <Button
+          onClick={handleAddToCart}
+          disabled={
+            allSizesOutOfStock ||
+            (hasSizes
+              ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
+              : hasWeightOptions
+                ? Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
+                : ((isWeightBased ? weight : quantity) <= 0 ||
+                  (isWeightBased ? weight : quantity) > maxStock ||
+                  maxStock === 0))
+          }
+        >
+          <ShoppingCart className="h-4 w-4 mr-2" />
+          {(maxStock === 0 || allSizesOutOfStock)
+            ? "Out of Stock"
+            : hasSizes
+              ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
+                ? "Select Items"
+                : isBogoProduct ? "Add to Cart & Pick Free Items" : "Add to Cart"
+              : hasWeightOptions
+                ? Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
                   ? "Select Items"
                   : isBogoProduct ? "Add to Cart & Pick Free Items" : "Add to Cart"
-                : hasWeightOptions
-                  ? Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
-                    ? "Select Items"
-                    : isBogoProduct ? "Add to Cart & Pick Free Items" : "Add to Cart"
-                  : (isWeightBased ? weight : quantity) > maxStock
-                    ? "Insufficient Stock"
-                    : isBogoProduct ? "Add to Cart & Pick Free Items" : "Add to Cart"
-            }
-          </Button>
-        </DialogFooter>
+                : (isWeightBased ? weight : quantity) > maxStock
+                  ? "Insufficient Stock"
+                  : isBogoProduct ? "Add to Cart & Pick Free Items" : "Add to Cart"
+          }
+        </Button>
+      </DialogFooter>
+    </>
+  );
+
+  // ── Single Dialog wrapping both steps ────────────────────────────────────
+  return (
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+      <DialogContent className="sm:max-w-[400px] max-h-[90vh] flex flex-col">
+        {step === 'free' ? freeStepContent : paidStepContent}
       </DialogContent>
     </Dialog>
   );
