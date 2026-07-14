@@ -1033,24 +1033,6 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                 <Clock className="h-3 w-3 mr-1" />Pending
                               </Badge>
                             )}
-                            {/* Substitute button — admin only, non-removed items */}
-                            {isAdmin && !isRemoved && !['shipped', 'cancelled'].includes(displayOrder.status) && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-6 px-2 text-xs text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-700 dark:hover:bg-amber-900/20"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  cancelScanning();
-                                  setAddingItem(false);
-                                  setSubstituteItemId(item.id);
-                                  setSubstituteQuantity(String(item.quantity));
-                                  setProductSearch("");
-                                }}
-                              >
-                                <ArrowLeftRight className="h-3 w-3 mr-1" />Sub
-                              </Button>
-                            )}
                             {/* Remove button — admin only, non-removed items */}
                             {isAdmin && !isRemoved && !['shipped', 'cancelled'].includes(displayOrder.status) && (
                               <Button
