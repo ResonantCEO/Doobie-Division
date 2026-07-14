@@ -1425,7 +1425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             gte(orders.createdAt, startOfDay),
             lt(orders.createdAt, endOfDay),
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed'])
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed'])
           )
         )
         .groupBy(sql`EXTRACT(HOUR FROM ${orders.createdAt})`)
@@ -1468,7 +1468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             gte(orders.createdAt, startOfDay),
             lt(orders.createdAt, endOfDay),
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed'])
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed'])
           )
         )
         .groupBy(products.id)
@@ -1623,7 +1623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             gte(orders.createdAt, startOfDay),
             lt(orders.createdAt, endOfDay),
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed']),
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed']),
             sql`${orders.customerId} IS NOT NULL`
           )
         )
@@ -1675,7 +1675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             gte(orders.createdAt, startOfDay),
             lt(orders.createdAt, endOfDay),
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed']),
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed']),
             sql`${orders.customerId} IS NOT NULL`
           )
         )
@@ -1769,10 +1769,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(u.city, 'Unknown') AS city,
           COUNT(o.id)::int AS total_orders,
           COALESCE(SUM(o.total::numeric), 0)::float AS total_revenue,
-          COUNT(CASE WHEN o.status IN ('pending', 'processing') THEN 1 END)::int AS outstanding_orders,
+          COUNT(CASE WHEN o.status IN ('pending', 'processing', 'packed') THEN 1 END)::int AS outstanding_orders,
           COUNT(CASE WHEN o.status IN ('shipped', 'delivered', 'completed') THEN 1 END)::int AS completed_orders,
           COUNT(CASE WHEN o.status = 'pending' THEN 1 END)::int AS pending_orders,
           COUNT(CASE WHEN o.status = 'processing' THEN 1 END)::int AS processing_orders,
+          COUNT(CASE WHEN o.status = 'packed' THEN 1 END)::int AS packed_orders,
           COUNT(CASE WHEN o.status = 'shipped' THEN 1 END)::int AS shipped_orders,
           COALESCE(AVG(o.total::numeric), 0)::float AS avg_order_value,
           MAX(o.created_at) AS last_order_date

@@ -240,6 +240,20 @@ app.use((req, res, next) => {
     console.warn("⚠ Could not verify order_sequences table:", error?.message);
   }
 
+  // Fix user_activity_logs sequence if it has fallen behind actual data
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`
+      SELECT setval(
+        pg_get_serial_sequence('user_activity_logs', 'id'),
+        COALESCE((SELECT MAX(id) FROM user_activity_logs), 0) + 1,
+        false
+      )
+    `);
+  } catch (error: any) {
+    console.warn("⚠ Could not reset user_activity_logs sequence:", error?.message);
+  }
+
   // Add health check endpoint
   app.get("/api/health", async (req, res) => {
     const dbConnected = await checkDatabaseConnection();

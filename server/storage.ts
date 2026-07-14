@@ -1468,12 +1468,12 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             eq(orderItems.productId, id),
-            or(eq(orders.status, 'pending'), eq(orders.status, 'processing'))
+            or(eq(orders.status, 'pending'), eq(orders.status, 'processing'), eq(orders.status, 'packed'))
           )
         );
 
       if (activeOrderCount && activeOrderCount[0] && Number(activeOrderCount[0].count) > 0) {
-        throw new Error("Cannot delete product. It is referenced in pending or processing orders.");
+        throw new Error("Cannot delete product. It is referenced in pending, packed, or processing orders.");
       }
     } catch (error: any) {
       if (error?.message?.includes('pending or processing')) {
@@ -2384,7 +2384,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             sql`${orders.createdAt} >= ${startDate}`,
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed'])
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed'])
           )
         );
 
@@ -2408,7 +2408,7 @@ export class DatabaseStorage implements IStorage {
         .innerJoin(products, eq(orderItems.productId, products.id))
         .innerJoin(orders, eq(orderItems.orderId, orders.id))
         .where(
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
         )
         .groupBy(products.id)
         .orderBy(desc(sql`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`))
@@ -2457,7 +2457,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             sql`${orders.createdAt} >= ${startDate}`,
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed'])
+            inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed'])
           )
         )
         .groupBy(sql`DATE_TRUNC('day', ${orders.createdAt})`)
@@ -2485,7 +2485,7 @@ export class DatabaseStorage implements IStorage {
         .leftJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(orders, eq(orderItems.orderId, orders.id))
         .where(
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
         )
         .groupBy(sql`COALESCE(${categories.name}, 'Uncategorized')`);
 
@@ -2524,7 +2524,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           sql`${orders.createdAt} >= ${startDate}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
         )
       );
 
@@ -2538,7 +2538,7 @@ export class DatabaseStorage implements IStorage {
         and(
           sql`${orders.createdAt} >= ${prevStartDate}`,
           sql`${orders.createdAt} < ${prevEndDate}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
         )
       );
 
@@ -2579,7 +2579,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           sql`${orders.createdAt} >= ${startDate}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
         )
       );
 
@@ -2737,7 +2737,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           sql`${orders.createdAt} >= ${thirtyDaysAgo}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
         )
       );
 
@@ -2772,7 +2772,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           sql`${orders.createdAt} >= ${startDate}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
         )
       );
 
@@ -2797,7 +2797,7 @@ export class DatabaseStorage implements IStorage {
           .where(
             and(
               sql`${orders.createdAt} >= ${startDate}`,
-              inArray(orders.status, ['shipped', 'processing', 'pending', 'delivered', 'completed'])
+              inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed'])
             )
           )
           .groupBy(orders.customerId)
@@ -2846,7 +2846,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           sql`${orders.createdAt} >= ${sixMonthsAgo}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
         )
       )
       .groupBy(
@@ -2900,7 +2900,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           sql`${orders.createdAt} >= ${startDate}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
         )
       );
 
@@ -2921,7 +2921,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           sql`${orders.createdAt} >= ${startDate}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'completed'])
+          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
         )
       );
 
