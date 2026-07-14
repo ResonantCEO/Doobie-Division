@@ -67,6 +67,29 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const [prePayPhotoFile, setPrePayPhotoFile] = useState<File | null>(null);
   const [prePayPhotoPreview, setPrePayPhotoPreview] = useState<string | null>(null);
 
+  // Compute BOGO savings from product-level bogoEnabled flag
+  const bogoSavings = (() => {
+    let total = 0;
+    for (const item of state.items) {
+      if ((item.product as any).bogoEnabled !== true) continue;
+      const freeCount = Math.floor(item.quantity / 2);
+      if (freeCount <= 0) continue;
+      let unitPrice = 0;
+      if (item.product.sellingMethod === "weight") {
+        const norm = (item.size || "").toLowerCase().trim();
+        if (norm.includes("1/8") || norm.includes("⅛")) unitPrice = Number((item.product as any).pricePerEighth) || 0;
+        else if (norm.includes("1/4") || norm.includes("¼")) unitPrice = Number((item.product as any).pricePerQuarter) || 0;
+        else if (norm.includes("1/2") || norm.includes("½")) unitPrice = Number((item.product as any).pricePerHalf) || 0;
+        else if (norm.includes("1 oz") || norm === "ounce") unitPrice = Number(item.product.pricePerOunce) || 0;
+        else unitPrice = Number(item.product.pricePerGram) || 0;
+      } else {
+        unitPrice = Number(item.product.price) || 0;
+      }
+      total += freeCount * unitPrice;
+    }
+    return Math.round(total * 100) / 100;
+  })();
+
   // Evaluate discounts whenever cart items change (debounced)
   useEffect(() => {
     if (!user || state.items.length === 0) {
@@ -261,13 +284,14 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     try {
       // Check purchase limit for city (skipped if promo code bypasses minimum)
       if (city.trim() && !appliedPromo?.bypassPurchaseMinimum) {
+        const adjustedTotalForLimit = Math.max(0, state.total - (discountResult?.totalSavings || 0) - bogoSavings);
         const limitCheck = await fetch('/api/check-purchase-limit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({
             city: city.trim(),
-            total: state.total.toString(),
+            total: adjustedTotalForLimit.toString(),
             userId: user?.id,
           }),
         });
@@ -310,7 +334,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
       // Prepare order data (apply promo discount if any)
       const promoSavings = appliedPromo?.discountAmount || 0;
-      const finalTotal = Math.max(0, state.total - (discountResult?.totalSavings || 0) - promoSavings);
+      const finalTotal = Math.max(0, state.total - (discountResult?.totalSavings || 0) - promoSavings - bogoSavings);
       const orderData: any = {
         orderNumber,
         customerId: user?.id,
@@ -625,6 +649,16 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   <span>Items ({state.itemCount})</span>
                   <span>${state.total.toFixed(2)}</span>
                 </div>
+                {/* BOGO product-level savings */}
+                {bogoSavings > 0 && (
+                  <div className="flex justify-between text-sm text-purple-600 dark:text-purple-400">
+                    <span className="flex items-center gap-1">
+                      <Gift className="h-3 w-3" />
+                      BOGO – Buy One Get One
+                    </span>
+                    <span>-${bogoSavings.toFixed(2)}</span>
+                  </div>
+                )}
                 {/* Applied automatic discounts */}
                 {discountResult && discountResult.applied.length > 0 && (
                   <div className="space-y-1">
@@ -657,7 +691,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 {(() => {
                   const autoSavings = discountResult?.totalSavings || 0;
                   const promoSavings = appliedPromo?.discountAmount || 0;
-                  const totalSavings = autoSavings + promoSavings;
+                  const totalSavings = autoSavings + promoSavings + bogoSavings;
                   const finalTotal = Math.max(0, state.total - totalSavings);
                   return (
                     <>
@@ -741,15 +775,33 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 })}
                 <Separator className="my-2" />
                 <div className="flex justify-between font-medium">
-                  <span>Total</span>
+                  <span>Subtotal</span>
                   <span>${state.total.toFixed(2)}</span>
                 </div>
-                {appliedPromo && (
-                  <div className="flex justify-between font-semibold text-green-600 dark:text-green-400 mt-1">
-                    <span>Total after promo</span>
-                    <span>${Math.max(0, state.total - appliedPromo.discountAmount).toFixed(2)}</span>
+                {bogoSavings > 0 && (
+                  <div className="flex justify-between text-sm text-purple-600 dark:text-purple-400">
+                    <span className="flex items-center gap-1"><Gift className="h-3 w-3" /> BOGO Discount</span>
+                    <span>-${bogoSavings.toFixed(2)}</span>
                   </div>
                 )}
+                {(discountResult?.totalSavings || 0) > 0 && (
+                  <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                    <span className="flex items-center gap-1"><Tag className="h-3 w-3" /> Auto Discounts</span>
+                    <span>-${(discountResult!.totalSavings).toFixed(2)}</span>
+                  </div>
+                )}
+                {appliedPromo && (
+                  <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                    <span className="flex items-center gap-1"><Tag className="h-3 w-3" /> Promo: {appliedPromo.code}</span>
+                    <span>-${appliedPromo.discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-semibold text-base mt-1">
+                  <span>Total</span>
+                  <span className="text-green-600 dark:text-green-400">
+                    ${Math.max(0, state.total - bogoSavings - (discountResult?.totalSavings || 0) - (appliedPromo?.discountAmount || 0)).toFixed(2)}
+                  </span>
+                </div>
               </div>
             </div>
 
