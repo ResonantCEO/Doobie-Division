@@ -1397,7 +1397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders/:id/add-item', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
     try {
       const orderId = parseInt(req.params.id);
-      const { productId, quantity } = req.body;
+      const { productId, quantity, unitPrice, unitLabel } = req.body;
       if (!productId || !quantity || quantity <= 0) {
         return res.status(400).json({ message: "productId and quantity are required" });
       }
@@ -1408,7 +1408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cannot add items to shipped or cancelled orders" });
       }
 
-      await storage.addOrderItem(orderId, productId, quantity, req.currentUser.id);
+      await storage.addOrderItem(orderId, productId, quantity, req.currentUser.id, unitPrice != null ? Number(unitPrice) : undefined, unitLabel);
       const updatedOrder = await storage.getOrder(orderId);
       res.status(200).json(updatedOrder);
     } catch (error: any) {

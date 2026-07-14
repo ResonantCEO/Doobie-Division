@@ -41,6 +41,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [addingItem, setAddingItem] = useState(false);
   const [addItemSearch, setAddItemSearch] = useState("");
   const [addItemQuantity, setAddItemQuantity] = useState("1");
+  const [selectedAddProduct, setSelectedAddProduct] = useState<Product | null>(null);
+  const [selectedAddUnit, setSelectedAddUnit] = useState<string>("units");
 
   const isFulfillingRef = useRef(false);
   const isScanningRef = useRef(false);
@@ -210,6 +212,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       setAddingItem(false);
       setAddItemSearch("");
       setAddItemQuantity("1");
+      setSelectedAddProduct(null);
+      setSelectedAddUnit("units");
       queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
@@ -769,85 +773,201 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
               )}
 
               {/* Add Item panel */}
-              {addingItem && isAdmin && (
-                <Card className="border-green-500">
-                  <CardContent className="p-4">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <PlusCircle className="h-5 w-5 text-green-500" />
-                          <h4 className="font-medium text-gray-900 dark:text-gray-100">Add Product to Order</h4>
+              {addingItem && isAdmin && (() => {
+                const closeAddPanel = () => {
+                  setAddingItem(false);
+                  setAddItemSearch("");
+                  setAddItemQuantity("1");
+                  setSelectedAddProduct(null);
+                  setSelectedAddUnit("units");
+                };
+
+                const ap = selectedAddProduct as any;
+                const isWeightBased = ap?.sellingMethod === "weight";
+                const weightOptions = !ap ? [] : [
+                  { key: "grams", label: "Grams", price: Number(ap.pricePerGram) || 0 },
+                  { key: "eighth", label: "1/8 oz", price: Number(ap.pricePerEighth) || 0 },
+                  { key: "quarter", label: "1/4 oz", price: Number(ap.pricePerQuarter) || 0 },
+                  { key: "half", label: "1/2 oz", price: Number(ap.pricePerHalf) || 0 },
+                  { key: "ounce", label: "1 oz", price: Number(ap.pricePerOunce) || 0 },
+                ].filter(o => o.price > 0);
+                const hasWeightOptions = isWeightBased && weightOptions.length > 0;
+
+                const resolvedUnitPrice = (() => {
+                  if (!ap) return 0;
+                  if (hasWeightOptions) {
+                    const opt = weightOptions.find(o => o.key === selectedAddUnit);
+                    return opt ? opt.price : weightOptions[0]?.price || 0;
+                  }
+                  return Number(ap.price) || 0;
+                })();
+
+                const unitLabel = hasWeightOptions
+                  ? weightOptions.find(o => o.key === selectedAddUnit)?.label || weightOptions[0]?.label
+                  : undefined;
+
+                const qty = Math.max(1, parseInt(addItemQuantity) || 1);
+                const lineTotal = resolvedUnitPrice * qty;
+
+                const searchResults = (allProducts || []).filter((p: Product) =>
+                  p.isActive && p.stock > 0 && (
+                    addItemSearch.trim() === "" ? false :
+                    p.name.toLowerCase().includes(addItemSearch.toLowerCase()) ||
+                    p.sku.toLowerCase().includes(addItemSearch.toLowerCase())
+                  )
+                ).slice(0, 20);
+
+                return (
+                  <Card className="border-green-500">
+                    <CardContent className="p-4">
+                      <div className="space-y-4">
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <PlusCircle className="h-5 w-5 text-green-500" />
+                            <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                              {selectedAddProduct ? "Configure Item" : "Add Product to Order"}
+                            </h4>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={closeAddPanel}>
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => { setAddingItem(false); setAddItemSearch(""); setAddItemQuantity("1"); }}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Search className="h-4 w-4 text-gray-400 shrink-0" />
-                        <Input
-                          placeholder="Search by product name or SKU..."
-                          value={addItemSearch}
-                          onChange={(e) => setAddItemSearch(e.target.value)}
-                          className="flex-1"
-                          autoFocus
-                        />
-                      </div>
-                      <div className="max-h-48 overflow-y-auto border rounded-lg divide-y dark:divide-gray-700">
-                        {addItemSearch.trim() === "" ? (
-                          <p className="text-sm text-gray-500 text-center py-4">Type to search products</p>
-                        ) : (allProducts || []).filter((p: Product) =>
-                            p.isActive && p.stock > 0 && (
-                              p.name.toLowerCase().includes(addItemSearch.toLowerCase()) ||
-                              p.sku.toLowerCase().includes(addItemSearch.toLowerCase())
-                            )
-                          ).slice(0, 20).length === 0 ? (
-                          <p className="text-sm text-gray-500 text-center py-4">No products found</p>
-                        ) : (
-                          (allProducts || []).filter((p: Product) =>
-                            p.isActive && p.stock > 0 && (
-                              p.name.toLowerCase().includes(addItemSearch.toLowerCase()) ||
-                              p.sku.toLowerCase().includes(addItemSearch.toLowerCase())
-                            )
-                          ).slice(0, 20).map((p: Product) => (
-                            <button
-                              key={p.id}
-                              className="w-full text-left px-3 py-2 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
-                              onClick={() => {
-                                const qty = parseInt(addItemQuantity) || 1;
-                                addItemMutation.mutate({ orderId: displayOrder.id, productId: p.id, quantity: qty });
-                              }}
-                              disabled={addItemMutation.isPending}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{p.name}</p>
-                                  <p className="text-xs text-gray-500">SKU: {p.sku} · Stock: {p.stock}</p>
-                                </div>
-                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">${p.price ? parseFloat(p.price).toFixed(2) : "—"}</span>
+
+                        {/* Step 1: search */}
+                        {!selectedAddProduct && (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <Search className="h-4 w-4 text-gray-400 shrink-0" />
+                              <Input
+                                placeholder="Search by product name or SKU..."
+                                value={addItemSearch}
+                                onChange={(e) => setAddItemSearch(e.target.value)}
+                                className="flex-1"
+                                autoFocus
+                              />
+                            </div>
+                            <div className="max-h-48 overflow-y-auto border rounded-lg divide-y dark:divide-gray-700">
+                              {addItemSearch.trim() === "" ? (
+                                <p className="text-sm text-gray-500 text-center py-4">Type to search products</p>
+                              ) : searchResults.length === 0 ? (
+                                <p className="text-sm text-gray-500 text-center py-4">No products found</p>
+                              ) : searchResults.map((p: Product) => {
+                                const pa = p as any;
+                                const isWB = pa.sellingMethod === "weight";
+                                const displayPrice = isWB
+                                  ? (pa.pricePerGram ? `$${Number(pa.pricePerGram).toFixed(2)}/g` : pa.pricePerOunce ? `$${Number(pa.pricePerOunce).toFixed(2)}/oz` : "—")
+                                  : (p.price ? `$${parseFloat(p.price).toFixed(2)}` : "—");
+                                return (
+                                  <button
+                                    key={p.id}
+                                    className="w-full text-left px-3 py-2 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                                    onClick={() => {
+                                      setSelectedAddProduct(p);
+                                      const opts = [
+                                        { key: "grams", price: Number(pa.pricePerGram) || 0 },
+                                        { key: "eighth", price: Number(pa.pricePerEighth) || 0 },
+                                        { key: "quarter", price: Number(pa.pricePerQuarter) || 0 },
+                                        { key: "half", price: Number(pa.pricePerHalf) || 0 },
+                                        { key: "ounce", price: Number(pa.pricePerOunce) || 0 },
+                                      ].filter(o => o.price > 0);
+                                      setSelectedAddUnit(pa.sellingMethod === "weight" && opts.length > 0 ? opts[0].key : "units");
+                                    }}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{p.name}</p>
+                                        <p className="text-xs text-gray-500">SKU: {p.sku} · Stock: {p.stock}</p>
+                                      </div>
+                                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{displayPrice}</span>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Step 2: configure unit + quantity */}
+                        {selectedAddProduct && (
+                          <>
+                            <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{selectedAddProduct.name}</p>
+                                <p className="text-xs text-gray-500">Stock: {selectedAddProduct.stock}</p>
                               </div>
-                            </button>
-                          ))
+                              <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => { setSelectedAddProduct(null); setSelectedAddUnit("units"); }}>
+                                Change
+                              </Button>
+                            </div>
+
+                            {/* Weight options */}
+                            {hasWeightOptions && (
+                              <div className="space-y-1">
+                                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Unit / Size</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {weightOptions.map(opt => (
+                                    <button
+                                      key={opt.key}
+                                      onClick={() => setSelectedAddUnit(opt.key)}
+                                      className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+                                        selectedAddUnit === opt.key
+                                          ? "bg-green-600 text-white border-green-600"
+                                          : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-green-400"
+                                      }`}
+                                    >
+                                      {opt.label} — ${opt.price.toFixed(2)}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Quantity */}
+                            <div className="flex items-center gap-3">
+                              <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">Quantity:</label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={selectedAddProduct.stock}
+                                value={addItemQuantity}
+                                onChange={(e) => setAddItemQuantity(e.target.value)}
+                                className="w-24"
+                                autoFocus
+                              />
+                              {resolvedUnitPrice > 0 && (
+                                <span className="text-sm text-gray-500">
+                                  ${resolvedUnitPrice.toFixed(2)} × {qty} = <strong className="text-gray-800 dark:text-gray-200">${lineTotal.toFixed(2)}</strong>
+                                </span>
+                              )}
+                              {resolvedUnitPrice === 0 && (
+                                <span className="text-xs text-amber-600">No price available for this unit</span>
+                              )}
+                            </div>
+
+                            {/* Confirm */}
+                            <Button
+                              className="w-full bg-green-600 hover:bg-green-700 text-white"
+                              disabled={addItemMutation.isPending || resolvedUnitPrice === 0 || qty < 1}
+                              onClick={() => {
+                                addItemMutation.mutate({
+                                  orderId: displayOrder.id,
+                                  productId: selectedAddProduct.id,
+                                  quantity: qty,
+                                  unitPrice: resolvedUnitPrice,
+                                  unitLabel,
+                                } as any);
+                              }}
+                            >
+                              {addItemMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Adding…</> : `Add to Order — $${lineTotal.toFixed(2)}`}
+                            </Button>
+                          </>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">Quantity:</label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={addItemQuantity}
-                          onChange={(e) => setAddItemQuantity(e.target.value)}
-                          className="w-20"
-                        />
-                      </div>
-                      {addItemMutation.isPending && (
-                        <div className="flex items-center gap-2 text-sm text-green-600">
-                          <Loader2 className="h-4 w-4 animate-spin" />Adding item…
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
               {/* Items list */}
               {displayOrder.items && displayOrder.items.length > 0 ? (

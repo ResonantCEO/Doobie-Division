@@ -102,7 +102,7 @@ export interface IStorage {
   unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
   substituteOrderItem(orderId: number, oldItemId: number, newProductId: number, quantity: number, userId: string): Promise<void>;
   removeOrderItem(orderId: number, itemId: number, userId: string): Promise<void>;
-  addOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void>;
+  addOrderItem(orderId: number, productId: number, quantity: number, userId: string, unitPrice?: number, unitLabel?: string): Promise<void>;
   markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }>;
   assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order>;
   deleteOrder(id: number): Promise<void>;
@@ -2244,7 +2244,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async addOrderItem(orderId: number, productId: number, quantity: number, userId: string): Promise<void> {
+  async addOrderItem(orderId: number, productId: number, quantity: number, userId: string, unitPrice?: number, unitLabel?: string): Promise<void> {
     const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     if (!order) throw new Error("Order not found");
 
@@ -2252,16 +2252,20 @@ export class DatabaseStorage implements IStorage {
     if (!product) throw new Error("Product not found");
     if (product.stock < quantity) throw new Error(`Insufficient stock. Available: ${product.stock}`);
 
-    const unitPrice = product.price ? parseFloat(product.price) : 0;
-    const subtotal = unitPrice * quantity;
+    // Use provided unitPrice, or fall back to product's unit price
+    const resolvedUnitPrice = unitPrice != null ? unitPrice : (product.price ? parseFloat(product.price) : 0);
+    const subtotal = resolvedUnitPrice * quantity;
+
+    // Append unit label to product name if provided (e.g. "Blue Dream - 1/8 oz")
+    const itemName = unitLabel ? `${product.name} - ${unitLabel}` : product.name;
 
     // Insert new order item
     await db.insert(orderItems).values({
       orderId,
       productId,
-      productName: product.name,
+      productName: itemName,
       productSku: product.sku,
-      productPrice: String(unitPrice),
+      productPrice: String(resolvedUnitPrice),
       quantity,
       subtotal: String(subtotal),
       fulfilled: false,
