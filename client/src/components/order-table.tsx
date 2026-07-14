@@ -33,6 +33,8 @@ interface OrderTableProps {
   orders: Order[];
   user: User | null | undefined; // Assuming user object contains role information
   staffUsers: User[]; // Array of staff users to populate the dropdown
+  activeTab: OrderTab;
+  onActiveTabChange: (tab: OrderTab) => void;
 }
 
 type OrderWithItems = Order & { items: (OrderItem & { product: Product | null })[] };
@@ -475,7 +477,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
   );
 }
 
-type OrderTab = "new" | "packed" | "shipped" | "cancelled";
+export type OrderTab = "new" | "packed" | "shipped" | "cancelled";
 
 function PackButton({ order, onOpenDetails, updateStatusMutation }: { 
   order: Order; 
@@ -526,13 +528,13 @@ function PackButton({ order, onOpenDetails, updateStatusMutation }: {
   );
 }
 
-export default function OrderTable({ orders, user, staffUsers }: OrderTableProps) {
+export default function OrderTable({ orders, user, staffUsers, activeTab, onActiveTabChange }: OrderTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
   const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
-  const [activeTab, setActiveTab] = useState<OrderTab>("new");
+  const setActiveTab = onActiveTabChange;
   const [deleteOrderId, setDeleteOrderId] = useState<number | null>(null);
   const [showClearAllDialog, setShowClearAllDialog] = useState(false);
 

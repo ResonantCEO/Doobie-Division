@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import OrderTable from "@/components/order-table";
+import OrderTable, { type OrderTab } from "@/components/order-table";
 import { useOrderNotifications } from "@/hooks/useOrderNotifications";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw, UserCheck, MapPin } from "lucide-react";
@@ -24,6 +24,7 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [citySort, setCitySort] = useState<string>("none");
+  const [activeTab, setActiveTab] = useState<OrderTab>("new");
   const queryClient = useQueryClient();
 
   // State for the modal
@@ -116,10 +117,18 @@ export default function OrdersPage() {
   }, [orders, cityFilter, citySort]);
 
   const handleExportOrders = () => {
-    const packedOrders = processedOrders.filter(o => o.status === "packed");
+    const tabOrders = processedOrders.filter(o => {
+      switch (activeTab) {
+        case "new": return o.status === "pending" || o.status === "processing";
+        case "packed": return o.status === "packed";
+        case "shipped": return o.status === "shipped";
+        case "cancelled": return o.status === "cancelled";
+        default: return true;
+      }
+    });
 
-    if (packedOrders.length === 0) {
-      alert("No packed orders to export.");
+    if (tabOrders.length === 0) {
+      alert(`No ${activeTab} orders to export.`);
       return;
     }
 
@@ -130,7 +139,6 @@ export default function OrdersPage() {
         : s;
     };
 
-    // Split "street, city, state, zip" into separate fields for Spoke.com
     const parseAddress = (addr: string) => {
       const parts = addr.split(",").map(p => p.trim());
       return {
@@ -156,7 +164,7 @@ export default function OrdersPage() {
       "Notes",
     ];
 
-    const rows = packedOrders.map(o => {
+    const rows = tabOrders.map(o => {
       const addr = parseAddress(o.shippingAddress);
       return [
         escape(o.customerName),
@@ -179,7 +187,7 @@ export default function OrdersPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `packed-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `${activeTab}-orders-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -322,7 +330,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders Table */}
-      <OrderTable orders={processedOrders} user={user} staffUsers={staffUsers} />
+      <OrderTable orders={processedOrders} user={user} staffUsers={staffUsers} activeTab={activeTab} onActiveTabChange={setActiveTab} />
 
       <OrderDetailsModal
         order={selectedOrder}
