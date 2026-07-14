@@ -210,6 +210,23 @@ app.use((req, res, next) => {
     }
   }
 
+  // Ensure BOGO columns exist (migration)
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS bogo_enabled BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS bogo_free_option_index INTEGER
+    `);
+    console.log("✓ Verified BOGO columns exist");
+  } catch (error: any) {
+    if (error?.message?.includes("already exists") || error?.message?.includes("duplicate")) {
+      console.log("✓ BOGO columns already exist");
+    } else {
+      console.warn("⚠ Could not verify BOGO columns:", error?.message);
+    }
+  }
+
   // Ensure order_sequences table exists for atomic order number generation
   try {
     const { sql } = await import("./db");

@@ -525,6 +525,8 @@ export const insertProductSchema = createInsertSchema(products).omit({
   purchasePricePerGram: z.string().nullable().optional(),
   purchasePricePerOunce: z.string().nullable().optional(),
   adminNotes: z.string().nullable().optional(),
+  bogoEnabled: z.boolean().optional(),
+  bogoFreeOptionIndex: z.number().int().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
   imageUrls: z.string().nullable().optional(), // JSON array as string
   sizes: z.array(z.object({

@@ -1201,7 +1201,7 @@ export class DatabaseStorage implements IStorage {
       fractionalFieldsToUpdate.pricePerHalf = updateData.pricePerHalf;
     }
 
-    // First, ensure fractional pricing columns exist
+    // First, ensure fractional pricing + bogo columns exist
     try {
       const { sql } = await import("./db");
       await sql`
@@ -1211,9 +1211,20 @@ export class DatabaseStorage implements IStorage {
         ADD COLUMN IF NOT EXISTS price_per_half DECIMAL(10, 2);
       `;
     } catch (colError: any) {
-      // Columns might already exist, that's fine
       if (!colError?.message?.includes('already exists') && !colError?.message?.includes('duplicate')) {
         console.warn('[updateProduct] Could not ensure fractional pricing columns exist:', colError?.message);
+      }
+    }
+    try {
+      const { sql } = await import("./db");
+      await sql`
+        ALTER TABLE products
+        ADD COLUMN IF NOT EXISTS bogo_enabled BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS bogo_free_option_index INTEGER;
+      `;
+    } catch (colError: any) {
+      if (!colError?.message?.includes('already exists') && !colError?.message?.includes('duplicate')) {
+        console.warn('[updateProduct] Could not ensure bogo columns exist:', colError?.message);
       }
     }
 
@@ -1291,6 +1302,16 @@ export class DatabaseStorage implements IStorage {
         if (ppo !== null) { await rawSql`UPDATE products SET purchase_price_per_ounce = ${ppo} WHERE id = ${id}`; }
         else { await rawSql`UPDATE products SET purchase_price_per_ounce = NULL WHERE id = ${id}`; }
 
+        // Save bogo fields
+        if (d.hasOwnProperty('bogoEnabled')) {
+          const bogoVal = d.bogoEnabled === true || d.bogoEnabled === 'true';
+          await rawSql`UPDATE products SET bogo_enabled = ${bogoVal} WHERE id = ${id}`;
+        }
+        if (d.hasOwnProperty('bogoFreeOptionIndex')) {
+          const bfi = d.bogoFreeOptionIndex == null ? null : parseInt(String(d.bogoFreeOptionIndex));
+          await rawSql`UPDATE products SET bogo_free_option_index = ${bfi} WHERE id = ${id}`;
+        }
+
         console.log('[updateProduct] Successfully updated all fields via direct SQL fallback');
         updateError = null;
       } catch (fallbackError: any) {
@@ -1298,31 +1319,42 @@ export class DatabaseStorage implements IStorage {
         throw fallbackError;
       }
     } else {
-      if (Object.keys(fractionalFieldsToUpdate).length > 0) {
-        try {
-          const { sql: rawSql } = await import("./db");
-          if (fractionalFieldsToUpdate.hasOwnProperty('pricePerEighth')) {
-            const value = fractionalFieldsToUpdate.pricePerEighth === null || fractionalFieldsToUpdate.pricePerEighth === '' 
-              ? null 
-              : parseFloat(String(fractionalFieldsToUpdate.pricePerEighth));
-            await rawSql`UPDATE products SET price_per_eighth = ${value} WHERE id = ${id}`;
-          }
-          if (fractionalFieldsToUpdate.hasOwnProperty('pricePerQuarter')) {
-            const value = fractionalFieldsToUpdate.pricePerQuarter === null || fractionalFieldsToUpdate.pricePerQuarter === '' 
-              ? null 
-              : parseFloat(String(fractionalFieldsToUpdate.pricePerQuarter));
-            await rawSql`UPDATE products SET price_per_quarter = ${value} WHERE id = ${id}`;
-          }
-          if (fractionalFieldsToUpdate.hasOwnProperty('pricePerHalf')) {
-            const value = fractionalFieldsToUpdate.pricePerHalf === null || fractionalFieldsToUpdate.pricePerHalf === '' 
-              ? null 
-              : parseFloat(String(fractionalFieldsToUpdate.pricePerHalf));
-            await rawSql`UPDATE products SET price_per_half = ${value} WHERE id = ${id}`;
-          }
-          console.log('[updateProduct] Successfully updated fractional pricing via direct SQL');
-        } catch (fractionalError: any) {
-          console.error('[updateProduct] Failed to update fractional pricing fields:', fractionalError?.message);
+      // Drizzle update succeeded — still save bogo and fractional fields via direct SQL to guarantee they land
+      try {
+        const { sql: rawSql } = await import("./db");
+
+        if (fractionalFieldsToUpdate.hasOwnProperty('pricePerEighth')) {
+          const value = fractionalFieldsToUpdate.pricePerEighth === null || fractionalFieldsToUpdate.pricePerEighth === '' 
+            ? null 
+            : parseFloat(String(fractionalFieldsToUpdate.pricePerEighth));
+          await rawSql`UPDATE products SET price_per_eighth = ${value} WHERE id = ${id}`;
         }
+        if (fractionalFieldsToUpdate.hasOwnProperty('pricePerQuarter')) {
+          const value = fractionalFieldsToUpdate.pricePerQuarter === null || fractionalFieldsToUpdate.pricePerQuarter === '' 
+            ? null 
+            : parseFloat(String(fractionalFieldsToUpdate.pricePerQuarter));
+          await rawSql`UPDATE products SET price_per_quarter = ${value} WHERE id = ${id}`;
+        }
+        if (fractionalFieldsToUpdate.hasOwnProperty('pricePerHalf')) {
+          const value = fractionalFieldsToUpdate.pricePerHalf === null || fractionalFieldsToUpdate.pricePerHalf === '' 
+            ? null 
+            : parseFloat(String(fractionalFieldsToUpdate.pricePerHalf));
+          await rawSql`UPDATE products SET price_per_half = ${value} WHERE id = ${id}`;
+        }
+
+        // Always save bogo via direct SQL regardless of Drizzle success
+        if (updateData.hasOwnProperty('bogoEnabled')) {
+          const bogoVal = updateData.bogoEnabled === true || updateData.bogoEnabled === 'true';
+          await rawSql`UPDATE products SET bogo_enabled = ${bogoVal} WHERE id = ${id}`;
+        }
+        if (updateData.hasOwnProperty('bogoFreeOptionIndex')) {
+          const bfi = updateData.bogoFreeOptionIndex == null ? null : parseInt(String(updateData.bogoFreeOptionIndex));
+          await rawSql`UPDATE products SET bogo_free_option_index = ${bfi} WHERE id = ${id}`;
+        }
+
+        console.log('[updateProduct] Successfully updated supplemental fields via direct SQL');
+      } catch (fractionalError: any) {
+        console.error('[updateProduct] Failed to update supplemental fields:', fractionalError?.message);
       }
     }
 
