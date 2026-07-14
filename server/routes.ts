@@ -1088,6 +1088,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/orders/:id/total', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { total } = req.body;
+
+      if (total === undefined || total === null || isNaN(parseFloat(total))) {
+        return res.status(400).json({ message: "A valid total is required" });
+      }
+
+      const numericTotal = parseFloat(total);
+      if (numericTotal < 0) {
+        return res.status(400).json({ message: "Total cannot be negative" });
+      }
+
+      const order = await storage.updateOrderTotal(id, numericTotal);
+      res.json(order);
+    } catch (error) {
+      console.error('Failed to update order total:', error);
+      res.status(500).json({ message: "Failed to update order total" });
+    }
+  });
+
   app.put('/api/orders/:id/assign', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);

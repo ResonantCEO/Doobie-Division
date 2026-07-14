@@ -97,6 +97,7 @@ export interface IStorage {
   getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined>;
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
+  updateOrderTotal(id: number, total: number): Promise<Order>;
   fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
   unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
   markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }>;
@@ -1900,6 +1901,20 @@ export class DatabaseStorage implements IStorage {
       }
       return order;
     }
+  }
+
+  async updateOrderTotal(orderId: number, total: number): Promise<Order> {
+    const [updatedOrder] = await retryQuery(() =>
+      db
+        .update(orders)
+        .set({ total: total.toString(), updatedAt: new Date() })
+        .where(eq(orders.id, orderId))
+        .returning()
+    );
+    if (!updatedOrder) {
+      throw new Error("Order not found");
+    }
+    return updatedOrder;
   }
 
   async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void> {

@@ -8,7 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive, ImageIcon, ShoppingBag } from "lucide-react";
+import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive, ImageIcon, ShoppingBag, Pencil } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import type { Order } from "@shared/schema";
 
@@ -28,6 +29,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [pendingFulfillment, setPendingFulfillment] = useState<{ item: any } | null>(null);
   const [confirmQuantity, setConfirmQuantity] = useState<string>("");
+  const [editingTotal, setEditingTotal] = useState(false);
+  const [totalOverride, setTotalOverride] = useState<string>("");
 
   const isFulfillingRef = useRef(false);
   const isScanningRef = useRef(false);                        // mirrors isScanning synchronously
@@ -107,6 +110,31 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         description: error.message || "Failed to fulfill item",
         variant: "destructive",
       });
+    }
+  });
+
+  // Override order total (admin only)
+  const overrideTotalMutation = useMutation({
+    mutationFn: async ({ orderId, total }: { orderId: number; total: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/total`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ total })
+      });
+      if (!response.ok) throw new Error('Failed to update order total');
+      return response.json();
+    },
+    onSuccess: (updatedOrder) => {
+      toast({ title: "Total Updated", description: "Order total has been overridden." });
+      setFullOrder(updatedOrder);
+      setEditingTotal(false);
+      setTotalOverride("");
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update order total.", variant: "destructive" });
     }
   });
 
@@ -867,10 +895,71 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Order Summary</h3>
               </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  <span>Total Amount:</span>
-                  <span>${displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00"}</span>
-                </div>
+                {editingTotal && userRole === 'admin' ? (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Override Total Amount</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-semibold text-gray-600 dark:text-gray-400">$</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={totalOverride}
+                        onChange={(e) => setTotalOverride(e.target.value)}
+                        placeholder={displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00"}
+                        className="w-40 text-lg font-semibold"
+                        autoFocus
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const val = parseFloat(totalOverride);
+                          if (isNaN(val) || val < 0) {
+                            toast({ title: "Invalid amount", description: "Please enter a valid positive number.", variant: "destructive" });
+                            return;
+                          }
+                          overrideTotalMutation.mutate({ orderId: displayOrder.id, total: val });
+                        }}
+                        disabled={overrideTotalMutation.isPending}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {overrideTotalMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setEditingTotal(false); setTotalOverride(""); }}
+                        disabled={overrideTotalMutation.isPending}
+                      >
+                        <X className="h-4 w-4" />
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    <span>Total Amount:</span>
+                    <div className="flex items-center gap-2">
+                      <span>${displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00"}</span>
+                      {userRole === 'admin' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setTotalOverride(displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00");
+                            setEditingTotal(true);
+                          }}
+                          className="h-7 px-2 text-xs text-gray-500 hover:text-gray-900"
+                          title="Override total"
+                        >
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
