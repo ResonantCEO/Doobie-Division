@@ -2928,7 +2928,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Board Posts - admin create
   app.post("/api/board-posts", isAuthenticated, requireRole(["admin"]), async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub || req.user?.id;
+      const userId = req.userId || req.user?.claims?.sub || req.user?.id;
       const { text, imageUrl } = req.body;
       if (!text && !imageUrl) {
         return res.status(400).json({ message: "Post must have text or an image" });
