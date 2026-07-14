@@ -1879,7 +1879,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If not admin, restrict what fields can be updated
       if (req.currentUser.role === 'customer') {
-        const allowedFields = ['firstName', 'lastName', 'address', 'city', 'state', 'postalCode', 'country'];
+        const allowedFields = ['firstName', 'lastName', 'address', 'city', 'state', 'postalCode', 'country', 'telegramUsername', 'phoneNumber'];
         const filteredData = Object.keys(userData)
           .filter(key => allowedFields.includes(key))
           .reduce((obj: any, key) => {

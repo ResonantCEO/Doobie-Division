@@ -3342,6 +3342,7 @@ export class DatabaseStorage implements IStorage {
     if (userData.postalCode !== undefined) updateFields.postalCode = userData.postalCode;
     if (userData.country !== undefined) updateFields.country = userData.country;
     if (userData.phoneNumber !== undefined) updateFields.phoneNumber = userData.phoneNumber;
+    if (userData.telegramUsername !== undefined) updateFields.telegramUsername = userData.telegramUsername || null;
     if (userData.minPurchaseExempt !== undefined) updateFields.minPurchaseExempt = userData.minPurchaseExempt;
     if (userData.minPurchaseOverride !== undefined) {
       const val = userData.minPurchaseOverride;

@@ -51,6 +51,7 @@ export default function ProfilePage() {
     postalCode: user?.postalCode || "",
     country: user?.country || "",
     phoneNumber: (user as any)?.phoneNumber || "",
+    telegramUsername: (user as any)?.telegramUsername || "",
   });
 
   // Fetch user orders for profile stats
@@ -107,6 +108,7 @@ export default function ProfilePage() {
       postalCode: user?.postalCode || "",
       country: user?.country || "",
       phoneNumber: (user as any)?.phoneNumber || "",
+      telegramUsername: (user as any)?.telegramUsername || "",
     });
     setIsEditing(false);
   };
@@ -440,17 +442,30 @@ export default function ProfilePage() {
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-3">
-                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <Label htmlFor="telegramUsername" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                         Telegram Username
                       </Label>
-                      <div className="p-3 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50 flex items-center gap-2">
-                        <MessageCircle className="h-4 w-4 text-blue-400 shrink-0" />
-                        <p className="text-gray-900 dark:text-gray-100">
-                          {(user as any).telegramUsername
-                            ? `@${(user as any).telegramUsername}`
-                            : "Not linked"}
-                        </p>
-                      </div>
+                      {isEditing ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 dark:text-gray-400">@</span>
+                          <Input
+                            id="telegramUsername"
+                            value={editData.telegramUsername}
+                            onChange={(e) => setEditData({ ...editData, telegramUsername: e.target.value.replace(/^@/, "") })}
+                            placeholder="your_telegram"
+                            className="glass-input"
+                          />
+                        </div>
+                      ) : (
+                        <div className="p-3 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50 flex items-center gap-2">
+                          <MessageCircle className="h-4 w-4 text-blue-400 shrink-0" />
+                          <p className="text-gray-900 dark:text-gray-100">
+                            {(user as any).telegramUsername
+                              ? `@${(user as any).telegramUsername}`
+                              : "Not linked"}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-3">
