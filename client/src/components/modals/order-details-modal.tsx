@@ -1164,9 +1164,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                 autoFocus
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
-                                    const val = parseFloat(priceOverride);
-                                    if (!isNaN(val) && val >= 0) {
-                                      overrideItemPriceMutation.mutate({ orderId: displayOrder.id, itemId: item.id, price: val });
+                                    const subtotal = parseFloat(priceOverride);
+                                    const qty = item.quantity || 1;
+                                    if (!isNaN(subtotal) && subtotal >= 0) {
+                                      overrideItemPriceMutation.mutate({ orderId: displayOrder.id, itemId: item.id, price: subtotal / qty });
                                     }
                                   }
                                   if (e.key === 'Escape') { setEditingPriceItemId(null); setPriceOverride(""); }
@@ -1176,9 +1177,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                 className="text-green-600 hover:text-green-700 disabled:opacity-50"
                                 disabled={overrideItemPriceMutation.isPending}
                                 onClick={() => {
-                                  const val = parseFloat(priceOverride);
-                                  if (!isNaN(val) && val >= 0) {
-                                    overrideItemPriceMutation.mutate({ orderId: displayOrder.id, itemId: item.id, price: val });
+                                  const subtotal = parseFloat(priceOverride);
+                                  const qty = item.quantity || 1;
+                                  if (!isNaN(subtotal) && subtotal >= 0) {
+                                    overrideItemPriceMutation.mutate({ orderId: displayOrder.id, itemId: item.id, price: subtotal / qty });
                                   }
                                 }}
                               >
@@ -1200,7 +1202,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setEditingPriceItemId(item.id);
-                                    setPriceOverride((item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00");
+                                    setPriceOverride(item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00");
                                   }}
                                 >
                                   <Pencil className="h-3 w-3" />
