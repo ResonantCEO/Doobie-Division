@@ -131,7 +131,6 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 // Auth endpoints - separate store to prevent interference from uploads
 app.use('/api/auth/login', createRateLimit(rateLimitStores.auth, 10, 15 * 60 * 1000)); // 10 login attempts per 15 minutes
 app.use('/api/auth/register', createRateLimit(rateLimitStores.auth, 10, 15 * 60 * 1000)); // 10 registration attempts per 15 minutes
-app.use('/api/auth/forgot-password', createRateLimit(rateLimitStores.auth, 5, 15 * 60 * 1000)); // 5 forgot-password requests per 15 minutes
 app.use('/api/auth/reset-password', createRateLimit(rateLimitStores.auth, 10, 15 * 60 * 1000)); // 10 reset-password attempts per 15 minutes
 app.use('/api/auth/', createRateLimit(rateLimitStores.auth, 100, 15 * 60 * 1000)); // 100 general auth requests per 15 minutes
 
