@@ -87,7 +87,8 @@ export default function StorefrontPage() {
     showDealsOnly: boolean;
   }>>([]);
 
-  // Fetch all discounted products for hero section (independent of filters)
+  // Fetch all deal products for hero section (independent of filters)
+  // Includes: discounted products, BOGO products, quantity-priced products
   const { data: allDiscountedProducts = [] } = useQuery({
     queryKey: ["/api/products", "discounted"],
     queryFn: async () => {
@@ -95,11 +96,14 @@ export default function StorefrontPage() {
       if (!response.ok) throw new Error('Failed to fetch products');
       const products = await response.json();
       return products.filter((product: Product) => {
+        if (product.stock <= 0) return false;
         const discount = product.discountPercentage;
-        if (!discount || discount === "0" || discount === 0) return false;
-        const discountValue = typeof discount === 'number' ? discount : parseFloat(String(discount));
-        if (isNaN(discountValue) || discountValue <= 0) return false;
-        return product.stock > 0;
+        const hasDiscount = discount && discount !== "0" && discount !== 0 &&
+          !isNaN(typeof discount === 'number' ? discount : parseFloat(String(discount))) &&
+          (typeof discount === 'number' ? discount : parseFloat(String(discount))) > 0;
+        const hasBogo = product.bogoEnabled === true;
+        const hasQuantityPricing = Array.isArray((product as any).quantityPricing) && (product as any).quantityPricing.length > 0;
+        return hasDiscount || hasBogo || hasQuantityPricing;
       });
     },
     staleTime: 60000,
@@ -256,8 +260,11 @@ export default function StorefrontPage() {
   const products = useMemo(() => {
     return allProducts.filter((product: Product & { category: Category | null }) => {
       const hasStock = product.stock > 0;
-      const matchesDeals = !showDealsOnly || (product.discountPercentage && parseFloat(String(product.discountPercentage)) > 0);
-      return hasStock && matchesDeals;
+      if (!showDealsOnly) return hasStock;
+      const hasDiscount = product.discountPercentage && parseFloat(String(product.discountPercentage)) > 0;
+      const hasBogo = product.bogoEnabled === true;
+      const hasQuantityPricing = Array.isArray((product as any).quantityPricing) && (product as any).quantityPricing.length > 0;
+      return hasStock && (hasDiscount || hasBogo || hasQuantityPricing);
     });
   }, [allProducts, showDealsOnly]);
 
