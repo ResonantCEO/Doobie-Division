@@ -926,6 +926,9 @@ export default function UsersPage() {
                   value={editData.email}
                   onChange={(e) => setEditData({ ...editData, email: e.target.value })}
                 />
+                {selectedUser?.telegramUsername && (
+                  <p className="text-sm text-blue-500 dark:text-blue-400 mt-1">@{selectedUser.telegramUsername}</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
