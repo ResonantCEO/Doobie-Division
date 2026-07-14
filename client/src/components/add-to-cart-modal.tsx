@@ -163,9 +163,9 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
           for (let i = 0; i < qty; i++) addItem(product, size.size);
         }
       }
-      toast({ title: "Added to Cart", description: `${totalSizeQuantity} ${totalSizeQuantity === 1 ? 'item' : 'items'} of ${product.name} added to your cart.` });
 
       if (isBogoProduct && totalSizeQuantity >= 1) {
+        toast({ title: "Added to Cart 🎁", description: `${totalSizeQuantity} ${totalSizeQuantity === 1 ? 'item' : 'items'} of ${product.name} added. Now choose your ${totalSizeQuantity} free BOGO ${totalSizeQuantity === 1 ? 'item' : 'items'}!` });
         const initFree: Record<string, number> = {};
         product.sizes!.forEach(s => { initFree[s.size] = 0; });
         setFreeQuantities(initFree);
@@ -173,6 +173,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
         setStep('free');
         return;
       }
+      toast({ title: "Added to Cart", description: `${totalSizeQuantity} ${totalSizeQuantity === 1 ? 'item' : 'items'} of ${product.name} added to your cart.` });
     } else if (hasWeightOptions) {
       const totalWeightQuantity = Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0);
       if (totalWeightQuantity <= 0) {
@@ -183,9 +184,9 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
         const qty = weightOptionQuantities[opt.key] || 0;
         for (let i = 0; i < qty; i++) addItem(product, opt.label);
       });
-      toast({ title: "Added to Cart", description: `${totalWeightQuantity} ${totalWeightQuantity === 1 ? 'item' : 'items'} of ${product.name} added to your cart.` });
 
       if (isBogoProduct && totalWeightQuantity >= 1) {
+        toast({ title: "Added to Cart 🎁", description: `${totalWeightQuantity} ${totalWeightQuantity === 1 ? 'item' : 'items'} of ${product.name} added. Now choose your ${totalWeightQuantity} free BOGO ${totalWeightQuantity === 1 ? 'item' : 'items'}!` });
         const initFree: Record<string, number> = {};
         weightOptions.forEach(o => { initFree[o.key] = 0; });
         setFreeQuantities(initFree);
@@ -193,6 +194,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
         setStep('free');
         return;
       }
+      toast({ title: "Added to Cart", description: `${totalWeightQuantity} ${totalWeightQuantity === 1 ? 'item' : 'items'} of ${product.name} added to your cart.` });
     } else {
       const finalQuantity = isWeightBased ? weight : quantity;
       if (finalQuantity <= 0) {
@@ -204,13 +206,14 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
         return;
       }
       for (let i = 0; i < finalQuantity; i++) addItem(product);
-      toast({ title: "Added to Cart", description: `${finalQuantity} ${isWeightBased ? product.weightUnit || 'units' : 'units'} of ${product.name} added to your cart.` });
 
       if (isBogoProduct && finalQuantity >= 1) {
+        toast({ title: "Added to Cart 🎁", description: `${finalQuantity} ${isWeightBased ? product.weightUnit || 'units' : 'units'} of ${product.name} added. Now claim your ${finalQuantity} free BOGO ${finalQuantity === 1 ? 'item' : 'items'}!` });
         setPaidQtyForBogo(finalQuantity);
         setStep('free');
         return;
       }
+      toast({ title: "Added to Cart", description: `${finalQuantity} ${isWeightBased ? product.weightUnit || 'units' : 'units'} of ${product.name} added to your cart.` });
     }
 
     resetAndClose();
@@ -219,6 +222,11 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
   const handleAddFreeItems = () => {
     if (!product) return;
     const totalFree = getFreeQuantityTotal();
+
+    if ((hasSizes || hasWeightOptions) && totalFree === 0) {
+      toast({ title: "No Free Items Selected", description: `Please select at least 1 free item above, or click "Skip Free Items" to continue without them.`, variant: "destructive" });
+      return;
+    }
 
     if (hasSizes) {
       product.sizes!.forEach(size => {
@@ -234,9 +242,8 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
       for (let i = 0; i < paidQtyForBogo; i++) addFreeItem(product);
     }
 
-    if (totalFree > 0 || (!hasSizes && !hasWeightOptions)) {
-      toast({ title: "Free Items Added!", description: `${hasSizes || hasWeightOptions ? totalFree : paidQtyForBogo} free ${(hasSizes || hasWeightOptions ? totalFree : paidQtyForBogo) === 1 ? 'item' : 'items'} added to your cart.` });
-    }
+    const addedCount = hasSizes || hasWeightOptions ? totalFree : paidQtyForBogo;
+    toast({ title: "Free Items Added!", description: `${addedCount} free ${addedCount === 1 ? 'item' : 'items'} added to your cart.` });
 
     resetAndClose();
   };
