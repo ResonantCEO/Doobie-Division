@@ -8,7 +8,7 @@ import { storage } from "./storage";
 
 const SALT_ROUNDS = 12;
 const MAX_LOGIN_ATTEMPTS = 5;
-const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
+const LOCKOUT_TIME = 5 * 60 * 1000; // 5 minutes
 const SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
 
 export function getSession() {
