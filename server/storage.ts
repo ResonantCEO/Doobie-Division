@@ -2654,9 +2654,18 @@ export class DatabaseStorage implements IStorage {
         totalRevenue: sql<number>`COALESCE(SUM(CAST(${orderItems.subtotal} AS NUMERIC)), 0)`,
         totalCost: sql<number>`COALESCE(SUM(
           CASE
-            WHEN ${products.purchasePrice} IS NOT NULL THEN CAST(${products.purchasePrice} AS NUMERIC) * ${orderItems.quantity}
-            WHEN ${products.purchasePricePerGram} IS NOT NULL AND ${products.pricePerGram} IS NOT NULL THEN
-              CAST(${products.purchasePricePerGram} AS NUMERIC) * (CAST(${orderItems.subtotal} AS NUMERIC) / NULLIF(CAST(${products.pricePerGram} AS NUMERIC), 0))
+            WHEN ${products.purchasePriceMethod} = 'units' AND ${products.purchasePrice} IS NOT NULL
+              THEN CAST(${products.purchasePrice} AS NUMERIC) * ${orderItems.quantity}
+            WHEN ${products.purchasePriceMethod} = 'weight' AND ${products.purchasePricePerGram} IS NOT NULL AND ${products.pricePerGram} IS NOT NULL
+              THEN CAST(${products.purchasePricePerGram} AS NUMERIC) * (CAST(${orderItems.subtotal} AS NUMERIC) / NULLIF(CAST(${products.pricePerGram} AS NUMERIC), 0))
+            WHEN ${products.purchasePriceMethod} = 'weight' AND ${products.purchasePricePerOunce} IS NOT NULL AND ${products.pricePerOunce} IS NOT NULL
+              THEN CAST(${products.purchasePricePerOunce} AS NUMERIC) * (CAST(${orderItems.subtotal} AS NUMERIC) / NULLIF(CAST(${products.pricePerOunce} AS NUMERIC), 0))
+            WHEN ${products.purchasePrice} IS NOT NULL
+              THEN CAST(${products.purchasePrice} AS NUMERIC) * ${orderItems.quantity}
+            WHEN ${products.purchasePricePerGram} IS NOT NULL AND ${products.pricePerGram} IS NOT NULL
+              THEN CAST(${products.purchasePricePerGram} AS NUMERIC) * (CAST(${orderItems.subtotal} AS NUMERIC) / NULLIF(CAST(${products.pricePerGram} AS NUMERIC), 0))
+            WHEN ${products.purchasePricePerOunce} IS NOT NULL AND ${products.pricePerOunce} IS NOT NULL
+              THEN CAST(${products.purchasePricePerOunce} AS NUMERIC) * (CAST(${orderItems.subtotal} AS NUMERIC) / NULLIF(CAST(${products.pricePerOunce} AS NUMERIC), 0))
             ELSE CAST(${orderItems.subtotal} AS NUMERIC) * 0.7
           END
         ), 0)`,
