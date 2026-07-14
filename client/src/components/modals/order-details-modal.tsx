@@ -8,16 +8,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive, ImageIcon, ShoppingBag, Pencil } from "lucide-react";
+import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive, ImageIcon, ShoppingBag, Pencil, ArrowLeftRight, Search, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
-import type { Order } from "@shared/schema";
+import type { Order, Product } from "@shared/schema";
 
 interface OrderDetailsModalProps {
   order: Order | null;
   isOpen: boolean;
   onClose: () => void;
-  userRole?: string; // Added to receive user role
+  userRole?: string;
 }
 
 export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: OrderDetailsModalProps) {
@@ -32,13 +32,18 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [editingTotal, setEditingTotal] = useState(false);
   const [totalOverride, setTotalOverride] = useState<string>("");
 
+  // Substitution state
+  const [substituteItemId, setSubstituteItemId] = useState<number | null>(null);
+  const [productSearch, setProductSearch] = useState("");
+  const [substituteQuantity, setSubstituteQuantity] = useState("1");
+
   const isFulfillingRef = useRef(false);
-  const isScanningRef = useRef(false);                        // mirrors isScanning synchronously
-  const lastScanTimeRef = useRef(0);                          // mirrors lastScanTime without closure capture
-  const handleQRCodeDetectedRef = useRef<(data: string) => void>(() => {}); // always-current handler
-  const jsQRRef = useRef<any>(null);                          // pre-loaded jsQR module
-  const firstDetectedAtRef = useRef<number>(0);               // when current code was first seen
-  const lastDetectedCodeRef = useRef<string>('');             // code value being held
+  const isScanningRef = useRef(false);
+  const lastScanTimeRef = useRef(0);
+  const handleQRCodeDetectedRef = useRef<(data: string) => void>(() => {});
+  const jsQRRef = useRef<any>(null);
+  const firstDetectedAtRef = useRef<number>(0);
+  const lastDetectedCodeRef = useRef<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -47,33 +52,32 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch complete order details including items when modal opens
   const { data: orderDetails, isLoading } = useQuery({
     queryKey: ["/api/orders", order?.id],
     queryFn: async () => {
       if (!order?.id) return null;
-      const response = await fetch(`/api/orders/${order.id}`, {
-        credentials: "include"
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch order details: ${response.statusText}`);
-      }
-      return response.json() as Order;
+      const response = await fetch(`/api/orders/${order.id}`, { credentials: "include" });
+      if (!response.ok) throw new Error(`Failed to fetch order details: ${response.statusText}`);
+      return response.json() as unknown as Order;
     },
     enabled: isOpen && !!order?.id,
   });
 
   useEffect(() => {
     if (orderDetails) {
-
       setFullOrder(orderDetails);
     } else if (order) {
-
       setFullOrder(order);
     }
   }, [orderDetails, order]);
 
-  // Fulfill order item mutation (reduces physical inventory)
+  // Products query for substitution picker
+  const { data: allProducts } = useQuery<Product[]>({
+    queryKey: ["/api/products"],
+    enabled: isOpen && userRole === 'admin',
+  });
+
+  // Fulfill order item mutation
   const fulfillItemMutation = useMutation({
     mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId?: number }) => {
       const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
@@ -86,10 +90,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       return response.json();
     },
     onSuccess: () => {
-      toast({
-        title: "Item Fulfilled",
-        description: "Order item fulfilled and inventory updated",
-      });
+      toast({ title: "Item Fulfilled", description: "Order item fulfilled and inventory updated" });
       queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
@@ -101,19 +102,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       stopScanning();
     },
     onError: (error: any) => {
-      // Reset the lock so the user can try again
       isFulfillingRef.current = false;
       setPendingFulfillment(null);
       setConfirmQuantity("");
-      toast({
-        title: "Fulfillment Failed",
-        description: error.message || "Failed to fulfill item",
-        variant: "destructive",
-      });
+      toast({ title: "Fulfillment Failed", description: error.message || "Failed to fulfill item", variant: "destructive" });
     }
   });
 
-  // Override order total (admin only)
+  // Override order total
   const overrideTotalMutation = useMutation({
     mutationFn: async ({ orderId, total }: { orderId: number; total: number }) => {
       const response = await fetch(`/api/orders/${orderId}/total`, {
@@ -138,7 +134,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     }
   });
 
-  // Mark order as packed
+  // Pack order
   const packOrderMutation = useMutation({
     mutationFn: async (orderId: number) => {
       const response = await fetch(`/api/orders/${orderId}/status`, {
@@ -161,175 +157,127 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     }
   });
 
-  // Start camera for QR scanning
+  // Substitute item mutation
+  const substituteMutation = useMutation({
+    mutationFn: async ({ orderId, oldItemId, newProductId, quantity }: { orderId: number; oldItemId: number; newProductId: number; quantity: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/substitute-item`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ oldItemId, newProductId, quantity })
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to substitute item');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Item Substituted", description: "The item has been swapped successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      setSubstituteItemId(null);
+      setProductSearch("");
+      setSubstituteQuantity("1");
+    },
+    onError: (error: any) => {
+      toast({ title: "Substitution Failed", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Camera / QR scanning
   const startScanning = async (requestedFacingMode?: "environment" | "user") => {
     try {
       setScanningError("");
-
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Camera not supported on this device. Please use manual SKU input instead.");
       }
-
-      // Stop any existing stream first
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
-
-      // Check for permissions first
       try {
         const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
-        if (permissionStatus.state === 'denied') {
-          throw new Error("Camera permission denied. Please enable camera access in your browser settings and reload the page.");
-        }
-      } catch (permError) {
-        console.warn('Permission check failed:', permError);
-      }
+        if (permissionStatus.state === 'denied') throw new Error("Camera permission denied.");
+      } catch (permError) { console.warn('Permission check failed:', permError); }
 
       const currentFacing = requestedFacingMode ?? facingMode;
-
-      // Try with the requested facing mode first, then fall back to any camera
       const constraints = [
         { video: { facingMode: currentFacing, width: { ideal: 640 }, height: { ideal: 480 } } },
         { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
         { video: true }
       ];
-
       let stream = null;
       let lastError = null;
-
       for (const constraint of constraints) {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia(constraint);
-          break;
-        } catch (err: any) {
+        try { stream = await navigator.mediaDevices.getUserMedia(constraint); break; }
+        catch (err: any) {
           lastError = err;
-          if (err.name === 'NotAllowedError' || err.message.includes('Permission denied')) {
-            throw new Error("Camera permission denied. Please click 'Allow' when prompted or enable camera access in your browser settings.");
-          }
+          if (err.name === 'NotAllowedError' || err.message.includes('Permission denied'))
+            throw new Error("Camera permission denied.");
         }
       }
-
-      if (!stream) {
-        throw lastError || new Error("Unable to access camera. Please try manual SKU input instead.");
-      }
-
+      if (!stream) throw lastError || new Error("Unable to access camera.");
       streamRef.current = stream;
       isScanningRef.current = true;
       lastScanTimeRef.current = 0;
       setIsScanning(true);
-
-      // Wait for React to render the video element into the DOM, then kick off scanning.
-      // We do NOT rely on video.play().then() — on Android Chrome the promise can hang
-      // silently on the first camera open, which was the root cause of "first click broken".
       setTimeout(() => {
         const video = videoRef.current;
         if (!video || !streamRef.current) return;
-
         video.srcObject = streamRef.current;
-
-        // Fire-and-forget play(); the detection loop handles waiting for HAVE_ENOUGH_DATA
         video.play().catch(e => console.warn('video.play():', e));
-
-        // Cancel any stale loop before starting a fresh one
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-          animationFrameRef.current = undefined;
-        }
-
-        // Start the detection loop immediately — it polls readyState each frame
+        if (animationFrameRef.current) { cancelAnimationFrame(animationFrameRef.current); animationFrameRef.current = undefined; }
         detectQRCode();
       }, 150);
-
     } catch (error: any) {
-      console.error('Camera access error:', error);
-      let errorMessage = "Unable to access camera.";
-      
-      if (error.name === 'NotAllowedError') {
-        errorMessage = "Camera permission denied. Please allow camera access in your browser settings and refresh the page.";
-      } else if (error.name === 'NotFoundError') {
-        errorMessage = "No camera found on this device.";
-      } else if (error.name === 'NotReadableError') {
-        errorMessage = "Camera is being used by another application.";
-      } else if (error.name === 'OverconstrainedError') {
-        errorMessage = "Camera constraints not supported.";
-      } else {
-        errorMessage = error.message || errorMessage;
-      }
-      
+      let errorMessage = error.message || "Unable to access camera.";
+      if (error.name === 'NotAllowedError') errorMessage = "Camera permission denied.";
+      else if (error.name === 'NotFoundError') errorMessage = "No camera found on this device.";
+      else if (error.name === 'NotReadableError') errorMessage = "Camera is being used by another application.";
       setScanningError(errorMessage);
       setIsScanning(false);
-      
-      toast({
-        title: "Camera Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      toast({ title: "Camera Error", description: errorMessage, variant: "destructive" });
     }
   };
 
-  // Switch between front and rear camera
   const switchCamera = useCallback(async () => {
     const newFacing = facingMode === "environment" ? "user" : "environment";
     setFacingMode(newFacing);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
+    if (streamRef.current) { streamRef.current.getTracks().forEach(track => track.stop()); streamRef.current = null; }
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     await startScanning(newFacing);
   }, [facingMode]);
 
-  // Stop camera
   const stopScanning = useCallback(() => {
     isScanningRef.current = false;
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
+    if (streamRef.current) { streamRef.current.getTracks().forEach(track => track.stop()); streamRef.current = null; }
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     setIsScanning(false);
     setScanningError("");
   }, []);
 
-  // QR code detection — only scans the center region matching the scan indicator
   const detectQRCode = useCallback(() => {
     if (!isScanningRef.current) return;
     if (!videoRef.current || !canvasRef.current) return;
     if (isFulfillingRef.current) return;
-
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
-
     if (video.readyState === video.HAVE_ENOUGH_DATA && context && jsQRRef.current) {
-      // Crop to the center 60% of the frame (both axes) — matches the on-screen indicator.
-      // QR codes outside this region are intentionally ignored.
       const cropFraction = 0.60;
       const sw = Math.floor(video.videoWidth * cropFraction);
       const sh = Math.floor(video.videoHeight * cropFraction);
       const sx = Math.floor((video.videoWidth - sw) / 2);
       const sy = Math.floor((video.videoHeight - sh) / 2);
-
-      canvas.width = sw;
-      canvas.height = sh;
-      // Draw only the cropped region onto the canvas
+      canvas.width = sw; canvas.height = sh;
       context.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
-
       const imageData = context.getImageData(0, 0, sw, sh);
-
-      const code = jsQRRef.current(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: "attemptBoth",
-      });
-
+      const code = jsQRRef.current(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
       if (code && isScanningRef.current && !isFulfillingRef.current) {
         const now = Date.now();
         if (lastDetectedCodeRef.current === code.data) {
-          // Same code still visible — check if held for at least 250 ms
           if (firstDetectedAtRef.current && now - firstDetectedAtRef.current >= 250) {
             if (now - lastScanTimeRef.current > 2000) {
               lastScanTimeRef.current = now;
@@ -339,82 +287,48 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
             }
           }
         } else {
-          // New code in view — start the hold timer fresh
           lastDetectedCodeRef.current = code.data;
           firstDetectedAtRef.current = now;
         }
       } else {
-        // Nothing detected — reset hold timer so a flash doesn't accumulate
         lastDetectedCodeRef.current = '';
         firstDetectedAtRef.current = 0;
       }
     }
-
-    if (isScanningRef.current) {
-      animationFrameRef.current = requestAnimationFrame(detectQRCode);
-    }
+    if (isScanningRef.current) animationFrameRef.current = requestAnimationFrame(detectQRCode);
   }, []);
 
-  // Handle QR code detection — stop scanning immediately and show confirmation
-  // NOTE: keep this as a regular function so handleQRCodeDetectedRef always points to the latest version
   const handleQRCodeDetected = (qrData: string) => {
     if (!selectedItemId || !fullOrder) return;
     if (isFulfillingRef.current) return;
-
-    const selectedItem = fullOrder.items?.find((item: any) => item.id === selectedItemId);
+    const selectedItem = (fullOrder as any).items?.find((item: any) => item.id === selectedItemId);
     if (!selectedItem) return;
-
     const scannedSku = qrData.trim();
-
     if (selectedItem.productSku === scannedSku) {
-      // Lock immediately to prevent the scan loop from firing again
       isFulfillingRef.current = true;
-      // Stop camera — we have a match
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      if (streamRef.current) { streamRef.current.getTracks().forEach(track => track.stop()); streamRef.current = null; }
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       isScanningRef.current = false;
       setIsScanning(false);
-      // Show confirmation step — leave quantity blank so it must be typed manually
       setConfirmQuantity("");
       setPendingFulfillment({ item: selectedItem });
     } else {
-      toast({
-        title: "Wrong Item",
-        description: `Scanned ${scannedSku} but expected ${selectedItem.productSku}`,
-        variant: "destructive",
-      });
+      toast({ title: "Wrong Item", description: `Scanned ${scannedSku} but expected ${selectedItem.productSku}`, variant: "destructive" });
     }
   };
-  // Keep the ref pointing to the latest version so detectQRCode (empty-dep useCallback) always calls current logic
   handleQRCodeDetectedRef.current = handleQRCodeDetected;
 
-  // Confirm and execute the fulfillment
   const confirmFulfillment = () => {
     if (!pendingFulfillment || !fullOrder) return;
     const { item } = pendingFulfillment;
     const qty = parseInt(confirmQuantity);
     if (isNaN(qty) || qty < 1 || qty > item.quantity) {
-      toast({
-        title: "Invalid Quantity",
-        description: `Please enter a number between 1 and ${item.quantity}`,
-        variant: "destructive",
-      });
+      toast({ title: "Invalid Quantity", description: `Please enter a number between 1 and ${item.quantity}`, variant: "destructive" });
       return;
     }
-    fulfillItemMutation.mutate({
-      orderId: fullOrder.id,
-      productId: item.productId,
-      quantity: qty,
-      orderItemId: item.id,
-    });
+    fulfillItemMutation.mutate({ orderId: fullOrder.id, productId: item.productId, quantity: qty, orderItemId: item.id });
   };
 
-  // Cancel pending fulfillment and return to scanning
   const cancelPendingFulfillment = () => {
     isFulfillingRef.current = false;
     setPendingFulfillment(null);
@@ -423,16 +337,11 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   };
 
   const handleItemClick = async (itemId: number, item: any) => {
-    if (item.fulfilled) return; // Don't allow scanning already fulfilled items
-
+    if (item.fulfilled) return;
     setSelectedItemId(itemId);
     setScanningMode(true);
     setScanningError("");
-
-    // Add a small delay to ensure DOM is updated before starting camera
-    setTimeout(async () => {
-      await startScanning();
-    }, 100);
+    setTimeout(async () => { await startScanning(); }, 100);
   };
 
   const cancelScanning = () => {
@@ -444,52 +353,44 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     stopScanning();
   };
 
-  // Pre-load jsQR so first scan is instant (dynamic import is slow on first call)
   useEffect(() => {
-    import('jsqr').then(({ default: jsQR }) => {
-      jsQRRef.current = jsQR;
-    }).catch(() => {});
+    import('jsqr').then(({ default: jsQR }) => { jsQRRef.current = jsQR; }).catch(() => {});
   }, []);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      stopScanning();
-    };
-  }, [stopScanning]);
-
-  // Debug logging
-
+  useEffect(() => { return () => { stopScanning(); }; }, [stopScanning]);
 
   if (!order) return null;
 
   const displayOrder = fullOrder || order;
+  const isAdmin = userRole === 'admin';
+  const canScan = userRole === 'staff' || userRole === 'manager' || userRole === 'admin';
+
+  const displayOrderAny = displayOrder as any;
+  const allItemsFulfilled =
+    displayOrderAny.items &&
+    displayOrderAny.items.length > 0 &&
+    displayOrderAny.items.filter((item: any) => !item.removed).every((item: any) => item.fulfilled);
+
+  const isAlreadyPacked = displayOrder.status === 'packed';
+
+  // Product search filter for substitution
+  const filteredProducts = (allProducts || []).filter((p: Product) =>
+    p.isActive &&
+    (productSearch === "" ||
+      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+      p.sku.toLowerCase().includes(productSearch.toLowerCase()))
+  ).slice(0, 20);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "pending":
-        return <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">Pending</Badge>;
-      case "processing":
-        return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Processing</Badge>;
-      case "packed":
-        return <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-200"><Archive className="h-3 w-3 mr-1" />Packed</Badge>;
-      case "shipped":
-        return <Badge variant="default" className="status-completed">Shipped</Badge>;
-      case "cancelled":
-        return <Badge variant="destructive" className="status-cancelled">Cancelled</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+      case "pending": return <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">Pending</Badge>;
+      case "processing": return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Processing</Badge>;
+      case "packed": return <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-200"><Archive className="h-3 w-3 mr-1" />Packed</Badge>;
+      case "shipped": return <Badge variant="default" className="status-completed">Shipped</Badge>;
+      case "cancelled": return <Badge variant="destructive" className="status-cancelled">Cancelled</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
     }
   };
-
-  const canScan = userRole === 'staff' || userRole === 'manager' || userRole === 'admin';
-
-  const allItemsFulfilled =
-    displayOrder.items &&
-    displayOrder.items.length > 0 &&
-    displayOrder.items.every((item: any) => item.fulfilled);
-
-  const isAlreadyPacked = displayOrder.status === 'packed';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -497,7 +398,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Order Details - {displayOrder.orderNumber || displayOrder.order_number || 'N/A'}
+            Order Details - {displayOrder.orderNumber || (displayOrder as any).order_number || 'N/A'}
           </DialogTitle>
         </DialogHeader>
 
@@ -516,10 +417,9 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                   <span className="text-sm text-gray-600 dark:text-gray-300">Order Date</span>
                 </div>
                 <p className="text-sm text-gray-900 dark:text-gray-100">
-                  {(displayOrder.createdAt || displayOrder.created_at)
-                    ? format(new Date(displayOrder.createdAt || displayOrder.created_at), "MMM d, yyyy 'at' h:mm a")
-                    : "Date not available"
-                  }
+                  {(displayOrder.createdAt || (displayOrder as any).created_at)
+                    ? format(new Date(displayOrder.createdAt || (displayOrder as any).created_at), "MMM d, yyyy 'at' h:mm a")
+                    : "Date not available"}
                 </p>
               </div>
               <div className="space-y-3">
@@ -540,20 +440,20 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="font-medium text-gray-900 dark:text-gray-100">{displayOrder.customerName || displayOrder.customer_name || "Not provided"}</p>
-                  <p className="text-gray-700 dark:text-gray-300">{displayOrder.customerEmail || displayOrder.customer_email || "Not provided"}</p>
-                  {(displayOrder.customerPhone || displayOrder.customer_phone) && (
-                    <p className="text-gray-700 dark:text-gray-300">{displayOrder.customerPhone || displayOrder.customer_phone}</p>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">{displayOrder.customerName || (displayOrder as any).customer_name || "Not provided"}</p>
+                  <p className="text-gray-700 dark:text-gray-300">{displayOrder.customerEmail || (displayOrder as any).customer_email || "Not provided"}</p>
+                  {(displayOrder.customerPhone || (displayOrder as any).customer_phone) && (
+                    <p className="text-gray-700 dark:text-gray-300">{displayOrder.customerPhone || (displayOrder as any).customer_phone}</p>
                   )}
                 </div>
                 <div className="text-sm">
-                  <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{displayOrder.shippingAddress || displayOrder.shipping_address || "Not provided"}</pre>
+                  <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{displayOrder.shippingAddress || (displayOrder as any).shipping_address || "Not provided"}</pre>
                 </div>
               </div>
             </div>
 
             {/* Shipping Address */}
-            {(displayOrder.shippingAddress || displayOrder.shipping_address) && (
+            {(displayOrder.shippingAddress || (displayOrder as any).shipping_address) && (
               <>
                 <Separator />
                 <div className="space-y-4">
@@ -562,7 +462,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Shipping Address</h3>
                   </div>
                   <div className="text-sm">
-                    <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{displayOrder.shippingAddress || displayOrder.shipping_address}</pre>
+                    <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{displayOrder.shippingAddress || (displayOrder as any).shipping_address}</pre>
                   </div>
                 </div>
               </>
@@ -589,17 +489,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
               {(displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url ? (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Payment Photo</p>
-                  <a
-                    href={(displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block"
-                  >
-                    <img
-                      src={(displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url}
-                      alt="Payment photo"
-                      className="max-h-48 rounded-lg border object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                    />
+                  <a href={(displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url} target="_blank" rel="noopener noreferrer" className="inline-block">
+                    <img src={(displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url} alt="Payment photo" className="max-h-48 rounded-lg border object-contain cursor-pointer hover:opacity-90 transition-opacity" />
                   </a>
                   <p className="text-xs text-muted-foreground">Click to open full size</p>
                 </div>
@@ -613,12 +504,12 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Order Items</h3>
                 {scanningMode && (
                   <Button onClick={cancelScanning} variant="outline" size="sm">
-                    <X className="h-4 w-4 mr-1" />
-                    Cancel
+                    <X className="h-4 w-4 mr-1" />Cancel
                   </Button>
                 )}
               </div>
 
+              {/* QR Scanning panel */}
               {scanningMode && selectedItemId && (
                 <Card className="border-blue-500">
                   <CardContent className="p-4">
@@ -629,32 +520,21 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                           <h4 className="font-medium">Scan Item to Fulfill Order</h4>
                         </div>
                         {!isScanning && !scanningError && (
-                          <Button onClick={startScanning} size="sm" variant="outline">
-                            <Camera className="h-4 w-4 mr-1" />
-                            Start Camera
+                          <Button onClick={() => startScanning()} size="sm" variant="outline">
+                            <Camera className="h-4 w-4 mr-1" />Start Camera
                           </Button>
                         )}
                       </div>
-
                       {scanningError && (
                         <Alert variant="destructive">
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
                             {scanningError}
-                            <Button 
-                              onClick={startScanning} 
-                              size="sm" 
-                              variant="outline" 
-                              className="ml-2"
-                            >
-                              Try Again
-                            </Button>
+                            <Button onClick={() => startScanning()} size="sm" variant="outline" className="ml-2">Try Again</Button>
                           </AlertDescription>
                         </Alert>
                       )}
-
                       {pendingFulfillment ? (
-                        /* ── Confirmation step ── */
                         (() => {
                           const { item } = pendingFulfillment;
                           const isWeightBased = item.product?.sellingMethod === "weight";
@@ -665,164 +545,71 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                 <CheckCircle className="h-5 w-5" />
                                 <span className="font-medium">QR Code Matched!</span>
                               </div>
-
                               <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 p-4 flex items-center justify-between">
                                 <div className="space-y-2 flex-1">
-                                <p className="font-semibold text-gray-900 dark:text-gray-100">{item.productName}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">SKU: {item.productSku}</p>
-
-                                {isWeightBased && (
-                                  <div className="mt-2 p-2 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
-                                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                                      ⚖️ Weight-based product — measured in {weightUnit}
-                                    </p>
-                                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                                      Confirm the correct weight is ready before fulfilling.
-                                    </p>
-                                  </div>
-                                )}
+                                  <p className="font-semibold text-gray-900 dark:text-gray-100">{item.productName}</p>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">SKU: {item.productSku}</p>
+                                  {isWeightBased && (
+                                    <div className="mt-2 p-2 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+                                      <p className="text-sm font-medium text-amber-800 dark:text-amber-300">⚖️ Weight-based product — measured in {weightUnit}</p>
+                                    </div>
+                                  )}
                                 </div>
                                 <span className="text-lg font-bold text-green-700 dark:text-green-400 ml-4">x{item.quantity}</span>
                               </div>
-
                               <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                  Units fulfilled
-                                </label>
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Units fulfilled</label>
                                 <div className="flex items-center gap-2">
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    max={item.quantity}
-                                    value={confirmQuantity}
-                                    onChange={(e) => setConfirmQuantity(e.target.value)}
-                                    className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                                  />
-                                  <span className="text-sm text-gray-500">
-                                    {isWeightBased ? `${weightUnit} unit(s)` : "unit(s)"}
-                                  </span>
+                                  <input type="number" min={1} max={item.quantity} value={confirmQuantity} onChange={(e) => setConfirmQuantity(e.target.value)} className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
+                                  <span className="text-sm text-gray-500">{isWeightBased ? `${weightUnit} unit(s)` : "unit(s)"}</span>
                                 </div>
-                                {item.quantity > 1 && (
-                                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                                    ⚠ This order requires {item.quantity} {isWeightBased ? `${weightUnit} unit(s)` : "unit(s)"}. Verify the amount before confirming.
-                                  </p>
-                                )}
                               </div>
-
                               <div className="flex gap-2">
-                                <Button
-                                  onClick={confirmFulfillment}
-                                  disabled={fulfillItemMutation.isPending}
-                                  className="flex-1 bg-green-600 hover:bg-green-700"
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                  {fulfillItemMutation.isPending ? "Fulfilling…" : "Confirm Fulfillment"}
+                                <Button onClick={confirmFulfillment} disabled={fulfillItemMutation.isPending} className="flex-1 bg-green-600 hover:bg-green-700">
+                                  <CheckCircle className="h-4 w-4 mr-2" />{fulfillItemMutation.isPending ? "Fulfilling…" : "Confirm Fulfillment"}
                                 </Button>
-                                <Button
-                                  onClick={cancelPendingFulfillment}
-                                  variant="outline"
-                                  disabled={fulfillItemMutation.isPending}
-                                >
-                                  Rescan
-                                </Button>
+                                <Button onClick={cancelPendingFulfillment} variant="outline" disabled={fulfillItemMutation.isPending}>Rescan</Button>
                               </div>
                             </div>
                           );
                         })()
                       ) : isScanning ? (
-                        /* ── Live camera feed ── */
                         <div className="relative">
-                          <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            className="w-full max-w-sm mx-auto rounded-lg border-2 border-blue-500"
-                          />
+                          <video ref={videoRef} autoPlay playsInline muted className="w-full max-w-sm mx-auto rounded-lg border-2 border-blue-500" />
                           <canvas ref={canvasRef} className="hidden" />
-                          {/*
-                            Scan region overlay — the detection crop is exactly 60% of the video
-                            frame centered on both axes. The overlay mirrors this with a CSS grid
-                            that creates four dark panels (20% each side) leaving a precise 60×60%
-                            rectangular window. QR codes outside this window are not processed.
-                          */}
-                          <div
-                            className="absolute inset-0 pointer-events-none"
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: '20% 60% 20%',
-                              gridTemplateRows: '20% 60% 20%',
-                            }}
-                          >
-                            {/* Left column — all 3 rows */}
+                          <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateColumns: '20% 60% 20%', gridTemplateRows: '20% 60% 20%' }}>
                             <div className="bg-black/55" style={{ gridColumn: 1, gridRow: '1 / 4' }} />
-                            {/* Right column — all 3 rows */}
                             <div className="bg-black/55" style={{ gridColumn: 3, gridRow: '1 / 4' }} />
-                            {/* Top centre */}
                             <div className="bg-black/55" style={{ gridColumn: 2, gridRow: 1 }} />
-                            {/* Bottom centre */}
                             <div className="bg-black/55" style={{ gridColumn: 2, gridRow: 3 }} />
-                            {/* Centre cell = scan zone (transparent) — corner brackets sit here */}
                             <div className="relative" style={{ gridColumn: 2, gridRow: 2 }}>
                               <span className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-white rounded-tl-md" />
                               <span className="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-white rounded-tr-md" />
                               <span className="absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-white rounded-bl-md" />
                               <span className="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-white rounded-br-md" />
-                              {/* Animated scan line inside the zone */}
-                              <div
-                                className="absolute inset-x-3 h-0.5 bg-blue-400 opacity-90 animate-bounce"
-                                style={{ animationDuration: '1.5s', top: '50%' }}
-                              />
+                              <div className="absolute inset-x-3 h-0.5 bg-blue-400 opacity-90 animate-bounce" style={{ animationDuration: '1.5s', top: '50%' }} />
                             </div>
                           </div>
-                          {/* Switch camera button */}
-                          <button
-                            onClick={switchCamera}
-                            className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
-                            title={facingMode === "environment" ? "Switch to front camera" : "Switch to rear camera"}
-                          >
+                          <button onClick={switchCamera} className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors" title="Switch camera">
                             <SwitchCamera className="h-5 w-5" />
                           </button>
                         </div>
                       ) : (
-                        /* ── Idle / not started ── */
                         <div className="text-center py-8 text-gray-500">
                           <Camera className="h-12 w-12 mx-auto mb-2 opacity-50" />
                           <p>Camera not active. Click "Start Camera" to begin scanning.</p>
                         </div>
                       )}
-
-                      {/* Manual SKU input — only show when not confirming */}
                       {!pendingFulfillment && (
                         <div className="border-t pt-4">
                           <p className="text-sm text-gray-600 mb-2">Or manually confirm SKU:</p>
                           <div className="flex gap-2">
-                            <input
-                              type="text"
-                              placeholder="Enter SKU manually"
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            <input type="text" placeholder="Enter SKU manually" className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  const input = e.target as HTMLInputElement;
-                                  if (input.value.trim()) {
-                                    handleQRCodeDetected(input.value.trim());
-                                    input.value = '';
-                                  }
-                                }
+                                if (e.key === 'Enter') { const input = e.target as HTMLInputElement; if (input.value.trim()) { handleQRCodeDetected(input.value.trim()); input.value = ''; } }
                               }}
                             />
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                const input = (e.target as HTMLElement).parentElement?.querySelector('input') as HTMLInputElement;
-                                if (input?.value.trim()) {
-                                  handleQRCodeDetected(input.value.trim());
-                                  input.value = '';
-                                }
-                              }}
-                            >
-                              Confirm
-                            </Button>
+                            <Button size="sm" onClick={(e) => { const input = (e.target as HTMLElement).parentElement?.querySelector('input') as HTMLInputElement; if (input?.value.trim()) { handleQRCodeDetected(input.value.trim()); input.value = ''; } }}>Confirm</Button>
                           </div>
                         </div>
                       )}
@@ -831,58 +618,172 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                 </Card>
               )}
 
+              {/* Substitution panel */}
+              {substituteItemId && isAdmin && (
+                <Card className="border-amber-500">
+                  <CardContent className="p-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <ArrowLeftRight className="h-5 w-5 text-amber-500" />
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100">Select Replacement Product</h4>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => { setSubstituteItemId(null); setProductSearch(""); setSubstituteQuantity("1"); }}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {(() => {
+                        const oldItem = displayOrder.items?.find((i: any) => i.id === substituteItemId);
+                        return oldItem ? (
+                          <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded p-2">
+                            Replacing: <span className="font-medium text-gray-900 dark:text-gray-100">{oldItem.productName}</span> (qty: {oldItem.quantity})
+                          </div>
+                        ) : null;
+                      })()}
+                      <div className="flex items-center gap-2">
+                        <Search className="h-4 w-4 text-gray-400 shrink-0" />
+                        <Input
+                          placeholder="Search by product name or SKU..."
+                          value={productSearch}
+                          onChange={(e) => setProductSearch(e.target.value)}
+                          className="flex-1"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto border rounded-lg divide-y dark:divide-gray-700">
+                        {filteredProducts.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-4">No products found</p>
+                        ) : filteredProducts.map((p: Product) => (
+                          <button
+                            key={p.id}
+                            className="w-full text-left px-3 py-2 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+                            onClick={() => {
+                              const oldItem = displayOrder.items?.find((i: any) => i.id === substituteItemId);
+                              const qty = parseInt(substituteQuantity) || oldItem?.quantity || 1;
+                              substituteMutation.mutate({ orderId: displayOrder.id, oldItemId: substituteItemId!, newProductId: p.id, quantity: qty });
+                            }}
+                            disabled={substituteMutation.isPending}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{p.name}</p>
+                                <p className="text-xs text-gray-500">SKU: {p.sku} · Stock: {p.stock}</p>
+                              </div>
+                              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">${p.price ? parseFloat(p.price).toFixed(2) : "—"}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">Quantity:</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={substituteQuantity}
+                          onChange={(e) => setSubstituteQuantity(e.target.value)}
+                          className="w-20"
+                        />
+                      </div>
+                      {substituteMutation.isPending && (
+                        <div className="flex items-center gap-2 text-sm text-amber-600">
+                          <Loader2 className="h-4 w-4 animate-spin" />Substituting item…
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Items list */}
               {displayOrder.items && displayOrder.items.length > 0 ? (
                 <div className="space-y-3">
-                  {displayOrder.items.map((item: any, index: number) => (
-                    <div
-                      key={item.id || index}
-                      className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
-                        item.fulfilled
-                          ? "bg-gray-50 dark:bg-gray-700/50"
-                          : "bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600/50 cursor-pointer"
-                      } ${selectedItemId === item.id ? "ring-2 ring-blue-500" : ""}`}
-                      onClick={() => !item.fulfilled && canScan && handleItemClick(item.id, item)}
-                    >
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100">{item.productName || item.product_name || "Unknown Product"}</h4>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                          SKU: {item.productSku || item.product_sku || "N/A"}
-                        </p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                          ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
-                        </p>
-                        {!item.fulfilled && canScan && (
-                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Click to scan and fulfill item</p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">${item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00"}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          {item.fulfilled ? (
-                            <Badge variant="default" className="bg-green-600">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Fulfilled
-                            </Badge>
-                          ) : canScan ? (
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                              <Scan className="h-3 w-3 mr-1" />
-                              Click to scan and fulfill
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Pending
-                            </Badge>
+                  {displayOrder.items.map((item: any, index: number) => {
+                    const isRemoved = item.removed === true;
+                    const isSubstitute = !!item.substitutedForItemId;
+                    return (
+                      <div
+                        key={item.id || index}
+                        className={`flex items-start justify-between p-3 rounded-lg transition-colors ${
+                          isRemoved
+                            ? "bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 opacity-70"
+                            : isSubstitute
+                            ? "bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700"
+                            : item.fulfilled
+                            ? "bg-gray-50 dark:bg-gray-700/50"
+                            : "bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600/50"
+                        } ${!isRemoved && !item.fulfilled && canScan && selectedItemId !== item.id ? "cursor-pointer" : ""} ${selectedItemId === item.id ? "ring-2 ring-blue-500" : ""}`}
+                        onClick={() => !isRemoved && !item.fulfilled && canScan && !substituteItemId && handleItemClick(item.id, item)}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className={`font-medium text-sm ${isRemoved ? "line-through text-red-500 dark:text-red-400" : "text-gray-900 dark:text-gray-100"}`}>
+                              {item.productName || item.product_name || "Unknown Product"}
+                            </h4>
+                            {isRemoved && (
+                              <Badge variant="destructive" className="text-xs py-0">
+                                <Trash2 className="h-2.5 w-2.5 mr-1" />Removed
+                              </Badge>
+                            )}
+                            {isSubstitute && !isRemoved && (
+                              <Badge className="text-xs py-0 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300">
+                                <ArrowLeftRight className="h-2.5 w-2.5 mr-1" />Substituted In
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">SKU: {item.productSku || item.product_sku || "N/A"}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
+                          </p>
+                          {!isRemoved && !item.fulfilled && canScan && (
+                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Click to scan and fulfill item</p>
                           )}
                         </div>
+                        <div className="text-right flex flex-col items-end gap-1 ml-2">
+                          <p className={`font-medium text-sm ${isRemoved ? "line-through text-gray-400" : "text-gray-900 dark:text-gray-100"}`}>
+                            ${item.subtotal ? parseFloat(item.subtotal.toString()).toFixed(2) : "0.00"}
+                          </p>
+                          <div className="flex items-center gap-1 flex-wrap justify-end">
+                            {isRemoved ? (
+                              <Badge variant="destructive" className="text-xs">Removed</Badge>
+                            ) : item.fulfilled ? (
+                              <Badge variant="default" className="bg-green-600">
+                                <CheckCircle className="h-3 w-3 mr-1" />Fulfilled
+                              </Badge>
+                            ) : canScan ? (
+                              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                                <Scan className="h-3 w-3 mr-1" />Click to scan
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                                <Clock className="h-3 w-3 mr-1" />Pending
+                              </Badge>
+                            )}
+                            {/* Substitute button — admin only, non-removed items */}
+                            {isAdmin && !isRemoved && !['shipped', 'cancelled'].includes(displayOrder.status) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 px-2 text-xs text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-700 dark:hover:bg-amber-900/20"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  cancelScanning();
+                                  setSubstituteItemId(item.id);
+                                  setSubstituteQuantity(String(item.quantity));
+                                  setProductSearch("");
+                                }}
+                              >
+                                <ArrowLeftRight className="h-3 w-3 mr-1" />Sub
+                              </Button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-4">
                   <p className="text-gray-700 dark:text-gray-300">No items found for this order</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Items data: {JSON.stringify(displayOrder.items)}</p>
                 </div>
               )}
             </div>
@@ -900,40 +801,12 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Override Total Amount</label>
                     <div className="flex items-center gap-2">
                       <span className="text-lg font-semibold text-gray-600 dark:text-gray-400">$</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={totalOverride}
-                        onChange={(e) => setTotalOverride(e.target.value)}
-                        placeholder={displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00"}
-                        className="w-40 text-lg font-semibold"
-                        autoFocus
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          const val = parseFloat(totalOverride);
-                          if (isNaN(val) || val < 0) {
-                            toast({ title: "Invalid amount", description: "Please enter a valid positive number.", variant: "destructive" });
-                            return;
-                          }
-                          overrideTotalMutation.mutate({ orderId: displayOrder.id, total: val });
-                        }}
-                        disabled={overrideTotalMutation.isPending}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        {overrideTotalMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-                        Save
+                      <Input type="number" min="0" step="0.01" value={totalOverride} onChange={(e) => setTotalOverride(e.target.value)} placeholder={displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00"} className="w-40 text-lg font-semibold" autoFocus />
+                      <Button size="sm" onClick={() => { const val = parseFloat(totalOverride); if (isNaN(val) || val < 0) { toast({ title: "Invalid amount", description: "Please enter a valid positive number.", variant: "destructive" }); return; } overrideTotalMutation.mutate({ orderId: displayOrder.id, total: val }); }} disabled={overrideTotalMutation.isPending} className="bg-green-600 hover:bg-green-700">
+                        {overrideTotalMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />} Save
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => { setEditingTotal(false); setTotalOverride(""); }}
-                        disabled={overrideTotalMutation.isPending}
-                      >
-                        <X className="h-4 w-4" />
-                        Cancel
+                      <Button size="sm" variant="outline" onClick={() => { setEditingTotal(false); setTotalOverride(""); }} disabled={overrideTotalMutation.isPending}>
+                        <X className="h-4 w-4" />Cancel
                       </Button>
                     </div>
                   </div>
@@ -943,18 +816,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                     <div className="flex items-center gap-2">
                       <span>${displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00"}</span>
                       {userRole === 'admin' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setTotalOverride(displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00");
-                            setEditingTotal(true);
-                          }}
-                          className="h-7 px-2 text-xs text-gray-500 hover:text-gray-900"
-                          title="Override total"
-                        >
-                          <Pencil className="h-3 w-3 mr-1" />
-                          Edit
+                        <Button size="sm" variant="outline" onClick={() => { setTotalOverride(displayOrder.total ? parseFloat(displayOrder.total.toString()).toFixed(2) : "0.00"); setEditingTotal(true); }} className="h-7 px-2 text-xs text-gray-500 hover:text-gray-900" title="Override total">
+                          <Pencil className="h-3 w-3 mr-1" />Edit
                         </Button>
                       )}
                     </div>
@@ -968,9 +831,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
               <>
                 <Separator />
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Notes</h3>
-                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Notes</h3>
                   <div className="text-sm text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-300 dark:border-gray-600">
                     <p className="whitespace-pre-wrap">{displayOrder.notes}</p>
                   </div>
@@ -978,24 +839,16 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
               </>
             )}
 
-            {/* Pack button — only visible to staff/managers/admins, not shown if already packed/shipped */}
+            {/* Pack button */}
             {canScan && !isAlreadyPacked && displayOrder.status !== 'shipped' && displayOrder.status !== 'cancelled' && (
               <>
                 <Separator />
                 <div className="pt-2 pb-1">
                   {!allItemsFulfilled && (
-                    <p className="text-sm text-muted-foreground mb-3 text-center">
-                      Fulfill all items above to enable packing.
-                    </p>
+                    <p className="text-sm text-muted-foreground mb-3 text-center">Fulfill all items above to enable packing.</p>
                   )}
-                  <Button
-                    onClick={() => packOrderMutation.mutate(displayOrder.id)}
-                    disabled={!allItemsFulfilled || packOrderMutation.isPending}
-                    className="w-full h-12 text-base font-semibold bg-purple-600 hover:bg-purple-700 disabled:opacity-40"
-                    size="lg"
-                  >
-                    <Archive className="h-5 w-5 mr-2" />
-                    {packOrderMutation.isPending ? "Packing…" : "Pack Order"}
+                  <Button onClick={() => packOrderMutation.mutate(displayOrder.id)} disabled={!allItemsFulfilled || packOrderMutation.isPending} className="w-full h-12 text-base font-semibold bg-purple-600 hover:bg-purple-700 disabled:opacity-40" size="lg">
+                    <Archive className="h-5 w-5 mr-2" />{packOrderMutation.isPending ? "Packing…" : "Pack Order"}
                   </Button>
                 </div>
               </>

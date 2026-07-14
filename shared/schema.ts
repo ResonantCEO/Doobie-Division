@@ -160,6 +160,8 @@ export const orderItems = pgTable("order_items", {
   quantity: integer("quantity").notNull(),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   fulfilled: boolean("fulfilled").default(false),
+  removed: boolean("removed").default(false),
+  substitutedForItemId: integer("substituted_for_item_id"),
 });
 
 export const inventoryLogs = pgTable("inventory_logs", {

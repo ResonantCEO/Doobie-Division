@@ -1363,6 +1363,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Substitute order item (admin only)
+  app.post('/api/orders/:id/substitute-item', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const { oldItemId, newProductId, quantity } = req.body;
+
+      if (!oldItemId || !newProductId || !quantity || quantity <= 0) {
+        return res.status(400).json({ message: "oldItemId, newProductId, and positive quantity are required" });
+      }
+
+      const order = await storage.getOrder(orderId);
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      if (['shipped', 'cancelled'].includes(order.status)) {
+        return res.status(400).json({ message: "Cannot substitute items on shipped or cancelled orders" });
+      }
+
+      const oldItem = order.items?.find((item: any) => item.id === oldItemId);
+      if (!oldItem) return res.status(400).json({ message: "Item not in this order" });
+      if ((oldItem as any).removed) return res.status(400).json({ message: "Item has already been removed" });
+
+      const newProduct = await storage.getProduct(newProductId);
+      if (!newProduct) return res.status(404).json({ message: "Replacement product not found" });
+      if (!newProduct.isActive) return res.status(400).json({ message: "Replacement product is not active" });
+      if (newProduct.stock < quantity) return res.status(400).json({ message: `Insufficient stock. Available: ${newProduct.stock}` });
+
+      await storage.substituteOrderItem(orderId, oldItemId, newProductId, quantity, req.currentUser.id);
+
+      res.status(200).json({ message: "Item substituted successfully" });
+    } catch (error: any) {
+      console.error('Substitute item error:', error);
+      res.status(500).json({ message: error.message || "Failed to substitute item" });
+    }
+  });
+
   // Daily analytics endpoints
   app.get("/api/analytics/hourly-breakdown", isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {

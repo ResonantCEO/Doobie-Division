@@ -100,6 +100,7 @@ export interface IStorage {
   updateOrderTotal(id: number, total: number): Promise<Order>;
   fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
   unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
+  substituteOrderItem(orderId: number, oldItemId: number, newProductId: number, quantity: number, userId: string): Promise<void>;
   markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }>;
   assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order>;
   deleteOrder(id: number): Promise<void>;
@@ -2130,6 +2131,75 @@ export class DatabaseStorage implements IStorage {
       reason: `Order unfulfillment - Order #${orderId} (Physical inventory restored)`,
       createdAt: new Date()
     });
+  }
+
+  async substituteOrderItem(orderId: number, oldItemId: number, newProductId: number, quantity: number, userId: string): Promise<void> {
+    // Fetch the old item
+    const [oldItem] = await db.select().from(orderItems).where(and(eq(orderItems.id, oldItemId), eq(orderItems.orderId, orderId))).limit(1);
+    if (!oldItem) throw new Error("Order item not found");
+
+    // Fetch the replacement product
+    const [newProduct] = await db.select().from(products).where(eq(products.id, newProductId)).limit(1);
+    if (!newProduct) throw new Error("Replacement product not found");
+
+    const unitPrice = newProduct.price ? parseFloat(newProduct.price) : 0;
+    const newSubtotal = unitPrice * quantity;
+
+    // Mark old item as removed
+    await db.update(orderItems).set({ removed: true }).where(eq(orderItems.id, oldItemId));
+
+    // Insert the new replacement item
+    const [newItem] = await db.insert(orderItems).values({
+      orderId,
+      productId: newProductId,
+      productName: newProduct.name,
+      productSku: newProduct.sku,
+      productPrice: String(unitPrice),
+      quantity,
+      subtotal: String(newSubtotal),
+      fulfilled: false,
+      removed: false,
+      substitutedForItemId: oldItemId,
+    }).returning();
+
+    // Recalculate order total: sum all non-removed items
+    const activeItems = await db.select().from(orderItems).where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
+    const newTotal = activeItems.reduce((sum, item) => sum + parseFloat(item.subtotal), 0);
+    await db.update(orders).set({ total: String(newTotal), updatedAt: new Date() }).where(eq(orders.id, orderId));
+
+    // Restore stock for old product (since it was reserved when order was placed)
+    await db.update(products).set({ stock: sql`${products.stock} + ${oldItem.quantity}`, updatedAt: new Date() }).where(eq(products.id, oldItem.productId!));
+    // Deduct stock for new product
+    await db.update(products).set({ stock: sql`${products.stock} - ${quantity}`, updatedAt: new Date() }).where(eq(products.id, newProductId));
+
+    // Inventory log for old product restore
+    const [oldProduct] = await db.select().from(products).where(eq(products.id, oldItem.productId!)).limit(1);
+    if (oldProduct) {
+      await db.insert(inventoryLogs).values({
+        productId: oldItem.productId!,
+        userId,
+        type: 'stock_in',
+        quantity: oldItem.quantity,
+        previousStock: oldProduct.stock - oldItem.quantity,
+        newStock: oldProduct.stock,
+        reason: `Item substituted out of Order #${orderId} - stock restored`,
+        createdAt: new Date()
+      });
+    }
+    // Inventory log for new product deduction
+    const [newProductUpdated] = await db.select().from(products).where(eq(products.id, newProductId)).limit(1);
+    if (newProductUpdated) {
+      await db.insert(inventoryLogs).values({
+        productId: newProductId,
+        userId,
+        type: 'stock_out',
+        quantity,
+        previousStock: newProductUpdated.stock + quantity,
+        newStock: newProductUpdated.stock,
+        reason: `Item substituted into Order #${orderId}`,
+        createdAt: new Date()
+      });
+    }
   }
 
   async markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }> {
