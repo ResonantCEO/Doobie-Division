@@ -248,8 +248,9 @@ export default function EditProductModal({ open, onOpenChange, product, categori
 
       // Reset BOGO state
       setBogoEnabled(!!(product as any).bogoEnabled);
+      const savedIndex = (product as any).bogoFreeOptionIndex;
       setBogoFreeOptionIndex(
-        (product as any).bogoFreeOptionIndex != null ? String((product as any).bogoFreeOptionIndex) : "__same__"
+        savedIndex == null ? "__same__" : savedIndex === -1 ? "__any__" : String(savedIndex)
       );
 
       // Pre-populate lb/oz/g fields from grams for weight-based products
@@ -389,7 +390,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
           : [],
         bogoEnabled,
         bogoFreeOptionIndex: bogoEnabled && bogoFreeOptionIndex !== "__same__"
-          ? parseInt(bogoFreeOptionIndex)
+          ? (bogoFreeOptionIndex === "__any__" ? -1 : parseInt(bogoFreeOptionIndex))
           : null,
       };
       
@@ -506,9 +507,10 @@ export default function EditProductModal({ open, onOpenChange, product, categori
 
   const currentDiscountPercentage = parseFloat(form.watch("discountPercentage") || "0");
   const [bogoEnabled, setBogoEnabled] = useState<boolean>(!!(product as any).bogoEnabled);
-  const [bogoFreeOptionIndex, setBogoFreeOptionIndex] = useState<string>(
-    (product as any).bogoFreeOptionIndex != null ? String((product as any).bogoFreeOptionIndex) : "__same__"
-  );
+  const [bogoFreeOptionIndex, setBogoFreeOptionIndex] = useState<string>(() => {
+    const idx = (product as any).bogoFreeOptionIndex;
+    return idx == null ? "__same__" : idx === -1 ? "__any__" : String(idx);
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1079,6 +1081,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__same__">Same as purchased option</SelectItem>
+                    <SelectItem value="__any__">Customer's choice (any option)</SelectItem>
                     {(form.watch("sizes") || []).map((s, i) => (
                       <SelectItem key={i} value={String(i)}>
                         {s.size || `Option ${i + 1}`}
