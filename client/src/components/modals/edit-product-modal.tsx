@@ -246,6 +246,12 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         setQuantityTiers([]);
       }
 
+      // Reset BOGO state
+      setBogoEnabled(!!(product as any).bogoEnabled);
+      setBogoFreeOptionIndex(
+        (product as any).bogoFreeOptionIndex != null ? String((product as any).bogoFreeOptionIndex) : "__same__"
+      );
+
       // Pre-populate lb/oz/g fields from grams for weight-based products
       if (product.sellingMethod === "weight") {
         const totalG = product.stock;
@@ -381,6 +387,10 @@ export default function EditProductModal({ open, onOpenChange, product, categori
               .filter(t => t.minQuantity && t.pricePerItem)
               .map(t => ({ minQuantity: parseInt(t.minQuantity), pricePerItem: t.pricePerItem }))
           : [],
+        bogoEnabled,
+        bogoFreeOptionIndex: bogoEnabled && bogoFreeOptionIndex !== "__same__"
+          ? parseInt(bogoFreeOptionIndex)
+          : null,
       };
       
       // Remove undefined values to avoid sending them
@@ -495,6 +505,10 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   };
 
   const currentDiscountPercentage = parseFloat(form.watch("discountPercentage") || "0");
+  const [bogoEnabled, setBogoEnabled] = useState<boolean>(!!(product as any).bogoEnabled);
+  const [bogoFreeOptionIndex, setBogoFreeOptionIndex] = useState<string>(
+    (product as any).bogoFreeOptionIndex != null ? String((product as any).bogoFreeOptionIndex) : "__same__"
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1035,6 +1049,45 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                 </FormItem>
               )}
             />
+
+            {/* BOGO Toggle */}
+            <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label className="text-base">Buy One Get One Free</Label>
+                <div className="text-sm text-muted-foreground">
+                  Customer gets a free item with each purchase
+                </div>
+              </div>
+              <Switch
+                checked={bogoEnabled}
+                onCheckedChange={setBogoEnabled}
+              />
+            </div>
+
+            {bogoEnabled && enableSizes && form.watch("sizes") && (form.watch("sizes") || []).length > 0 && (
+              <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
+                <Label className="text-sm font-medium">Free Item Option</Label>
+                <p className="text-xs text-muted-foreground">
+                  Which option does the customer receive for free?
+                </p>
+                <Select
+                  value={bogoFreeOptionIndex}
+                  onValueChange={setBogoFreeOptionIndex}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select free option" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__same__">Same as purchased option</SelectItem>
+                    {(form.watch("sizes") || []).map((s, i) => (
+                      <SelectItem key={i} value={String(i)}>
+                        {s.size || `Option ${i + 1}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {!enableSizes && (
               sellingMethod === "weight" ? (
