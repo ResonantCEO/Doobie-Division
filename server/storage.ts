@@ -2491,7 +2491,8 @@ export class DatabaseStorage implements IStorage {
   }> {
     return withCache(analyticsCache, generateCacheKey.salesMetrics(days), async () => {
       const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+      startDate.setDate(startDate.getDate() - (days - 1));
+      startDate.setHours(0, 0, 0, 0);
 
       const [metrics] = await db
         .select({
