@@ -1669,9 +1669,12 @@ export class DatabaseStorage implements IStorage {
     try {
       // Auto-archive shipped orders older than 23 hours (raw SQL for reliability)
       try {
-        const { sql: rawSql } = await import("./db");
+        const { sql: pool } = await import("./db");
         const twentyThreeHoursAgo = new Date(Date.now() - 23 * 60 * 60 * 1000);
-        await rawSql`UPDATE orders SET archived = true, updated_at = NOW() WHERE status = 'shipped' AND archived = false AND updated_at < ${twentyThreeHoursAgo}`;
+        await pool.query(
+          `UPDATE orders SET archived = true, updated_at = NOW() WHERE status = 'shipped' AND archived = false AND updated_at < $1`,
+          [twentyThreeHoursAgo]
+        );
       } catch (archiveErr: any) {
         console.warn('[getOrders] Auto-archive step failed (non-fatal):', archiveErr?.message);
       }

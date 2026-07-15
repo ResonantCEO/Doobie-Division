@@ -26,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Eye, Edit, MessageSquare, MoreHorizontal, Package2, ChevronDown, ChevronRight, ChevronUp, Loader2, Trash2, Search, Archive } from "lucide-react";
+import { Eye, Edit, MessageSquare, MoreHorizontal, Package2, ChevronDown, ChevronRight, ChevronUp, Loader2, Trash2, Search, Archive, Truck } from "lucide-react";
 import { format } from "date-fns";
 import type { Order, User, OrderItem, Product } from "@shared/schema";
 
@@ -478,7 +478,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
   );
 }
 
-export type OrderTab = "new" | "packed" | "shipped" | "cancelled" | "archived";
+export type OrderTab = "new" | "packed" | "shipped" | "archived";
 
 function PackButton({ order, onOpenDetails, updateStatusMutation }: { 
   order: Order; 
@@ -563,7 +563,6 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
     switch (tab) {
       case "packed": return ["packed"];
       case "shipped": return ["shipped"];
-      case "cancelled": return ["cancelled"];
       case "archived": return ["shipped"];
       default: return [];
     }
@@ -573,7 +572,6 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
     switch (tab) {
       case "packed": return "Packed";
       case "shipped": return "Shipped";
-      case "cancelled": return "Cancelled";
       case "archived": return "Archived";
       default: return "";
     }
@@ -595,6 +593,25 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
         return;
       }
       toast({ title: "Error", description: "Failed to clear orders", variant: "destructive" });
+    },
+  });
+
+  const shipAllPackedMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/orders/ship-all-packed`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/order-status-breakdown"] });
+      toast({ title: "All Shipped", description: "All packed orders have been moved to Shipped." });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Unauthorized", description: "You are logged out. Logging in again...", variant: "destructive" });
+        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        return;
+      }
+      toast({ title: "Error", description: "Failed to ship all packed orders", variant: "destructive" });
     },
   });
 
@@ -624,9 +641,6 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
       case "shipped":
         base = orders.filter(o => o.status === "shipped" && !o.archived);
         break;
-      case "cancelled":
-        base = orders.filter(o => o.status === "cancelled" && !o.archived);
-        break;
       case "archived":
         base = orders.filter(o => o.archived);
         break;
@@ -640,7 +654,6 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
     new: orders.filter(o => (o.status === "pending" || o.status === "processing") && !o.archived).length,
     packed: orders.filter(o => o.status === "packed" && !o.archived).length,
     shipped: orders.filter(o => o.status === "shipped" && !o.archived).length,
-    cancelled: orders.filter(o => o.status === "cancelled" && !o.archived).length,
     archived: orders.filter(o => o.archived).length,
   }), [orders]);
 
@@ -1241,23 +1254,36 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
             className="pl-8 h-8 text-sm"
           />
         </div>
-        {(user?.role === 'admin' || user?.role === 'manager') && activeTab !== "new" && filteredOrders.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
-            onClick={() => setShowClearAllDialog(true)}
-            disabled={clearAllOrdersMutation.isPending}
-          >
-            <Trash2 className="h-4 w-4 mr-1.5" />
-            {clearAllOrdersMutation.isPending ? "Clearing..." : `Clear ${getTabLabel(activeTab)} Orders`}
-          </Button>
-        )}
+        <div className="flex items-center gap-2 ml-auto shrink-0">
+          {(user?.role === 'admin' || user?.role === 'manager') && activeTab === "packed" && filteredOrders.length > 0 && (
+            <Button
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => shipAllPackedMutation.mutate()}
+              disabled={shipAllPackedMutation.isPending}
+            >
+              <Truck className="h-4 w-4 mr-1.5" />
+              {shipAllPackedMutation.isPending ? "Shipping..." : "Ship All"}
+            </Button>
+          )}
+          {(user?.role === 'admin' || user?.role === 'manager') && activeTab === "shipped" && filteredOrders.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+              onClick={() => setShowClearAllDialog(true)}
+              disabled={clearAllOrdersMutation.isPending}
+            >
+              <Trash2 className="h-4 w-4 mr-1.5" />
+              {clearAllOrdersMutation.isPending ? "Clearing..." : "Clear Shipped Orders"}
+            </Button>
+          )}
+        </div>
       </div>
       
       <div className="w-full">
         <div className="px-4 sm:px-6 pt-4">
-          <div className="grid w-full grid-cols-3 sm:grid-cols-5 gap-1 p-1 bg-gray-100 dark:bg-gray-700 rounded-md">
+          <div className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 p-1 bg-gray-100 dark:bg-gray-700 rounded-md">
             <button
               onClick={() => setActiveTab("new")}
               className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
@@ -1287,16 +1313,6 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
               }`}
             >
               Shipped {tabCounts.shipped > 0 && <span className="ml-1.5 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">{tabCounts.shipped}</span>}
-            </button>
-            <button
-              onClick={() => setActiveTab("cancelled")}
-              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
-                activeTab === "cancelled"
-                  ? "bg-white dark:bg-gray-600 text-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600"
-              }`}
-            >
-              Cancelled {tabCounts.cancelled > 0 && <span className="ml-1.5 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">{tabCounts.cancelled}</span>}
             </button>
             <button
               onClick={() => setActiveTab("archived")}

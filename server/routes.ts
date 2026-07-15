@@ -1249,6 +1249,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk ship all packed orders
+  app.post('/api/orders/ship-all-packed', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const { sql: pool } = await import("./db");
+      await pool.query(`UPDATE orders SET status = 'shipped', updated_at = NOW() WHERE status = 'packed'`);
+      res.json({ message: "All packed orders have been shipped" });
+    } catch (error) {
+      console.error('Failed to ship all packed orders:', error);
+      res.status(500).json({ message: "Failed to ship all packed orders" });
+    }
+  });
+
   // Order item packing route (marks as packed without reducing physical inventory)
   app.post('/api/orders/:id/pack-item', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {

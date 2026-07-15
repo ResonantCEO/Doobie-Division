@@ -84,7 +84,6 @@ export default function OrdersPage() {
       pending: 0,
       processing: 0,
       shipped: 0,
-      cancelled: 0,
     };
 
     statusBreakdown.forEach((item) => {
@@ -92,7 +91,6 @@ export default function OrdersPage() {
       if (item.status === "pending") stats.pending = item.count;
       else if (item.status === "processing") stats.processing = item.count;
       else if (item.status === "shipped" || item.status === "delivered") stats.shipped += item.count;
-      else if (item.status === "cancelled") stats.cancelled = item.count;
     });
 
     return stats;
@@ -126,7 +124,7 @@ export default function OrdersPage() {
         case "new": return o.status === "pending" || o.status === "processing";
         case "packed": return o.status === "packed";
         case "shipped": return o.status === "shipped";
-        case "cancelled": return o.status === "cancelled";
+        case "archived": return o.archived;
         default: return true;
       }
     });
@@ -256,7 +254,6 @@ export default function OrdersPage() {
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
 
