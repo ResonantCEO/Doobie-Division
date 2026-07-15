@@ -1695,6 +1695,7 @@ export class DatabaseStorage implements IStorage {
           updatedAt: orders.updatedAt,
           assignedUser: users,
           customerTelegramUsername: sql<string | null>`(SELECT telegram_username FROM users WHERE id = ${orders.customerId})`,
+          productNames: sql<string | null>`(SELECT string_agg(product_name, ' ') FROM order_items WHERE order_id = ${orders.id})`,
         })
         .from(orders)
         .leftJoin(users, eq(orders.assignedUserId, users.id));

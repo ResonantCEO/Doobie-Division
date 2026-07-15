@@ -607,7 +607,8 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
       (order.customerPhone || "").toLowerCase().includes(lower) ||
       (order.orderNumber || "").toLowerCase().includes(lower) ||
       (order.shippingAddress || "").toLowerCase().includes(lower) ||
-      (order.notes || "").toLowerCase().includes(lower)
+      (order.notes || "").toLowerCase().includes(lower) ||
+      (order.productNames || "").toLowerCase().includes(lower)
     );
   };
 

@@ -646,6 +646,7 @@ export type Order = typeof orders.$inferSelect & {
     email: string | null;
   };
   customerTelegramUsername?: string | null;
+  productNames?: string | null;
 };
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;
