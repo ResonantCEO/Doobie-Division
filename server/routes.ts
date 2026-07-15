@@ -970,22 +970,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
 
-          let allowed = true;
-          let minimumAmount: number | null = null;
+          // Check if the applied promo code bypasses the purchase minimum
+          const promoCodeStr = (orderData as any).promoCode as string | undefined;
+          let promoBypassesMinimum = false;
+          if (promoCodeStr) {
+            const promoRecord = await storage.getPromoCodeByCode(promoCodeStr);
+            if (promoRecord?.bypassPurchaseMinimum) {
+              promoBypassesMinimum = true;
+            }
+          }
 
-          // Use the pre-promo original total for city minimum check
-          const checkTotal = parseFloat(orderData.originalTotal || orderData.total || "0");
+          if (!promoBypassesMinimum) {
+            let allowed = true;
+            let minimumAmount: number | null = null;
 
-          if (orderData.customerId) {
-            const { rows: userRows } = await rawPool.query(`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = $1`, [orderData.customerId]);
-            if (userRows && userRows.length > 0) {
-              const userRow = userRows[0];
-              const isExempt = userRow.exempt_text === 'true' || userRow.exempt_text === 't';
-              if (isExempt) {
-                allowed = true;
-              } else if (userRow.min_purchase_override !== null && userRow.min_purchase_override !== undefined) {
-                minimumAmount = parseFloat(String(userRow.min_purchase_override));
-                allowed = checkTotal >= minimumAmount;
+            // Use the pre-promo original total for city minimum check
+            const checkTotal = parseFloat(orderData.originalTotal || orderData.total || "0");
+
+            if (orderData.customerId) {
+              const { rows: userRows } = await rawPool.query(`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = $1`, [orderData.customerId]);
+              if (userRows && userRows.length > 0) {
+                const userRow = userRows[0];
+                const isExempt = userRow.exempt_text === 'true' || userRow.exempt_text === 't';
+                if (isExempt) {
+                  allowed = true;
+                } else if (userRow.min_purchase_override !== null && userRow.min_purchase_override !== undefined) {
+                  minimumAmount = parseFloat(String(userRow.min_purchase_override));
+                  allowed = checkTotal >= minimumAmount;
+                } else {
+                  const cityLimit = await storage.getCityPurchaseLimitByCity(city);
+                  if (cityLimit) {
+                    minimumAmount = parseFloat(cityLimit.minimumAmount);
+                    allowed = checkTotal >= minimumAmount;
+                  }
+                }
               } else {
                 const cityLimit = await storage.getCityPurchaseLimitByCity(city);
                 if (cityLimit) {
@@ -1000,18 +1018,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 allowed = checkTotal >= minimumAmount;
               }
             }
-          } else {
-            const cityLimit = await storage.getCityPurchaseLimitByCity(city);
-            if (cityLimit) {
-              minimumAmount = parseFloat(cityLimit.minimumAmount);
-              allowed = checkTotal >= minimumAmount;
-            }
-          }
 
-          if (!allowed && minimumAmount !== null) {
-            return res.status(400).json({
-              message: `Orders shipping to ${city} require a minimum of $${minimumAmount.toFixed(2)}. Your pre-discount order total of $${checkTotal.toFixed(2)} does not meet this minimum.`,
-            });
+            if (!allowed && minimumAmount !== null) {
+              return res.status(400).json({
+                message: `Orders shipping to ${city} require a minimum of $${minimumAmount.toFixed(2)}. Your pre-discount order total of $${checkTotal.toFixed(2)} does not meet this minimum.`,
+              });
+            }
           }
         }
       }
