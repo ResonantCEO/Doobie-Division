@@ -316,8 +316,308 @@ export default function AnalyticsPage() {
     customers: { label: "Customers", color: "hsl(var(--chart-3))" },
   };
 
-  const handleExportReport = () => {
-    alert("Analytics report export functionality would be implemented here");
+  const handleExportReport = async () => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const margin = 14;
+    let y = 0;
+
+    const timeLabel = timeRange === '7' ? 'Last 7 Days' : timeRange === '30' ? 'Last 30 Days' : timeRange === '90' ? 'Last 3 Months' : 'Last Year';
+    const generatedAt = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const ensureSpace = (needed: number) => {
+      if (y + needed > 270) { doc.addPage(); y = 20; }
+    };
+
+    const sectionHeader = (title: string, color: [number, number, number] = [22, 163, 74]) => {
+      ensureSpace(14);
+      doc.setFillColor(...color);
+      doc.rect(margin, y, pageW - margin * 2, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.setFont(undefined as any, 'bold');
+      doc.text(title, margin + 3, y + 5.5);
+      doc.setTextColor(30, 30, 30);
+      doc.setFont(undefined as any, 'normal');
+      y += 12;
+    };
+
+    const metricGrid = (items: { label: string; value: string }[], cols = 2) => {
+      const colW = (pageW - margin * 2) / cols;
+      const rowH = 14;
+      const rows = Math.ceil(items.length / cols);
+      ensureSpace(rows * rowH + 4);
+      items.forEach((item, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = margin + col * colW;
+        const ry = y + row * rowH;
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(x + 1, ry, colW - 2, rowH - 2, 2, 2, 'F');
+        doc.setTextColor(100, 116, 139);
+        doc.setFontSize(7);
+        doc.setFont(undefined as any, 'normal');
+        doc.text(item.label.toUpperCase(), x + 4, ry + 4.5);
+        doc.setTextColor(15, 23, 42);
+        doc.setFontSize(10);
+        doc.setFont(undefined as any, 'bold');
+        doc.text(item.value, x + 4, ry + 10);
+      });
+      y += rows * rowH + 4;
+    };
+
+    // ── COVER ──────────────────────────────────────────────────────────────────
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, pageW, 50, 'F');
+    doc.setFillColor(22, 163, 74);
+    doc.rect(0, 48, pageW, 3, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont(undefined as any, 'bold');
+    doc.text('Doobie Division!', margin, 20);
+    doc.setFontSize(13);
+    doc.setFont(undefined as any, 'normal');
+    doc.text('Analytics & Reports', margin, 30);
+    doc.setFontSize(9);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Period: ${timeLabel}   ·   Generated: ${generatedAt}`, margin, 42);
+    doc.setTextColor(30, 30, 30);
+    y = 58;
+
+    // ── OVERVIEW ──────────────────────────────────────────────────────────────
+    sectionHeader('OVERVIEW — KEY METRICS', [15, 118, 110]);
+    metricGrid([
+      { label: 'Total Revenue', value: `$${salesMetrics?.totalSales?.toFixed(2) ?? '0.00'}` },
+      { label: 'Total Orders', value: String(salesMetrics?.totalOrders ?? 0) },
+      { label: 'Avg. Order Value', value: `$${salesMetrics?.averageOrderValue?.toFixed(2) ?? '0.00'}` },
+      { label: 'Total Customers', value: String(customerData?.totalCustomers ?? 0) },
+      { label: 'Net Profit', value: `$${advancedMetrics?.netProfit?.toFixed(2) ?? '0.00'}` },
+      { label: 'Sales Growth Rate', value: `${advancedMetrics?.salesGrowthRate?.toFixed(1) ?? '0.0'}%` },
+      { label: 'Return Rate', value: `${advancedMetrics?.returnRate?.toFixed(1) ?? '0.0'}%` },
+      { label: 'New Customers (Month)', value: String(customerData?.newCustomersThisMonth ?? 0) },
+    ]);
+
+    // ── SALES TREND ───────────────────────────────────────────────────────────
+    if (salesData.length > 0) {
+      sectionHeader('SALES TREND', [37, 99, 235]);
+      autoTable(doc, {
+        startY: y,
+        head: [['Date', 'Revenue ($)', 'Orders', 'Customers']],
+        body: salesData.map(d => [d.date, `$${Number(d.sales).toFixed(2)}`, d.orders, d.customers]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [239, 246, 255] },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // ── TOP PRODUCTS ──────────────────────────────────────────────────────────
+    if (topProducts && topProducts.length > 0) {
+      sectionHeader('TOP SELLING PRODUCTS', [124, 58, 237]);
+      autoTable(doc, {
+        startY: y,
+        head: [['#', 'Product', 'Units Sold', 'Revenue ($)']],
+        body: topProducts.map((item, i) => [i + 1, item.product.name, item.sales, `$${Number(item.revenue).toFixed(2)}`]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [124, 58, 237], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 243, 255] },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // ── CATEGORY BREAKDOWN ────────────────────────────────────────────────────
+    if (categoryData.length > 0) {
+      sectionHeader('CATEGORY BREAKDOWN', [217, 119, 6]);
+      autoTable(doc, {
+        startY: y,
+        head: [['Category', 'Units Sold', 'Revenue ($)', '% of Revenue']],
+        body: (() => {
+          const totalRev = categoryData.reduce((s, c) => s + Number(c.revenue || 0), 0);
+          return categoryData.map(c => [
+            c.name,
+            c.value,
+            `$${Number(c.revenue || 0).toFixed(2)}`,
+            totalRev > 0 ? `${((Number(c.revenue || 0) / totalRev) * 100).toFixed(1)}%` : '0%',
+          ]);
+        })(),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [217, 119, 6], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [255, 251, 235] },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // ── PEAK PURCHASE TIMES ───────────────────────────────────────────────────
+    if (peakTimesData.length > 0) {
+      sectionHeader('PEAK PURCHASE TIMES', [15, 118, 110]);
+      autoTable(doc, {
+        startY: y,
+        head: [['Time Window', 'Orders', '% of Total']],
+        body: peakTimesData.map(p => [p.time, p.orders, `${p.percentage}%`]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [15, 118, 110], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [240, 253, 250] },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // ── CUSTOMERS ─────────────────────────────────────────────────────────────
+    sectionHeader('CUSTOMER METRICS', [37, 99, 235]);
+    metricGrid([
+      { label: 'Total Customers', value: String(customerData?.totalCustomers ?? 0) },
+      { label: 'New This Month', value: String(customerData?.newCustomersThisMonth ?? 0) },
+      { label: 'Retention Rate', value: `${customerMetrics?.retentionRate?.toFixed(1) ?? '0.0'}%` },
+      { label: 'Avg Purchase Freq.', value: `${customerMetrics?.avgPurchaseFrequency?.toFixed(1) ?? '0.0'}/period` },
+      { label: 'Lifetime Value (CLV)', value: `$${customerMetrics?.customerLifetimeValue?.toFixed(2) ?? '0.00'}` },
+      { label: 'New Customers Today', value: String(dailyNewCustomersData?.newCustomersToday ?? 0) },
+      { label: 'Return Customers Today', value: String(dailyReturnCustomersData?.returnCustomersToday ?? 0) },
+      { label: 'New Users Today', value: String(dailyNewUsersData?.newUsersToday ?? 0) },
+    ]);
+
+    // Customer growth table
+    if (customerMetrics?.customerGrowth && customerMetrics.customerGrowth.length > 0) {
+      ensureSpace(10);
+      autoTable(doc, {
+        startY: y,
+        head: [['Month', 'New Customers', 'Returning Customers']],
+        body: customerMetrics.customerGrowth.map(g => [g.month, g.new, g.returning]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [239, 246, 255] },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // ── INVENTORY ─────────────────────────────────────────────────────────────
+    sectionHeader('INVENTORY METRICS', [220, 38, 38]);
+    metricGrid([
+      { label: 'Stock Turnover Rate', value: `${inventoryMetrics?.stockTurnoverRate?.toFixed(1) ?? '0.0'}x` },
+      { label: 'Total Inventory Value', value: `$${(inventoryMetrics?.inventoryValue ?? 0).toFixed(2)}` },
+      { label: 'Low Stock Items', value: String(inventoryMetrics?.lowStockCount ?? 0) },
+      { label: 'Out of Stock Items', value: String(inventoryMetrics?.outOfStockCount ?? 0) },
+    ], 4);
+
+    if (inventoryData.length > 0) {
+      ensureSpace(10);
+      autoTable(doc, {
+        startY: y,
+        head: [['Product', 'Current Stock', 'Min. Threshold', 'Status']],
+        body: inventoryData.map(item => [
+          item.product,
+          item.current,
+          item.threshold,
+          item.current === 0 ? 'OUT OF STOCK' : item.current < item.threshold ? 'LOW STOCK' : 'Normal',
+        ]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [255, 241, 242] },
+        bodyStyles: { textColor: 30 },
+        didParseCell: (data: any) => {
+          if (data.column.index === 3 && data.section === 'body') {
+            const v = String(data.cell.raw);
+            if (v === 'OUT OF STOCK') data.cell.styles.textColor = [185, 28, 28];
+            else if (v === 'LOW STOCK') data.cell.styles.textColor = [180, 83, 9];
+            else data.cell.styles.textColor = [22, 101, 52];
+          }
+        },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // ── OPERATIONS ────────────────────────────────────────────────────────────
+    sectionHeader('OPERATIONS METRICS', [107, 114, 128]);
+    metricGrid([
+      { label: 'Avg Fulfillment Time', value: `${operationsMetrics?.avgFulfillmentTime?.toFixed(1) ?? '0.0'} days` },
+      { label: 'Fulfillment Rate', value: `${operationsMetrics?.fulfillmentRate?.toFixed(1) ?? '0.0'}%` },
+      { label: 'Cost of Goods Sold', value: `$${(operationsMetrics?.costOfGoodsSold ?? 0).toFixed(2)}` },
+      { label: 'Avg. Order Value', value: `$${salesMetrics?.averageOrderValue?.toFixed(2) ?? '0.00'}` },
+    ], 4);
+
+    if (orderBreakdown.length > 0) {
+      const total = orderBreakdown.reduce((s, i) => s + i.count, 0);
+      autoTable(doc, {
+        startY: y,
+        head: [['Status', 'Count', '% of Total']],
+        body: orderBreakdown.map(item => [
+          item.status.charAt(0).toUpperCase() + item.status.slice(1),
+          item.count,
+          total > 0 ? `${((item.count / total) * 100).toFixed(1)}%` : '0%',
+        ]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [107, 114, 128], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // ── CITIES ────────────────────────────────────────────────────────────────
+    if (cityAnalytics.length > 0) {
+      sectionHeader('CITY ANALYTICS', [79, 70, 229]);
+      autoTable(doc, {
+        startY: y,
+        head: [['City', 'Total Orders', 'Revenue ($)', 'Outstanding', 'Pending', 'Processing', 'Shipped/Done', 'Avg Order ($)', 'Last Order']],
+        body: cityAnalytics.map(row => [
+          row.city,
+          row.total_orders,
+          `$${row.total_revenue.toFixed(2)}`,
+          row.outstanding_orders,
+          row.pending_orders,
+          row.processing_orders,
+          row.completed_orders,
+          `$${row.avg_order_value.toFixed(2)}`,
+          row.last_order_date ? new Date(row.last_order_date).toLocaleDateString() : '—',
+        ]),
+        styles: { fontSize: 7.5, cellPadding: 1.8 },
+        headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [238, 242, 255] },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // ── TODAY'S SUMMARY ───────────────────────────────────────────────────────
+    sectionHeader("TODAY'S DAILY SUMMARY", [15, 118, 110]);
+    metricGrid([
+      { label: "Today's Revenue", value: `$${dailyMetrics?.totalSales?.toFixed(2) ?? '0.00'}` },
+      { label: "Today's Orders", value: String(dailyMetrics?.totalOrders ?? 0) },
+      { label: 'Today AOV', value: `$${dailyMetrics?.averageOrderValue?.toFixed(2) ?? '0.00'}` },
+      { label: 'New Customers Today', value: String(dailyNewCustomersData?.newCustomersToday ?? 0) },
+    ], 4);
+
+    if (dailyTopProducts && dailyTopProducts.length > 0) {
+      autoTable(doc, {
+        startY: y,
+        head: [["Today's Top Sellers", 'Units Sold Today', 'Revenue Today ($)']],
+        body: dailyTopProducts.map(item => [item.product.name, item.sales, `$${Number(item.revenue).toFixed(2)}`]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [15, 118, 110], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [240, 253, 250] },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // ── PAGE NUMBERS ──────────────────────────────────────────────────────────
+    const totalPages = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Doobie Division! — Confidential   ·   Page ${i} of ${totalPages}   ·   ${generatedAt}`, margin, doc.internal.pageSize.getHeight() - 8);
+    }
+
+    const fileName = `doobie-division-analytics-${timeLabel.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    doc.save(fileName);
   };
 
   const totalCustomers = orderBreakdown.reduce((acc, item) => acc + item.count, 0);
