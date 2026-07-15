@@ -357,7 +357,10 @@ export default function OrdersPage() {
       <RouteManagementModal
         isOpen={isRouteManagementOpen}
         onClose={() => setIsRouteManagementOpen(false)}
-        orders={orders}
+        orders={orders.filter(o =>
+          (o.status === "pending" || o.status === "processing" || o.status === "packed") &&
+          !o.archived
+        )}
       />
     </div>
   );
