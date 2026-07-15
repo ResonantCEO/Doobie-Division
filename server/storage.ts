@@ -170,6 +170,7 @@ export interface IStorage {
   logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void>;
   getUserActivity(userId: string, options?: { limit?: number; type?: string }): Promise<any[]>;
   getInventoryLogs(filters?: { days?: number; type?: string; product?: string }): Promise<any[]>;
+  clearInventoryLogs(): Promise<void>;
 
   // Support ticket operations
   createSupportTicket(data: any): Promise<any>;
@@ -3819,6 +3820,10 @@ export class DatabaseStorage implements IStorage {
     }
 
     return await finalQuery.orderBy(desc(inventoryLogs.createdAt));
+  }
+
+  async clearInventoryLogs(): Promise<void> {
+    await retryQuery(() => db.delete(inventoryLogs));
   }
 
   async logUserActivity(userId: string, action: string, details: string, metadata?: any): Promise<void> {

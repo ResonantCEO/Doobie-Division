@@ -2128,6 +2128,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin routes
+  app.delete('/api/admin/inventory-logs', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      await storage.clearInventoryLogs();
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to clear inventory logs" });
+    }
+  });
+
   app.get('/api/admin/inventory-logs', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {
       const { days, type, product } = req.query;

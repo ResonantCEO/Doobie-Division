@@ -82,6 +82,7 @@ export default function AdminPage() {
   const [deleteLimitConfirmOpen, setDeleteLimitConfirmOpen] = useState(false);
   const [limitToDelete, setLimitToDelete] = useState<CityPurchaseLimit | null>(null);
   const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
+  const [clearLogsConfirmOpen, setClearLogsConfirmOpen] = useState(false);
 
   // Access passwords state
   const [showAccessModal, setShowAccessModal] = useState(false);
@@ -125,6 +126,16 @@ export default function AdminPage() {
       </div>
     );
   }
+
+  const clearLogsMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", "/api/admin/inventory-logs"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/inventory-logs"] });
+      setClearLogsConfirmOpen(false);
+      toast({ title: "Logs cleared", description: "All stock adjustment logs have been deleted." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to clear logs.", variant: "destructive" }),
+  });
 
   const { data: inventoryLogs = [], isLoading } = useQuery<InventoryLogWithDetails[]>({
     queryKey: ["/api/admin/inventory-logs", { days: dateFilter, type: typeFilter, product: productFilter }],
@@ -959,10 +970,22 @@ export default function AdminPage() {
           {/* Inventory Changes Section */}
           <Card>
         <CardHeader>
-          <CardTitle>Logs</CardTitle>
-          <p className="text-sm text-gray-600">
-            Track all stock adjustments, additions, and removals made to products
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Logs</CardTitle>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Track all stock adjustments, additions, and removals made to products
+              </p>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setClearLogsConfirmOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear Logs
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {/* Filters */}
@@ -2310,6 +2333,28 @@ export default function AdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Clear Inventory Logs Confirmation Dialog */}
+      <Dialog open={clearLogsConfirmOpen} onOpenChange={setClearLogsConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear All Stock Adjustment Logs</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            This will permanently delete <strong>all</strong> stock adjustment log entries. This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearLogsConfirmOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => clearLogsMutation.mutate()}
+              disabled={clearLogsMutation.isPending}
+            >
+              {clearLogsMutation.isPending ? "Clearing..." : "Clear All Logs"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add/Edit Access Password Dialog */}
       <Dialog open={showAccessModal} onOpenChange={(open) => {
         setShowAccessModal(open);
