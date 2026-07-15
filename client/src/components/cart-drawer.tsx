@@ -56,7 +56,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
   const [shippingForm, setShippingForm] = useState({
     customerName: "",
-    customerPhone: "",
     street: "",
     city: "",
     state: "",
@@ -165,9 +164,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     if (!shippingForm.customerName.trim()) {
       errors.customerName = "Full name is required";
     }
-    if (!shippingForm.customerPhone.trim()) {
-      errors.customerPhone = "Phone number is required";
-    }
     if (!shippingForm.street.trim()) {
       errors.street = "Street address is required";
     }
@@ -275,7 +271,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   };
 
   const handleConfirmOrder = async (paymentMethod: "cod" | "prepay" = "cod", paymentPhotoUrl?: string) => {
-    const { customerName, customerPhone, street, city, state: shippingState, zipCode } = shippingForm;
+    const { customerName, street, city, state: shippingState, zipCode } = shippingForm;
 
     if (!validateForm()) {
       return;
@@ -342,7 +338,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         customerId: user?.id,
         customerName,
         customerEmail: user?.email || "",
-        customerPhone,
         shippingAddress,
         total: finalTotal.toFixed(2),
         paymentMethod,
@@ -434,7 +429,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         clearCart();
         setIsOpen(false);
         setShowConfirmation(false);
-        setShippingForm({ customerName: "", customerPhone: "", street: "", city: "", state: "", zipCode: "", notes: "" });
+        setShippingForm({ customerName: "", street: "", city: "", state: "", zipCode: "", notes: "" });
         setFormErrors({});
         setPromoInput("");
         setAppliedPromo(null);
@@ -885,27 +880,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 />
                 {formErrors.customerName && (
                   <p className="text-sm text-red-500 mt-1">{formErrors.customerName}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="customerPhone">Phone Number *</Label>
-                <Input
-                  id="customerPhone"
-                  type="tel"
-                  value={shippingForm.customerPhone}
-                  onChange={(e) => {
-                    setShippingForm(prev => ({ ...prev, customerPhone: e.target.value }));
-                    if (formErrors.customerPhone) {
-                      setFormErrors(prev => ({ ...prev, customerPhone: "" }));
-                    }
-                  }}
-                  placeholder="Enter your phone number"
-                  className={formErrors.customerPhone ? "border-red-500 focus:border-red-500" : ""}
-                  required
-                />
-                {formErrors.customerPhone && (
-                  <p className="text-sm text-red-500 mt-1">{formErrors.customerPhone}</p>
                 )}
               </div>
 
