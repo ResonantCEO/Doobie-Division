@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   DropdownMenu, 
@@ -25,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Eye, Edit, MessageSquare, MoreHorizontal, Package2, ChevronDown, ChevronRight, ChevronUp, Loader2, Trash2 } from "lucide-react";
+import { Eye, Edit, MessageSquare, MoreHorizontal, Package2, ChevronDown, ChevronRight, ChevronUp, Loader2, Trash2, Search, Archive } from "lucide-react";
 import { format } from "date-fns";
 import type { Order, User, OrderItem, Product } from "@shared/schema";
 
@@ -477,7 +478,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
   );
 }
 
-export type OrderTab = "new" | "packed" | "shipped" | "cancelled";
+export type OrderTab = "new" | "packed" | "shipped" | "cancelled" | "archived";
 
 function PackButton({ order, onOpenDetails, updateStatusMutation }: { 
   order: Order; 
@@ -537,6 +538,7 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
   const setActiveTab = onActiveTabChange;
   const [deleteOrderId, setDeleteOrderId] = useState<number | null>(null);
   const [showClearAllDialog, setShowClearAllDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const deleteOrderMutation = useMutation({
     mutationFn: async (orderId: number) => {
@@ -562,6 +564,7 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
       case "packed": return ["packed"];
       case "shipped": return ["shipped"];
       case "cancelled": return ["cancelled"];
+      case "archived": return ["shipped"];
       default: return [];
     }
   };
@@ -571,6 +574,7 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
       case "packed": return "Packed";
       case "shipped": return "Shipped";
       case "cancelled": return "Cancelled";
+      case "archived": return "Archived";
       default: return "";
     }
   };
@@ -594,26 +598,49 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
     },
   });
 
+  const matchesSearch = (order: Order, q: string): boolean => {
+    if (!q) return true;
+    const lower = q.toLowerCase();
+    return (
+      (order.customerName || "").toLowerCase().includes(lower) ||
+      (order.customerEmail || "").toLowerCase().includes(lower) ||
+      (order.customerPhone || "").toLowerCase().includes(lower) ||
+      (order.orderNumber || "").toLowerCase().includes(lower) ||
+      (order.shippingAddress || "").toLowerCase().includes(lower) ||
+      (order.notes || "").toLowerCase().includes(lower)
+    );
+  };
+
   const filteredOrders = useMemo(() => {
+    let base: Order[];
     switch (activeTab) {
       case "new":
-        return orders.filter(order => order.status === "pending" || order.status === "processing");
+        base = orders.filter(o => (o.status === "pending" || o.status === "processing") && !o.archived);
+        break;
       case "packed":
-        return orders.filter(order => order.status === "packed");
+        base = orders.filter(o => o.status === "packed" && !o.archived);
+        break;
       case "shipped":
-        return orders.filter(order => order.status === "shipped");
+        base = orders.filter(o => o.status === "shipped" && !o.archived);
+        break;
       case "cancelled":
-        return orders.filter(order => order.status === "cancelled");
+        base = orders.filter(o => o.status === "cancelled" && !o.archived);
+        break;
+      case "archived":
+        base = orders.filter(o => o.archived);
+        break;
       default:
-        return orders;
+        base = orders;
     }
-  }, [orders, activeTab]);
+    return base.filter(o => matchesSearch(o, searchQuery));
+  }, [orders, activeTab, searchQuery]);
 
   const tabCounts = useMemo(() => ({
-    new: orders.filter(o => o.status === "pending" || o.status === "processing").length,
-    packed: orders.filter(o => o.status === "packed").length,
-    shipped: orders.filter(o => o.status === "shipped").length,
-    cancelled: orders.filter(o => o.status === "cancelled").length,
+    new: orders.filter(o => (o.status === "pending" || o.status === "processing") && !o.archived).length,
+    packed: orders.filter(o => o.status === "packed" && !o.archived).length,
+    shipped: orders.filter(o => o.status === "shipped" && !o.archived).length,
+    cancelled: orders.filter(o => o.status === "cancelled" && !o.archived).length,
+    archived: orders.filter(o => o.archived).length,
   }), [orders]);
 
   const allExpanded = useMemo(() => {
@@ -724,6 +751,8 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
         return <Badge variant="default" className="status-completed">Shipped</Badge>;
       case "cancelled":
         return <Badge variant="destructive" className="status-cancelled">Cancelled</Badge>;
+      case "archived":
+        return <Badge variant="secondary" className="bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">Archived</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -1200,13 +1229,22 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
       </AlertDialog>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Orders</h3>
+      <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center gap-3">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 shrink-0">Recent Orders</h3>
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search by customer, product, order #..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
         {(user?.role === 'admin' || user?.role === 'manager') && activeTab !== "new" && filteredOrders.length > 0 && (
           <Button
             variant="outline"
             size="sm"
-            className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+            className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
             onClick={() => setShowClearAllDialog(true)}
             disabled={clearAllOrdersMutation.isPending}
           >
@@ -1218,7 +1256,7 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
       
       <div className="w-full">
         <div className="px-4 sm:px-6 pt-4">
-          <div className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 p-1 bg-gray-100 dark:bg-gray-700 rounded-md">
+          <div className="grid w-full grid-cols-3 sm:grid-cols-5 gap-1 p-1 bg-gray-100 dark:bg-gray-700 rounded-md">
             <button
               onClick={() => setActiveTab("new")}
               className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
@@ -1258,6 +1296,17 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
               }`}
             >
               Cancelled {tabCounts.cancelled > 0 && <span className="ml-1.5 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">{tabCounts.cancelled}</span>}
+            </button>
+            <button
+              onClick={() => setActiveTab("archived")}
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
+                activeTab === "archived"
+                  ? "bg-white dark:bg-gray-600 text-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600"
+              }`}
+            >
+              <Archive className="h-3.5 w-3.5 mr-1.5" />
+              Archived {tabCounts.archived > 0 && <span className="ml-1.5 bg-gray-500 text-white text-xs px-1.5 py-0.5 rounded-full">{tabCounts.archived}</span>}
             </button>
           </div>
         </div>

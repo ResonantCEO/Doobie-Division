@@ -146,6 +146,7 @@ export const orders = pgTable("orders", {
   paymentPhotoUrl: text("payment_photo_url"),
   assignedUserId: varchar("assigned_user_id").references(() => users.id),
   notes: text("notes"),
+  archived: boolean("archived").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

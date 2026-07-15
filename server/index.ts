@@ -226,6 +226,19 @@ app.use((req, res, next) => {
     }
   }
 
+  // Ensure archived column exists on orders table
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false`);
+    console.log("✓ Verified orders.archived column exists");
+  } catch (error: any) {
+    if (error?.message?.includes("already exists") || error?.message?.includes("duplicate")) {
+      console.log("✓ orders.archived column already exists");
+    } else {
+      console.warn("⚠ Could not verify orders.archived column:", error?.message);
+    }
+  }
+
   // Ensure order_sequences table exists for atomic order number generation
   try {
     const { sql } = await import("./db");

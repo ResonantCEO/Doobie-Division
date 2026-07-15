@@ -1667,6 +1667,15 @@ export class DatabaseStorage implements IStorage {
     hideOldDelivered?: boolean;
   } = {}): Promise<Order[]> {
     try {
+      // Auto-archive shipped orders older than 23 hours (raw SQL for reliability)
+      try {
+        const { sql: rawSql } = await import("./db");
+        const twentyThreeHoursAgo = new Date(Date.now() - 23 * 60 * 60 * 1000);
+        await rawSql`UPDATE orders SET archived = true, updated_at = NOW() WHERE status = 'shipped' AND archived = false AND updated_at < ${twentyThreeHoursAgo}`;
+      } catch (archiveErr: any) {
+        console.warn('[getOrders] Auto-archive step failed (non-fatal):', archiveErr?.message);
+      }
+
       let query = db
         .select({
           id: orders.id,
@@ -1678,6 +1687,7 @@ export class DatabaseStorage implements IStorage {
           shippingAddress: orders.shippingAddress,
           total: orders.total,
           status: orders.status,
+          archived: orders.archived,
           paymentMethod: orders.paymentMethod,
           assignedUserId: orders.assignedUserId,
           notes: orders.notes,
