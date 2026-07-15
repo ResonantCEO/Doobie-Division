@@ -644,7 +644,7 @@ export class DatabaseStorage implements IStorage {
     } else if (filters?.status === 'out_of_stock') {
       conditions.push(eq(products.stock, 0));
     } else if (filters?.status === 'in_stock') {
-      conditions.push(sql`${products.stock} > ${products.minStockThreshold}`);
+      conditions.push(sql`${products.stock} > 0`);
     }
 
     let finalQuery = query;
