@@ -66,6 +66,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
   const [prePayPhotoFile, setPrePayPhotoFile] = useState<File | null>(null);
   const [prePayPhotoPreview, setPrePayPhotoPreview] = useState<string | null>(null);
+  const isBeforeNoon = new Date().getHours() < 12;
+  const [runPreference, setRunPreference] = useState<"1st" | "2nd">("2nd");
 
   // Compute BOGO savings: sum the full price value of all isFree items
   const bogoSavings = (() => {
@@ -343,7 +345,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         total: finalTotal.toFixed(2),
         paymentMethod,
         paymentPhotoUrl: paymentPhotoUrl || null,
-        notes: shippingForm.notes,
+        notes: [`[${runPreference} Run]`, shippingForm.notes].filter(Boolean).join(" — "),
       };
       orderData.originalTotal = state.total.toFixed(2);
       if (appliedPromo) {
@@ -997,6 +999,40 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   rows={2}
                 />
               </div>
+            </div>
+
+            {/* Run Preference Selection */}
+            <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+              <p className="text-sm font-medium">Delivery Run</p>
+              <div className="flex gap-3">
+                {isBeforeNoon && (
+                  <button
+                    type="button"
+                    onClick={() => setRunPreference("1st")}
+                    className={`flex-1 rounded-md border py-2 text-sm font-medium transition-colors ${
+                      runPreference === "1st"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border hover:border-primary hover:text-foreground"
+                    }`}
+                  >
+                    1st Run
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setRunPreference("2nd")}
+                  className={`flex-1 rounded-md border py-2 text-sm font-medium transition-colors ${
+                    runPreference === "2nd"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-border hover:border-primary hover:text-foreground"
+                  }`}
+                >
+                  2nd Run
+                </button>
+              </div>
+              {!isBeforeNoon && (
+                <p className="text-xs text-muted-foreground">1st run orders are only available before 12:00 PM.</p>
+              )}
             </div>
 
             {/* Pre-Pay Photo Upload Section */}
