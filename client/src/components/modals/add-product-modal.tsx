@@ -294,7 +294,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         return (
           Math.round(parseFloat(lbs || "0") * 448) +
           Math.round(parseFloat(oz || "0") * 28) +
-          Math.round(parseFloat(g || "0"))
+          Math.floor(parseFloat(g || "0"))
         );
       };
 
@@ -941,7 +941,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                         <Input
                           type="number"
                           min="0"
-                          step="0.1"
+                          step="1"
                           placeholder="0"
                           value={stockG}
                           onChange={(e) => setStockG(e.target.value)}
@@ -986,7 +986,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                     <Input
                       type="number"
                       min="0"
-                      step="0.1"
+                      step="1"
                       placeholder="5"
                       value={minStockG}
                       onChange={(e) => setMinStockG(e.target.value)}
