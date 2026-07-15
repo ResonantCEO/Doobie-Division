@@ -971,7 +971,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Check if the applied promo code bypasses the purchase minimum
-          const promoCodeStr = (orderData as any).promoCode as string | undefined;
+          // NOTE: promoCode is not in insertOrderSchema, so read from raw request body
+          const promoCodeStr = (order.promoCode || (orderData as any).promoCode) as string | undefined;
           let promoBypassesMinimum = false;
           if (promoCodeStr) {
             const promoRecord = await storage.getPromoCodeByCode(promoCodeStr);
