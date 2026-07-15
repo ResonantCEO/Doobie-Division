@@ -615,6 +615,42 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
     },
   });
 
+  const archiveAllShippedMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/orders/archive-all-shipped`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Archived", description: "All shipped orders have been moved to Archived." });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Unauthorized", description: "You are logged out. Logging in again...", variant: "destructive" });
+        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        return;
+      }
+      toast({ title: "Error", description: "Failed to archive shipped orders", variant: "destructive" });
+    },
+  });
+
+  const clearArchivedMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/orders/archived`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Cleared", description: "All archived orders have been permanently removed." });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Unauthorized", description: "You are logged out. Logging in again...", variant: "destructive" });
+        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        return;
+      }
+      toast({ title: "Error", description: "Failed to clear archived orders", variant: "destructive" });
+    },
+  });
+
   const matchesSearch = (order: Order, q: string): boolean => {
     if (!q) return true;
     const lower = q.toLowerCase();
@@ -1224,7 +1260,7 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
           <AlertDialogHeader>
             <AlertDialogTitle>Clear {getTabLabel(activeTab)} Orders</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete all {getTabLabel(activeTab).toLowerCase()} orders? This action cannot be undone. These orders and their items will be permanently removed.
+              Are you sure you want to permanently delete all {getTabLabel(activeTab).toLowerCase()} orders? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1232,7 +1268,11 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={() => {
-                clearAllOrdersMutation.mutate(getStatusesForTab(activeTab));
+                if (activeTab === "archived") {
+                  clearArchivedMutation.mutate();
+                } else {
+                  clearAllOrdersMutation.mutate(getStatusesForTab(activeTab));
+                }
                 setShowClearAllDialog(false);
               }}
             >
@@ -1270,12 +1310,24 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
             <Button
               variant="outline"
               size="sm"
+              className="text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+              onClick={() => archiveAllShippedMutation.mutate()}
+              disabled={archiveAllShippedMutation.isPending}
+            >
+              <Archive className="h-4 w-4 mr-1.5" />
+              {archiveAllShippedMutation.isPending ? "Archiving..." : "Archive All"}
+            </Button>
+          )}
+          {(user?.role === 'admin' || user?.role === 'manager') && activeTab === "archived" && filteredOrders.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
               className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
               onClick={() => setShowClearAllDialog(true)}
-              disabled={clearAllOrdersMutation.isPending}
+              disabled={clearArchivedMutation.isPending}
             >
               <Trash2 className="h-4 w-4 mr-1.5" />
-              {clearAllOrdersMutation.isPending ? "Clearing..." : "Clear Shipped Orders"}
+              {clearArchivedMutation.isPending ? "Clearing..." : "Clear Archived"}
             </Button>
           )}
         </div>

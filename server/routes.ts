@@ -1249,6 +1249,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Archive all shipped orders
+  app.post('/api/orders/archive-all-shipped', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const { sql: pool } = await import("./db");
+      await pool.query(`UPDATE orders SET archived = true, updated_at = NOW() WHERE status = 'shipped' AND archived = false`);
+      res.json({ message: "All shipped orders have been archived" });
+    } catch (error) {
+      console.error('Failed to archive shipped orders:', error);
+      res.status(500).json({ message: "Failed to archive shipped orders" });
+    }
+  });
+
+  // Delete all archived orders
+  app.delete('/api/orders/archived', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const { sql: pool } = await import("./db");
+      await pool.query(`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE archived = true)`);
+      await pool.query(`DELETE FROM orders WHERE archived = true`);
+      res.json({ message: "All archived orders have been cleared" });
+    } catch (error) {
+      console.error('Failed to clear archived orders:', error);
+      res.status(500).json({ message: "Failed to clear archived orders" });
+    }
+  });
+
   // Bulk ship all packed orders
   app.post('/api/orders/ship-all-packed', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
