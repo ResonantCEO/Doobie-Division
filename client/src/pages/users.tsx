@@ -403,10 +403,6 @@ export default function UsersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h2>
-        <Button onClick={handleInviteUser} className="w-full sm:w-auto">
-          <UserPlus className="h-4 w-4 mr-2" />
-          Invite User
-        </Button>
       </div>
 
       {/* Pending Approvals Alert */}
