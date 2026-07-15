@@ -66,7 +66,9 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
   const [prePayPhotoFile, setPrePayPhotoFile] = useState<File | null>(null);
   const [prePayPhotoPreview, setPrePayPhotoPreview] = useState<string | null>(null);
-  const isBeforeNoon = new Date().getHours() < 12;
+  const currentHour = new Date().getHours();
+  const isBeforeNoon = currentHour < 12;
+  const isAfter5pm = currentHour >= 17;
   const [runPreference, setRunPreference] = useState<"1st" | "2nd">("2nd");
 
   // Compute BOGO savings: sum the full price value of all isFree items
@@ -345,7 +347,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         total: finalTotal.toFixed(2),
         paymentMethod,
         paymentPhotoUrl: paymentPhotoUrl || null,
-        notes: [`[${runPreference} Run]`, shippingForm.notes].filter(Boolean).join(" — "),
+        notes: [isAfter5pm ? "[Next Day 1st Run]" : `[${runPreference} Run]`, shippingForm.notes].filter(Boolean).join(" — "),
       };
       orderData.originalTotal = state.total.toFixed(2);
       if (appliedPromo) {
@@ -1004,33 +1006,42 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             {/* Run Preference Selection */}
             <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
               <p className="text-sm font-medium">Delivery Run</p>
-              <div className="flex gap-3">
-                {isBeforeNoon && (
+              {isAfter5pm ? (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-center space-y-1">
+                  <p className="text-sm font-medium text-amber-600 dark:text-amber-400">5:00pm Cutoff Passed</p>
+                  <p className="text-xs text-muted-foreground">Your order will be queued for the next day's <span className="font-medium">1st Run</span> (12:30pm dispatch).</p>
+                </div>
+              ) : (
+                <div className="flex gap-3">
+                  {isBeforeNoon && (
+                    <button
+                      type="button"
+                      onClick={() => setRunPreference("1st")}
+                      className={`flex-1 rounded-md border py-2.5 px-3 text-left transition-colors ${
+                        runPreference === "1st"
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-foreground border-border hover:border-primary"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold leading-tight">1st Run</p>
+                      <p className={`text-xs leading-tight mt-0.5 ${runPreference === "1st" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>12:00pm Cutoff · 12:30pm Dispatch</p>
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setRunPreference("1st")}
-                    className={`flex-1 rounded-md border py-2 text-sm font-medium transition-colors ${
-                      runPreference === "1st"
+                    onClick={() => setRunPreference("2nd")}
+                    className={`flex-1 rounded-md border py-2.5 px-3 text-left transition-colors ${
+                      runPreference === "2nd"
                         ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-muted-foreground border-border hover:border-primary hover:text-foreground"
+                        : "bg-background text-foreground border-border hover:border-primary"
                     }`}
                   >
-                    1st Run
+                    <p className="text-sm font-semibold leading-tight">2nd Run</p>
+                    <p className={`text-xs leading-tight mt-0.5 ${runPreference === "2nd" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>5:00pm Cutoff · 5:30pm Dispatch</p>
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setRunPreference("2nd")}
-                  className={`flex-1 rounded-md border py-2 text-sm font-medium transition-colors ${
-                    runPreference === "2nd"
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background text-muted-foreground border-border hover:border-primary hover:text-foreground"
-                  }`}
-                >
-                  2nd Run
-                </button>
-              </div>
-              {!isBeforeNoon && (
+                </div>
+              )}
+              {!isBeforeNoon && !isAfter5pm && (
                 <p className="text-xs text-muted-foreground">1st run orders are only available before 12:00 PM.</p>
               )}
             </div>
