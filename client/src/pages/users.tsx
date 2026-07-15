@@ -45,7 +45,8 @@ import {
   Activity,
   Save,
   ShoppingCart,
-  Trash2
+  Trash2,
+  Search
 } from "lucide-react";
 import { format } from "date-fns";
 import type { User } from "@shared/schema";
@@ -65,6 +66,7 @@ export default function UsersPage() {
   const [userToSuspend, setUserToSuspend] = useState<User | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
 
   // Fetch users with stats
@@ -227,6 +229,20 @@ export default function UsersPage() {
 
   const stats = getUserStats();
   const pendingUsers = users.filter(u => u.status === 'pending');
+
+  const filteredUsers = searchQuery.trim()
+    ? users.filter((u) => {
+        const q = searchQuery.toLowerCase();
+        return (
+          `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+          (u.email?.toLowerCase().includes(q)) ||
+          (u.telegramUsername?.toLowerCase().includes(q)) ||
+          (u.city?.toLowerCase().includes(q)) ||
+          (u.state?.toLowerCase().includes(q)) ||
+          (u.address?.toLowerCase().includes(q))
+        );
+      })
+    : users;
 
   const getRoleBadge = (role: string) => {
     switch (role?.toLowerCase()) {
@@ -473,20 +489,29 @@ export default function UsersPage() {
 
       {/* Users Table */}
       <Card>
-        <div className="px-4 md:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-4 md:px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">All Users</h3>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <Input
+              placeholder="Search users..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
         </div>
         <CardContent className="p-0">
-          {users.length === 0 ? (
+          {filteredUsers.length === 0 ? (
             <div className="text-center py-12">
               <UsersIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 text-lg">No users found</p>
+              <p className="text-gray-500 text-lg">{searchQuery.trim() ? "No users match your search" : "No users found"}</p>
             </div>
           ) : (
             <>
               {/* Mobile Card View */}
               <div className="md:hidden space-y-3 p-4">
-                {users.map((user) => (
+                {filteredUsers.map((user) => (
                   <div key={user.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
                     {/* User Header */}
                     <div className="flex items-start justify-between">
@@ -692,7 +717,7 @@ export default function UsersPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((user) => (
+                    {filteredUsers.map((user) => (
                       <TableRow key={user.id}>
                         <TableCell>
                           <div className="flex items-center space-x-3">
