@@ -722,6 +722,14 @@ export const insertPriceTemplateSchema = createInsertSchema(priceTemplates).omit
 
 export type PriceTemplate = typeof priceTemplates.$inferSelect;
 
+// Site settings - simple key/value store for feature flags and global config
+export const siteSettings = pgTable("site_settings", {
+  key: varchar("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
+export type SiteSetting = typeof siteSettings.$inferSelect;
+
 // Analytics snapshot tables - preserve order data after deletion so reports never lose history
 export const analyticsOrdersSnapshot = pgTable("analytics_orders_snapshot", {
   id: serial("id").primaryKey(),

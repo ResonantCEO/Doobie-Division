@@ -23,6 +23,7 @@ import {
   boardPosts,
   analyticsOrdersSnapshot,
   analyticsOrderItemsSnapshot,
+  siteSettings,
   type Discount,
   type PromotionalAd,
   type AccessPassword,
@@ -224,6 +225,10 @@ export interface IStorage {
   createPriceTemplate(data: any): Promise<any>;
   updatePriceTemplate(id: number, data: any): Promise<any>;
   deletePriceTemplate(id: number): Promise<void>;
+
+  // Site settings
+  getSiteSetting(key: string): Promise<string | null>;
+  setSiteSetting(key: string, value: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4273,6 +4278,20 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBoardPost(id: number): Promise<void> {
     await retryQuery(() => db.delete(boardPosts).where(eq(boardPosts.id, id)));
+  }
+
+  async getSiteSetting(key: string): Promise<string | null> {
+    const results = await retryQuery(() =>
+      db.select().from(siteSettings).where(eq(siteSettings.key, key))
+    );
+    return results[0]?.value ?? null;
+  }
+
+  async setSiteSetting(key: string, value: string): Promise<void> {
+    await retryQuery(() =>
+      db.insert(siteSettings).values({ key, value })
+        .onConflictDoUpdate({ target: siteSettings.key, set: { value } })
+    );
   }
 }
 

@@ -140,6 +140,21 @@ export default function AdminPage() {
     }
   });
 
+  // Delivery runs feature toggle
+  const { data: deliveryRunsSetting, isLoading: isLoadingDeliveryRuns } = useQuery<{ key: string; value: string | null }>({
+    queryKey: ["/api/settings/delivery_runs_enabled"],
+  });
+  const deliveryRunsEnabled = deliveryRunsSetting?.value !== "false";
+  const toggleDeliveryRunsMutation = useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiRequest("PUT", "/api/admin/settings/delivery_runs_enabled", { value: String(enabled) }),
+    onSuccess: (_data, enabled) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/delivery_runs_enabled"] });
+      toast({ title: "Setting saved", description: `Delivery run selection has been ${enabled ? "enabled" : "disabled"}.` });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to update setting.", variant: "destructive" }),
+  });
+
   const { data: accessPasswords = [], isLoading: isLoadingPasswords } = useQuery<AccessPassword[]>({
     queryKey: ["/api/admin/access-passwords"],
     queryFn: async () => {
@@ -1587,6 +1602,36 @@ export default function AdminPage() {
 
         {/* Access Passwords Tab */}
         <TabsContent value="access">
+          {/* Delivery Runs Feature Toggle */}
+          <Card className="mb-4">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TruckIcon className="h-4 w-4" />
+                Delivery Run Selection
+              </CardTitle>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                When enabled, customers can choose between 1st Run and 2nd Run at checkout.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Show delivery run options at checkout</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Customers see 1st Run / 2nd Run selector on the confirm order screen.</p>
+                </div>
+                {isLoadingDeliveryRuns ? (
+                  <div className="h-6 w-11 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                ) : (
+                  <Switch
+                    checked={deliveryRunsEnabled}
+                    onCheckedChange={(val) => toggleDeliveryRunsMutation.mutate(val)}
+                    disabled={toggleDeliveryRunsMutation.isPending}
+                  />
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">

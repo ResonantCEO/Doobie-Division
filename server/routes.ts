@@ -2546,6 +2546,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Site settings - get a setting (public for feature flags)
+  app.get("/api/settings/:key", async (req, res) => {
+    try {
+      const value = await storage.getSiteSetting(req.params.key);
+      res.json({ key: req.params.key, value });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch setting" });
+    }
+  });
+
+  // Site settings - update a setting (admin only)
+  app.put("/api/admin/settings/:key", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const { value } = req.body;
+      if (value === undefined) return res.status(400).json({ message: "value is required" });
+      await storage.setSiteSetting(req.params.key, String(value));
+      res.json({ key: req.params.key, value: String(value) });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update setting" });
+    }
+  });
+
   // Promotional Ads - public (for storefront carousel)
   app.get("/api/ads", async (req, res) => {
     try {
