@@ -721,4 +721,34 @@ export const insertPriceTemplateSchema = createInsertSchema(priceTemplates).omit
 });
 
 export type PriceTemplate = typeof priceTemplates.$inferSelect;
-export type InsertPriceTemplate = z.infer<typeof insertPriceTemplateSchema>;
+
+// Analytics snapshot tables - preserve order data after deletion so reports never lose history
+export const analyticsOrdersSnapshot = pgTable("analytics_orders_snapshot", {
+  id: serial("id").primaryKey(),
+  originalOrderId: integer("original_order_id").notNull(),
+  customerId: varchar("customer_id"),
+  status: varchar("status").notNull(),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at"),
+  customerCity: varchar("customer_city"),
+  snapshotAt: timestamp("snapshot_at").defaultNow(),
+}, (table) => ({
+  originalOrderIdx: index("IDX_aos_original_order_id").on(table.originalOrderId),
+  createdAtIdx: index("IDX_aos_created_at").on(table.createdAt),
+}));
+
+export const analyticsOrderItemsSnapshot = pgTable("analytics_order_items_snapshot", {
+  id: serial("id").primaryKey(),
+  originalOrderId: integer("original_order_id").notNull(),
+  productId: integer("product_id"),
+  productName: varchar("product_name"),
+  categoryId: integer("category_id"),
+  categoryName: varchar("category_name"),
+  quantity: integer("quantity").notNull().default(0),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull().default("0"),
+  purchaseCost: decimal("purchase_cost", { precision: 10, scale: 2 }).default("0"),
+  snapshotAt: timestamp("snapshot_at").defaultNow(),
+}, (table) => ({
+  originalOrderIdx: index("IDX_aois_original_order_id").on(table.originalOrderId),
+}));

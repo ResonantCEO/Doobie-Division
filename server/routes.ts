@@ -1278,6 +1278,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/orders/archived', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
       const { sql: pool } = await import("./db");
+      // Snapshot archived orders before deleting so analytics data is preserved
+      const archivedIds = await pool.query(`SELECT id FROM orders WHERE archived = true`);
+      const ids = (archivedIds as any).rows.map((r: any) => r.id) as number[];
+      if (ids.length > 0) {
+        try {
+          await storage.snapshotOrdersBeforeArchiveDeletion(ids);
+        } catch (e) {
+          console.warn('Failed to snapshot archived orders for analytics:', e);
+        }
+      }
       await pool.query(`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE archived = true)`);
       await pool.query(`DELETE FROM orders WHERE archived = true`);
       res.json({ message: "All archived orders have been cleared" });
@@ -1547,23 +1557,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-      // Get hourly data for today
-      const result = await db
-        .select({
-          hour: sql<string>`EXTRACT(HOUR FROM ${orders.createdAt})`,
-          sales: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
-          orders: sql<number>`COUNT(*)`,
-        })
-        .from(orders)
-        .where(
-          and(
-            gte(orders.createdAt, startOfDay),
-            lt(orders.createdAt, endOfDay),
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed'])
-          )
+      // Get hourly data for today (live + snapshot)
+      const rawResult = await db.execute(sql`
+        WITH all_orders AS (
+          SELECT total, created_at, status FROM orders
+          UNION ALL
+          SELECT total, created_at, status FROM analytics_orders_snapshot
         )
-        .groupBy(sql`EXTRACT(HOUR FROM ${orders.createdAt})`)
-        .orderBy(sql`EXTRACT(HOUR FROM ${orders.createdAt})`);
+        SELECT
+          EXTRACT(HOUR FROM created_at) AS hour,
+          COALESCE(SUM(CAST(total AS NUMERIC)), 0) AS sales,
+          COUNT(*) AS orders
+        FROM all_orders
+        WHERE created_at >= ${startOfDay} AND created_at < ${endOfDay}
+          AND status IN ('shipped', 'processing', 'pending', 'packed', 'delivered', 'completed')
+        GROUP BY EXTRACT(HOUR FROM created_at)
+        ORDER BY EXTRACT(HOUR FROM created_at)
+      `);
+      const result = (rawResult.rows as any[]).map(r => ({ hour: String(r.hour), sales: Number(r.sales), orders: Number(r.orders) }));
 
       // Format data for chart - create 24 hours with defaults
       const hourlyData = Array.from({ length: 24 }, (_, i) => {
@@ -1589,7 +1600,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-      const topProducts = await db
+      // Live order items for today
+      const liveTopProducts = await db
         .select({
           product: products,
           sales: sql<number>`SUM(${orderItems.quantity})`,
@@ -1608,6 +1620,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .groupBy(products.id)
         .orderBy(desc(sql`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`))
         .limit(10);
+
+      // Snapshot items for today
+      const snapTop = await db.execute(sql`
+        SELECT s.product_id, s.product_name, SUM(s.quantity) AS sales, SUM(CAST(s.subtotal AS NUMERIC)) AS revenue
+        FROM analytics_order_items_snapshot s
+        INNER JOIN analytics_orders_snapshot ao ON s.original_order_id = ao.original_order_id
+        WHERE ao.created_at >= ${startOfDay} AND ao.created_at < ${endOfDay}
+          AND ao.status IN ('shipped', 'processing', 'pending', 'packed', 'delivered', 'completed')
+          AND s.product_id IS NOT NULL
+        GROUP BY s.product_id, s.product_name
+      `);
+
+      // Merge live + snapshot results
+      const merged = new Map<number, any>();
+      for (const r of liveTopProducts) {
+        merged.set(r.product.id, { product: r.product, sales: Number(r.sales), revenue: Number(r.revenue) });
+      }
+      for (const snap of (snapTop.rows as any[])) {
+        const pid = Number(snap.product_id);
+        if (merged.has(pid)) {
+          const ex = merged.get(pid)!;
+          ex.sales += Number(snap.sales);
+          ex.revenue += Number(snap.revenue);
+        } else {
+          const [prod] = await db.select().from(products).where(eq(products.id, pid));
+          if (prod) merged.set(pid, { product: prod, sales: Number(snap.sales), revenue: Number(snap.revenue) });
+        }
+      }
+      const topProducts = Array.from(merged.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
 
       res.json(topProducts);
     } catch (error) {
@@ -1747,44 +1788,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-      // Get all customers who ordered today
-      const customersToday = await db
-        .select({ 
-          customerId: orders.customerId 
-        })
-        .from(orders)
-        .where(
-          and(
-            gte(orders.createdAt, startOfDay),
-            lt(orders.createdAt, endOfDay),
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed']),
-            sql`${orders.customerId} IS NOT NULL`
+      // Get customers who ordered today (live + snapshot) with no prior orders
+      const newCustResult = await db.execute(sql`
+        WITH all_orders AS (
+          SELECT customer_id, created_at, status FROM orders
+          UNION ALL
+          SELECT customer_id, created_at, status FROM analytics_orders_snapshot
+        ),
+        today_customers AS (
+          SELECT DISTINCT customer_id
+          FROM all_orders
+          WHERE created_at >= ${startOfDay} AND created_at < ${endOfDay}
+            AND status IN ('shipped', 'processing', 'pending', 'packed', 'delivered', 'completed')
+            AND customer_id IS NOT NULL
+        ),
+        new_customers AS (
+          SELECT tc.customer_id
+          FROM today_customers tc
+          WHERE NOT EXISTS (
+            SELECT 1 FROM all_orders ao
+            WHERE ao.customer_id = tc.customer_id AND ao.created_at < ${startOfDay}
           )
         )
-        .groupBy(orders.customerId);
-
-      // For each customer, check if they have orders before today
-      let newCustomersCount = 0;
-      for (const customer of customersToday) {
-        if (customer.customerId) {
-          const previousOrders = await db
-            .select({ count: sql<number>`COUNT(*)` })
-            .from(orders)
-            .where(
-              and(
-                eq(orders.customerId, customer.customerId),
-                lt(orders.createdAt, startOfDay)
-              )
-            );
-          
-          if (Number(previousOrders[0]?.count || 0) === 0) {
-            newCustomersCount++;
-          }
-        }
-      }
+        SELECT COUNT(*) AS count FROM new_customers
+      `);
 
       res.json({
-        newCustomersToday: newCustomersCount
+        newCustomersToday: Number((newCustResult.rows[0] as any)?.count || 0)
       });
     } catch (error) {
       console.error('Daily new customers error:', error);
@@ -1799,44 +1829,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-      // Get all customers who ordered today
-      const customersToday = await db
-        .select({ 
-          customerId: orders.customerId 
-        })
-        .from(orders)
-        .where(
-          and(
-            gte(orders.createdAt, startOfDay),
-            lt(orders.createdAt, endOfDay),
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed']),
-            sql`${orders.customerId} IS NOT NULL`
+      // Get return customers who ordered today (live + snapshot)
+      const returnCustResult = await db.execute(sql`
+        WITH all_orders AS (
+          SELECT customer_id, created_at, status FROM orders
+          UNION ALL
+          SELECT customer_id, created_at, status FROM analytics_orders_snapshot
+        ),
+        today_customers AS (
+          SELECT DISTINCT customer_id
+          FROM all_orders
+          WHERE created_at >= ${startOfDay} AND created_at < ${endOfDay}
+            AND status IN ('shipped', 'processing', 'pending', 'packed', 'delivered', 'completed')
+            AND customer_id IS NOT NULL
+        ),
+        return_customers AS (
+          SELECT tc.customer_id
+          FROM today_customers tc
+          WHERE EXISTS (
+            SELECT 1 FROM all_orders ao
+            WHERE ao.customer_id = tc.customer_id AND ao.created_at < ${startOfDay}
           )
         )
-        .groupBy(orders.customerId);
-
-      // For each customer, check if they have orders before today
-      let returnCustomersCount = 0;
-      for (const customer of customersToday) {
-        if (customer.customerId) {
-          const previousOrders = await db
-            .select({ count: sql<number>`COUNT(*)` })
-            .from(orders)
-            .where(
-              and(
-                eq(orders.customerId, customer.customerId),
-                lt(orders.createdAt, startOfDay)
-              )
-            );
-          
-          if (Number(previousOrders[0]?.count || 0) > 0) {
-            returnCustomersCount++;
-          }
-        }
-      }
+        SELECT COUNT(*) AS count FROM return_customers
+      `);
 
       res.json({
-        returnCustomersToday: returnCustomersCount
+        returnCustomersToday: Number((returnCustResult.rows[0] as any)?.count || 0)
       });
     } catch (error) {
       console.error('Daily return customers error:', error);
@@ -1899,22 +1918,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       since.setDate(since.getDate() - days);
 
       const result = await db.execute(sql`
+        WITH all_orders AS (
+          SELECT o.id, o.total, o.status, o.created_at,
+            COALESCE(u.city, 'Unknown') AS city
+          FROM orders o
+          LEFT JOIN users u ON o.customer_id = u.id
+          UNION ALL
+          SELECT s.original_order_id AS id, s.total, s.status, s.created_at,
+            COALESCE(s.customer_city, 'Unknown') AS city
+          FROM analytics_orders_snapshot s
+        )
         SELECT
-          COALESCE(u.city, 'Unknown') AS city,
-          COUNT(o.id)::int AS total_orders,
-          COALESCE(SUM(o.total::numeric), 0)::float AS total_revenue,
-          COUNT(CASE WHEN o.status IN ('pending', 'processing', 'packed') THEN 1 END)::int AS outstanding_orders,
-          COUNT(CASE WHEN o.status IN ('shipped', 'delivered', 'completed') THEN 1 END)::int AS completed_orders,
-          COUNT(CASE WHEN o.status = 'pending' THEN 1 END)::int AS pending_orders,
-          COUNT(CASE WHEN o.status = 'processing' THEN 1 END)::int AS processing_orders,
-          COUNT(CASE WHEN o.status = 'packed' THEN 1 END)::int AS packed_orders,
-          COUNT(CASE WHEN o.status = 'shipped' THEN 1 END)::int AS shipped_orders,
-          COALESCE(AVG(o.total::numeric), 0)::float AS avg_order_value,
-          MAX(o.created_at) AS last_order_date
-        FROM orders o
-        LEFT JOIN users u ON o.customer_id = u.id
-        WHERE o.created_at >= ${since}
-        GROUP BY COALESCE(u.city, 'Unknown')
+          city,
+          COUNT(id)::int AS total_orders,
+          COALESCE(SUM(total::numeric), 0)::float AS total_revenue,
+          COUNT(CASE WHEN status IN ('pending', 'processing', 'packed') THEN 1 END)::int AS outstanding_orders,
+          COUNT(CASE WHEN status IN ('shipped', 'delivered', 'completed') THEN 1 END)::int AS completed_orders,
+          COUNT(CASE WHEN status = 'pending' THEN 1 END)::int AS pending_orders,
+          COUNT(CASE WHEN status = 'processing' THEN 1 END)::int AS processing_orders,
+          COUNT(CASE WHEN status = 'packed' THEN 1 END)::int AS packed_orders,
+          COUNT(CASE WHEN status = 'shipped' THEN 1 END)::int AS shipped_orders,
+          COALESCE(AVG(total::numeric), 0)::float AS avg_order_value,
+          MAX(created_at) AS last_order_date
+        FROM all_orders
+        WHERE created_at >= ${since}
+        GROUP BY city
         ORDER BY total_orders DESC
       `);
 

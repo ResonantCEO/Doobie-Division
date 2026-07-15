@@ -21,6 +21,8 @@ import {
   promoCodeUses,
   priceTemplates,
   boardPosts,
+  analyticsOrdersSnapshot,
+  analyticsOrderItemsSnapshot,
   type Discount,
   type PromotionalAd,
   type AccessPassword,
@@ -2449,10 +2451,111 @@ export class DatabaseStorage implements IStorage {
     return updatedOrder;
   }
 
+  // Public alias so routes.ts can snapshot archived orders before raw SQL deletion
+  async snapshotOrdersBeforeArchiveDeletion(orderIds: number[]): Promise<void> {
+    return this.snapshotOrdersBeforeDeletion(orderIds);
+  }
+
+  // Snapshot orders and their items before deletion so analytics data is preserved
+  private async snapshotOrdersBeforeDeletion(orderIds: number[]): Promise<void> {
+    if (orderIds.length === 0) return;
+
+    // Avoid double-snapshotting already-snapshotted orders
+    const alreadySnapped = await db
+      .select({ originalOrderId: analyticsOrdersSnapshot.originalOrderId })
+      .from(analyticsOrdersSnapshot)
+      .where(inArray(analyticsOrdersSnapshot.originalOrderId, orderIds));
+    const alreadySnappedIds = new Set(alreadySnapped.map(r => r.originalOrderId));
+    const toSnapshot = orderIds.filter(id => !alreadySnappedIds.has(id));
+    if (toSnapshot.length === 0) return;
+
+    // Fetch orders with customer city
+    const ordersToSnap = await db
+      .select({
+        id: orders.id,
+        customerId: orders.customerId,
+        status: orders.status,
+        total: orders.total,
+        createdAt: orders.createdAt,
+        updatedAt: orders.updatedAt,
+        customerCity: users.city,
+      })
+      .from(orders)
+      .leftJoin(users, eq(orders.customerId, users.id))
+      .where(inArray(orders.id, toSnapshot));
+
+    if (ordersToSnap.length > 0) {
+      await db.insert(analyticsOrdersSnapshot).values(
+        ordersToSnap.map(o => ({
+          originalOrderId: o.id,
+          customerId: o.customerId,
+          status: o.status,
+          total: o.total,
+          createdAt: o.createdAt!,
+          updatedAt: o.updatedAt,
+          customerCity: o.customerCity,
+        }))
+      );
+    }
+
+    // Fetch order items with product/category info and calculate purchase cost
+    const itemsToSnap = await db
+      .select({
+        orderId: orderItems.orderId,
+        productId: orderItems.productId,
+        productName: orderItems.productName,
+        categoryId: products.categoryId,
+        categoryName: categories.name,
+        quantity: orderItems.quantity,
+        subtotal: orderItems.subtotal,
+        purchasePrice: products.purchasePrice,
+        purchasePriceMethod: products.purchasePriceMethod,
+        purchasePricePerGram: products.purchasePricePerGram,
+        purchasePricePerOunce: products.purchasePricePerOunce,
+        pricePerGram: products.pricePerGram,
+        pricePerOunce: products.pricePerOunce,
+      })
+      .from(orderItems)
+      .leftJoin(products, eq(orderItems.productId, products.id))
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(inArray(orderItems.orderId, toSnapshot));
+
+    if (itemsToSnap.length > 0) {
+      await db.insert(analyticsOrderItemsSnapshot).values(
+        itemsToSnap.map(item => {
+          const subtotal = parseFloat(item.subtotal || '0');
+          let purchaseCost = subtotal * 0.7;
+          if (item.purchasePrice) {
+            purchaseCost = parseFloat(item.purchasePrice) * (item.quantity || 0);
+          } else if (item.purchasePricePerGram && item.pricePerGram && parseFloat(item.pricePerGram) > 0) {
+            purchaseCost = parseFloat(item.purchasePricePerGram) * (subtotal / parseFloat(item.pricePerGram));
+          } else if (item.purchasePricePerOunce && item.pricePerOunce && parseFloat(item.pricePerOunce) > 0) {
+            purchaseCost = parseFloat(item.purchasePricePerOunce) * (subtotal / parseFloat(item.pricePerOunce));
+          }
+          return {
+            originalOrderId: item.orderId!,
+            productId: item.productId,
+            productName: item.productName,
+            categoryId: item.categoryId,
+            categoryName: item.categoryName,
+            quantity: item.quantity,
+            subtotal: item.subtotal,
+            purchaseCost: purchaseCost.toFixed(2),
+          };
+        })
+      );
+    }
+  }
+
   async deleteOrder(id: number): Promise<void> {
     const existing = await retryQuery(() => db.select({ id: orders.id }).from(orders).where(eq(orders.id, id)));
     if (existing.length === 0) {
       throw new Error("Order not found");
+    }
+    try {
+      await this.snapshotOrdersBeforeDeletion([id]);
+    } catch (e) {
+      console.warn('[deleteOrder] Failed to snapshot order for analytics:', e);
     }
     try {
       await retryQuery(() => db.delete(orderItems).where(eq(orderItems.orderId, id)));
@@ -2472,10 +2575,22 @@ export class DatabaseStorage implements IStorage {
       const matchingOrders = await retryQuery(() => db.select({ id: orders.id }).from(orders).where(inArray(orders.status, statuses)));
       if (matchingOrders.length === 0) return 0;
       const orderIds = matchingOrders.map(o => o.id);
+      try {
+        await this.snapshotOrdersBeforeDeletion(orderIds);
+      } catch (e) {
+        console.warn('[clearAllOrders] Failed to snapshot orders for analytics:', e);
+      }
       await retryQuery(() => db.delete(orderItems).where(inArray(orderItems.orderId, orderIds)));
       const deleted = await retryQuery(() => db.delete(orders).where(inArray(orders.id, orderIds)).returning());
       try { invalidateCache.analytics(); } catch (e) { console.warn('Cache invalidation error:', e); }
       return deleted.length;
+    }
+    // Snapshot all orders first
+    const allOrderIds = await retryQuery(() => db.select({ id: orders.id }).from(orders));
+    try {
+      await this.snapshotOrdersBeforeDeletion(allOrderIds.map(o => o.id));
+    } catch (e) {
+      console.warn('[clearAllOrders] Failed to snapshot orders for analytics:', e);
     }
     await retryQuery(() => db.delete(orderItems));
     const deleted = await retryQuery(() => db.delete(orders).returning());
@@ -2494,20 +2609,22 @@ export class DatabaseStorage implements IStorage {
       startDate.setDate(startDate.getDate() - (days - 1));
       startDate.setHours(0, 0, 0, 0);
 
-      const [metrics] = await db
-        .select({
-          totalSales: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
-          totalOrders: sql<number>`COUNT(*)`,
-          averageOrderValue: sql<number>`COALESCE(AVG(CAST(${orders.total} AS NUMERIC)), 0)`,
-        })
-        .from(orders)
-        .where(
-          and(
-            sql`${orders.createdAt} >= ${startDate}`,
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed'])
-          )
-        );
+      const result = await db.execute(sql`
+        WITH all_orders AS (
+          SELECT total, created_at, status FROM orders
+          UNION ALL
+          SELECT total, created_at, status FROM analytics_orders_snapshot
+        )
+        SELECT
+          COALESCE(SUM(CAST(total AS NUMERIC)), 0) AS "totalSales",
+          COUNT(*) AS "totalOrders",
+          COALESCE(AVG(CAST(total AS NUMERIC)), 0) AS "averageOrderValue"
+        FROM all_orders
+        WHERE created_at >= ${startDate}
+          AND status IN ('shipped', 'processing', 'pending', 'packed', 'delivered', 'completed')
+      `);
 
+      const metrics = result.rows[0] as any;
       return {
         totalSales: Number(metrics.totalSales),
         totalOrders: Number(metrics.totalOrders),
@@ -2518,7 +2635,8 @@ export class DatabaseStorage implements IStorage {
 
   async getTopProducts(limit: number): Promise<{ product: Product; sales: number; revenue: number }[]> {
     return withCache(analyticsCache, generateCacheKey.topProducts(limit), async () => {
-      const results = await db
+      // Live order items joined with products
+      const liveResults = await db
         .select({
           product: products,
           sales: sql<number>`SUM(${orderItems.quantity})`,
@@ -2527,34 +2645,61 @@ export class DatabaseStorage implements IStorage {
         .from(orderItems)
         .innerJoin(products, eq(orderItems.productId, products.id))
         .innerJoin(orders, eq(orderItems.orderId, orders.id))
-        .where(
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
-        )
+        .where(inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed']))
         .groupBy(products.id)
         .orderBy(desc(sql`SUM(CAST(${orderItems.subtotal} AS NUMERIC))`))
         .limit(limit);
 
-      return results.map(r => ({
-        product: r.product,
-        sales: Number(r.sales),
-        revenue: Number(r.revenue),
-      }));
+      // Snapshot items - group by product_id
+      const snapResults = await db.execute(sql`
+        SELECT product_id, product_name,
+          SUM(quantity) AS sales,
+          SUM(CAST(subtotal AS NUMERIC)) AS revenue
+        FROM analytics_order_items_snapshot
+        WHERE product_id IS NOT NULL
+        GROUP BY product_id, product_name
+      `);
+
+      // Merge: for products already in live results add snapshot counts, else use snapshot only
+      const merged = new Map<number, { product: Product; sales: number; revenue: number }>();
+      for (const r of liveResults) {
+        merged.set(r.product.id, { product: r.product, sales: Number(r.sales), revenue: Number(r.revenue) });
+      }
+      for (const snap of (snapResults.rows as any[])) {
+        const pid = Number(snap.product_id);
+        if (merged.has(pid)) {
+          const existing = merged.get(pid)!;
+          existing.sales += Number(snap.sales);
+          existing.revenue += Number(snap.revenue);
+        } else {
+          // Product might still exist in DB even if order is gone
+          const [prod] = await db.select().from(products).where(eq(products.id, pid));
+          if (prod) {
+            merged.set(pid, { product: prod, sales: Number(snap.sales), revenue: Number(snap.revenue) });
+          }
+        }
+      }
+
+      return Array.from(merged.values())
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, limit);
     });
   }
 
   async getOrderStatusBreakdown(): Promise<{ status: string; count: number }[]> {
     return withCache(analyticsCache, generateCacheKey.orderStatusBreakdown(), async () => {
-      const results = await retryQuery(() =>
-        db
-          .select({
-            status: orders.status,
-            count: sql<number>`COUNT(*)`,
-          })
-          .from(orders)
-          .groupBy(orders.status)
-      );
+      const result = await db.execute(sql`
+        WITH all_orders AS (
+          SELECT status FROM orders
+          UNION ALL
+          SELECT status FROM analytics_orders_snapshot
+        )
+        SELECT status, COUNT(*) AS count
+        FROM all_orders
+        GROUP BY status
+      `);
 
-      return results.map(r => ({
+      return (result.rows as any[]).map(r => ({
         status: r.status,
         count: Number(r.count),
       }));
@@ -2566,24 +2711,25 @@ export class DatabaseStorage implements IStorage {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      const results = await db
-        .select({
-          date: sql<string>`DATE_TRUNC('day', ${orders.createdAt})`,
-          sales: sql<number>`SUM(CAST(${orders.total} AS NUMERIC))`,
-          orders: sql<number>`COUNT(*)`,
-          customers: sql<number>`COUNT(DISTINCT ${orders.customerId})`,
-        })
-        .from(orders)
-        .where(
-          and(
-            sql`${orders.createdAt} >= ${startDate}`,
-            inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed'])
-          )
+      const result = await db.execute(sql`
+        WITH all_orders AS (
+          SELECT total, created_at, status, customer_id FROM orders
+          UNION ALL
+          SELECT total, created_at, status, customer_id FROM analytics_orders_snapshot
         )
-        .groupBy(sql`DATE_TRUNC('day', ${orders.createdAt})`)
-        .orderBy(asc(sql`DATE_TRUNC('day', ${orders.createdAt})`));
+        SELECT
+          DATE_TRUNC('day', created_at) AS date,
+          SUM(CAST(total AS NUMERIC)) AS sales,
+          COUNT(*) AS orders,
+          COUNT(DISTINCT customer_id) AS customers
+        FROM all_orders
+        WHERE created_at >= ${startDate}
+          AND status IN ('shipped', 'processing', 'pending', 'packed', 'delivered', 'completed')
+        GROUP BY DATE_TRUNC('day', created_at)
+        ORDER BY DATE_TRUNC('day', created_at) ASC
+      `);
 
-      return results.map(r => ({
+      return (result.rows as any[]).map(r => ({
         date: typeof r.date === 'string' ? r.date.split('T')[0].split(' ')[0] : new Date(r.date as any).toISOString().split('T')[0],
         sales: Number(r.sales),
         orders: Number(r.orders),
@@ -2594,25 +2740,37 @@ export class DatabaseStorage implements IStorage {
 
   async getCategoryBreakdown(): Promise<{ name: string; value: number; revenue: number; fill: string }[]> {
     return withCache(analyticsCache, generateCacheKey.categoryBreakdown(), async () => {
-      const results = await db
-        .select({
-          categoryName: sql<string>`COALESCE(${categories.name}, 'Uncategorized')`,
-          value: sql<number>`COUNT(${orderItems.id})`,
-          revenue: sql<number>`COALESCE(SUM(CAST(${orderItems.subtotal} AS NUMERIC)), 0)`,
-        })
-        .from(orderItems)
-        .innerJoin(products, eq(orderItems.productId, products.id))
-        .leftJoin(categories, eq(products.categoryId, categories.id))
-        .innerJoin(orders, eq(orderItems.orderId, orders.id))
-        .where(
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
+      const result = await db.execute(sql`
+        WITH all_items AS (
+          SELECT
+            COALESCE(c.name, 'Uncategorized') AS category_name,
+            oi.subtotal
+          FROM order_items oi
+          LEFT JOIN products p ON oi.product_id = p.id
+          LEFT JOIN categories c ON p.category_id = c.id
+          INNER JOIN orders o ON oi.order_id = o.id
+          WHERE o.status IN ('shipped', 'processing', 'pending', 'packed', 'completed')
+          UNION ALL
+          SELECT
+            COALESCE(s.category_name, 'Uncategorized') AS category_name,
+            s.subtotal
+          FROM analytics_order_items_snapshot s
+          INNER JOIN analytics_orders_snapshot ao ON s.original_order_id = ao.original_order_id
+          WHERE ao.status IN ('shipped', 'processing', 'pending', 'packed', 'completed')
         )
-        .groupBy(sql`COALESCE(${categories.name}, 'Uncategorized')`);
+        SELECT
+          category_name,
+          COUNT(*) AS value,
+          COALESCE(SUM(CAST(subtotal AS NUMERIC)), 0) AS revenue
+        FROM all_items
+        GROUP BY category_name
+        ORDER BY revenue DESC
+      `);
 
       const colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
-      return results.map((r, index) => ({
-        name: r.categoryName || 'Uncategorized',
+      return (result.rows as any[]).map((r, index) => ({
+        name: r.category_name || 'Uncategorized',
         value: Number(r.value) || 0,
         revenue: Number(r.revenue) || 0,
         fill: colors[index % colors.length],
@@ -2634,86 +2792,92 @@ export class DatabaseStorage implements IStorage {
     const prevEndDate = new Date();
     prevEndDate.setDate(prevEndDate.getDate() - days);
 
-    // Current period sales
-    const currentSalesResult = await db
-      .select({
-        totalSales: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
-        totalOrders: sql<number>`COUNT(*)`,
-      })
-      .from(orders)
-      .where(
-        and(
-          sql`${orders.createdAt} >= ${startDate}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
-        )
-      );
+    // Current period sales (live + snapshot)
+    const currentPeriodResult = await db.execute(sql`
+      WITH all_orders AS (
+        SELECT total, created_at, status FROM orders
+        UNION ALL
+        SELECT total, created_at, status FROM analytics_orders_snapshot
+      )
+      SELECT
+        COALESCE(SUM(CAST(total AS NUMERIC)), 0) AS total_sales,
+        COUNT(*) AS total_orders
+      FROM all_orders
+      WHERE created_at >= ${startDate}
+        AND status IN ('shipped', 'processing', 'pending', 'packed', 'completed')
+    `);
 
-    // Previous period sales for growth calculation
-    const prevSalesResult = await db
-      .select({
-        totalSales: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
-      })
-      .from(orders)
-      .where(
-        and(
-          sql`${orders.createdAt} >= ${prevStartDate}`,
-          sql`${orders.createdAt} < ${prevEndDate}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
-        )
-      );
+    // Previous period sales for growth calculation (live + snapshot)
+    const prevPeriodResult = await db.execute(sql`
+      WITH all_orders AS (
+        SELECT total, created_at, status FROM orders
+        UNION ALL
+        SELECT total, created_at, status FROM analytics_orders_snapshot
+      )
+      SELECT COALESCE(SUM(CAST(total AS NUMERIC)), 0) AS total_sales
+      FROM all_orders
+      WHERE created_at >= ${prevStartDate} AND created_at < ${prevEndDate}
+        AND status IN ('shipped', 'processing', 'pending', 'packed', 'completed')
+    `);
 
-    // Return rate (cancelled orders / total orders)
-    const returnResult = await db
-      .select({
-        cancelledOrders: sql<number>`COUNT(*)`,
-      })
-      .from(orders)
-      .where(
-        and(
-          sql`${orders.createdAt} >= ${startDate}`,
-          eq(orders.status, 'cancelled')
-        )
-      );
+    // Return rate (cancelled orders / total orders) - live + snapshot
+    const cancelledResult = await db.execute(sql`
+      WITH all_orders AS (
+        SELECT created_at, status FROM orders
+        UNION ALL
+        SELECT created_at, status FROM analytics_orders_snapshot
+      )
+      SELECT COUNT(*) AS cancelled_orders
+      FROM all_orders
+      WHERE created_at >= ${startDate} AND status = 'cancelled'
+    `);
 
-    const currentSales = Number(currentSalesResult[0]?.totalSales || 0);
-    const currentOrders = Number(currentSalesResult[0]?.totalOrders || 0);
-    const prevSales = Number(prevSalesResult[0]?.totalSales || 0);
-    const cancelledOrders = Number(returnResult[0]?.cancelledOrders || 0);
+    const currentSales = Number((currentPeriodResult.rows[0] as any)?.total_sales || 0);
+    const currentOrders = Number((currentPeriodResult.rows[0] as any)?.total_orders || 0);
+    const prevSales = Number((prevPeriodResult.rows[0] as any)?.total_sales || 0);
+    const cancelledOrders = Number((cancelledResult.rows[0] as any)?.cancelled_orders || 0);
 
-    // Calculate net profit using actual purchase prices from order items
-    const profitResult = await db
-      .select({
-        totalRevenue: sql<number>`COALESCE(SUM(CAST(${orderItems.subtotal} AS NUMERIC)), 0)`,
-        totalCost: sql<number>`COALESCE(SUM(
-          CASE
-            WHEN ${products.purchasePriceMethod} = 'units' AND ${products.purchasePrice} IS NOT NULL
-              THEN CAST(${products.purchasePrice} AS NUMERIC) * ${orderItems.quantity}
-            WHEN ${products.purchasePriceMethod} = 'weight' AND ${products.purchasePricePerGram} IS NOT NULL AND ${products.pricePerGram} IS NOT NULL
-              THEN CAST(${products.purchasePricePerGram} AS NUMERIC) * (CAST(${orderItems.subtotal} AS NUMERIC) / NULLIF(CAST(${products.pricePerGram} AS NUMERIC), 0))
-            WHEN ${products.purchasePriceMethod} = 'weight' AND ${products.purchasePricePerOunce} IS NOT NULL AND ${products.pricePerOunce} IS NOT NULL
-              THEN CAST(${products.purchasePricePerOunce} AS NUMERIC) * (CAST(${orderItems.subtotal} AS NUMERIC) / NULLIF(CAST(${products.pricePerOunce} AS NUMERIC), 0))
-            WHEN ${products.purchasePrice} IS NOT NULL
-              THEN CAST(${products.purchasePrice} AS NUMERIC) * ${orderItems.quantity}
-            WHEN ${products.purchasePricePerGram} IS NOT NULL AND ${products.pricePerGram} IS NOT NULL
-              THEN CAST(${products.purchasePricePerGram} AS NUMERIC) * (CAST(${orderItems.subtotal} AS NUMERIC) / NULLIF(CAST(${products.pricePerGram} AS NUMERIC), 0))
-            WHEN ${products.purchasePricePerOunce} IS NOT NULL AND ${products.pricePerOunce} IS NOT NULL
-              THEN CAST(${products.purchasePricePerOunce} AS NUMERIC) * (CAST(${orderItems.subtotal} AS NUMERIC) / NULLIF(CAST(${products.pricePerOunce} AS NUMERIC), 0))
-            ELSE CAST(${orderItems.subtotal} AS NUMERIC) * 0.7
-          END
-        ), 0)`,
-      })
-      .from(orderItems)
-      .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .leftJoin(products, eq(orderItems.productId, products.id))
-      .where(
-        and(
-          sql`${orders.createdAt} >= ${startDate}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
-        )
-      );
+    // Calculate net profit: live items use product prices, snapshot items use stored purchase_cost
+    const profitResult = await db.execute(sql`
+      WITH live_items AS (
+        SELECT
+          oi.subtotal::numeric AS revenue,
+          COALESCE(
+            CASE
+              WHEN p.purchase_price_method = 'units' AND p.purchase_price IS NOT NULL
+                THEN p.purchase_price::numeric * oi.quantity
+              WHEN p.purchase_price_method = 'weight' AND p.purchase_price_per_gram IS NOT NULL AND p.price_per_gram IS NOT NULL
+                THEN p.purchase_price_per_gram::numeric * (oi.subtotal::numeric / NULLIF(p.price_per_gram::numeric, 0))
+              WHEN p.purchase_price_method = 'weight' AND p.purchase_price_per_ounce IS NOT NULL AND p.price_per_ounce IS NOT NULL
+                THEN p.purchase_price_per_ounce::numeric * (oi.subtotal::numeric / NULLIF(p.price_per_ounce::numeric, 0))
+              WHEN p.purchase_price IS NOT NULL THEN p.purchase_price::numeric * oi.quantity
+              ELSE oi.subtotal::numeric * 0.7
+            END, oi.subtotal::numeric * 0.7
+          ) AS cost
+        FROM order_items oi
+        INNER JOIN orders o ON oi.order_id = o.id
+        LEFT JOIN products p ON oi.product_id = p.id
+        WHERE o.created_at >= ${startDate}
+          AND o.status IN ('shipped', 'processing', 'pending', 'packed', 'completed')
+      ),
+      snap_items AS (
+        SELECT
+          s.subtotal::numeric AS revenue,
+          COALESCE(s.purchase_cost::numeric, s.subtotal::numeric * 0.7) AS cost
+        FROM analytics_order_items_snapshot s
+        INNER JOIN analytics_orders_snapshot ao ON s.original_order_id = ao.original_order_id
+        WHERE ao.created_at >= ${startDate}
+          AND ao.status IN ('shipped', 'processing', 'pending', 'packed', 'completed')
+      ),
+      all_items AS (SELECT * FROM live_items UNION ALL SELECT * FROM snap_items)
+      SELECT
+        COALESCE(SUM(revenue), 0) AS total_revenue,
+        COALESCE(SUM(cost), 0) AS total_cost
+      FROM all_items
+    `);
 
-    const totalRevenue = Number(profitResult[0]?.totalRevenue || 0);
-    const totalCost = Number(profitResult[0]?.totalCost || 0);
+    const totalRevenue = Number((profitResult.rows[0] as any)?.total_revenue || 0);
+    const totalCost = Number((profitResult.rows[0] as any)?.total_cost || 0);
     const netProfit = totalRevenue - totalCost;
 
     const salesGrowthRate = prevSales > 0 ? ((currentSales - prevSales) / prevSales) * 100 : 0;
@@ -2732,27 +2896,21 @@ export class DatabaseStorage implements IStorage {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // Get hourly order counts
-    const results = await db
-      .select({
-        hour: sql<number>`EXTRACT(HOUR FROM ${orders.createdAt})`,
-        orderCount: sql<number>`COUNT(*)`,
-      })
-      .from(orders)
-      .where(
-        and(
-          sql`${orders.createdAt} >= ${startDate}`,
-          or(
-            eq(orders.status, 'shipped'),
-            eq(orders.status, 'processing'),
-            eq(orders.status, 'pending'),
-            eq(orders.status, 'delivered'),
-            eq(orders.status, 'completed')
-          )
-        )
+    // Get hourly order counts (live + snapshot)
+    const peakResult = await db.execute(sql`
+      WITH all_orders AS (
+        SELECT created_at, status FROM orders
+        UNION ALL
+        SELECT created_at, status FROM analytics_orders_snapshot
       )
-      .groupBy(sql`EXTRACT(HOUR FROM ${orders.createdAt})`)
-      .orderBy(desc(sql`COUNT(*)`));
+      SELECT EXTRACT(HOUR FROM created_at) AS hour, COUNT(*) AS order_count
+      FROM all_orders
+      WHERE created_at >= ${startDate}
+        AND status IN ('shipped', 'processing', 'pending', 'delivered', 'completed')
+      GROUP BY EXTRACT(HOUR FROM created_at)
+      ORDER BY COUNT(*) DESC
+    `);
+    const results = (peakResult.rows as any[]).map(r => ({ hour: Number(r.hour), orderCount: Number(r.order_count) }));
 
     // Calculate total orders for percentage calculation
     const totalOrders = results.reduce((sum, result) => sum + Number(result.orderCount), 0);
@@ -2857,18 +3015,21 @@ export class DatabaseStorage implements IStorage {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const [soldUnits] = await db
-      .select({
-        totalSold: sql<number>`COALESCE(SUM(${orderItems.quantity}), 0)`,
-      })
-      .from(orderItems)
-      .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .where(
-        and(
-          sql`${orders.createdAt} >= ${thirtyDaysAgo}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
-        )
-      );
+    const soldUnitsResult = await db.execute(sql`
+      WITH all_items AS (
+        SELECT oi.quantity, o.created_at, o.status
+        FROM order_items oi INNER JOIN orders o ON oi.order_id = o.id
+        UNION ALL
+        SELECT s.quantity, ao.created_at, ao.status
+        FROM analytics_order_items_snapshot s
+        INNER JOIN analytics_orders_snapshot ao ON s.original_order_id = ao.original_order_id
+      )
+      SELECT COALESCE(SUM(quantity), 0) AS total_sold
+      FROM all_items
+      WHERE created_at >= ${thirtyDaysAgo}
+        AND status IN ('shipped', 'processing', 'pending', 'packed', 'completed')
+    `);
+    const soldUnits = { totalSold: Number((soldUnitsResult.rows[0] as any)?.total_sold || 0) };
 
     const totalStock = Number(inventoryStats.totalStockUnits) || 1;
     const totalSold = Number(soldUnits.totalSold) || 0;
@@ -2891,50 +3052,46 @@ export class DatabaseStorage implements IStorage {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const [customerStats] = await db
-      .select({
-        totalCustomers: sql<number>`COUNT(DISTINCT ${orders.customerId})`,
-        totalOrders: sql<number>`COUNT(*)`,
-        totalRevenue: sql<number>`COALESCE(SUM(CAST(${orders.total} AS NUMERIC)), 0)`,
-      })
-      .from(orders)
-      .where(
-        and(
-          sql`${orders.createdAt} >= ${startDate}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
-        )
-      );
+    const customerStatsResult = await db.execute(sql`
+      WITH all_orders AS (
+        SELECT customer_id, total, created_at, status FROM orders
+        UNION ALL
+        SELECT customer_id, total, created_at, status FROM analytics_orders_snapshot
+      )
+      SELECT
+        COUNT(DISTINCT customer_id) AS total_customers,
+        COUNT(*) AS total_orders,
+        COALESCE(SUM(CAST(total AS NUMERIC)), 0) AS total_revenue
+      FROM all_orders
+      WHERE created_at >= ${startDate}
+        AND status IN ('shipped', 'processing', 'pending', 'packed', 'completed')
+    `);
 
-    const totalCustomers = Number(customerStats.totalCustomers) || 1;
-    const totalOrders = Number(customerStats.totalOrders) || 0;
-    const totalRevenue = Number(customerStats.totalRevenue) || 0;
+    const totalCustomers = Number((customerStatsResult.rows[0] as any)?.total_customers) || 1;
+    const totalOrders = Number((customerStatsResult.rows[0] as any)?.total_orders) || 0;
+    const totalRevenue = Number((customerStatsResult.rows[0] as any)?.total_revenue) || 0;
 
     const avgPurchaseFrequency = Math.round((totalOrders / totalCustomers) * 10) / 10;
     const customerLifetimeValue = Math.round((totalRevenue / totalCustomers) * 100) / 100;
 
-    const repeatCustomerResult = await db
-      .select({
-        repeatCount: sql<number>`COUNT(*)`,
-      })
-      .from(
-        db
-          .select({
-            customerId: orders.customerId,
-            orderCount: sql<number>`COUNT(*)`,
-          })
-          .from(orders)
-          .where(
-            and(
-              sql`${orders.createdAt} >= ${startDate}`,
-              inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'delivered', 'completed'])
-            )
-          )
-          .groupBy(orders.customerId)
-          .having(sql`COUNT(*) > 1`)
-          .as('repeat_customers')
-      );
+    const repeatResult = await db.execute(sql`
+      WITH all_orders AS (
+        SELECT customer_id, created_at, status FROM orders
+        UNION ALL
+        SELECT customer_id, created_at, status FROM analytics_orders_snapshot
+      ),
+      customer_counts AS (
+        SELECT customer_id, COUNT(*) AS order_count
+        FROM all_orders
+        WHERE created_at >= ${startDate}
+          AND status IN ('shipped', 'processing', 'pending', 'packed', 'delivered', 'completed')
+        GROUP BY customer_id
+        HAVING COUNT(*) > 1
+      )
+      SELECT COUNT(*) AS repeat_count FROM customer_counts
+    `);
 
-    const repeatCustomers = Number(repeatCustomerResult[0]?.repeatCount || 0);
+    const repeatCustomers = Number((repeatResult.rows[0] as any)?.repeat_count || 0);
     const retentionRate = totalCustomers > 0 ? Math.round((repeatCustomers / totalCustomers) * 1000) / 10 : 0;
 
     const sixMonthsAgo = new Date();
@@ -2964,29 +3121,29 @@ export class DatabaseStorage implements IStorage {
         sql`EXTRACT(MONTH FROM ${users.createdAt})`
       );
 
-    const monthlyOrders = await db
-      .select({
-        month: sql<string>`TO_CHAR(${orders.createdAt}, 'Mon')`,
-        monthNum: sql<number>`EXTRACT(MONTH FROM ${orders.createdAt})`,
-        yearNum: sql<number>`EXTRACT(YEAR FROM ${orders.createdAt})`,
-        returningCustomers: sql<number>`COUNT(DISTINCT ${orders.customerId})`,
-      })
-      .from(orders)
-      .where(
-        and(
-          sql`${orders.createdAt} >= ${sixMonthsAgo}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
-        )
+    const monthlyOrdersResult = await db.execute(sql`
+      WITH all_orders AS (
+        SELECT customer_id, created_at, status FROM orders
+        UNION ALL
+        SELECT customer_id, created_at, status FROM analytics_orders_snapshot
       )
-      .groupBy(
-        sql`TO_CHAR(${orders.createdAt}, 'Mon')`,
-        sql`EXTRACT(MONTH FROM ${orders.createdAt})`,
-        sql`EXTRACT(YEAR FROM ${orders.createdAt})`
-      )
-      .orderBy(
-        sql`EXTRACT(YEAR FROM ${orders.createdAt})`,
-        sql`EXTRACT(MONTH FROM ${orders.createdAt})`
-      );
+      SELECT
+        TO_CHAR(created_at, 'Mon') AS month,
+        EXTRACT(MONTH FROM created_at) AS month_num,
+        EXTRACT(YEAR FROM created_at) AS year_num,
+        COUNT(DISTINCT customer_id) AS returning_customers
+      FROM all_orders
+      WHERE created_at >= ${sixMonthsAgo}
+        AND status IN ('shipped', 'processing', 'pending', 'packed', 'completed')
+      GROUP BY TO_CHAR(created_at, 'Mon'), EXTRACT(MONTH FROM created_at), EXTRACT(YEAR FROM created_at)
+      ORDER BY EXTRACT(YEAR FROM created_at), EXTRACT(MONTH FROM created_at)
+    `);
+    const monthlyOrders = (monthlyOrdersResult.rows as any[]).map(r => ({
+      month: r.month,
+      monthNum: Number(r.month_num),
+      yearNum: Number(r.year_num),
+      returningCustomers: Number(r.returning_customers),
+    }));
 
     const customerGrowth = monthlyGrowth.map(mg => {
       const matchingOrder = monthlyOrders.find(
@@ -3015,55 +3172,63 @@ export class DatabaseStorage implements IStorage {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const [fulfillmentStats] = await db
-      .select({
-        totalOrders: sql<number>`COUNT(*)`,
-        fulfilledOrders: sql<number>`COUNT(CASE WHEN ${orders.status} IN ('shipped', 'delivered', 'completed') THEN 1 END)`,
-        avgFulfillmentHours: sql<number>`COALESCE(AVG(
-          CASE WHEN ${orders.status} IN ('shipped', 'delivered', 'completed') AND ${orders.updatedAt} IS NOT NULL
-            THEN EXTRACT(EPOCH FROM (${orders.updatedAt} - ${orders.createdAt})) / 3600
+    const fulfillmentResult = await db.execute(sql`
+      WITH all_orders AS (
+        SELECT status, created_at, updated_at FROM orders
+        UNION ALL
+        SELECT status, created_at, updated_at FROM analytics_orders_snapshot
+      )
+      SELECT
+        COUNT(*) AS total_orders,
+        COUNT(CASE WHEN status IN ('shipped', 'delivered', 'completed') THEN 1 END) AS fulfilled_orders,
+        COALESCE(AVG(
+          CASE WHEN status IN ('shipped', 'delivered', 'completed') AND updated_at IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600
           END
-        ), 0)`,
-      })
-      .from(orders)
-      .where(
-        and(
-          sql`${orders.createdAt} >= ${startDate}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
-        )
-      );
+        ), 0) AS avg_fulfillment_hours
+      FROM all_orders
+      WHERE created_at >= ${startDate}
+        AND status IN ('shipped', 'processing', 'pending', 'packed', 'completed')
+    `);
 
-    const [cogsResult] = await db
-      .select({
-        totalCogs: sql<number>`COALESCE(SUM(
-          CASE
-            WHEN ${products.purchasePrice} IS NOT NULL THEN CAST(${products.purchasePrice} AS NUMERIC) * ${orderItems.quantity}
-            WHEN ${products.purchasePricePerGram} IS NOT NULL AND ${products.pricePerGram} IS NOT NULL THEN
-              CAST(${products.purchasePricePerGram} AS NUMERIC) * (CAST(${orderItems.subtotal} AS NUMERIC) / NULLIF(CAST(${products.pricePerGram} AS NUMERIC), 0))
-            ELSE CAST(${orderItems.subtotal} AS NUMERIC) * 0.7
-          END
-        ), 0)`,
-      })
-      .from(orderItems)
-      .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .leftJoin(products, eq(orderItems.productId, products.id))
-      .where(
-        and(
-          sql`${orders.createdAt} >= ${startDate}`,
-          inArray(orders.status, ['shipped', 'processing', 'pending', 'packed', 'completed'])
-        )
-      );
+    const cogsResult = await db.execute(sql`
+      WITH live_cogs AS (
+        SELECT
+          COALESCE(
+            CASE
+              WHEN p.purchase_price IS NOT NULL THEN p.purchase_price::numeric * oi.quantity
+              WHEN p.purchase_price_per_gram IS NOT NULL AND p.price_per_gram IS NOT NULL
+                THEN p.purchase_price_per_gram::numeric * (oi.subtotal::numeric / NULLIF(p.price_per_gram::numeric, 0))
+              ELSE oi.subtotal::numeric * 0.7
+            END, oi.subtotal::numeric * 0.7
+          ) AS cost
+        FROM order_items oi
+        INNER JOIN orders o ON oi.order_id = o.id
+        LEFT JOIN products p ON oi.product_id = p.id
+        WHERE o.created_at >= ${startDate}
+          AND o.status IN ('shipped', 'processing', 'pending', 'packed', 'completed')
+      ),
+      snap_cogs AS (
+        SELECT COALESCE(s.purchase_cost::numeric, s.subtotal::numeric * 0.7) AS cost
+        FROM analytics_order_items_snapshot s
+        INNER JOIN analytics_orders_snapshot ao ON s.original_order_id = ao.original_order_id
+        WHERE ao.created_at >= ${startDate}
+          AND ao.status IN ('shipped', 'processing', 'pending', 'packed', 'completed')
+      )
+      SELECT COALESCE(SUM(cost), 0) AS total_cogs
+      FROM (SELECT * FROM live_cogs UNION ALL SELECT * FROM snap_cogs) all_cogs
+    `);
 
-    const totalOrders = Number(fulfillmentStats.totalOrders) || 1;
-    const fulfilledOrders = Number(fulfillmentStats.fulfilledOrders) || 0;
-    const avgFulfillmentHours = Number(fulfillmentStats.avgFulfillmentHours) || 0;
+    const totalOrders = Number((fulfillmentResult.rows[0] as any)?.total_orders) || 1;
+    const fulfilledOrders = Number((fulfillmentResult.rows[0] as any)?.fulfilled_orders) || 0;
+    const avgFulfillmentHours = Number((fulfillmentResult.rows[0] as any)?.avg_fulfillment_hours) || 0;
     const avgFulfillmentDays = Math.round((avgFulfillmentHours / 24) * 10) / 10;
     const fulfillmentRate = Math.round((fulfilledOrders / totalOrders) * 1000) / 10;
 
     return {
       avgFulfillmentTime: avgFulfillmentDays,
       fulfillmentRate,
-      costOfGoodsSold: Number(cogsResult.totalCogs),
+      costOfGoodsSold: Number((cogsResult.rows[0] as any)?.total_cogs || 0),
     };
   }
 

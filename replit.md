@@ -148,6 +148,16 @@ The application is designed to be deployed on Replit with integrated authenticat
 
 ## Recent Changes
 
+### July 15, 2026 - Analytics Data Persistence After Order Deletion
+- **New Feature: Analytics Snapshot Tables**: Analytics and reports now retain historical data even after orders are cleared or deleted
+  - Two new database tables: `analytics_orders_snapshot` and `analytics_order_items_snapshot`
+  - Orders are automatically snapshotted before any deletion (individual delete, bulk clear, or archived clear)
+  - `customer_city` captured at snapshot time so city analytics survive user profile changes
+  - `purchase_cost` stored in item snapshots so profit calculations don't need product joins on historical data
+- **How it works**: Every analytics query now uses a `UNION ALL` CTE combining live `orders`/`order_items` tables with the snapshot tables, so historical data seamlessly blends with current data
+- **Coverage**: All analytics endpoints updated — sales metrics, top products, category breakdown, sales trend, peak purchase times, customer metrics, inventory metrics, operations metrics, hourly breakdown, daily new/return customers, and city analytics
+- **Impact**: Clearing orders from the Orders tab no longer wipes out analytics history; all charts and reports remain accurate
+
 ### February 23, 2026 - City-Based Purchase Limits System
 - **New Feature: City Purchase Limits**: Admins can set minimum order amounts per city
   - `city_purchase_limits` table with city name, minimum amount, and active status
