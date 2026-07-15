@@ -321,7 +321,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         return (
           Math.round(parseFloat(lbs || "0") * 448) +
           Math.round(parseFloat(oz || "0") * 28) +
-          Math.floor(parseFloat(g || "0"))
+          Math.round(parseFloat(g || "0"))
         );
       };
 
@@ -1123,7 +1123,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                       <Input
                         type="number"
                         min="0"
-                        step="1"
+                        step="0.1"
                         placeholder="0"
                         value={stockG}
                         onChange={(e) => setStockG(e.target.value)}
@@ -1181,7 +1181,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                     <Input
                       type="number"
                       min="0"
-                      step="1"
+                      step="0.1"
                       placeholder="5"
                       value={minStockG}
                       onChange={(e) => setMinStockG(e.target.value)}
