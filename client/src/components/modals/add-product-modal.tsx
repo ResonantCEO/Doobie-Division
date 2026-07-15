@@ -987,7 +987,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                       type="number"
                       min="0"
                       step="0.1"
-                      placeholder="5"
+                      placeholder="0"
                       value={minStockG}
                       onChange={(e) => setMinStockG(e.target.value)}
                       className="pr-6"
