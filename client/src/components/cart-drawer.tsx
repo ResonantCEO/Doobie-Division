@@ -344,11 +344,14 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         customerId: user?.id,
         customerName,
         customerEmail: user?.email || "",
+        customerPhone: (user as any)?.phoneNumber || "",
         shippingAddress,
         total: finalTotal.toFixed(2),
         paymentMethod,
         paymentPhotoUrl: paymentPhotoUrl || null,
-        notes: [isAfter5pm ? "[Next Day 1st Run]" : `[${runPreference} Run]`, shippingForm.notes].filter(Boolean).join(" — "),
+        notes: deliveryRunsEnabled
+          ? [isAfter5pm ? "[Next Day 1st Run]" : `[${runPreference} Run]`, shippingForm.notes].filter(Boolean).join(" — ")
+          : shippingForm.notes || null,
       };
       orderData.originalTotal = state.total.toFixed(2);
       if (appliedPromo) {

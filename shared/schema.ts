@@ -572,7 +572,7 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
 }).extend({
   total: z.string().or(z.number()).transform(val => String(val)),
   customerId: z.string().nullable().optional(),
-  customerPhone: z.string().min(1, "Phone number is required"),
+  customerPhone: z.string().optional().default(""),
   assignedUserId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
