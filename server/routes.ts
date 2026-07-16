@@ -3269,14 +3269,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
-    // Dynamic budget: track how much is left as each category is processed
+    // Single global remaining budget — passes the full remainder to each category in sequence
     let remainingBudget = remainingTarget;
-    let remainingCatCount = poolEntries.reduce((s, e) => s + e.sel.count, 0);
 
     for (const { sel, pool } of poolEntries) {
-      // Allocate budget for this category proportional to its share of remaining item slots
-      const catBudget = remainingCatCount > 0 ? remainingBudget * (sel.count / remainingCatCount) : 0;
-      const picked = pickBestUnder(pool, sel.count, catBudget);
+      const picked = pickBestUnder(pool, sel.count, remainingBudget);
       const pickedTotal = picked.reduce((s, p) => s + p.price, 0);
       for (const p of picked) {
         if (!selectedProducts.find(s => s.id === p.id)) {
@@ -3285,7 +3282,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       remainingBudget -= pickedTotal;
-      remainingCatCount -= sel.count;
       if (picked.length < sel.count) {
         warnings.push(`Only ${picked.length} of ${sel.count} requested items could be found within budget for category ID ${sel.categoryId}.`);
       }
