@@ -985,8 +985,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let allowed = true;
             let minimumAmount: number | null = null;
 
-            // Use the pre-promo original total for city minimum check
-            const checkTotal = parseFloat(orderData.originalTotal || orderData.total || "0");
+            // Use the pre-promo original total for city minimum check (rounded to cents to avoid float precision issues)
+            const checkTotal = Math.round(parseFloat(orderData.originalTotal || orderData.total || "0") * 100) / 100;
 
             if (orderData.customerId) {
               const { rows: userRows } = await rawPool.query(`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = $1`, [orderData.customerId]);
@@ -2499,7 +2499,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const minimumAmount = parseFloat(cityLimit.minimumAmount);
-      const orderTotal = parseFloat(total);
+      const orderTotal = Math.round(parseFloat(total) * 100) / 100;
 
       res.json({
         allowed: orderTotal >= minimumAmount,
