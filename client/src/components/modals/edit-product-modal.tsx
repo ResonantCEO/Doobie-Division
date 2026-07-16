@@ -1012,92 +1012,99 @@ export default function EditProductModal({ open, onOpenChange, product, categori
               </div>
             )}
 
-            {/* Discount Percentage Field */}
-            <FormField
-              control={form.control}
-              name="discountPercentage"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Discount Percentage</FormLabel>
-                  <FormControl>
-                    <div className="space-y-2">
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        min="0" 
-                        max="100" 
-                        placeholder="0" 
-                        {...field} 
-                      />
-                      {currentDiscountPercentage > 0 && (
-                        <div className="text-sm text-gray-600">
-                          {sellingMethod === "units" && form.watch("price") && (
-                            <div>
-                              Original: ${parseFloat(form.watch("price") || "0").toFixed(2)} → 
-                              Discounted: ${getDiscountedPrice(parseFloat(form.watch("price") || "0"), currentDiscountPercentage).toFixed(2)}
-                            </div>
-                          )}
-                          {sellingMethod === "weight" && (
-                            <div className="space-y-1">
-                              {form.watch("pricePerGram") && (
-                                <div>
-                                  Original: ${parseFloat(form.watch("pricePerGram") || "0").toFixed(2)}/g → 
-                                  Discounted: ${getDiscountedPrice(parseFloat(form.watch("pricePerGram") || "0"), currentDiscountPercentage).toFixed(2)}/g
-                                </div>
-                              )}
-                              {form.watch("pricePerOunce") && (
-                                <div>
-                                  Original: ${parseFloat(form.watch("pricePerOunce") || "0").toFixed(2)}/oz → 
-                                  Discounted: ${getDiscountedPrice(parseFloat(form.watch("pricePerOunce") || "0"), currentDiscountPercentage).toFixed(2)}/oz
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Discount Fields */}
+            <div className="rounded-lg border p-4 space-y-4">
+              <Label className="text-base font-semibold">Discounts</Label>
 
-            {/* Discount Amount Field */}
-            <FormField
-              control={form.control}
-              name="discountAmount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Discount Amount</FormLabel>
-                  <FormControl>
-                    <div className="space-y-2">
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          className="pl-7"
-                          {...field}
-                        />
-                      </div>
-                      {parseFloat(field.value || "0") > 0 && (
-                        <div className="text-sm text-gray-600">
-                          {sellingMethod === "units" && form.watch("price") && (
-                            <div>
-                              Original: ${parseFloat(form.watch("price") || "0").toFixed(2)} →{" "}
-                              Discounted: ${Math.max(0, parseFloat(form.watch("price") || "0") - parseFloat(field.value || "0")).toFixed(2)}
-                            </div>
-                          )}
+              <FormField
+                control={form.control}
+                name="discountPercentage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Discount Percentage</FormLabel>
+                    <FormControl>
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            placeholder="0"
+                            className="pr-8"
+                            {...field}
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
                         </div>
-                      )}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                        {currentDiscountPercentage > 0 && (
+                          <div className="text-sm text-muted-foreground">
+                            {sellingMethod === "units" && form.watch("price") && (
+                              <div>
+                                Original: ${parseFloat(form.watch("price") || "0").toFixed(2)} →{" "}
+                                Discounted: ${getDiscountedPrice(parseFloat(form.watch("price") || "0"), currentDiscountPercentage).toFixed(2)}
+                              </div>
+                            )}
+                            {sellingMethod === "weight" && (
+                              <div className="space-y-1">
+                                {form.watch("pricePerGram") && (
+                                  <div>
+                                    Original: ${parseFloat(form.watch("pricePerGram") || "0").toFixed(2)}/g →{" "}
+                                    Discounted: ${getDiscountedPrice(parseFloat(form.watch("pricePerGram") || "0"), currentDiscountPercentage).toFixed(2)}/g
+                                  </div>
+                                )}
+                                {form.watch("pricePerOunce") && (
+                                  <div>
+                                    Original: ${parseFloat(form.watch("pricePerOunce") || "0").toFixed(2)}/oz →{" "}
+                                    Discounted: ${getDiscountedPrice(parseFloat(form.watch("pricePerOunce") || "0"), currentDiscountPercentage).toFixed(2)}/oz
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="discountAmount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Discount Amount</FormLabel>
+                    <FormControl>
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            className="pl-7"
+                            {...field}
+                          />
+                        </div>
+                        {parseFloat(field.value || "0") > 0 && (
+                          <div className="text-sm text-muted-foreground">
+                            {sellingMethod === "units" && form.watch("price") && (
+                              <div>
+                                Original: ${parseFloat(form.watch("price") || "0").toFixed(2)} →{" "}
+                                Discounted: ${Math.max(0, parseFloat(form.watch("price") || "0") - parseFloat(field.value || "0")).toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             {/* BOGO Toggle */}
             <div className="rounded-lg border p-4 space-y-3">
