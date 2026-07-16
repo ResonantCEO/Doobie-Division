@@ -1040,8 +1040,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
 
-        // Check if there's enough stock
-        if (product.stock < item.quantity) {
+        // Check if there's enough stock (size-based products use product_sizes quantities)
+        if (item.size && product.sizes && product.sizes.length > 0) {
+          const sizeData = product.sizes.find((s: any) => s.size === item.size);
+          if (!sizeData) {
+            stockErrors.push(`Size "${item.size}" not found for ${product.name}`);
+            continue;
+          }
+          if (sizeData.quantity < item.quantity) {
+            stockErrors.push(`Insufficient stock for ${product.name} (${item.size}). Available: ${sizeData.quantity}, Requested: ${item.quantity}`);
+            continue;
+          }
+        } else if (product.stock < item.quantity) {
           stockErrors.push(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
           continue;
         }
