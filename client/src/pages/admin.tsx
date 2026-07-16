@@ -1232,18 +1232,21 @@ export default function AdminPage() {
                             <div className="font-medium text-gray-900 dark:text-white">
                               {item.ticket.customerName || (item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Anonymous')}
                             </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {item.ticket.customerEmail || item.user?.email || 'No email'}
-                            </div>
-                            {item.ticket.customerPhone && (
-                              <div className="text-xs text-gray-400 mt-0.5">
-                                📞 {item.ticket.customerPhone}
+                            {(item.ticket as any).customerTelegram ? (
+                              <div className="text-sm text-blue-500 dark:text-blue-400">
+                                @{(item.ticket as any).customerTelegram}
                               </div>
-                            )}
-                            {(item.ticket as any).customerTelegram && (
-                              <div className="text-xs text-gray-400 mt-0.5">
-                                ✈️ {(item.ticket as any).customerTelegram}
-                              </div>
+                            ) : (
+                              <>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  {item.ticket.customerEmail || item.user?.email || 'No email'}
+                                </div>
+                                {item.ticket.customerPhone && (
+                                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                                    {item.ticket.customerPhone}
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                           <Badge className={getStatusColor(item.ticket.status)}>
@@ -1308,18 +1311,21 @@ export default function AdminPage() {
                                 <div className="font-medium text-gray-900 dark:text-white text-lg">
                                   {item.ticket.customerName || (item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Anonymous')}
                                 </div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                  {item.ticket.customerEmail || item.user?.email || 'No email'}
-                                </div>
-                                {item.ticket.customerPhone && (
-                                  <div className="text-xs text-gray-400 mt-0.5">
-                                    📞 {item.ticket.customerPhone}
+                                {(item.ticket as any).customerTelegram ? (
+                                  <div className="text-sm text-blue-500 dark:text-blue-400">
+                                    @{(item.ticket as any).customerTelegram}
                                   </div>
-                                )}
-                                {(item.ticket as any).customerTelegram && (
-                                  <div className="text-xs text-gray-400 mt-0.5">
-                                    ✈️ {(item.ticket as any).customerTelegram}
-                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                      {item.ticket.customerEmail || item.user?.email || 'No email'}
+                                    </div>
+                                    {item.ticket.customerPhone && (
+                                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                                        {item.ticket.customerPhone}
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </div>
