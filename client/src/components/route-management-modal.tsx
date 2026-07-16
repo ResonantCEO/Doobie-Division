@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Download, Route, Plus, CheckCircle2, MapPin, Package, Trash2, Info, X, FileText, Phone, Mail, CreditCard, StickyNote } from "lucide-react";
+import { Download, Route, Plus, CheckCircle2, MapPin, Package, Trash2, Info, X, FileText, Phone, Mail, CreditCard, StickyNote, Send } from "lucide-react";
 import type { Order, OrderItem } from "@shared/schema";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -118,7 +118,7 @@ function OrderInfoDialog({ order, onClose }: OrderInfoDialogProps) {
 
   return (
     <Dialog open={!!order} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg w-full max-h-[85vh] flex flex-col p-0">
+      <DialogContent className="max-w-lg w-full p-0" style={{ maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
         <DialogHeader className="px-5 pt-5 pb-3 border-b flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base font-bold">
             <FileText className="h-4 w-4 text-primary" />
@@ -126,7 +126,7 @@ function OrderInfoDialog({ order, onClose }: OrderInfoDialogProps) {
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0">
+        <ScrollArea className="flex-1" style={{ minHeight: 0, overflowY: "auto" }}>
           <div className="px-5 py-4 space-y-4">
             {/* Status + Payment row */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -156,6 +156,12 @@ function OrderInfoDialog({ order, onClose }: OrderInfoDialogProps) {
             <div className="space-y-1.5">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Customer</p>
               <p className="font-semibold">{order.customerName}</p>
+              {order.customerTelegramUsername && (
+                <div className="flex items-center gap-1.5 text-sm text-blue-500">
+                  <Send className="h-3.5 w-3.5 flex-shrink-0" />
+                  @{order.customerTelegramUsername}
+                </div>
+              )}
               {order.customerPhone && (
                 <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
                   <Phone className="h-3.5 w-3.5 flex-shrink-0" />
@@ -419,6 +425,12 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                                 )}
                               </div>
                               <p className="text-sm text-gray-700 dark:text-gray-300 truncate mt-0.5">{order.customerName}</p>
+                              {order.customerTelegramUsername && (
+                                <div className="flex items-center gap-1 text-xs text-blue-500 mt-0.5">
+                                  <Send className="h-3 w-3 flex-shrink-0" />
+                                  <span className="truncate">@{order.customerTelegramUsername}</span>
+                                </div>
+                              )}
                               <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
                                 <MapPin className="h-3 w-3 flex-shrink-0" />
                                 <span className="truncate">{addr.line1}, {addr.city}</span>
@@ -521,6 +533,12 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                                 <PaymentBadge paymentMethod={order.paymentMethod} />
                               </div>
                               <p className="text-sm text-gray-700 dark:text-gray-300 truncate mt-0.5">{order.customerName}</p>
+                              {order.customerTelegramUsername && (
+                                <div className="flex items-center gap-1 text-xs text-blue-500 mt-0.5">
+                                  <Send className="h-3 w-3 flex-shrink-0" />
+                                  <span className="truncate">@{order.customerTelegramUsername}</span>
+                                </div>
+                              )}
                               <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
                                 <MapPin className="h-3 w-3 flex-shrink-0" />
                                 <span className="truncate">{addr.line1}, {addr.city}</span>
@@ -596,6 +614,12 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                                       <PaymentBadge paymentMethod={order.paymentMethod} />
                                     </div>
                                     <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{order.customerName}</p>
+                                    {order.customerTelegramUsername && (
+                                      <div className="flex items-center gap-1 text-xs text-blue-500 mt-0.5">
+                                        <Send className="h-3 w-3 flex-shrink-0" />
+                                        <span className="truncate">@{order.customerTelegramUsername}</span>
+                                      </div>
+                                    )}
                                     <div className="flex items-center gap-1 text-xs text-gray-500">
                                       <MapPin className="h-3 w-3 flex-shrink-0" />
                                       <span className="truncate">{addr.line1}, {addr.city}</span>
