@@ -1829,7 +1829,21 @@ export class DatabaseStorage implements IStorage {
         if (!product) {
           throw new Error(`Product with ID ${item.productId} not found`);
         }
-        if (Number(product.stock) < item.quantity) {
+
+        const itemSize = (item as any).size;
+        if (itemSize) {
+          // Size-based product — check product_sizes quantity
+          const sizeResult = await retryQuery(() =>
+            db.execute(sql`SELECT quantity FROM product_sizes WHERE product_id = ${item.productId} AND size = ${itemSize}`)
+          );
+          const sizeRow = sizeResult?.rows?.[0];
+          if (!sizeRow) {
+            throw new Error(`Size "${itemSize}" not found for ${product.name}`);
+          }
+          if (Number(sizeRow.quantity) < item.quantity) {
+            throw new Error(`Insufficient stock for ${product.name} (${itemSize}). Available: ${sizeRow.quantity}, Requested: ${item.quantity}`);
+          }
+        } else if (Number(product.stock) < item.quantity) {
           throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
         }
       } catch (stockErr: any) {
