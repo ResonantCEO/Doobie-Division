@@ -128,27 +128,29 @@ function OrderInfoDialog({ order, onClose }: OrderInfoDialogProps) {
 
         <ScrollArea className="flex-1" style={{ minHeight: 0, overflowY: "auto" }}>
           <div className="px-5 py-4 space-y-4">
-            {/* Status + Payment row */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge
-                variant="outline"
-                className={
-                  order.status === "pending"
-                    ? "text-yellow-600 border-yellow-400"
-                    : order.status === "processing"
-                    ? "text-blue-600 border-blue-400"
-                    : order.status === "shipped"
-                    ? "text-green-600 border-green-400"
-                    : "text-gray-500 border-gray-400"
-                }
-              >
-                {order.status}
-              </Badge>
-              <PaymentBadge paymentMethod={order.paymentMethod} />
+            {/* Status + Payment + Date row */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge
+                  variant="outline"
+                  className={
+                    order.status === "pending"
+                      ? "text-yellow-600 border-yellow-400"
+                      : order.status === "processing"
+                      ? "text-blue-600 border-blue-400"
+                      : order.status === "shipped"
+                      ? "text-green-600 border-green-400"
+                      : "text-gray-500 border-gray-400"
+                  }
+                >
+                  {order.status}
+                </Badge>
+                <PaymentBadge paymentMethod={order.paymentMethod} />
+              </div>
               {order.createdAt && (
-                <span className="text-xs text-gray-500 ml-auto">
+                <p className="text-xs text-gray-500">
                   {format(new Date(order.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                </span>
+                </p>
               )}
             </div>
 
