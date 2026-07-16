@@ -924,14 +924,15 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
                     <div className="font-medium text-gray-900 dark:text-gray-100">
                       {order.customerName}
                     </div>
-                    <div className="text-gray-600 dark:text-gray-400">
-                      {order.customerTelegramUsername
-                        ? `@${order.customerTelegramUsername}`
-                        : order.customerEmail}
-                    </div>
-                    <div className="text-gray-600 dark:text-gray-400">
-                      {order.customerPhone}
-                    </div>
+                    {order.customerTelegramUsername ? (
+                      <div className="text-blue-500 dark:text-blue-400">
+                        @{order.customerTelegramUsername}
+                      </div>
+                    ) : (
+                      <div className="text-gray-600 dark:text-gray-400">
+                        {order.customerEmail}
+                      </div>
+                    )}
                     <div className="text-gray-500 dark:text-gray-400 text-xs">
                       {order.shippingAddress}
                     </div>
@@ -1081,14 +1082,15 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
                         <div className="font-medium text-gray-900 dark:text-white">
                           {order.customerName}
                         </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {order.customerTelegramUsername
-                            ? `@${order.customerTelegramUsername}`
-                            : order.customerEmail}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {order.customerPhone}
-                        </div>
+                        {order.customerTelegramUsername ? (
+                          <div className="text-sm text-blue-500 dark:text-blue-400">
+                            @{order.customerTelegramUsername}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            {order.customerEmail}
+                          </div>
+                        )}
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           {order.shippingAddress}
                         </div>
