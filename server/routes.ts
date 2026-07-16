@@ -3129,5 +3129,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Grab Bags ────────────────────────────────────────────────────────────────
+
+  app.get("/api/admin/grab-bags", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      res.json(await storage.getGrabBags());
+    } catch (e) {
+      res.status(500).json({ message: "Failed to fetch grab bags" });
+    }
+  });
+
+  app.post("/api/admin/grab-bags", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const created = await storage.createGrabBag(req.body);
+      res.status(201).json(created);
+    } catch (e) {
+      console.error("Failed to create grab bag:", e);
+      res.status(500).json({ message: "Failed to create grab bag" });
+    }
+  });
+
+  app.put("/api/admin/grab-bags/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const updated = await storage.updateGrabBag(parseInt(req.params.id), req.body);
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (e) {
+      res.status(500).json({ message: "Failed to update grab bag" });
+    }
+  });
+
+  app.delete("/api/admin/grab-bags/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      await storage.deleteGrabBag(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ message: "Failed to delete grab bag" });
+    }
+  });
+
+  // Generate a grab bag product from a template
+  app.post("/api/admin/grab-bags/:id/generate", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const bag = await storage.getGrabBag(parseInt(req.params.id));
+      if (!bag) return res.status(404).json({ message: "Grab bag not found" });
+
+      const sellingPrice = parseFloat(bag.sellingPrice);
+      const maxTotal = parseFloat(bag.maxTotalItemPrice);
+      let runningTotal = 0;
+      const selectedProducts: Array<{ id: number; name: string; price: number; sku: string }> = [];
+
+      // 1. Add specific products
+      const specificIds: number[] = bag.specificProductIds ? JSON.parse(bag.specificProductIds) : [];
+      for (const pid of specificIds) {
+        const p = await storage.getProduct(pid);
+        if (p && p.price) {
+          const price = parseFloat(p.price);
+          selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku });
+          runningTotal += price;
+        }
+      }
+
+      // 2. Pick random items from category selections
+      const categorySelections: Array<{ categoryId: number; count: number }> =
+        bag.categorySelections ? JSON.parse(bag.categorySelections) : [];
+
+      for (const sel of categorySelections) {
+        const allInCat = await storage.getProducts({ categoryId: sel.categoryId, isActive: true });
+        // Exclude already-selected products
+        const pool = allInCat.filter(p => p.price && !selectedProducts.find(s => s.id === p.id));
+        // Shuffle
+        for (let i = pool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        let added = 0;
+        for (const p of pool) {
+          if (added >= sel.count) break;
+          if (!p.price) continue;
+          const price = parseFloat(p.price);
+          if (runningTotal + price <= maxTotal) {
+            selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku });
+            runningTotal += price;
+            added++;
+          }
+        }
+      }
+
+      if (selectedProducts.length === 0) {
+        return res.status(400).json({ message: "No products could be selected for this grab bag. Check your category selections and max total price." });
+      }
+
+      // Validate grab bag value >= selling price
+      if (runningTotal < sellingPrice) {
+        return res.status(400).json({
+          message: `Grab bag retail value ($${runningTotal.toFixed(2)}) is less than the selling price ($${sellingPrice.toFixed(2)}). Increase the max total item price or add more items.`
+        });
+      }
+
+      // 3. Build description listing items
+      const itemList = selectedProducts.map(p => `• ${p.name} ($${p.price.toFixed(2)})`).join("\n");
+      const description = `🎁 Grab Bag — ${selectedProducts.length} item${selectedProducts.length !== 1 ? 's' : ''} (retail value: $${runningTotal.toFixed(2)})\n\n${itemList}`;
+
+      // 4. Create the product
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const sku = `GRAB-BAG-${bag.id}-${Date.now()}`;
+      const newProduct = await storage.createProduct({
+        name: bag.name,
+        description,
+        price: bag.sellingPrice,
+        sku,
+        stock: 1,
+        physicalInventory: 1,
+        isActive: true,
+        sellingMethod: "units",
+        adminNotes: `Auto-generated grab bag from template ID ${bag.id}. Contains: ${selectedProducts.map(p => p.sku).join(", ")}`,
+      } as any);
+
+      res.status(201).json({
+        product: newProduct,
+        selectedProducts,
+        retailValue: runningTotal,
+        sellingPrice,
+      });
+    } catch (e) {
+      console.error("Failed to generate grab bag:", e);
+      res.status(500).json({ message: "Failed to generate grab bag" });
+    }
+  });
+
   return httpServer;
 }

@@ -763,3 +763,33 @@ export const analyticsOrderItemsSnapshot = pgTable("analytics_order_items_snapsh
 }, (table) => ({
   originalOrderIdx: index("IDX_aois_original_order_id").on(table.originalOrderId),
 }));
+
+// Grab Bags - templates that generate grab bag products
+export const grabBags = pgTable("grab_bags", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }).notNull(),
+  maxTotalItemPrice: decimal("max_total_item_price", { precision: 10, scale: 2 }).notNull(),
+  specificProductIds: text("specific_product_ids"), // JSON array of product IDs always included
+  categorySelections: text("category_selections"), // JSON array of { categoryId, count }
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertGrabBagSchema = createInsertSchema(grabBags).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  name: z.string().min(1, "Name is required"),
+  sellingPrice: z.string().min(1, "Selling price is required"),
+  maxTotalItemPrice: z.string().min(1, "Max total item price is required"),
+  specificProductIds: z.string().nullable().optional(),
+  categorySelections: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type GrabBag = typeof grabBags.$inferSelect;
+export type InsertGrabBag = z.infer<typeof insertGrabBagSchema>;

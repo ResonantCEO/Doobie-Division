@@ -15,7 +15,7 @@ import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount, PromoCode } from "@shared/schema";
+import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount, PromoCode, GrabBag, Category } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
 function toLocalDateTimeString(date: Date): string {
@@ -114,6 +114,44 @@ export default function AdminPage() {
     validTo: "",
   });
 
+
+  // Grab Bags state
+  const [discountsSubTab, setDiscountsSubTab] = useState("promo-codes");
+  const [showGrabBagModal, setShowGrabBagModal] = useState(false);
+  const [editingGrabBag, setEditingGrabBag] = useState<GrabBag | null>(null);
+  const [grabBagToDelete, setGrabBagToDelete] = useState<GrabBag | null>(null);
+  const [deleteGrabBagConfirmOpen, setDeleteGrabBagConfirmOpen] = useState(false);
+  const [grabBagToGenerate, setGrabBagToGenerate] = useState<GrabBag | null>(null);
+  const [generateResultOpen, setGenerateResultOpen] = useState(false);
+  const [generateResult, setGenerateResult] = useState<{ product: Product; selectedProducts: { name: string; price: number }[]; retailValue: number; sellingPrice: number } | null>(null);
+  const [grabBagForm, setGrabBagForm] = useState({
+    name: "",
+    description: "",
+    sellingPrice: "",
+    maxTotalItemPrice: "",
+    specificProductIds: [] as number[],
+    categorySelections: [] as { categoryId: number; count: number }[],
+    isActive: true,
+  });
+
+  const resetGrabBagForm = () => setGrabBagForm({
+    name: "", description: "", sellingPrice: "", maxTotalItemPrice: "",
+    specificProductIds: [], categorySelections: [], isActive: true,
+  });
+
+  const openEditGrabBag = (g: GrabBag) => {
+    setEditingGrabBag(g);
+    setGrabBagForm({
+      name: g.name,
+      description: g.description || "",
+      sellingPrice: g.sellingPrice?.toString() || "",
+      maxTotalItemPrice: g.maxTotalItemPrice?.toString() || "",
+      specificProductIds: g.specificProductIds ? JSON.parse(g.specificProductIds) : [],
+      categorySelections: g.categorySelections ? JSON.parse(g.categorySelections) : [],
+      isActive: g.isActive,
+    });
+    setShowGrabBagModal(true);
+  };
 
   // Redirect if not admin
   if (!user || user.role !== 'admin') {
@@ -483,6 +521,110 @@ export default function AdminPage() {
       toast({ title: "Promo code deleted" });
     },
     onError: () => toast({ title: "Failed to delete promo code", variant: "destructive" }),
+  });
+
+  // Grab Bag queries & mutations
+  const { data: allGrabBags = [], isLoading: isLoadingGrabBags } = useQuery<GrabBag[]>({
+    queryKey: ["/api/admin/grab-bags"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/grab-bags", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch grab bags");
+      return res.json();
+    },
+  });
+
+  const { data: allCategories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/categories", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      return res.json();
+    },
+  });
+
+  const createGrabBagMutation = useMutation({
+    mutationFn: async (data: typeof grabBagForm) => {
+      const res = await apiRequest("POST", "/api/admin/grab-bags", {
+        name: data.name,
+        description: data.description || null,
+        sellingPrice: data.sellingPrice,
+        maxTotalItemPrice: data.maxTotalItemPrice,
+        specificProductIds: data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
+        categorySelections: data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
+        isActive: data.isActive,
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/grab-bags"] });
+      setShowGrabBagModal(false);
+      resetGrabBagForm();
+      toast({ title: "Grab bag created" });
+    },
+    onError: (e: any) => toast({ title: e.message || "Failed to create grab bag", variant: "destructive" }),
+  });
+
+  const updateGrabBagMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: typeof grabBagForm }) => {
+      const res = await apiRequest("PUT", `/api/admin/grab-bags/${id}`, {
+        name: data.name,
+        description: data.description || null,
+        sellingPrice: data.sellingPrice,
+        maxTotalItemPrice: data.maxTotalItemPrice,
+        specificProductIds: data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
+        categorySelections: data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
+        isActive: data.isActive,
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/grab-bags"] });
+      setShowGrabBagModal(false);
+      setEditingGrabBag(null);
+      resetGrabBagForm();
+      toast({ title: "Grab bag updated" });
+    },
+    onError: (e: any) => toast({ title: e.message || "Failed to update grab bag", variant: "destructive" }),
+  });
+
+  const toggleGrabBagMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
+      const res = await apiRequest("PUT", `/api/admin/grab-bags/${id}`, { isActive });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/grab-bags"] }),
+    onError: () => toast({ title: "Failed to toggle grab bag", variant: "destructive" }),
+  });
+
+  const deleteGrabBagMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/admin/grab-bags/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/grab-bags"] });
+      setDeleteGrabBagConfirmOpen(false);
+      setGrabBagToDelete(null);
+      toast({ title: "Grab bag deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete grab bag", variant: "destructive" }),
+  });
+
+  const generateGrabBagMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/admin/grab-bags/${id}/generate`, {});
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      setGenerateResult(data);
+      setGenerateResultOpen(true);
+      toast({ title: "Grab bag generated!", description: `Product "${data.product.name}" has been added to your catalog.` });
+    },
+    onError: (e: any) => toast({ title: e.message || "Failed to generate grab bag", variant: "destructive" }),
   });
 
   const openEditDiscount = (d: Discount) => {
@@ -1818,90 +1960,453 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
 
-        {/* Promo Codes Tab */}
+        {/* Discounts Tab — inner tabs: Promo Codes / Bags */}
         <TabsContent value="discounts">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Tag className="h-5 w-5" />
-                    Promo Codes
-                  </CardTitle>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Create discount codes customers enter at checkout — % off, flat amounts, or minimum bypasses.
-                  </p>
-                </div>
-                <Button onClick={() => { resetPromoCodeForm(); setEditingPromoCode(null); setShowPromoCodeModal(true); }}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Code
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {isLoadingPromoCodes ? (
-                <div className="space-y-3">
-                  {[...Array(3)].map((_, i) => <div key={i} className="h-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />)}
-                </div>
-              ) : allPromoCodes.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                  <Tag className="h-12 w-12 mb-3 opacity-30" />
-                  <p className="font-medium">No promo codes yet</p>
-                  <p className="text-sm">Click "Create Code" to add your first promo code.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {allPromoCodes.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-4 border rounded-lg dark:border-gray-700">
-                      <div className="flex items-start gap-3">
-                        <div className={`mt-0.5 p-2 rounded-md ${p.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
-                          <Tag className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-bold tracking-wider text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{p.code}</span>
-                            <Badge variant={p.isActive ? "default" : "secondary"} className="text-xs">{p.isActive ? 'Active' : 'Inactive'}</Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {p.discountType === 'percent' ? `${p.discountValue}% off` : `$${Number(p.discountValue).toFixed(2)} off`}
-                            </Badge>
-                            {p.minOrderAmount && (
-                              <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">Min. ${Number(p.minOrderAmount).toFixed(2)}</Badge>
-                            )}
-                            {p.bypassPurchaseMinimum && (
-                              <Badge variant="outline" className="text-xs text-blue-600 border-blue-400">Bypasses min. purchase</Badge>
-                            )}
-                          </div>
-                          {p.description && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{p.description}</p>}
-                          <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
-                            <span>{p.usageLimitType === 'once_per_user' ? 'Once per customer' : 'Unlimited uses'}</span>
-                            {p.maxTotalUses && <span>· Max {p.maxTotalUses} total uses</span>}
-                            <span>· Used {p.totalUses} time{p.totalUses !== 1 ? 's' : ''}</span>
-                            {(p.validFrom || p.validTo) && (
-                              <span>
-                                · {p.validFrom ? `From ${format(new Date(p.validFrom), 'MMM d, yyyy')}` : ''}
-                                {p.validFrom && p.validTo ? ' – ' : ''}
-                                {p.validTo ? `Until ${format(new Date(p.validTo), 'MMM d, yyyy')}` : ''}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch checked={p.isActive} onCheckedChange={(checked) => togglePromoCodeMutation.mutate({ id: p.id, isActive: checked })} />
-                        <Button variant="ghost" size="sm" onClick={() => openEditPromoCode(p)}><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setPromoCodeToDelete(p); setDeletePromoCodeConfirmOpen(true); }}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+          <Tabs value={discountsSubTab} onValueChange={setDiscountsSubTab} className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2 max-w-xs">
+              <TabsTrigger value="promo-codes">Promo Codes</TabsTrigger>
+              <TabsTrigger value="bags">Bags</TabsTrigger>
+            </TabsList>
+
+            {/* ── Promo Codes sub-tab ── */}
+            <TabsContent value="promo-codes">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Tag className="h-5 w-5" />
+                        Promo Codes
+                      </CardTitle>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        Create discount codes customers enter at checkout — % off, flat amounts, or minimum bypasses.
+                      </p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    <Button onClick={() => { resetPromoCodeForm(); setEditingPromoCode(null); setShowPromoCodeModal(true); }}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Code
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingPromoCodes ? (
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, i) => <div key={i} className="h-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />)}
+                    </div>
+                  ) : allPromoCodes.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                      <Tag className="h-12 w-12 mb-3 opacity-30" />
+                      <p className="font-medium">No promo codes yet</p>
+                      <p className="text-sm">Click "Create Code" to add your first promo code.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {allPromoCodes.map((p) => (
+                        <div key={p.id} className="flex items-center justify-between p-4 border rounded-lg dark:border-gray-700">
+                          <div className="flex items-start gap-3">
+                            <div className={`mt-0.5 p-2 rounded-md ${p.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                              <Tag className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono font-bold tracking-wider text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{p.code}</span>
+                                <Badge variant={p.isActive ? "default" : "secondary"} className="text-xs">{p.isActive ? 'Active' : 'Inactive'}</Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {p.discountType === 'percent' ? `${p.discountValue}% off` : `$${Number(p.discountValue).toFixed(2)} off`}
+                                </Badge>
+                                {p.minOrderAmount && (
+                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">Min. ${Number(p.minOrderAmount).toFixed(2)}</Badge>
+                                )}
+                                {p.bypassPurchaseMinimum && (
+                                  <Badge variant="outline" className="text-xs text-blue-600 border-blue-400">Bypasses min. purchase</Badge>
+                                )}
+                              </div>
+                              {p.description && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{p.description}</p>}
+                              <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
+                                <span>{p.usageLimitType === 'once_per_user' ? 'Once per customer' : 'Unlimited uses'}</span>
+                                {p.maxTotalUses && <span>· Max {p.maxTotalUses} total uses</span>}
+                                <span>· Used {p.totalUses} time{p.totalUses !== 1 ? 's' : ''}</span>
+                                {(p.validFrom || p.validTo) && (
+                                  <span>
+                                    · {p.validFrom ? `From ${format(new Date(p.validFrom), 'MMM d, yyyy')}` : ''}
+                                    {p.validFrom && p.validTo ? ' – ' : ''}
+                                    {p.validTo ? `Until ${format(new Date(p.validTo), 'MMM d, yyyy')}` : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Switch checked={p.isActive} onCheckedChange={(checked) => togglePromoCodeMutation.mutate({ id: p.id, isActive: checked })} />
+                            <Button variant="ghost" size="sm" onClick={() => openEditPromoCode(p)}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setPromoCodeToDelete(p); setDeletePromoCodeConfirmOpen(true); }}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* ── Bags sub-tab ── */}
+            <TabsContent value="bags">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <ShoppingBag className="h-5 w-5" />
+                        Grab Bags
+                      </CardTitle>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        Create grab bag templates with specific items or random category picks. Generate a product listing with one click.
+                      </p>
+                    </div>
+                    <Button onClick={() => { resetGrabBagForm(); setEditingGrabBag(null); setShowGrabBagModal(true); }}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      New Bag Template
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingGrabBags ? (
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, i) => <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />)}
+                    </div>
+                  ) : allGrabBags.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                      <ShoppingBag className="h-12 w-12 mb-3 opacity-30" />
+                      <p className="font-medium">No grab bag templates yet</p>
+                      <p className="text-sm">Click "New Bag Template" to create your first grab bag.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {allGrabBags.map((bag) => {
+                        const specificIds: number[] = bag.specificProductIds ? JSON.parse(bag.specificProductIds) : [];
+                        const catSels: { categoryId: number; count: number }[] = bag.categorySelections ? JSON.parse(bag.categorySelections) : [];
+                        return (
+                          <div key={bag.id} className="flex items-start justify-between p-4 border rounded-lg dark:border-gray-700">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <div className={`mt-0.5 p-2 rounded-md shrink-0 ${bag.isActive ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                                <ShoppingBag className="h-4 w-4" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-semibold text-sm">{bag.name}</span>
+                                  <Badge variant={bag.isActive ? "default" : "secondary"} className="text-xs">{bag.isActive ? 'Active' : 'Inactive'}</Badge>
+                                  <Badge variant="outline" className="text-xs text-green-700 border-green-400 dark:text-green-400">Sells for ${Number(bag.sellingPrice).toFixed(2)}</Badge>
+                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">Max value ${Number(bag.maxTotalItemPrice).toFixed(2)}</Badge>
+                                </div>
+                                {bag.description && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 truncate">{bag.description}</p>}
+                                <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
+                                  {specificIds.length > 0 && (
+                                    <span>{specificIds.length} specific item{specificIds.length !== 1 ? 's' : ''}</span>
+                                  )}
+                                  {catSels.length > 0 && (
+                                    <span>{catSels.reduce((s, c) => s + c.count, 0)} random from {catSels.length} categor{catSels.length !== 1 ? 'ies' : 'y'}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0 ml-3">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-purple-600 border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                                onClick={() => generateGrabBagMutation.mutate(bag.id)}
+                                disabled={generateGrabBagMutation.isPending}
+                              >
+                                <Gift className="h-4 w-4 mr-1" />
+                                Generate
+                              </Button>
+                              <Switch checked={bag.isActive} onCheckedChange={(checked) => toggleGrabBagMutation.mutate({ id: bag.id, isActive: checked })} />
+                              <Button variant="ghost" size="sm" onClick={() => openEditGrabBag(bag)}><Pencil className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setGrabBagToDelete(bag); setDeleteGrabBagConfirmOpen(true); }}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
       </Tabs>
+
+      {/* ── Grab Bag Dialogs ──────────────────────────────────────────────────── */}
+
+      {/* Delete Grab Bag Confirmation */}
+      <Dialog open={deleteGrabBagConfirmOpen} onOpenChange={setDeleteGrabBagConfirmOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Grab Bag Template</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Are you sure you want to delete <span className="font-semibold">{grabBagToDelete?.name}</span>? This cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteGrabBagConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => grabBagToDelete && deleteGrabBagMutation.mutate(grabBagToDelete.id)} disabled={deleteGrabBagMutation.isPending}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Generate Result Dialog */}
+      <Dialog open={generateResultOpen} onOpenChange={setGenerateResultOpen}>
+        <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gift className="h-5 w-5 text-purple-600" />
+              Grab Bag Generated!
+            </DialogTitle>
+          </DialogHeader>
+          {generateResult && (
+            <div className="space-y-4 py-2">
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                  Product <span className="font-bold">"{generateResult.product.name}"</span> has been added to your catalog.
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">SKU: {generateResult.product.sku}</p>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Items included</span>
+                  <span className="font-medium">{generateResult.selectedProducts.length}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Total retail value</span>
+                  <span className="font-medium text-green-700 dark:text-green-400">${generateResult.retailValue.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Selling price</span>
+                  <span className="font-medium">${generateResult.sellingPrice.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Customer saves</span>
+                  <span className="font-medium text-purple-600">${(generateResult.retailValue - generateResult.sellingPrice).toFixed(2)}</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Items in this bag</p>
+                <div className="space-y-1">
+                  {generateResult.selectedProducts.map((p, i) => (
+                    <div key={i} className="flex justify-between text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                      <span>{p.name}</span>
+                      <span className="text-gray-500">${p.price.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setGenerateResultOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create / Edit Grab Bag Dialog */}
+      <Dialog open={showGrabBagModal} onOpenChange={(open) => { setShowGrabBagModal(open); if (!open) { setEditingGrabBag(null); resetGrabBagForm(); } }}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingGrabBag ? "Edit" : "New"} Grab Bag Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 py-2">
+            {/* Name */}
+            <div className="space-y-2">
+              <Label>Name *</Label>
+              <Input
+                placeholder="e.g. Mystery Sampler"
+                value={grabBagForm.name}
+                onChange={e => setGrabBagForm(f => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            {/* Description */}
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Optional description shown to customers"
+                value={grabBagForm.description}
+                onChange={e => setGrabBagForm(f => ({ ...f, description: e.target.value }))}
+                rows={2}
+              />
+            </div>
+            {/* Pricing */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Selling Price * <span className="text-gray-400 font-normal text-xs">(what customers pay)</span></Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                  <Input
+                    className="pl-7"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={grabBagForm.sellingPrice}
+                    onChange={e => setGrabBagForm(f => ({ ...f, sellingPrice: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Max Total Item Price * <span className="text-gray-400 font-normal text-xs">(cap on retail value)</span></Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                  <Input
+                    className="pl-7"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={grabBagForm.maxTotalItemPrice}
+                    onChange={e => setGrabBagForm(f => ({ ...f, maxTotalItemPrice: e.target.value }))}
+                  />
+                </div>
+                <p className="text-xs text-gray-400">Items selected will not exceed this total retail value.</p>
+              </div>
+            </div>
+
+            {/* Specific Products */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1">
+                <Package className="h-4 w-4" />
+                Always Include — Specific Products
+              </Label>
+              <p className="text-xs text-gray-400">These products are always added to every generated bag.</p>
+              <Select
+                onValueChange={(val) => {
+                  const id = parseInt(val);
+                  if (!grabBagForm.specificProductIds.includes(id)) {
+                    setGrabBagForm(f => ({ ...f, specificProductIds: [...f.specificProductIds, id] }));
+                  }
+                }}
+                value=""
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Add a specific product…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allProducts.filter(p => !grabBagForm.specificProductIds.includes(p.id) && p.price).map(p => (
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      {p.name} — ${Number(p.price).toFixed(2)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {grabBagForm.specificProductIds.length > 0 && (
+                <div className="space-y-1 mt-2">
+                  {grabBagForm.specificProductIds.map(pid => {
+                    const prod = allProducts.find(p => p.id === pid);
+                    return (
+                      <div key={pid} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
+                        <span>{prod ? `${prod.name} — $${Number(prod.price).toFixed(2)}` : `Product #${pid}`}</span>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setGrabBagForm(f => ({ ...f, specificProductIds: f.specificProductIds.filter(id => id !== pid) }))}>
+                          <Trash2 className="h-3.5 w-3.5 text-gray-400" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Category Random Picks */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1">
+                <ShoppingBag className="h-4 w-4" />
+                Random Category Picks
+              </Label>
+              <p className="text-xs text-gray-400">Randomly select a set number of items from a category each time the bag is generated.</p>
+              <div className="flex gap-2">
+                <Select
+                  onValueChange={(val) => {
+                    const catId = parseInt(val);
+                    if (!grabBagForm.categorySelections.find(c => c.categoryId === catId)) {
+                      setGrabBagForm(f => ({ ...f, categorySelections: [...f.categorySelections, { categoryId: catId, count: 1 }] }));
+                    }
+                  }}
+                  value=""
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Add a category…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allCategories.filter(c => c.isActive && !grabBagForm.categorySelections.find(s => s.categoryId === c.id)).map(c => (
+                      <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {grabBagForm.categorySelections.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  {grabBagForm.categorySelections.map((sel, idx) => {
+                    const cat = allCategories.find(c => c.id === sel.categoryId);
+                    return (
+                      <div key={sel.categoryId} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                        <span className="text-sm flex-1">{cat?.name || `Category #${sel.categoryId}`}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Label className="text-xs text-gray-500 whitespace-nowrap">Pick count</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="20"
+                            value={sel.count}
+                            onChange={e => {
+                              const count = Math.max(1, parseInt(e.target.value) || 1);
+                              setGrabBagForm(f => ({
+                                ...f,
+                                categorySelections: f.categorySelections.map((s, i) => i === idx ? { ...s, count } : s),
+                              }));
+                            }}
+                            className="w-16 h-8 text-center"
+                          />
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setGrabBagForm(f => ({ ...f, categorySelections: f.categorySelections.filter((_, i) => i !== idx) }))}>
+                            <Trash2 className="h-3.5 w-3.5 text-gray-400" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Active toggle */}
+            <div className="flex items-center gap-3">
+              <Switch checked={grabBagForm.isActive} onCheckedChange={v => setGrabBagForm(f => ({ ...f, isActive: v }))} />
+              <Label>Active</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowGrabBagModal(false); setEditingGrabBag(null); resetGrabBagForm(); }}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!grabBagForm.name.trim()) return toast({ title: "Name is required", variant: "destructive" });
+                if (!grabBagForm.sellingPrice) return toast({ title: "Selling price is required", variant: "destructive" });
+                if (!grabBagForm.maxTotalItemPrice) return toast({ title: "Max total item price is required", variant: "destructive" });
+                if (editingGrabBag) {
+                  updateGrabBagMutation.mutate({ id: editingGrabBag.id, data: grabBagForm });
+                } else {
+                  createGrabBagMutation.mutate(grabBagForm);
+                }
+              }}
+              disabled={createGrabBagMutation.isPending || updateGrabBagMutation.isPending}
+            >
+              {editingGrabBag ? "Save Changes" : "Create Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Promo Code Confirmation */}
       <Dialog open={deletePromoCodeConfirmOpen} onOpenChange={setDeletePromoCodeConfirmOpen}>

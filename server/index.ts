@@ -253,6 +253,28 @@ app.use((req, res, next) => {
     console.warn("⚠ Could not verify order_sequences table:", error?.message);
   }
 
+  // Ensure grab_bags table exists
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`
+      CREATE TABLE IF NOT EXISTS grab_bags (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR NOT NULL,
+        description TEXT,
+        selling_price DECIMAL(10,2) NOT NULL,
+        max_total_item_price DECIMAL(10,2) NOT NULL,
+        specific_product_ids TEXT,
+        category_selections TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log("✓ Verified grab_bags table exists");
+  } catch (error: any) {
+    console.warn("⚠ Could not verify grab_bags table:", error?.message);
+  }
+
   // Fix user_activity_logs sequence if it has fallen behind actual data
   try {
     const { sql } = await import("./db");

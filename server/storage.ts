@@ -24,6 +24,8 @@ import {
   analyticsOrdersSnapshot,
   analyticsOrderItemsSnapshot,
   siteSettings,
+  grabBags,
+  type GrabBag,
   type Discount,
   type PromotionalAd,
   type AccessPassword,
@@ -4297,6 +4299,49 @@ export class DatabaseStorage implements IStorage {
       db.insert(siteSettings).values({ key, value })
         .onConflictDoUpdate({ target: siteSettings.key, set: { value } })
     );
+  }
+
+  // Grab Bags
+  async getGrabBags(): Promise<GrabBag[]> {
+    return retryQuery(() => db.select().from(grabBags).orderBy(desc(grabBags.createdAt)));
+  }
+
+  async getGrabBag(id: number): Promise<GrabBag | undefined> {
+    const results = await retryQuery(() => db.select().from(grabBags).where(eq(grabBags.id, id)));
+    return results[0];
+  }
+
+  async createGrabBag(data: any): Promise<GrabBag> {
+    const toInsert: any = {
+      name: data.name,
+      sellingPrice: data.sellingPrice,
+      maxTotalItemPrice: data.maxTotalItemPrice,
+      isActive: data.isActive !== false,
+    };
+    if (data.description) toInsert.description = data.description;
+    if (data.specificProductIds != null) toInsert.specificProductIds = data.specificProductIds;
+    if (data.categorySelections != null) toInsert.categorySelections = data.categorySelections;
+    const results = await retryQuery(() => db.insert(grabBags).values(toInsert).returning());
+    return results[0];
+  }
+
+  async updateGrabBag(id: number, data: any): Promise<GrabBag | undefined> {
+    const existing = await retryQuery(() => db.select().from(grabBags).where(eq(grabBags.id, id)));
+    if (!existing[0]) return undefined;
+    const toUpdate: any = { updatedAt: new Date() };
+    if (data.name !== undefined) toUpdate.name = data.name;
+    if (data.description !== undefined) toUpdate.description = data.description;
+    if (data.sellingPrice !== undefined) toUpdate.sellingPrice = data.sellingPrice;
+    if (data.maxTotalItemPrice !== undefined) toUpdate.maxTotalItemPrice = data.maxTotalItemPrice;
+    if (data.specificProductIds !== undefined) toUpdate.specificProductIds = data.specificProductIds;
+    if (data.categorySelections !== undefined) toUpdate.categorySelections = data.categorySelections;
+    if (data.isActive !== undefined) toUpdate.isActive = data.isActive;
+    const results = await retryQuery(() => db.update(grabBags).set(toUpdate).where(eq(grabBags.id, id)).returning());
+    return results[0];
+  }
+
+  async deleteGrabBag(id: number): Promise<void> {
+    await retryQuery(() => db.delete(grabBags).where(eq(grabBags.id, id)));
   }
 }
 
