@@ -956,6 +956,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const orderData = insertOrderSchema.parse(order);
 
+      // NOTE: promoCode is not in insertOrderSchema, so read from raw request body
+      const promoCodeStr = (order.promoCode || (orderData as any).promoCode) as string | undefined;
+
       // Server-side delivery block and purchase limit enforcement
       if (orderData.shippingAddress) {
         const addressParts = orderData.shippingAddress.split(",").map((s: string) => s.trim());
@@ -971,8 +974,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Check if the applied promo code bypasses the purchase minimum
-          // NOTE: promoCode is not in insertOrderSchema, so read from raw request body
-          const promoCodeStr = (order.promoCode || (orderData as any).promoCode) as string | undefined;
           let promoBypassesMinimum = false;
           if (promoCodeStr) {
             const promoRecord = await storage.getPromoCodeByCode(promoCodeStr);
@@ -1077,6 +1078,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemsData = enrichedItems.map((item: any) => insertOrderItemSchema.parse(item));
 
       const newOrder = await storage.createOrder(orderData, itemsData);
+
+      // Track promo code usage
+      if (promoCodeStr) {
+        try {
+          const promoRecord = await storage.getPromoCodeByCode(promoCodeStr.trim());
+          if (promoRecord) {
+            await storage.incrementPromoCodeTotalUses(promoRecord.id);
+            if (orderData.customerId) {
+              await storage.recordPromoCodeUse(promoRecord.id, orderData.customerId);
+            }
+          }
+        } catch (promoTrackError) {
+          console.error('Failed to track promo code usage:', promoTrackError);
+          // Don't fail the order creation if promo tracking fails
+        }
+      }
 
       // If the order has a phone number and the customer is logged in, save it to their profile if not already set
       if (orderData.customerId && orderData.customerPhone) {
