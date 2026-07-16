@@ -110,6 +110,7 @@ export interface IStorage {
   substituteOrderItem(orderId: number, oldItemId: number, newProductId: number, quantity: number, userId: string): Promise<void>;
   removeOrderItem(orderId: number, itemId: number, userId: string): Promise<void>;
   addOrderItem(orderId: number, productId: number, quantity: number, userId: string, unitPrice?: number, unitLabel?: string): Promise<void>;
+  addCustomOrderItem(orderId: number, customName: string, price: number, quantity: number, userId: string): Promise<void>;
   updateOrderItemPrice(orderId: number, itemId: number, newPrice: number): Promise<Order>;
   markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }>;
   assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order>;
@@ -2337,6 +2338,30 @@ export class DatabaseStorage implements IStorage {
         createdAt: new Date()
       });
     }
+  }
+
+  async addCustomOrderItem(orderId: number, customName: string, price: number, quantity: number, userId: string): Promise<void> {
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (!order) throw new Error("Order not found");
+
+    const subtotal = price * quantity;
+
+    await db.insert(orderItems).values({
+      orderId,
+      productId: null,
+      productName: customName,
+      productSku: 'CUSTOM',
+      productPrice: String(price),
+      quantity,
+      subtotal: String(subtotal),
+      fulfilled: false,
+      removed: false,
+    });
+
+    // Recalculate order total
+    const activeItems = await db.select().from(orderItems).where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
+    const newTotal = activeItems.reduce((sum, i) => sum + parseFloat(i.subtotal), 0);
+    await db.update(orders).set({ total: String(newTotal), updatedAt: new Date() }).where(eq(orders.id, orderId));
   }
 
   async markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }> {

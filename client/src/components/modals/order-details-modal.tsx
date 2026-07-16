@@ -43,11 +43,15 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
   // Add item state
   const [addingItem, setAddingItem] = useState(false);
+  const [addItemMode, setAddItemMode] = useState<'search' | 'custom'>('search');
   const [addItemSearch, setAddItemSearch] = useState("");
   const [addItemQuantity, setAddItemQuantity] = useState("1");
   const [selectedAddProduct, setSelectedAddProduct] = useState<Product | null>(null);
   const [selectedAddUnit, setSelectedAddUnit] = useState<string>("units");
   const [addItemSizeQuantities, setAddItemSizeQuantities] = useState<Record<string, number>>({});
+  // Custom item state
+  const [customItemName, setCustomItemName] = useState("");
+  const [customItemPrice, setCustomItemPrice] = useState("");
 
   const isFulfillingRef = useRef(false);
   const isScanningRef = useRef(false);
@@ -251,6 +255,37 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     },
     onError: (error: any) => {
       toast({ title: "Failed to Add Item", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Add custom (one-off) item mutation
+  const addCustomItemMutation = useMutation({
+    mutationFn: async ({ orderId, customName, price, quantity }: { orderId: number; customName: string; price: number; quantity: number }) => {
+      const response = await fetch(`/api/orders/${orderId}/add-custom-item`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ customName, price, quantity })
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to add custom item');
+      }
+      return response.json();
+    },
+    onSuccess: (updatedOrder) => {
+      toast({ title: "Custom Item Added", description: "One-off item added to order." });
+      setFullOrder(updatedOrder);
+      setAddingItem(false);
+      setAddItemMode('search');
+      setCustomItemName("");
+      setCustomItemPrice("");
+      setAddItemQuantity("1");
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to Add Custom Item", description: error.message, variant: "destructive" });
     }
   });
 
@@ -807,11 +842,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
               {addingItem && isAdmin && (() => {
                 const closeAddPanel = () => {
                   setAddingItem(false);
+                  setAddItemMode('search');
                   setAddItemSearch("");
                   setAddItemQuantity("1");
                   setSelectedAddProduct(null);
                   setSelectedAddUnit("units");
                   setAddItemSizeQuantities({});
+                  setCustomItemName("");
+                  setCustomItemPrice("");
                 };
 
                 const ap = selectedAddProduct as any;
@@ -903,7 +941,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                           <div className="flex items-center gap-2">
                             <PlusCircle className="h-5 w-5 text-green-500" />
                             <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                              {selectedAddProduct ? "Configure Item" : "Add Product to Order"}
+                              {addItemMode === 'custom' ? "Create Custom Item" : selectedAddProduct ? "Configure Item" : "Add Product to Order"}
                             </h4>
                           </div>
                           <Button variant="ghost" size="sm" onClick={closeAddPanel}>
@@ -911,8 +949,94 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                           </Button>
                         </div>
 
+                        {/* Mode toggle */}
+                        <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-sm">
+                          <button
+                            className={`flex-1 py-1.5 font-medium transition-colors ${addItemMode === 'search' ? 'bg-green-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                            onClick={() => { setAddItemMode('search'); setCustomItemName(""); setCustomItemPrice(""); }}
+                          >
+                            Search Product
+                          </button>
+                          <button
+                            className={`flex-1 py-1.5 font-medium transition-colors ${addItemMode === 'custom' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                            onClick={() => { setAddItemMode('custom'); setSelectedAddProduct(null); setAddItemSearch(""); }}
+                          >
+                            Custom Item
+                          </button>
+                        </div>
+
+                        {/* Custom item form */}
+                        {addItemMode === 'custom' && (
+                          <div className="space-y-3">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              This item exists only for this order — it won't be added to the product catalog or affect any inventory.
+                            </p>
+                            <div className="space-y-1">
+                              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Item Name</label>
+                              <Input
+                                placeholder="e.g. Custom Gift Wrap, Special Service Fee..."
+                                value={customItemName}
+                                onChange={(e) => setCustomItemName(e.target.value)}
+                                autoFocus
+                              />
+                            </div>
+                            <div className="flex gap-3">
+                              <div className="space-y-1 flex-1">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Price (per unit)</label>
+                                <div className="relative">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    value={customItemPrice}
+                                    onChange={(e) => setCustomItemPrice(e.target.value)}
+                                    className="pl-7"
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-1 w-24">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Qty</label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={addItemQuantity}
+                                  onChange={(e) => setAddItemQuantity(e.target.value)}
+                                />
+                              </div>
+                            </div>
+                            {customItemName && customItemPrice && parseFloat(customItemPrice) >= 0 && (
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Total: <strong className="text-gray-900 dark:text-gray-100">${(parseFloat(customItemPrice) * Math.max(1, parseInt(addItemQuantity) || 1)).toFixed(2)}</strong>
+                              </p>
+                            )}
+                            <Button
+                              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                              disabled={
+                                addCustomItemMutation.isPending ||
+                                !customItemName.trim() ||
+                                !customItemPrice ||
+                                isNaN(parseFloat(customItemPrice)) ||
+                                parseFloat(customItemPrice) < 0
+                              }
+                              onClick={() => {
+                                const qty = Math.max(1, parseInt(addItemQuantity) || 1);
+                                const price = parseFloat(customItemPrice);
+                                if (!customItemName.trim() || isNaN(price) || price < 0) return;
+                                addCustomItemMutation.mutate({ orderId: displayOrder.id, customName: customItemName.trim(), price, quantity: qty });
+                              }}
+                            >
+                              {addCustomItemMutation.isPending
+                                ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Adding…</>
+                                : `Add Custom Item${customItemName && customItemPrice && !isNaN(parseFloat(customItemPrice)) ? ` — $${(parseFloat(customItemPrice) * Math.max(1, parseInt(addItemQuantity) || 1)).toFixed(2)}` : ''}`
+                              }
+                            </Button>
+                          </div>
+                        )}
+
                         {/* Step 1: search */}
-                        {!selectedAddProduct && (
+                        {addItemMode === 'search' && !selectedAddProduct && (
                           <>
                             <div className="flex items-center gap-2">
                               <Search className="h-4 w-4 text-gray-400 shrink-0" />
@@ -977,7 +1101,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                         )}
 
                         {/* Step 2: configure unit + quantity */}
-                        {selectedAddProduct && (
+                        {addItemMode === 'search' && selectedAddProduct && (
                           <>
                             <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
                               <div className="flex-1 min-w-0">

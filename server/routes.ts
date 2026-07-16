@@ -1515,6 +1515,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add custom (one-off) item to order — no product record, no stock change (admin only)
+  app.post('/api/orders/:id/add-custom-item', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const { customName, price, quantity } = req.body;
+      if (!customName || customName.trim() === '') {
+        return res.status(400).json({ message: "customName is required" });
+      }
+      if (price == null || isNaN(Number(price)) || Number(price) < 0) {
+        return res.status(400).json({ message: "A valid price is required" });
+      }
+      if (!quantity || Number(quantity) <= 0) {
+        return res.status(400).json({ message: "A positive quantity is required" });
+      }
+
+      const order = await storage.getOrder(orderId);
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (['shipped', 'cancelled'].includes(order.status)) {
+        return res.status(400).json({ message: "Cannot add items to shipped or cancelled orders" });
+      }
+
+      await storage.addCustomOrderItem(orderId, customName.trim(), Number(price), Number(quantity), req.currentUser.id);
+      const updatedOrder = await storage.getOrder(orderId);
+      res.status(200).json(updatedOrder);
+    } catch (error: any) {
+      console.error('Add custom item error:', error);
+      res.status(500).json({ message: error.message || "Failed to add custom item" });
+    }
+  });
+
   // Substitute order item (admin only)
   app.post('/api/orders/:id/substitute-item', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
     try {
