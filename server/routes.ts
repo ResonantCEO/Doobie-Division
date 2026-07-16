@@ -3189,23 +3189,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return arr;
     }
 
-    // Helper: pick `count` items from pool whose total is closest to subTarget, using random trials
-    function pickClosest(
+    // Helper: pick `count` items from pool with total ≤ budget, maximizing total (closest to budget from below).
+    // Uses random trials for variety while respecting the hard ceiling.
+    function pickBestUnder(
       pool: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }>,
       count: number,
-      subTarget: number,
-      trials = 200
+      budget: number,
+      trials = 300
     ) {
       if (pool.length <= count) return pool;
-      let bestCombo = pool.slice(0, count);
-      let bestDiff = Math.abs(bestCombo.reduce((s, p) => s + p.price, 0) - subTarget);
+      // Only work with items that individually fit
+      const affordable = pool.filter(p => p.price <= budget);
+      if (affordable.length === 0) return [];
+      if (affordable.length <= count) return affordable;
+
+      let bestCombo: typeof pool = [];
+      let bestTotal = -1;
       for (let t = 0; t < trials; t++) {
-        const shuffled = shuffle([...pool]);
-        const combo = shuffled.slice(0, count);
-        const total = combo.reduce((s, p) => s + p.price, 0);
-        const diff = Math.abs(total - subTarget);
-        if (diff < bestDiff) { bestDiff = diff; bestCombo = combo; }
-        if (bestDiff === 0) break;
+        const shuffled = shuffle([...affordable]);
+        // Greedily pick up to `count` items that fit within remaining budget
+        const combo: typeof pool = [];
+        let spent = 0;
+        for (const p of shuffled) {
+          if (combo.length >= count) break;
+          if (spent + p.price <= budget) { combo.push(p); spent += p.price; }
+        }
+        if (combo.length > 0 && spent > bestTotal) {
+          bestTotal = spent;
+          bestCombo = combo;
+        }
+        if (bestTotal === budget) break; // perfect fit
       }
       return bestCombo;
     }
@@ -3237,9 +3250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Compute how much of the target remains after specific products, distributed across categories by count
     const remainingTarget = Math.max(0, targetTotal - runningTotal);
-    const totalCatCount = categorySelections.reduce((s, c) => s + c.count, 0);
-
-    // Fetch all category pools first so we can do proportional targeting
+    // Fetch all category pools first, then process with dynamic budget tracking
     type PoolEntry = { sel: { categoryId: number; count: number }; pool: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }> };
     const poolEntries: PoolEntry[] = [];
     for (const sel of categorySelections) {
@@ -3258,19 +3269,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
+    // Dynamic budget: track how much is left as each category is processed
+    let remainingBudget = remainingTarget;
+    let remainingCatCount = poolEntries.reduce((s, e) => s + e.sel.count, 0);
+
     for (const { sel, pool } of poolEntries) {
-      // Sub-target for this category proportional to its share of total category item count
-      const subTarget = totalCatCount > 0 ? remainingTarget * (sel.count / totalCatCount) : 0;
-      const picked = pickClosest(pool, sel.count, subTarget);
+      // Allocate budget for this category proportional to its share of remaining item slots
+      const catBudget = remainingCatCount > 0 ? remainingBudget * (sel.count / remainingCatCount) : 0;
+      const picked = pickBestUnder(pool, sel.count, catBudget);
+      const pickedTotal = picked.reduce((s, p) => s + p.price, 0);
       for (const p of picked) {
-        // Exclude items already added (in case pools overlap)
         if (!selectedProducts.find(s => s.id === p.id)) {
           selectedProducts.push(p);
           runningTotal += p.price;
         }
       }
+      remainingBudget -= pickedTotal;
+      remainingCatCount -= sel.count;
       if (picked.length < sel.count) {
-        warnings.push(`Only ${picked.length} of ${sel.count} requested items could be found in category ID ${sel.categoryId}.`);
+        warnings.push(`Only ${picked.length} of ${sel.count} requested items could be found within budget for category ID ${sel.categoryId}.`);
       }
     }
 
