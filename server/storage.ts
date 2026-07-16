@@ -1832,16 +1832,19 @@ export class DatabaseStorage implements IStorage {
 
         const itemSize = (item as any).size;
         if (itemSize) {
-          // Size-based product — check product_sizes quantity
+          // Check if this is a size-based product (has a matching product_sizes record)
           const sizeResult = await retryQuery(() =>
             db.execute(sql`SELECT quantity FROM product_sizes WHERE product_id = ${item.productId} AND size = ${itemSize}`)
           );
           const sizeRow = sizeResult?.rows?.[0];
-          if (!sizeRow) {
-            throw new Error(`Size "${itemSize}" not found for ${product.name}`);
-          }
-          if (Number(sizeRow.quantity) < item.quantity) {
-            throw new Error(`Insufficient stock for ${product.name} (${itemSize}). Available: ${sizeRow.quantity}, Requested: ${item.quantity}`);
+          if (sizeRow) {
+            // Size-based product — validate against size-specific quantity
+            if (Number(sizeRow.quantity) < item.quantity) {
+              throw new Error(`Insufficient stock for ${product.name} (${itemSize}). Available: ${sizeRow.quantity}, Requested: ${item.quantity}`);
+            }
+          } else if (Number(product.stock) < item.quantity) {
+            // Weight-based or flat-stock product — validate against product.stock
+            throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
           }
         } else if (Number(product.stock) < item.quantity) {
           throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
