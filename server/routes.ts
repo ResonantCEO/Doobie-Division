@@ -3199,13 +3199,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     // 2. Pick random items from category selections
+    let blacklistedIds: number[] = [];
+    try { blacklistedIds = bag.blacklistedProductIds ? JSON.parse(bag.blacklistedProductIds) : []; } catch { /* ignore */ }
+
     let categorySelections: Array<{ categoryId: number; count: number }> = [];
     try { categorySelections = bag.categorySelections ? JSON.parse(bag.categorySelections) : []; } catch { /* ignore */ }
 
     for (const sel of categorySelections) {
       try {
         const allInCat = await storage.getProducts({ categoryId: sel.categoryId, isActive: true });
-        const pool = allInCat.filter(p => p.price && !isNaN(parseFloat(p.price)) && !selectedProducts.find(s => s.id === p.id));
+        const pool = allInCat.filter(p =>
+          p.price &&
+          !isNaN(parseFloat(p.price)) &&
+          !selectedProducts.find(s => s.id === p.id) &&
+          !blacklistedIds.includes(p.id)
+        );
 
         if (pool.length === 0) {
           warnings.push(`Category ID ${sel.categoryId} has no eligible products.`);

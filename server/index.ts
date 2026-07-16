@@ -270,6 +270,7 @@ app.use((req, res, next) => {
         updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    await sql.query(`ALTER TABLE grab_bags ADD COLUMN IF NOT EXISTS blacklisted_product_ids TEXT`);
     console.log("✓ Verified grab_bags table exists");
   } catch (error: any) {
     console.warn("⚠ Could not verify grab_bags table:", error?.message);

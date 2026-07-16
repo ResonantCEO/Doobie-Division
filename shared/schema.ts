@@ -773,6 +773,7 @@ export const grabBags = pgTable("grab_bags", {
   maxTotalItemPrice: decimal("max_total_item_price", { precision: 10, scale: 2 }).notNull(),
   specificProductIds: text("specific_product_ids"), // JSON array of product IDs always included
   categorySelections: text("category_selections"), // JSON array of { categoryId, count }
+  blacklistedProductIds: text("blacklisted_product_ids"), // JSON array of product IDs never picked from category selections
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -788,6 +789,7 @@ export const insertGrabBagSchema = createInsertSchema(grabBags).omit({
   maxTotalItemPrice: z.string().min(1, "Max total item price is required"),
   specificProductIds: z.string().nullable().optional(),
   categorySelections: z.string().nullable().optional(),
+  blacklistedProductIds: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
 });
 

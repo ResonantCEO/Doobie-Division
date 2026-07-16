@@ -133,12 +133,13 @@ export default function AdminPage() {
     maxTotalItemPrice: "",
     specificProductIds: [] as number[],
     categorySelections: [] as { categoryId: number; count: number }[],
+    blacklistedProductIds: [] as number[],
     isActive: true,
   });
 
   const resetGrabBagForm = () => setGrabBagForm({
     name: "", description: "", sellingPrice: "", maxTotalItemPrice: "",
-    specificProductIds: [], categorySelections: [], isActive: true,
+    specificProductIds: [], categorySelections: [], blacklistedProductIds: [], isActive: true,
   });
 
   const openEditGrabBag = (g: GrabBag) => {
@@ -150,6 +151,7 @@ export default function AdminPage() {
       maxTotalItemPrice: g.maxTotalItemPrice?.toString() || "",
       specificProductIds: g.specificProductIds ? JSON.parse(g.specificProductIds) : [],
       categorySelections: g.categorySelections ? JSON.parse(g.categorySelections) : [],
+      blacklistedProductIds: g.blacklistedProductIds ? JSON.parse(g.blacklistedProductIds) : [],
       isActive: g.isActive,
     });
     setShowGrabBagModal(true);
@@ -553,6 +555,7 @@ export default function AdminPage() {
         maxTotalItemPrice: data.maxTotalItemPrice,
         specificProductIds: data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
         categorySelections: data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
+        blacklistedProductIds: data.blacklistedProductIds.length > 0 ? JSON.stringify(data.blacklistedProductIds) : null,
         isActive: data.isActive,
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
@@ -576,6 +579,7 @@ export default function AdminPage() {
         maxTotalItemPrice: data.maxTotalItemPrice,
         specificProductIds: data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
         categorySelections: data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
+        blacklistedProductIds: data.blacklistedProductIds.length > 0 ? JSON.stringify(data.blacklistedProductIds) : null,
         isActive: data.isActive,
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
@@ -2463,6 +2467,50 @@ export default function AdminPage() {
                             <Trash2 className="h-3.5 w-3.5 text-gray-400" />
                           </Button>
                         </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Blacklisted Products */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1">
+                <Trash2 className="h-4 w-4 text-red-500" />
+                Never Include — Blacklisted Products
+              </Label>
+              <p className="text-xs text-gray-400">These products will never be randomly picked from category selections for this bag.</p>
+              <Select
+                onValueChange={(val) => {
+                  const id = parseInt(val);
+                  if (!grabBagForm.blacklistedProductIds.includes(id)) {
+                    setGrabBagForm(f => ({ ...f, blacklistedProductIds: [...f.blacklistedProductIds, id] }));
+                  }
+                }}
+                value=""
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Add a product to exclude…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allProducts.filter(p => !grabBagForm.blacklistedProductIds.includes(p.id) && p.price).map(p => (
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      {p.name} — ${Number(p.price).toFixed(2)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {grabBagForm.blacklistedProductIds.length > 0 && (
+                <div className="space-y-1 mt-2">
+                  {grabBagForm.blacklistedProductIds.map(pid => {
+                    const prod = allProducts.find(p => p.id === pid);
+                    return (
+                      <div key={pid} className="flex items-center justify-between p-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded text-sm">
+                        <span className="text-red-700 dark:text-red-300">{prod ? `${prod.name} — $${Number(prod.price).toFixed(2)}` : `Product #${pid}`}</span>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setGrabBagForm(f => ({ ...f, blacklistedProductIds: f.blacklistedProductIds.filter(id => id !== pid) }))}>
+                          <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                        </Button>
                       </div>
                     );
                   })}
