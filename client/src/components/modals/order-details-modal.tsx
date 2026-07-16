@@ -938,31 +938,32 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                       <div className="space-y-4">
                         {/* Header */}
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <PlusCircle className="h-5 w-5 text-green-500" />
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            <PlusCircle className="h-5 w-5 text-green-500 shrink-0" />
                             <h4 className="font-medium text-gray-900 dark:text-gray-100">
                               {addItemMode === 'custom' ? "Create Custom Item" : selectedAddProduct ? "Configure Item" : "Add Product to Order"}
                             </h4>
+                            <button
+                              title={addItemMode === 'custom' ? "Switch to product search" : "Create a custom one-off item"}
+                              onClick={() => {
+                                if (addItemMode === 'custom') {
+                                  setAddItemMode('search');
+                                  setCustomItemName("");
+                                  setCustomItemPrice("");
+                                } else {
+                                  setAddItemMode('custom');
+                                  setSelectedAddProduct(null);
+                                  setAddItemSearch("");
+                                }
+                              }}
+                              className={`ml-1 p-0.5 rounded transition-colors ${addItemMode === 'custom' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
                           </div>
                           <Button variant="ghost" size="sm" onClick={closeAddPanel}>
                             <X className="h-4 w-4" />
                           </Button>
-                        </div>
-
-                        {/* Mode toggle */}
-                        <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-sm">
-                          <button
-                            className={`flex-1 py-1.5 font-medium transition-colors ${addItemMode === 'search' ? 'bg-green-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                            onClick={() => { setAddItemMode('search'); setCustomItemName(""); setCustomItemPrice(""); }}
-                          >
-                            Search Product
-                          </button>
-                          <button
-                            className={`flex-1 py-1.5 font-medium transition-colors ${addItemMode === 'custom' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                            onClick={() => { setAddItemMode('custom'); setSelectedAddProduct(null); setAddItemSearch(""); }}
-                          >
-                            Custom Item
-                          </button>
                         </div>
 
                         {/* Custom item form */}
