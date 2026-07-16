@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -2389,11 +2389,29 @@ export default function AdminPage() {
                   <SelectValue placeholder="Add a specific product…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allProducts.filter(p => !grabBagForm.specificProductIds.includes(p.id) && p.price).map(p => (
-                    <SelectItem key={p.id} value={p.id.toString()}>
-                      {p.name} — ${Number(p.price).toFixed(2)}
-                    </SelectItem>
-                  ))}
+                  {(() => {
+                    const eligible = allProducts.filter(p => !grabBagForm.specificProductIds.includes(p.id) && p.price);
+                    const catMap = new Map<number | null, typeof eligible>();
+                    for (const p of eligible) {
+                      const cid = p.categoryId ?? null;
+                      if (!catMap.has(cid)) catMap.set(cid, []);
+                      catMap.get(cid)!.push(p);
+                    }
+                    const groups = Array.from(catMap.entries()).map(([cid, prods]) => ({
+                      label: cid ? (allCategories.find(c => c.id === cid)?.name ?? `Category #${cid}`) : "Uncategorized",
+                      prods: [...prods].sort((a, b) => a.name.localeCompare(b.name)),
+                    })).sort((a, b) => a.label.localeCompare(b.label));
+                    return groups.map(g => (
+                      <SelectGroup key={g.label}>
+                        <SelectLabel>{g.label}</SelectLabel>
+                        {g.prods.map(p => (
+                          <SelectItem key={p.id} value={p.id.toString()}>
+                            {p.name} — ${Number(p.price).toFixed(2)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
               {grabBagForm.specificProductIds.length > 0 && (
@@ -2494,11 +2512,29 @@ export default function AdminPage() {
                   <SelectValue placeholder="Add a product to exclude…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allProducts.filter(p => !grabBagForm.blacklistedProductIds.includes(p.id) && p.price).map(p => (
-                    <SelectItem key={p.id} value={p.id.toString()}>
-                      {p.name} — ${Number(p.price).toFixed(2)}
-                    </SelectItem>
-                  ))}
+                  {(() => {
+                    const eligible = allProducts.filter(p => !grabBagForm.blacklistedProductIds.includes(p.id) && p.price);
+                    const catMap = new Map<number | null, typeof eligible>();
+                    for (const p of eligible) {
+                      const cid = p.categoryId ?? null;
+                      if (!catMap.has(cid)) catMap.set(cid, []);
+                      catMap.get(cid)!.push(p);
+                    }
+                    const groups = Array.from(catMap.entries()).map(([cid, prods]) => ({
+                      label: cid ? (allCategories.find(c => c.id === cid)?.name ?? `Category #${cid}`) : "Uncategorized",
+                      prods: [...prods].sort((a, b) => a.name.localeCompare(b.name)),
+                    })).sort((a, b) => a.label.localeCompare(b.label));
+                    return groups.map(g => (
+                      <SelectGroup key={g.label}>
+                        <SelectLabel>{g.label}</SelectLabel>
+                        {g.prods.map(p => (
+                          <SelectItem key={p.id} value={p.id.toString()}>
+                            {p.name} — ${Number(p.price).toFixed(2)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
               {grabBagForm.blacklistedProductIds.length > 0 && (
