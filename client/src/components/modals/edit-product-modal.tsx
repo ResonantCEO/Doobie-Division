@@ -255,6 +255,8 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       setBogoFreeOptionIndex(
         savedIndex == null ? "__same__" : savedIndex === -1 ? "__any__" : String(savedIndex)
       );
+      setBogoDiscountType((product as any).bogoDiscountType || "free");
+      setBogoDiscountValue((product as any).bogoDiscountValue || "0");
 
       // Pre-populate lb/oz/g fields from grams for weight-based products
       if (product.sellingMethod === "weight") {
@@ -396,6 +398,8 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         bogoFreeOptionIndex: bogoEnabled && bogoFreeOptionIndex !== "__same__"
           ? (bogoFreeOptionIndex === "__any__" ? -1 : parseInt(bogoFreeOptionIndex))
           : null,
+        bogoDiscountType: bogoEnabled ? bogoDiscountType : "free",
+        bogoDiscountValue: bogoEnabled && bogoDiscountType !== "free" ? parseFloat(bogoDiscountValue || "0").toFixed(2) : "0",
       };
       
       // Remove undefined values to avoid sending them
@@ -515,6 +519,8 @@ export default function EditProductModal({ open, onOpenChange, product, categori
     const idx = (product as any).bogoFreeOptionIndex;
     return idx == null ? "__same__" : idx === -1 ? "__any__" : String(idx);
   });
+  const [bogoDiscountType, setBogoDiscountType] = useState<string>((product as any).bogoDiscountType || "free");
+  const [bogoDiscountValue, setBogoDiscountValue] = useState<string>((product as any).bogoDiscountValue || "0");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1094,20 +1100,88 @@ export default function EditProductModal({ open, onOpenChange, product, categori
             />
 
             {/* BOGO Toggle */}
-            <div className="flex flex-row items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <Label className="text-base">Buy One Get One Free</Label>
-                <div className="text-sm text-muted-foreground">
-                  Customer gets a free item with each purchase
+            <div className="rounded-lg border p-4 space-y-3">
+              <div className="flex flex-row items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Buy One Get One (BOGO)</Label>
+                  <div className="text-sm text-muted-foreground">
+                    Customer gets a deal on a second item with each purchase
+                  </div>
                 </div>
+                <Switch
+                  checked={bogoEnabled}
+                  onCheckedChange={setBogoEnabled}
+                />
               </div>
-              <Switch
-                checked={bogoEnabled}
-                onCheckedChange={setBogoEnabled}
-              />
+
+              {bogoEnabled && (
+                <div className="space-y-3 pt-1 border-t">
+                  <Label className="text-sm font-medium">Deal Type</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBogoDiscountType("free")}
+                      className={`p-2 rounded-lg border text-xs font-medium text-center transition-colors ${bogoDiscountType === "free" ? "border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300" : "border-muted hover:border-muted-foreground"}`}
+                    >
+                      🎁 Get One Free
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBogoDiscountType("percentage")}
+                      className={`p-2 rounded-lg border text-xs font-medium text-center transition-colors ${bogoDiscountType === "percentage" ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300" : "border-muted hover:border-muted-foreground"}`}
+                    >
+                      % Off Second
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBogoDiscountType("amount")}
+                      className={`p-2 rounded-lg border text-xs font-medium text-center transition-colors ${bogoDiscountType === "amount" ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300" : "border-muted hover:border-muted-foreground"}`}
+                    >
+                      $ Off Second
+                    </button>
+                  </div>
+
+                  {bogoDiscountType === "percentage" && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Percentage off second item</Label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min="1"
+                          max="99"
+                          step="1"
+                          placeholder="50"
+                          value={bogoDiscountValue}
+                          onChange={(e) => setBogoDiscountValue(e.target.value)}
+                          className="pr-8"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {bogoDiscountType === "amount" && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Dollar amount off second item</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                        <Input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          placeholder="10.00"
+                          value={bogoDiscountValue}
+                          onChange={(e) => setBogoDiscountValue(e.target.value)}
+                          className="pl-7"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {bogoEnabled && enableSizes && form.watch("sizes") && (form.watch("sizes") || []).length > 0 && (
+            {bogoEnabled && bogoDiscountType === "free" && enableSizes && form.watch("sizes") && (form.watch("sizes") || []).length > 0 && (
               <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
                 <Label className="text-sm font-medium">Free Item Option</Label>
                 <p className="text-xs text-muted-foreground">

@@ -98,6 +98,8 @@ export const products = pgTable("products", {
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"), // flat dollar amount off
   bogoEnabled: boolean("bogo_enabled").notNull().default(false), // buy one get one free
   bogoFreeOptionIndex: integer("bogo_free_option_index"), // which option index is free (null = same as purchased)
+  bogoDiscountType: varchar("bogo_discount_type").default("free"), // 'free', 'percentage', 'amount'
+  bogoDiscountValue: decimal("bogo_discount_value", { precision: 10, scale: 2 }).default("0"), // value for percentage/amount BOGO
   purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }), // admin only - cost price per unit
   purchasePriceMethod: varchar("purchase_price_method").default("units"), // units or weight
   purchasePricePerGram: decimal("purchase_price_per_gram", { precision: 10, scale: 4 }), // admin only - cost per gram

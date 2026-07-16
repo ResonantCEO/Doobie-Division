@@ -263,7 +263,11 @@ export default function ProductCard({ product }: ProductCardProps) {
               {(product as any).bogoEnabled === true && (
                 <div className="flex justify-center">
                   <span className="text-[10px] sm:text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30 border border-purple-300 dark:border-purple-700 px-2 py-0.5 rounded-full">
-                    🎁 BOGO – Buy One Get One
+                    {(product as any).bogoDiscountType === "percentage" && parseFloat((product as any).bogoDiscountValue || "0") > 0
+                      ? `🎁 Buy 1 Get 1 ${parseFloat((product as any).bogoDiscountValue).toFixed(0)}% Off`
+                      : (product as any).bogoDiscountType === "amount" && parseFloat((product as any).bogoDiscountValue || "0") > 0
+                        ? `🎁 Buy 1 Get 1 $${parseFloat((product as any).bogoDiscountValue).toFixed(2)} Off`
+                        : "🎁 BOGO – Buy One Get One Free"}
                   </span>
                 </div>
               )}

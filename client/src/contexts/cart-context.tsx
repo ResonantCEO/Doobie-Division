@@ -12,6 +12,7 @@ interface CartItem {
   quantity: number;
   size?: string;
   isFree?: boolean;
+  customPrice?: number;
 }
 
 interface CartState {
@@ -23,6 +24,7 @@ interface CartState {
 type CartAction =
   | { type: 'ADD_ITEM'; payload: { product: Product & { category: Category | null; quantityPricing?: QuantityTier[] }; size?: string } }
   | { type: 'ADD_FREE_ITEM'; payload: { product: Product & { category: Category | null; quantityPricing?: QuantityTier[] }; size?: string } }
+  | { type: 'ADD_DISCOUNTED_ITEM'; payload: { product: Product & { category: Category | null; quantityPricing?: QuantityTier[] }; size?: string; customPrice: number } }
   | { type: 'REMOVE_ITEM'; payload: { id: number; size?: string; isFree?: boolean } }
   | { type: 'UPDATE_QUANTITY'; payload: { id: number; quantity: number; size?: string; isFree?: boolean } }
   | { type: 'CLEAR_CART' }
@@ -74,13 +76,16 @@ function getApplicableTierPrice(product: Product & { category: Category | null; 
 }
 
 function computeTotal(items: CartItem[]): number {
-  // Only paid (non-free) items contribute to the total
+  // Free items (isFree=true) don't contribute to total; discounted items use customPrice
   const paidItems = items.filter(i => !i.isFree);
   const productQtyMap = new Map<number, number>();
   for (const item of paidItems) {
     productQtyMap.set(item.product.id, (productQtyMap.get(item.product.id) || 0) + item.quantity);
   }
   return paidItems.reduce((sum, item) => {
+    if (item.customPrice !== undefined) {
+      return sum + item.customPrice * item.quantity;
+    }
     const totalQty = productQtyMap.get(item.product.id) || item.quantity;
     return sum + getApplicableTierPrice(item.product, item.size, totalQty) * item.quantity;
   }, 0);
@@ -153,6 +158,34 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       return { items: newItems, total, itemCount };
     }
 
+    case 'ADD_DISCOUNTED_ITEM': {
+      const itemKey = `${action.payload.product.id}-${action.payload.size || ''}-discounted`;
+      const existingItem = state.items.find(item =>
+        `${item.product.id}-${item.size || ''}-discounted` === itemKey && item.customPrice !== undefined
+      );
+
+      let newItems: CartItem[];
+      if (existingItem) {
+        newItems = state.items.map(item =>
+          `${item.product.id}-${item.size || ''}-discounted` === itemKey && item.customPrice !== undefined
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      } else {
+        newItems = [...state.items, {
+          product: action.payload.product,
+          quantity: 1,
+          size: action.payload.size,
+          isFree: false,
+          customPrice: action.payload.customPrice,
+        }];
+      }
+
+      const total = computeTotal(newItems);
+      const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
+      return { items: newItems, total, itemCount };
+    }
+
     case 'REMOVE_ITEM': {
       const itemKey = makeItemKey(action.payload.id, action.payload.size, action.payload.isFree);
 
@@ -196,6 +229,7 @@ interface CartContextType {
   state: CartState;
   addItem: (product: Product & { category: Category | null; quantityPricing?: QuantityTier[] }, size?: string) => void;
   addFreeItem: (product: Product & { category: Category | null; quantityPricing?: QuantityTier[] }, size?: string) => void;
+  addDiscountedItem: (product: Product & { category: Category | null; quantityPricing?: QuantityTier[] }, size: string | undefined, customPrice: number) => void;
   removeItem: (productId: number, size?: string, isFree?: boolean) => void;
   updateQuantity: (productId: number, quantity: number, size?: string, isFree?: boolean) => void;
   clearCart: () => void;
@@ -263,6 +297,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'ADD_FREE_ITEM', payload: { product, size } });
   };
 
+  const addDiscountedItem = (product: Product & { category: Category | null; quantityPricing?: QuantityTier[] }, size: string | undefined, customPrice: number) => {
+    dispatch({ type: 'ADD_DISCOUNTED_ITEM', payload: { product, size, customPrice } });
+  };
+
   const removeItem = (productId: number, size?: string, isFree?: boolean) => {
     dispatch({ type: 'REMOVE_ITEM', payload: { id: productId, size, isFree } });
   };
@@ -289,7 +327,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <CartContext.Provider value={{ state, addItem, addFreeItem, removeItem, updateQuantity, clearCart, getEffectivePrice }}>
+    <CartContext.Provider value={{ state, addItem, addFreeItem, addDiscountedItem, removeItem, updateQuantity, clearCart, getEffectivePrice }}>
       {children}
     </CartContext.Provider>
   );
