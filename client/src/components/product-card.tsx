@@ -287,6 +287,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 {product.sellingMethod === "weight" ? (
                   (() => {
                     const discount = product.discountPercentage ? parseFloat(product.discountPercentage) : 0;
+                    const discountAmt = (product as any).discountAmount ? parseFloat((product as any).discountAmount) : 0;
                     const weightOpts = [
                       { label: "g", price: product.pricePerGram },
                       { label: "⅛ oz", price: (product as any).pricePerEighth },
@@ -296,10 +297,13 @@ export default function ProductCard({ product }: ProductCardProps) {
                     ].filter(o => Number(o.price) > 0);
                     const renderOpt = (opt: { label: string; price: any }) => {
                       const base = Number(opt.price);
-                      const final = discount > 0 ? base * (1 - discount / 100) : base;
+                      let final = base;
+                      if (discount > 0) final = base * (1 - discount / 100);
+                      else if (discountAmt > 0) final = Math.max(0, base - discountAmt);
+                      const hasAnyDiscount = discount > 0 || discountAmt > 0;
                       return (
                         <div key={opt.label} className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
-                          {discount > 0 ? (
+                          {hasAnyDiscount ? (
                             <span className="text-green-600 dark:text-green-400">${final.toFixed(2)}</span>
                           ) : (
                             <span>${base.toFixed(2)}</span>
@@ -334,6 +338,13 @@ export default function ProductCard({ product }: ProductCardProps) {
                             </span>
                           </div>
                         )}
+                        {discountAmt > 0 && discount === 0 && (
+                          <div className="flex justify-center mt-0.5">
+                            <span className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">
+                              ${discountAmt.toFixed(2)} OFF
+                            </span>
+                          </div>
+                        )}
                       </div>
                     );
                   })()
@@ -349,6 +360,18 @@ export default function ProductCard({ product }: ProductCardProps) {
                         </div>
                         <div className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">
                           ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
+                        </div>
+                      </div>
+                    ) : (product as any).discountAmount && parseFloat((product as any).discountAmount) > 0 ? (
+                      <div className="space-y-0.5">
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                          <div className="text-sm sm:text-base line-through text-gray-500 dark:text-gray-400">${Number(product.price || 0).toFixed(2)}</div>
+                          <div className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">
+                            ${parseFloat((product as any).discountAmount).toFixed(2)} OFF
+                          </div>
+                        </div>
+                        <div className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">
+                          ${Math.max(0, Number(product.price || 0) - parseFloat((product as any).discountAmount)).toFixed(2)}
                         </div>
                       </div>
                     ) : (

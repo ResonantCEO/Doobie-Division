@@ -42,6 +42,7 @@ const formSchema = z.object({
   pricePerQuarter: z.string().optional(),
   pricePerHalf: z.string().optional(),
   discountPercentage: z.string().nullable().optional(),
+  discountAmount: z.string().nullable().optional(),
   isActive: z.boolean().default(true),
   purchasePrice: z.string().optional(),
   purchasePriceMethod: z.enum(["units", "weight"]).default("units"),
@@ -329,6 +330,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         pricePerQuarter: data.pricePerQuarter ? parseFloat(data.pricePerQuarter).toFixed(2) : null,
         pricePerHalf: data.pricePerHalf ? parseFloat(data.pricePerHalf).toFixed(2) : null,
         discountPercentage: data.discountPercentage ? parseFloat(data.discountPercentage).toFixed(2) : null,
+        discountAmount: data.discountAmount ? parseFloat(data.discountAmount).toFixed(2) : null,
         isActive: data.isActive,
         imageUrl: imageUrl || null,
         imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
@@ -955,6 +957,32 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
                 )}
               </>
             )}
+
+            {/* Discount Amount Field */}
+            <FormField
+              control={form.control}
+              name="discountAmount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Discount Amount</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        className="pl-7"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {form.watch("sellingMethod") === "weight" ? (
               <div className="space-y-2">

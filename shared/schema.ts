@@ -95,6 +95,7 @@ export const products = pgTable("products", {
   pricePerQuarter: decimal("price_per_quarter", { precision: 10, scale: 2 }), // price per 1/4 ounce
   pricePerHalf: decimal("price_per_half", { precision: 10, scale: 2 }), // price per 1/2 ounce
   discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default("0"), // discount percentage (0-100)
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"), // flat dollar amount off
   bogoEnabled: boolean("bogo_enabled").notNull().default(false), // buy one get one free
   bogoFreeOptionIndex: integer("bogo_free_option_index"), // which option index is free (null = same as purchased)
   purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }), // admin only - cost price per unit

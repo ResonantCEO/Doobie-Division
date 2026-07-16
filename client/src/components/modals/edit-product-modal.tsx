@@ -65,6 +65,7 @@ const formSchema = z.object({
   pricePerQuarter: z.string().optional(),
   pricePerHalf: z.string().optional(),
   discountPercentage: z.string().nullable().optional(),
+  discountAmount: z.string().nullable().optional(),
   isActive: z.boolean(),
   purchasePrice: z.string().optional(),
   purchasePriceMethod: z.enum(["units", "weight"]).default("units"),
@@ -173,6 +174,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       pricePerGram: product.pricePerGram || "",
       pricePerOunce: product.pricePerOunce || "",
       discountPercentage: product.discountPercentage || "0",
+      discountAmount: (product as any).discountAmount || "0",
       isActive: product.isActive,
       purchasePrice: (product as any).purchasePrice || "",
       purchasePriceMethod: ((product as any).purchasePriceMethod as "units" | "weight") || "units",
@@ -207,6 +209,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         pricePerQuarter: (product as any).pricePerQuarter || "",
         pricePerHalf: (product as any).pricePerHalf || "",
         discountPercentage: product.discountPercentage || "0",
+        discountAmount: (product as any).discountAmount || "0",
         isActive: product.isActive,
         purchasePrice: (product as any).purchasePrice || "",
         purchasePriceMethod: ((product as any).purchasePriceMethod as "units" | "weight") || "units",
@@ -374,6 +377,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         pricePerQuarter: data.sellingMethod === "weight" ? formatPrice(data.pricePerQuarter, 2) : null,
         pricePerHalf: data.sellingMethod === "weight" ? formatPrice(data.pricePerHalf, 2) : null,
         discountPercentage: discountValue,
+        discountAmount: data.discountAmount ? parseFloat(data.discountAmount).toFixed(2) : "0",
         purchasePrice: formatPrice(data.purchasePrice, 2),
         purchasePriceMethod: data.purchasePriceMethod || "units",
         purchasePricePerGram: formatPrice(data.purchasePricePerGram, 4),
@@ -1041,6 +1045,43 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                                   Discounted: ${getDiscountedPrice(parseFloat(form.watch("pricePerOunce") || "0"), currentDiscountPercentage).toFixed(2)}/oz
                                 </div>
                               )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Discount Amount Field */}
+            <FormField
+              control={form.control}
+              name="discountAmount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Discount Amount</FormLabel>
+                  <FormControl>
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          className="pl-7"
+                          {...field}
+                        />
+                      </div>
+                      {parseFloat(field.value || "0") > 0 && (
+                        <div className="text-sm text-gray-600">
+                          {sellingMethod === "units" && form.watch("price") && (
+                            <div>
+                              Original: ${parseFloat(form.watch("price") || "0").toFixed(2)} →{" "}
+                              Discounted: ${Math.max(0, parseFloat(form.watch("price") || "0") - parseFloat(field.value || "0")).toFixed(2)}
                             </div>
                           )}
                         </div>

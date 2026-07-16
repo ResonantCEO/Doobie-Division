@@ -285,10 +285,14 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
     if (product.discountPercentage && parseFloat(product.discountPercentage) > 0) {
       return (totalPrice * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2);
     }
+    if ((product as any).discountAmount && parseFloat((product as any).discountAmount) > 0) {
+      return Math.max(0, totalPrice - parseFloat((product as any).discountAmount)).toFixed(2);
+    }
     return totalPrice.toFixed(2);
   };
 
-  const hasDiscount = product.discountPercentage && parseFloat(product.discountPercentage) > 0;
+  const hasDiscount = (product.discountPercentage && parseFloat(product.discountPercentage) > 0) ||
+    ((product as any).discountAmount && parseFloat((product as any).discountAmount) > 0);
 
   // ── Free Step Content ────────────────────────────────────────────────────
   const freeTotal = getFreeQuantityTotal();
@@ -705,7 +709,11 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                   <span>Discounted Total:</span>
                   <span>${getPrice()}</span>
                 </div>
-                <div className="text-xs text-green-600 font-medium">{product.discountPercentage}% OFF</div>
+                <div className="text-xs text-green-600 font-medium">
+                  {product.discountPercentage && parseFloat(product.discountPercentage) > 0
+                    ? `${product.discountPercentage}% OFF`
+                    : `$${parseFloat((product as any).discountAmount || "0").toFixed(2)} OFF`}
+                </div>
               </>
             ) : (
               <div className="flex justify-between font-medium">
