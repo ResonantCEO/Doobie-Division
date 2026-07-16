@@ -2120,7 +2120,7 @@ export default function AdminPage() {
                                   <span className="font-semibold text-sm">{bag.name}</span>
                                   <Badge variant={bag.isActive ? "default" : "secondary"} className="text-xs">{bag.isActive ? 'Active' : 'Inactive'}</Badge>
                                   <Badge variant="outline" className="text-xs text-green-700 border-green-400 dark:text-green-400">Sells for ${Number(bag.sellingPrice).toFixed(2)}</Badge>
-                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">Max value ${Number(bag.maxTotalItemPrice).toFixed(2)}</Badge>
+                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">Target value ${Number(bag.maxTotalItemPrice).toFixed(2)}</Badge>
                                 </div>
                                 {bag.description && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 truncate">{bag.description}</p>}
                                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
@@ -2352,7 +2352,7 @@ export default function AdminPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Max Total Item Price * <span className="text-gray-400 font-normal text-xs">(cap on retail value)</span></Label>
+                <Label>Target Retail Value * <span className="text-gray-400 font-normal text-xs">(generator aims to get as close as possible)</span></Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
                   <Input
@@ -2566,7 +2566,7 @@ export default function AdminPage() {
               onClick={() => {
                 if (!grabBagForm.name.trim()) return toast({ title: "Name is required", variant: "destructive" });
                 if (!grabBagForm.sellingPrice) return toast({ title: "Selling price is required", variant: "destructive" });
-                if (!grabBagForm.maxTotalItemPrice) return toast({ title: "Max total item price is required", variant: "destructive" });
+                if (!grabBagForm.maxTotalItemPrice) return toast({ title: "Target retail value is required", variant: "destructive" });
                 if (editingGrabBag) {
                   updateGrabBagMutation.mutate({ id: editingGrabBag.id, data: grabBagForm });
                 } else {

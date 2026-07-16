@@ -3175,12 +3175,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     warnings: string[];
     error?: string;
   }> {
-    const maxTotal = parseFloat(bag.maxTotalItemPrice) || Infinity;
+    const targetTotal = parseFloat(bag.maxTotalItemPrice) || 0;
     let runningTotal = 0;
     const warnings: string[] = [];
     const selectedProducts: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }> = [];
 
-    // 1. Always include specific products (regardless of budget)
+    // Helper: Fisher-Yates shuffle in place
+    function shuffle<T>(arr: T[]): T[] {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    // Helper: pick `count` items from pool whose total is closest to subTarget, using random trials
+    function pickClosest(
+      pool: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }>,
+      count: number,
+      subTarget: number,
+      trials = 200
+    ) {
+      if (pool.length <= count) return pool;
+      let bestCombo = pool.slice(0, count);
+      let bestDiff = Math.abs(bestCombo.reduce((s, p) => s + p.price, 0) - subTarget);
+      for (let t = 0; t < trials; t++) {
+        const shuffled = shuffle([...pool]);
+        const combo = shuffled.slice(0, count);
+        const total = combo.reduce((s, p) => s + p.price, 0);
+        const diff = Math.abs(total - subTarget);
+        if (diff < bestDiff) { bestDiff = diff; bestCombo = combo; }
+        if (bestDiff === 0) break;
+      }
+      return bestCombo;
+    }
+
+    // 1. Always include specific products
     let specificIds: number[] = [];
     try { specificIds = bag.specificProductIds ? JSON.parse(bag.specificProductIds) : []; } catch { /* ignore */ }
     for (const pid of specificIds) {
@@ -3198,66 +3228,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch { warnings.push(`Could not fetch product ID ${pid} — skipped.`); }
     }
 
-    // 2. Pick random items from category selections
+    // 2. Pick items from category selections targeting the remaining value
     let blacklistedIds: number[] = [];
     try { blacklistedIds = bag.blacklistedProductIds ? JSON.parse(bag.blacklistedProductIds) : []; } catch { /* ignore */ }
 
     let categorySelections: Array<{ categoryId: number; count: number }> = [];
     try { categorySelections = bag.categorySelections ? JSON.parse(bag.categorySelections) : []; } catch { /* ignore */ }
 
+    // Compute how much of the target remains after specific products, distributed across categories by count
+    const remainingTarget = Math.max(0, targetTotal - runningTotal);
+    const totalCatCount = categorySelections.reduce((s, c) => s + c.count, 0);
+
+    // Fetch all category pools first so we can do proportional targeting
+    type PoolEntry = { sel: { categoryId: number; count: number }; pool: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }> };
+    const poolEntries: PoolEntry[] = [];
     for (const sel of categorySelections) {
       try {
         const allInCat = await storage.getProducts({ categoryId: sel.categoryId, isActive: true });
-        const pool = allInCat.filter(p =>
-          p.price &&
-          !isNaN(parseFloat(p.price)) &&
-          !selectedProducts.find(s => s.id === p.id) &&
-          !blacklistedIds.includes(p.id)
-        );
-
+        const pool = allInCat
+          .filter(p => p.price && !isNaN(parseFloat(p.price)) && !selectedProducts.find(s => s.id === p.id) && !blacklistedIds.includes(p.id))
+          .map(p => ({ id: p.id, name: p.name, price: parseFloat(p.price!), sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls }));
         if (pool.length === 0) {
           warnings.push(`Category ID ${sel.categoryId} has no eligible products.`);
-          continue;
-        }
-
-        // Shuffle for randomness
-        for (let i = pool.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [pool[i], pool[j]] = [pool[j], pool[i]];
-        }
-
-        let added = 0;
-        // Pass 1: pick random items that fit within remaining budget
-        const remaining: typeof pool = [];
-        for (const p of pool) {
-          if (added >= sel.count) break;
-          const price = parseFloat(p.price!);
-          if (runningTotal + price <= maxTotal) {
-            selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
-            runningTotal += price;
-            added++;
-          } else {
-            remaining.push(p);
-          }
-        }
-
-        // Pass 2: if we still need items, pick the cheapest remaining ones (budget overflow is acceptable)
-        if (added < sel.count && remaining.length > 0) {
-          remaining.sort((a, b) => parseFloat(a.price!) - parseFloat(b.price!));
-          for (const p of remaining) {
-            if (added >= sel.count) break;
-            const price = parseFloat(p.price!);
-            selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
-            runningTotal += price;
-            added++;
-          }
-        }
-
-        if (added < sel.count) {
-          warnings.push(`Only ${added} of ${sel.count} requested items could be found in category ID ${sel.categoryId}.`);
+        } else {
+          poolEntries.push({ sel, pool });
         }
       } catch (e) {
-        warnings.push(`Error processing category ID ${sel.categoryId}: ${(e as any)?.message || "unknown error"}`);
+        warnings.push(`Error fetching category ID ${sel.categoryId}: ${(e as any)?.message || "unknown error"}`);
+      }
+    }
+
+    for (const { sel, pool } of poolEntries) {
+      // Sub-target for this category proportional to its share of total category item count
+      const subTarget = totalCatCount > 0 ? remainingTarget * (sel.count / totalCatCount) : 0;
+      const picked = pickClosest(pool, sel.count, subTarget);
+      for (const p of picked) {
+        // Exclude items already added (in case pools overlap)
+        if (!selectedProducts.find(s => s.id === p.id)) {
+          selectedProducts.push(p);
+          runningTotal += p.price;
+        }
+      }
+      if (picked.length < sel.count) {
+        warnings.push(`Only ${picked.length} of ${sel.count} requested items could be found in category ID ${sel.categoryId}.`);
       }
     }
 
