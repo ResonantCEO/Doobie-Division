@@ -227,9 +227,17 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       const outOfStockItems = stockValidation.filter(v => !v.hasStock);
 
       if (outOfStockItems.length > 0) {
+        const itemNames = outOfStockItems.map(v => {
+          const name = v.item.product.name;
+          const size = v.item.size ? ` (${v.item.size})` : '';
+          const available = v.item.size && v.product.sizes
+            ? (() => { const s = v.product.sizes.find((s: any) => s.size === v.item.size); return s ? s.quantity : 0; })()
+            : v.product.stock;
+          return `${name}${size} (only ${available} available)`;
+        });
         toast({
           title: "Stock Issue",
-          description: `Some items in your cart are no longer available with the requested quantity. Please update your cart.`,
+          description: `Cannot fulfill: ${itemNames.join('; ')}`,
           variant: "destructive",
         });
         setIsCheckingOut(false);
@@ -452,9 +460,12 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         const errorData = await response.json();
         console.error("Order creation failed:", errorData);
         setIsCheckingOut(false);
+        const description = errorData?.errors?.length
+          ? `Cannot fulfill: ${errorData.errors.join('; ')}`
+          : errorData?.message || "Failed to create order. Please try again.";
         toast({
           title: "Order Failed",
-          description: errorData?.message || "Failed to create order. Please try again.",
+          description,
           variant: "destructive",
         });
       }
