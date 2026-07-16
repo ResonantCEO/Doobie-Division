@@ -123,6 +123,8 @@ export default function AdminPage() {
   const [deleteGrabBagConfirmOpen, setDeleteGrabBagConfirmOpen] = useState(false);
   const [grabBagToGenerate, setGrabBagToGenerate] = useState<GrabBag | null>(null);
   const [generateResultOpen, setGenerateResultOpen] = useState(false);
+  type GrabBagPreview = { selectedProducts: { id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }[]; retailValue: number; sellingPrice: number; bagId: number; bagName: string };
+  const [generatePreview, setGeneratePreview] = useState<GrabBagPreview | null>(null);
   const [generateResult, setGenerateResult] = useState<{ product: Product; selectedProducts: { name: string; price: number }[]; retailValue: number; sellingPrice: number } | null>(null);
   const [grabBagForm, setGrabBagForm] = useState({
     name: "",
@@ -612,20 +614,36 @@ export default function AdminPage() {
     onError: () => toast({ title: "Failed to delete grab bag", variant: "destructive" }),
   });
 
-  const generateGrabBagMutation = useMutation({
+  const previewGrabBagMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("POST", `/api/admin/grab-bags/${id}/generate`, {});
+      const res = await apiRequest("POST", `/api/admin/grab-bags/${id}/preview`, {});
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setGeneratePreview(data);
+      setGenerateResult(null);
+      setGenerateResultOpen(true);
+    },
+    onError: (e: any) => toast({ title: e.message || "Failed to preview grab bag", variant: "destructive" }),
+  });
+
+  const confirmGrabBagMutation = useMutation({
+    mutationFn: async ({ bagId, selectedProducts }: { bagId: number; selectedProducts: any[] }) => {
+      const res = await apiRequest("POST", `/api/admin/grab-bags/${bagId}/generate`, { selectedProducts });
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
       return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       setGenerateResult(data);
-      setGenerateResultOpen(true);
-      toast({ title: "Grab bag generated!", description: `Product "${data.product.name}" has been added to your catalog.` });
+      setGeneratePreview(null);
+      toast({ title: "Grab bag added to storefront!", description: `"${data.product.name}" is now live in your catalog.` });
     },
-    onError: (e: any) => toast({ title: e.message || "Failed to generate grab bag", variant: "destructive" }),
+    onError: (e: any) => toast({ title: e.message || "Failed to create grab bag product", variant: "destructive" }),
   });
+
+  const generateGrabBagMutation = previewGrabBagMutation;
 
   const openEditDiscount = (d: Discount) => {
     setEditingDiscount(d);
@@ -2161,20 +2179,25 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Generate Result Dialog */}
-      <Dialog open={generateResultOpen} onOpenChange={setGenerateResultOpen}>
+      {/* Generate Preview / Result Dialog */}
+      <Dialog open={generateResultOpen} onOpenChange={(open) => { setGenerateResultOpen(open); if (!open) { setGeneratePreview(null); setGenerateResult(null); } }}>
         <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Gift className="h-5 w-5 text-purple-600" />
-              Grab Bag Generated!
+              {generateResult ? "Grab Bag Added!" : "Preview Grab Bag"}
             </DialogTitle>
+            {!generateResult && generatePreview && (
+              <p className="text-sm text-gray-500 mt-1">Review what would be in this bag before adding it to your storefront.</p>
+            )}
           </DialogHeader>
+
+          {/* SUCCESS STATE */}
           {generateResult && (
             <div className="space-y-4 py-2">
               <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <p className="text-sm font-medium text-green-800 dark:text-green-300">
-                  Product <span className="font-bold">"{generateResult.product.name}"</span> has been added to your catalog.
+                  <span className="font-bold">"{generateResult.product.name}"</span> is now live in your catalog.
                 </p>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">SKU: {generateResult.product.sku}</p>
               </div>
@@ -2207,11 +2230,62 @@ export default function AdminPage() {
                   ))}
                 </div>
               </div>
+              <DialogFooter>
+                <Button onClick={() => setGenerateResultOpen(false)}>Done</Button>
+              </DialogFooter>
             </div>
           )}
-          <DialogFooter>
-            <Button onClick={() => setGenerateResultOpen(false)}>Done</Button>
-          </DialogFooter>
+
+          {/* PREVIEW STATE */}
+          {generatePreview && !generateResult && (
+            <div className="space-y-4 py-2">
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Items selected</span>
+                  <span className="font-medium">{generatePreview.selectedProducts.length}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Total retail value</span>
+                  <span className="font-medium text-green-700 dark:text-green-400">${generatePreview.retailValue.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Selling price</span>
+                  <span className="font-medium">${generatePreview.sellingPrice.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Customer saves</span>
+                  <span className="font-medium text-purple-600">${(generatePreview.retailValue - generatePreview.sellingPrice).toFixed(2)}</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Items that would be in this bag</p>
+                <div className="space-y-1">
+                  {generatePreview.selectedProducts.map((p, i) => (
+                    <div key={i} className="flex justify-between text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                      <span>{p.name}</span>
+                      <span className="text-gray-500">${p.price.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  variant="outline"
+                  onClick={() => setGenerateResultOpen(false)}
+                  disabled={confirmGrabBagMutation.isPending}
+                >
+                  Discard
+                </Button>
+                <Button
+                  onClick={() => confirmGrabBagMutation.mutate({ bagId: generatePreview.bagId, selectedProducts: generatePreview.selectedProducts })}
+                  disabled={confirmGrabBagMutation.isPending}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  {confirmGrabBagMutation.isPending ? "Adding..." : "Add to Storefront"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

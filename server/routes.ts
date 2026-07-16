@@ -3168,78 +3168,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate a grab bag product from a template
+  // Shared helper: pick items for a grab bag (no DB writes)
+  async function pickGrabBagItems(bag: any): Promise<{ selectedProducts: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }>; runningTotal: number; error?: string }> {
+    const maxTotal = parseFloat(bag.maxTotalItemPrice);
+    const sellingPrice = parseFloat(bag.sellingPrice);
+    let runningTotal = 0;
+    const selectedProducts: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }> = [];
+
+    const specificIds: number[] = bag.specificProductIds ? JSON.parse(bag.specificProductIds) : [];
+    for (const pid of specificIds) {
+      const p = await storage.getProduct(pid);
+      if (p && p.price) {
+        const price = parseFloat(p.price);
+        selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
+        runningTotal += price;
+      }
+    }
+
+    const categorySelections: Array<{ categoryId: number; count: number }> =
+      bag.categorySelections ? JSON.parse(bag.categorySelections) : [];
+    for (const sel of categorySelections) {
+      const allInCat = await storage.getProducts({ categoryId: sel.categoryId, isActive: true });
+      const pool = allInCat.filter(p => p.price && !selectedProducts.find(s => s.id === p.id));
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      let added = 0;
+      for (const p of pool) {
+        if (added >= sel.count) break;
+        if (!p.price) continue;
+        const price = parseFloat(p.price);
+        if (runningTotal + price <= maxTotal) {
+          selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
+          runningTotal += price;
+          added++;
+        }
+      }
+    }
+
+    if (selectedProducts.length === 0) {
+      return { selectedProducts, runningTotal, error: "No products could be selected for this grab bag. Check your category selections and max total price." };
+    }
+    if (runningTotal < sellingPrice) {
+      return { selectedProducts, runningTotal, error: `Grab bag retail value ($${runningTotal.toFixed(2)}) is less than the selling price ($${sellingPrice.toFixed(2)}). Increase the max total item price or add more items.` };
+    }
+    return { selectedProducts, runningTotal };
+  }
+
+  // Preview a grab bag — picks items but does NOT create a product
+  app.post("/api/admin/grab-bags/:id/preview", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const bag = await storage.getGrabBag(parseInt(req.params.id));
+      if (!bag) return res.status(404).json({ message: "Grab bag not found" });
+
+      const { selectedProducts, runningTotal, error } = await pickGrabBagItems(bag);
+      if (error) return res.status(400).json({ message: error });
+
+      res.json({
+        selectedProducts,
+        retailValue: runningTotal,
+        sellingPrice: parseFloat(bag.sellingPrice),
+        bagId: bag.id,
+        bagName: bag.name,
+      });
+    } catch (e) {
+      console.error("Failed to preview grab bag:", e);
+      res.status(500).json({ message: "Failed to preview grab bag" });
+    }
+  });
+
+  // Confirm a grab bag — receives the pre-picked items and creates the product
   app.post("/api/admin/grab-bags/:id/generate", isAuthenticated, requireRole(["admin"]), async (req, res) => {
     try {
       const bag = await storage.getGrabBag(parseInt(req.params.id));
       if (!bag) return res.status(404).json({ message: "Grab bag not found" });
 
-      const sellingPrice = parseFloat(bag.sellingPrice);
-      const maxTotal = parseFloat(bag.maxTotalItemPrice);
-      let runningTotal = 0;
-      const selectedProducts: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }> = [];
-
-      // 1. Add specific products
-      const specificIds: number[] = bag.specificProductIds ? JSON.parse(bag.specificProductIds) : [];
-      for (const pid of specificIds) {
-        const p = await storage.getProduct(pid);
-        if (p && p.price) {
-          const price = parseFloat(p.price);
-          selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
-          runningTotal += price;
-        }
+      const confirmedProducts: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }> = req.body.selectedProducts;
+      if (!confirmedProducts || confirmedProducts.length === 0) {
+        return res.status(400).json({ message: "No products provided" });
       }
 
-      // 2. Pick random items from category selections
-      const categorySelections: Array<{ categoryId: number; count: number }> =
-        bag.categorySelections ? JSON.parse(bag.categorySelections) : [];
+      const runningTotal = confirmedProducts.reduce((s, p) => s + p.price, 0);
 
-      for (const sel of categorySelections) {
-        const allInCat = await storage.getProducts({ categoryId: sel.categoryId, isActive: true });
-        // Exclude already-selected products
-        const pool = allInCat.filter(p => p.price && !selectedProducts.find(s => s.id === p.id));
-        // Shuffle
-        for (let i = pool.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [pool[i], pool[j]] = [pool[j], pool[i]];
-        }
-        let added = 0;
-        for (const p of pool) {
-          if (added >= sel.count) break;
-          if (!p.price) continue;
-          const price = parseFloat(p.price);
-          if (runningTotal + price <= maxTotal) {
-            selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
-            runningTotal += price;
-            added++;
-          }
-        }
-      }
-
-      if (selectedProducts.length === 0) {
-        return res.status(400).json({ message: "No products could be selected for this grab bag. Check your category selections and max total price." });
-      }
-
-      // Validate grab bag value >= selling price
-      if (runningTotal < sellingPrice) {
-        return res.status(400).json({
-          message: `Grab bag retail value ($${runningTotal.toFixed(2)}) is less than the selling price ($${sellingPrice.toFixed(2)}). Increase the max total item price or add more items.`
-        });
-      }
-
-      // 3. Collect all images from selected products (deduplicated)
+      // Collect all images from selected products (deduplicated)
       const allImageUrls: string[] = [];
-      for (const p of selectedProducts) {
-        // Expand imageUrls JSON array first
+      for (const p of confirmedProducts) {
         if (p.imageUrls) {
           try {
             const parsed: string[] = JSON.parse(p.imageUrls);
             for (const url of parsed) {
               if (url && !allImageUrls.includes(url)) allImageUrls.push(url);
             }
-          } catch { /* ignore parse errors */ }
+          } catch { /* ignore */ }
         }
-        // Fall back to single imageUrl
         if (p.imageUrl && !allImageUrls.includes(p.imageUrl)) {
           allImageUrls.push(p.imageUrl);
         }
@@ -3247,11 +3269,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const primaryImage = allImageUrls[0] ?? null;
       const imageUrlsJson = allImageUrls.length > 0 ? JSON.stringify(allImageUrls) : null;
 
-      // 4. Build description listing items
-      const itemList = selectedProducts.map(p => `• ${p.name} ($${p.price.toFixed(2)})`).join("\n");
-      const description = `🎁 Grab Bag — ${selectedProducts.length} item${selectedProducts.length !== 1 ? 's' : ''} (retail value: $${runningTotal.toFixed(2)})\n\n${itemList}`;
+      const itemList = confirmedProducts.map(p => `• ${p.name} ($${p.price.toFixed(2)})`).join("\n");
+      const description = `🎁 Grab Bag — ${confirmedProducts.length} item${confirmedProducts.length !== 1 ? 's' : ''} (retail value: $${runningTotal.toFixed(2)})\n\n${itemList}`;
 
-      // 5. Create the product
       const sku = `GRAB-BAG-${bag.id}-${Date.now()}`;
       const newProduct = await storage.createProduct({
         name: bag.name,
@@ -3264,14 +3284,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sellingMethod: "units",
         imageUrl: primaryImage,
         imageUrls: imageUrlsJson,
-        adminNotes: `Auto-generated grab bag from template ID ${bag.id}. Contains: ${selectedProducts.map(p => p.sku).join(", ")}`,
+        adminNotes: `Auto-generated grab bag from template ID ${bag.id}. Contains: ${confirmedProducts.map(p => p.sku).join(", ")}`,
       } as any);
 
       res.status(201).json({
         product: newProduct,
-        selectedProducts,
+        selectedProducts: confirmedProducts,
         retailValue: runningTotal,
-        sellingPrice,
+        sellingPrice: parseFloat(bag.sellingPrice),
       });
     } catch (e) {
       console.error("Failed to generate grab bag:", e);
