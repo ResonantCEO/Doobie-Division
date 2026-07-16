@@ -3177,7 +3177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sellingPrice = parseFloat(bag.sellingPrice);
       const maxTotal = parseFloat(bag.maxTotalItemPrice);
       let runningTotal = 0;
-      const selectedProducts: Array<{ id: number; name: string; price: number; sku: string }> = [];
+      const selectedProducts: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }> = [];
 
       // 1. Add specific products
       const specificIds: number[] = bag.specificProductIds ? JSON.parse(bag.specificProductIds) : [];
@@ -3185,7 +3185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const p = await storage.getProduct(pid);
         if (p && p.price) {
           const price = parseFloat(p.price);
-          selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku });
+          selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
           runningTotal += price;
         }
       }
@@ -3209,7 +3209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!p.price) continue;
           const price = parseFloat(p.price);
           if (runningTotal + price <= maxTotal) {
-            selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku });
+            selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
             runningTotal += price;
             added++;
           }
@@ -3227,12 +3227,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // 3. Build description listing items
+      // 3. Collect all images from selected products (deduplicated)
+      const allImageUrls: string[] = [];
+      for (const p of selectedProducts) {
+        // Expand imageUrls JSON array first
+        if (p.imageUrls) {
+          try {
+            const parsed: string[] = JSON.parse(p.imageUrls);
+            for (const url of parsed) {
+              if (url && !allImageUrls.includes(url)) allImageUrls.push(url);
+            }
+          } catch { /* ignore parse errors */ }
+        }
+        // Fall back to single imageUrl
+        if (p.imageUrl && !allImageUrls.includes(p.imageUrl)) {
+          allImageUrls.push(p.imageUrl);
+        }
+      }
+      const primaryImage = allImageUrls[0] ?? null;
+      const imageUrlsJson = allImageUrls.length > 0 ? JSON.stringify(allImageUrls) : null;
+
+      // 4. Build description listing items
       const itemList = selectedProducts.map(p => `• ${p.name} ($${p.price.toFixed(2)})`).join("\n");
       const description = `🎁 Grab Bag — ${selectedProducts.length} item${selectedProducts.length !== 1 ? 's' : ''} (retail value: $${runningTotal.toFixed(2)})\n\n${itemList}`;
 
-      // 4. Create the product
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      // 5. Create the product
       const sku = `GRAB-BAG-${bag.id}-${Date.now()}`;
       const newProduct = await storage.createProduct({
         name: bag.name,
@@ -3243,6 +3262,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         physicalInventory: 1,
         isActive: true,
         sellingMethod: "units",
+        imageUrl: primaryImage,
+        imageUrls: imageUrlsJson,
         adminNotes: `Auto-generated grab bag from template ID ${bag.id}. Contains: ${selectedProducts.map(p => p.sku).join(", ")}`,
       } as any);
 
