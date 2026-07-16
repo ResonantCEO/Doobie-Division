@@ -123,7 +123,7 @@ export default function AdminPage() {
   const [deleteGrabBagConfirmOpen, setDeleteGrabBagConfirmOpen] = useState(false);
   const [grabBagToGenerate, setGrabBagToGenerate] = useState<GrabBag | null>(null);
   const [generateResultOpen, setGenerateResultOpen] = useState(false);
-  type GrabBagPreview = { selectedProducts: { id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }[]; retailValue: number; sellingPrice: number; bagId: number; bagName: string };
+  type GrabBagPreview = { selectedProducts: { id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }[]; retailValue: number; sellingPrice: number; bagId: number; bagName: string; warnings?: string[] };
   const [generatePreview, setGeneratePreview] = useState<GrabBagPreview | null>(null);
   const [generateResult, setGenerateResult] = useState<{ product: Product; selectedProducts: { name: string; price: number }[]; retailValue: number; sellingPrice: number } | null>(null);
   const [grabBagForm, setGrabBagForm] = useState({
@@ -2257,6 +2257,21 @@ export default function AdminPage() {
                   <span className="font-medium text-purple-600">${(generatePreview.retailValue - generatePreview.sellingPrice).toFixed(2)}</span>
                 </div>
               </div>
+              {generatePreview.warnings && generatePreview.warnings.length > 0 && (
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg space-y-1">
+                  <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-300 uppercase tracking-wide">Notices</p>
+                  {generatePreview.warnings.map((w, i) => (
+                    <p key={i} className="text-xs text-yellow-700 dark:text-yellow-400">• {w}</p>
+                  ))}
+                </div>
+              )}
+              {generatePreview.retailValue < generatePreview.sellingPrice && (
+                <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg">
+                  <p className="text-xs text-orange-700 dark:text-orange-400">
+                    ⚠️ Retail value (${generatePreview.retailValue.toFixed(2)}) is below the selling price (${generatePreview.sellingPrice.toFixed(2)}). You can still add it, or adjust the bag settings.
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Items that would be in this bag</p>
                 <div className="space-y-1">
