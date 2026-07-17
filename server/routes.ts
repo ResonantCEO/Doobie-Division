@@ -3239,24 +3239,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const targetTotal = parseFloat(bag.maxTotalItemPrice) || 0;
     let runningTotal = 0;
     const warnings: string[] = [];
-    const selectedProducts: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }> = [];
+    const selectedProducts: Array<{ id: number; name: string; price: number; sku: string; sellingMethod: string; weightLabel: string; imageUrl?: string | null; imageUrls?: string | null }> = [];
 
     // Build category name lookup
     const allCats = await storage.getCategories();
     const catNameMap = new Map<number, string>(allCats.map(c => [c.id, c.name]));
     const catLabel = (id: number) => catNameMap.get(id) ?? `Category #${id}`;
 
-    // Helper: resolve effective price for flat-price AND weight-based products
-    function effectivePrice(p: any): number {
+    // Helper: resolve effective price + label for flat-price AND weight-based products
+    function resolveProduct(p: any): { price: number; sellingMethod: string; weightLabel: string } {
       if (p.sellingMethod === "weight") {
-        // Use the cheapest available weight option as representative value
-        const candidates = [p.pricePerGram, p.pricePerEighth, p.pricePerQuarter, p.pricePerHalf, p.pricePerOunce]
-          .map((v: any) => (v != null ? parseFloat(v) : NaN))
-          .filter((v: number) => !isNaN(v) && v > 0);
-        return candidates.length > 0 ? Math.min(...candidates) : 0;
+        const opts = [
+          { label: "g", val: p.pricePerGram },
+          { label: "⅛ oz", val: p.pricePerEighth },
+          { label: "¼ oz", val: p.pricePerQuarter },
+          { label: "½ oz", val: p.pricePerHalf },
+          { label: "oz", val: p.pricePerOunce },
+        ].map(o => ({ label: o.label, price: o.val != null ? parseFloat(o.val) : NaN }))
+         .filter(o => !isNaN(o.price) && o.price > 0);
+        if (opts.length === 0) return { price: 0, sellingMethod: "weight", weightLabel: "" };
+        const cheapest = opts.reduce((a, b) => a.price < b.price ? a : b);
+        return { price: cheapest.price, sellingMethod: "weight", weightLabel: cheapest.label };
       }
       const v = parseFloat(p.price ?? "");
-      return !isNaN(v) && v > 0 ? v : 0;
+      return { price: !isNaN(v) && v > 0 ? v : 0, sellingMethod: "units", weightLabel: "" };
     }
 
     // Helper: Fisher-Yates shuffle in place
@@ -3309,9 +3315,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const p = await storage.getProduct(pid);
         if (p) {
-          const price = effectivePrice(p);
+          const { price, sellingMethod, weightLabel } = resolveProduct(p);
           if (price > 0) {
-            selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
+            selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, sellingMethod, weightLabel, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
             runningTotal += price;
           } else {
             warnings.push(`"${p.name}" has no resolvable price — skipped.`);
@@ -3332,14 +3338,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Compute how much of the target remains after specific products, distributed across categories by count
     const remainingTarget = Math.max(0, targetTotal - runningTotal);
     // Fetch all category pools first, then process with dynamic budget tracking
-    type PoolEntry = { sel: { categoryId: number; count: number }; pool: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }> };
+    type PoolEntry = { sel: { categoryId: number; count: number }; pool: Array<{ id: number; name: string; price: number; sku: string; sellingMethod: string; weightLabel: string; imageUrl?: string | null; imageUrls?: string | null }> };
     const poolEntries: PoolEntry[] = [];
     for (const sel of categorySelections) {
       try {
         const allInCat = await storage.getProducts({ categoryId: sel.categoryId, isActive: true });
         const pool = allInCat
           .filter(p => !selectedProducts.find(s => s.id === p.id) && !blacklistedIds.includes(p.id))
-          .map(p => ({ id: p.id, name: p.name, price: effectivePrice(p), sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls }))
+          .map(p => { const r = resolveProduct(p); return { id: p.id, name: p.name, price: r.price, sku: p.sku, sellingMethod: r.sellingMethod, weightLabel: r.weightLabel, imageUrl: p.imageUrl, imageUrls: p.imageUrls }; })
           .filter(p => p.price > 0);
         if (pool.length === 0) {
           warnings.push(`"${catLabel(sel.categoryId)}" has no eligible products.`);
