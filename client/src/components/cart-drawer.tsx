@@ -44,6 +44,30 @@ interface DiscountEvalResult {
   totalSavings: number;
 }
 
+function applyProductDiscount(product: any, price: number): number {
+  const discPct = parseFloat(product.discountPercentage || "0");
+  if (discPct > 0) return price * (1 - discPct / 100);
+  const discAmt = parseFloat(product.discountAmount || "0");
+  if (discAmt > 0) return Math.max(0, price - discAmt);
+  return price;
+}
+
+function getWeightPrice(product: any, size?: string): number {
+  const norm = (size || "").toLowerCase().trim();
+  if (norm.includes("1/8") || norm.includes("⅛")) return Number(product.pricePerEighth) || 0;
+  if (norm.includes("1/4") || norm.includes("¼")) return Number(product.pricePerQuarter) || 0;
+  if (norm.includes("1/2") || norm.includes("½")) return Number(product.pricePerHalf) || 0;
+  if (norm.includes("1 oz") || norm === "ounce") return Number(product.pricePerOunce) || 0;
+  return Number(product.pricePerGram) || 0;
+}
+
+function getEffectiveUnitPrice(product: any, size?: string): number {
+  const base = product.sellingMethod === "weight"
+    ? getWeightPrice(product, size)
+    : Number(product.price) || 0;
+  return applyProductDiscount(product, base);
+}
+
 export default function CartDrawer({ children }: CartDrawerProps) {
   const { state, removeItem, updateQuantity, clearCart } = useCart();
   const { toast } = useToast();
@@ -410,10 +434,23 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       };
 
       const orderItems = state.items.map(item => {
-        const basePrice = item.product.sellingMethod === "weight"
-          ? getWeightOptionPrice(item.product, item.size)
+        if (item.isFree) {
+          return {
+            productId: item.product.id,
+            productName: item.size ? `${item.product.name} (Size: ${item.size})` : item.product.name,
+            productPrice: "0.00",
+            quantity: item.quantity,
+            subtotal: "0.00",
+            size: item.size,
+          };
+        }
+        const rawBase = item.product.sellingMethod === "weight"
+          ? getWeightPrice(item.product, item.size)
           : Number(item.product.price) || 0;
-        const itemPrice = applyTierPrice(item.product, basePrice);
+        const discountedBase = item.customPrice !== undefined
+          ? item.customPrice
+          : applyProductDiscount(item.product, rawBase);
+        const itemPrice = applyTierPrice(item.product, discountedBase);
 
         const productName = item.size 
           ? `${item.product.name} (Size: ${item.size})`
@@ -598,7 +635,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           </div>
                         ) : (
                           <p className="font-semibold text-primary">
-                            ${Number(item.product.price || 0).toFixed(2)}
+                            ${getEffectiveUnitPrice(item.product).toFixed(2)}
                           </p>
                         )}
                       </div>
@@ -655,26 +692,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         {item.isFree ? (
                           <span className="text-green-600 dark:text-green-400">Subtotal: FREE</span>
                         ) : (
-                          <>Subtotal: ${(() => {
-                            if (item.product.sellingMethod === "weight") {
-                              const normalizedSize = (item.size || '').toLowerCase().trim();
-                              let price = 0;
-                              if (normalizedSize.includes('1/8') || normalizedSize.includes('⅛')) {
-                                price = Number((item.product as any).pricePerEighth) || 0;
-                              } else if (normalizedSize.includes('1/4') || normalizedSize.includes('¼')) {
-                                price = Number((item.product as any).pricePerQuarter) || 0;
-                              } else if (normalizedSize.includes('1/2') || normalizedSize.includes('½')) {
-                                price = Number((item.product as any).pricePerHalf) || 0;
-                              } else if (normalizedSize.includes('1 oz') || normalizedSize === '1 oz' || normalizedSize === 'ounce') {
-                                price = Number(item.product.pricePerOunce) || 0;
-                              } else {
-                                price = Number(item.product.pricePerGram) || 0;
-                              }
-                              return (price * item.quantity).toFixed(2);
-                            } else {
-                              return ((Number(item.product.price) || 0) * item.quantity).toFixed(2);
-                            }
-                          })()}</>
+                          <>Subtotal: ${(getEffectiveUnitPrice(item.product, item.size) * item.quantity).toFixed(2)}</>
                         )}
                       </p>
                     </div>
@@ -812,10 +830,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                       {' '}x {item.quantity}
                     </span>
                     <span className={item.isFree ? "text-green-600 dark:text-green-400 font-semibold" : ""}>
-                      {item.isFree ? "FREE" : `$${(item.product.sellingMethod === "weight"
-                        ? (Number(item.product.pricePerGram) || 0) * item.quantity
-                        : (Number(item.product.price) || 0) * item.quantity
-                      ).toFixed(2)}`}
+                      {item.isFree ? "FREE" : `$${(getEffectiveUnitPrice(item.product, item.size) * item.quantity).toFixed(2)}`}
                     </span>
                   </div>
                   );

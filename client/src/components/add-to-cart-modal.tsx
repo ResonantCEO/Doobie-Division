@@ -583,7 +583,16 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                   )}
                 </div>
               ) : (
-                <span className="text-sm font-medium">${Number(product.price || 0).toFixed(2)}</span>
+                <>
+                  {hasDiscount ? (
+                    <span className="text-sm font-medium">
+                      <span className="line-through text-muted-foreground mr-1">${Number(product.price || 0).toFixed(2)}</span>
+                      <span className="text-green-600 dark:text-green-400">${getPrice()}</span>
+                    </span>
+                  ) : (
+                    <span className="text-sm font-medium">${Number(product.price || 0).toFixed(2)}</span>
+                  )}
+                </>
               )}
               {!isBogoProduct && product.quantityPricing && product.quantityPricing.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1.5">

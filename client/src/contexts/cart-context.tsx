@@ -56,12 +56,22 @@ function getWeightOptionPrice(product: Product & { category: Category | null }, 
   return Number(product.pricePerGram) || 0;
 }
 
+function applyProductDiscount(product: any, price: number): number {
+  const discPct = parseFloat(product.discountPercentage || "0");
+  if (discPct > 0) return price * (1 - discPct / 100);
+  const discAmt = parseFloat(product.discountAmount || "0");
+  if (discAmt > 0) return Math.max(0, price - discAmt);
+  return price;
+}
+
 function getItemPrice(product: Product & { category: Category | null }, size?: string): number {
+  let price: number;
   if (product.sellingMethod === "weight") {
-    return getWeightOptionPrice(product, size);
+    price = getWeightOptionPrice(product, size);
   } else {
-    return Number(product.price) || 0;
+    price = Number(product.price) || 0;
   }
+  return applyProductDiscount(product, price);
 }
 
 function getApplicableTierPrice(product: Product & { category: Category | null; quantityPricing?: QuantityTier[] }, size: string | undefined, totalProductQty: number): number {
