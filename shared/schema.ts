@@ -546,6 +546,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
   company: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   discountPercentage: z.string().nullable().optional(),
+  discountAmount: z.string().nullable().optional(),
   stock: z.number().int().min(0).optional().default(0),
   physicalInventory: z.number().optional(),
   purchasePrice: z.string().nullable().optional(),

@@ -565,6 +565,7 @@ export class DatabaseStorage implements IStorage {
         pricePerQuarter: products.pricePerQuarter,
         pricePerHalf: products.pricePerHalf,
         discountPercentage: products.discountPercentage,
+        discountAmount: products.discountAmount,
         bogoEnabled: products.bogoEnabled,
         bogoFreeOptionIndex: products.bogoFreeOptionIndex,
         purchasePrice: products.purchasePrice,
@@ -757,7 +758,7 @@ export class DatabaseStorage implements IStorage {
     let product: any;
     try {
       const rawResult = await retryQuery(() =>
-        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, bogo_enabled, bogo_free_option_index, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
+        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, bogo_enabled, bogo_free_option_index, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
       );
       
       const row = rawResult?.rows?.[0];
@@ -783,6 +784,7 @@ export class DatabaseStorage implements IStorage {
           pricePerQuarter: row.price_per_quarter,
           pricePerHalf: row.price_per_half,
           discountPercentage: row.discount_percentage,
+          discountAmount: row.discount_amount,
           bogoEnabled: row.bogo_enabled === true || row.bogo_enabled === 't' || row.bogo_enabled === 'true',
           bogoFreeOptionIndex: row.bogo_free_option_index != null ? parseInt(String(row.bogo_free_option_index)) : null,
           purchasePrice: row.purchase_price,
@@ -1180,7 +1182,7 @@ export class DatabaseStorage implements IStorage {
       updateData.physicalInventory = dataWithoutSizes.stock;
     }
 
-    const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
+    const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'discountAmount', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
     for (const field of numericFields) {
       if (field in updateData) {
         // For fractional pricing fields, preserve the value as-is (string or null) to ensure they're always updated
@@ -1194,14 +1196,14 @@ export class DatabaseStorage implements IStorage {
         } else {
           const val = toNumericStr(updateData[field]);
           if (val !== undefined) {
-            if (field === 'discountPercentage') {
+            if (field === 'discountPercentage' || field === 'discountAmount') {
               const numVal = parseFloat(val);
               updateData[field] = (isNaN(numVal) || numVal < 0) ? "0" : val;
             } else {
               updateData[field] = val;
             }
           } else {
-            if (field === 'discountPercentage') {
+            if (field === 'discountPercentage' || field === 'discountAmount') {
               updateData[field] = "0";
             } else if (updateData[field] === '' || updateData[field] === null) {
               updateData[field] = null;
@@ -1326,7 +1328,11 @@ export class DatabaseStorage implements IStorage {
 
         const dp = toSafeNum(d.discountPercentage);
         if (dp !== null) { await rawSql`UPDATE products SET discount_percentage = ${dp} WHERE id = ${id}`; }
-        else { await rawSql`UPDATE products SET discount_percentage = NULL WHERE id = ${id}`; }
+        else { await rawSql`UPDATE products SET discount_percentage = 0 WHERE id = ${id}`; }
+
+        const da = toSafeNum(d.discountAmount);
+        if (da !== null) { await rawSql`UPDATE products SET discount_amount = ${da} WHERE id = ${id}`; }
+        else { await rawSql`UPDATE products SET discount_amount = 0 WHERE id = ${id}`; }
 
         const pp = toSafeNum(d.purchasePrice);
         if (pp !== null) { await rawSql`UPDATE products SET purchase_price = ${pp} WHERE id = ${id}`; }
@@ -1378,6 +1384,14 @@ export class DatabaseStorage implements IStorage {
             ? null 
             : parseFloat(String(fractionalFieldsToUpdate.pricePerHalf));
           await rawSql`UPDATE products SET price_per_half = ${value} WHERE id = ${id}`;
+        }
+
+        // Always save discountAmount via direct SQL to guarantee it lands
+        if (updateData.hasOwnProperty('discountAmount')) {
+          const daVal = updateData.discountAmount === null || updateData.discountAmount === '' || updateData.discountAmount === undefined
+            ? 0
+            : parseFloat(String(updateData.discountAmount));
+          await rawSql`UPDATE products SET discount_amount = ${isNaN(daVal) ? 0 : daVal} WHERE id = ${id}`;
         }
 
         // Always save bogo via direct SQL regardless of Drizzle success
