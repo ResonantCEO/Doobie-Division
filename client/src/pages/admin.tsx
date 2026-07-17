@@ -123,7 +123,7 @@ export default function AdminPage() {
   const [deleteGrabBagConfirmOpen, setDeleteGrabBagConfirmOpen] = useState(false);
   const [grabBagToGenerate, setGrabBagToGenerate] = useState<GrabBag | null>(null);
   const [generateResultOpen, setGenerateResultOpen] = useState(false);
-  type GrabBagPreview = { selectedProducts: { id: number; name: string; price: number; sku: string; sellingMethod?: string; weightLabel?: string; imageUrl?: string | null; imageUrls?: string | null }[]; retailValue: number; sellingPrice: number; bagId: number; bagName: string; warnings?: string[] };
+  type GrabBagPreview = { selectedProducts: { id: number; name: string; price: number; sku: string; sellingMethod?: string; weightLabel?: string; selectedSize?: string; imageUrl?: string | null; imageUrls?: string | null }[]; retailValue: number; sellingPrice: number; bagId: number; bagName: string; warnings?: string[] };
   const [generatePreview, setGeneratePreview] = useState<GrabBagPreview | null>(null);
   const [generateResult, setGenerateResult] = useState<{ product: Product; selectedProducts: { name: string; price: number }[]; retailValue: number; sellingPrice: number } | null>(null);
   const [grabBagForm, setGrabBagForm] = useState({
@@ -2281,8 +2281,15 @@ export default function AdminPage() {
                 <div className="space-y-1">
                   {generatePreview.selectedProducts.map((p, i) => (
                     <div key={i} className="flex justify-between text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                      <span>{p.name}</span>
-                      <span className="text-gray-500">
+                      <span className="flex items-center gap-1.5">
+                        {p.name}
+                        {p.selectedSize && (
+                          <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded">
+                            {p.selectedSize}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-gray-500 shrink-0 ml-2">
                         ${p.price.toFixed(2)}
                         {p.sellingMethod === "weight" && p.weightLabel
                           ? <span className="text-xs ml-0.5">/{p.weightLabel}</span>
