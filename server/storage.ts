@@ -4020,7 +4020,7 @@ export class DatabaseStorage implements IStorage {
 
   // Access passwords
   async getAccessPasswords(): Promise<AccessPassword[]> {
-    return retryQuery(() => db.select().from(accessPasswords).orderBy(desc(accessPasswords.createdAt)));
+    return retryQuery(() => db.select().from(accessPasswords).orderBy(asc(accessPasswords.createdAt)));
   }
 
   async getAccessPassword(id: number): Promise<AccessPassword | undefined> {
