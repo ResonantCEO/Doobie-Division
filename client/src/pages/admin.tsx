@@ -2430,9 +2430,10 @@ export default function AdminPage() {
                 <div className="space-y-1 mt-2">
                   {grabBagForm.specificProductIds.map(pid => {
                     const prod = allProducts.find(p => p.id === pid);
+                    const cat = prod ? allCategories.find(c => c.id === prod.categoryId) : null;
                     return (
                       <div key={pid} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
-                        <span>{prod ? `${prod.name} — $${Number(prod.price).toFixed(2)}` : `Product #${pid}`}</span>
+                        <span>{prod ? `${prod.name}${cat ? ` (${cat.name})` : ''} — $${Number(prod.price).toFixed(2)}` : `Product #${pid}`}</span>
                         <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setGrabBagForm(f => ({ ...f, specificProductIds: f.specificProductIds.filter(id => id !== pid) }))}>
                           <Trash2 className="h-3.5 w-3.5 text-gray-400" />
                         </Button>
@@ -2553,9 +2554,10 @@ export default function AdminPage() {
                 <div className="space-y-1 mt-2">
                   {grabBagForm.blacklistedProductIds.map(pid => {
                     const prod = allProducts.find(p => p.id === pid);
+                    const cat = prod ? allCategories.find(c => c.id === prod.categoryId) : null;
                     return (
                       <div key={pid} className="flex items-center justify-between p-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded text-sm">
-                        <span className="text-red-700 dark:text-red-300">{prod ? `${prod.name} — $${Number(prod.price).toFixed(2)}` : `Product #${pid}`}</span>
+                        <span className="text-red-700 dark:text-red-300">{prod ? `${prod.name}${cat ? ` (${cat.name})` : ''} — $${Number(prod.price).toFixed(2)}` : `Product #${pid}`}</span>
                         <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setGrabBagForm(f => ({ ...f, blacklistedProductIds: f.blacklistedProductIds.filter(id => id !== pid) }))}>
                           <Trash2 className="h-3.5 w-3.5 text-red-400" />
                         </Button>
