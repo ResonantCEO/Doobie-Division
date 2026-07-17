@@ -318,7 +318,13 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
       return (totalPrice * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2);
     }
     if ((product as any).discountAmount && parseFloat((product as any).discountAmount) > 0) {
-      return Math.max(0, totalPrice - parseFloat((product as any).discountAmount)).toFixed(2);
+      const discAmt = parseFloat((product as any).discountAmount);
+      const totalQty = hasSizes
+        ? Object.values(sizeQuantities).reduce((sum: number, qty: number) => sum + qty, 0)
+        : hasWeightOptions
+        ? Object.values(weightOptionQuantities).reduce((sum: number, qty: number) => sum + qty, 0)
+        : isWeightBased ? weight : quantity;
+      return Math.max(0, totalPrice - discAmt * totalQty).toFixed(2);
     }
     return totalPrice.toFixed(2);
   };
