@@ -3241,6 +3241,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const warnings: string[] = [];
     const selectedProducts: Array<{ id: number; name: string; price: number; sku: string; imageUrl?: string | null; imageUrls?: string | null }> = [];
 
+    // Build category name lookup
+    const allCats = await storage.getCategories();
+    const catNameMap = new Map<number, string>(allCats.map(c => [c.id, c.name]));
+    const catLabel = (id: number) => catNameMap.get(id) ?? `Category #${id}`;
+
     // Helper: Fisher-Yates shuffle in place
     function shuffle<T>(arr: T[]): T[] {
       for (let i = arr.length - 1; i > 0; i--) {
@@ -3321,12 +3326,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .filter(p => p.price && !isNaN(parseFloat(p.price)) && !selectedProducts.find(s => s.id === p.id) && !blacklistedIds.includes(p.id))
           .map(p => ({ id: p.id, name: p.name, price: parseFloat(p.price!), sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls }));
         if (pool.length === 0) {
-          warnings.push(`Category ID ${sel.categoryId} has no eligible products.`);
+          warnings.push(`"${catLabel(sel.categoryId)}" has no eligible products.`);
         } else {
           poolEntries.push({ sel, pool });
         }
       } catch (e) {
-        warnings.push(`Error fetching category ID ${sel.categoryId}: ${(e as any)?.message || "unknown error"}`);
+        warnings.push(`Error fetching "${catLabel(sel.categoryId)}": ${(e as any)?.message || "unknown error"}`);
       }
     }
 
@@ -3344,7 +3349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       remainingBudget -= pickedTotal;
       if (picked.length < sel.count) {
-        warnings.push(`Only ${picked.length} of ${sel.count} requested items could be found within budget for category ID ${sel.categoryId}.`);
+        warnings.push(`Only ${picked.length} of ${sel.count} requested items could be found within budget for "${catLabel(sel.categoryId)}".`);
       }
     }
 
