@@ -3246,6 +3246,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const catNameMap = new Map<number, string>(allCats.map(c => [c.id, c.name]));
     const catLabel = (id: number) => catNameMap.get(id) ?? `Category #${id}`;
 
+    // Helper: resolve effective price for flat-price AND weight-based products
+    function effectivePrice(p: any): number {
+      if (p.sellingMethod === "weight") {
+        // Use the cheapest available weight option as representative value
+        const candidates = [p.pricePerGram, p.pricePerEighth, p.pricePerQuarter, p.pricePerHalf, p.pricePerOunce]
+          .map((v: any) => (v != null ? parseFloat(v) : NaN))
+          .filter((v: number) => !isNaN(v) && v > 0);
+        return candidates.length > 0 ? Math.min(...candidates) : 0;
+      }
+      const v = parseFloat(p.price ?? "");
+      return !isNaN(v) && v > 0 ? v : 0;
+    }
+
     // Helper: Fisher-Yates shuffle in place
     function shuffle<T>(arr: T[]): T[] {
       for (let i = arr.length - 1; i > 0; i--) {
@@ -3295,14 +3308,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     for (const pid of specificIds) {
       try {
         const p = await storage.getProduct(pid);
-        if (p && p.price) {
-          const price = parseFloat(p.price);
-          if (!isNaN(price)) {
+        if (p) {
+          const price = effectivePrice(p);
+          if (price > 0) {
             selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
             runningTotal += price;
+          } else {
+            warnings.push(`"${p.name}" has no resolvable price — skipped.`);
           }
         } else {
-          warnings.push(`Product ID ${pid} not found or has no price — skipped.`);
+          warnings.push(`Product ID ${pid} not found — skipped.`);
         }
       } catch { warnings.push(`Could not fetch product ID ${pid} — skipped.`); }
     }
@@ -3323,8 +3338,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const allInCat = await storage.getProducts({ categoryId: sel.categoryId, isActive: true });
         const pool = allInCat
-          .filter(p => p.price && !isNaN(parseFloat(p.price)) && !selectedProducts.find(s => s.id === p.id) && !blacklistedIds.includes(p.id))
-          .map(p => ({ id: p.id, name: p.name, price: parseFloat(p.price!), sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls }));
+          .filter(p => !selectedProducts.find(s => s.id === p.id) && !blacklistedIds.includes(p.id))
+          .map(p => ({ id: p.id, name: p.name, price: effectivePrice(p), sku: p.sku, imageUrl: p.imageUrl, imageUrls: p.imageUrls }))
+          .filter(p => p.price > 0);
         if (pool.length === 0) {
           warnings.push(`"${catLabel(sel.categoryId)}" has no eligible products.`);
         } else {
