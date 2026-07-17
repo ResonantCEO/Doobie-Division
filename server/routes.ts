@@ -3246,8 +3246,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const catNameMap = new Map<number, string>(allCats.map(c => [c.id, c.name]));
     const catLabel = (id: number) => catNameMap.get(id) ?? `Category #${id}`;
 
-    // Helper: resolve effective price + label + selected size for flat-price AND weight-based products
-    function resolveProduct(p: any): { price: number; sellingMethod: string; weightLabel: string; selectedSize?: string } {
+    // Helper: resolve effective price + label + selected size for flat-price AND weight-based products.
+    // slotBudget: the per-item budget — weight-based items pick the highest tier that fits within it.
+    function resolveProduct(p: any, slotBudget = Infinity): { price: number; sellingMethod: string; weightLabel: string; selectedSize?: string } {
       // Pick a size option if this product has sizes (prefer one with stock, else first)
       let selectedSize: string | undefined;
       if (Array.isArray(p.sizes) && p.sizes.length > 0) {
@@ -3265,8 +3266,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ].map(o => ({ label: o.label, price: o.val != null ? parseFloat(o.val) : NaN }))
          .filter(o => !isNaN(o.price) && o.price > 0);
         if (opts.length === 0) return { price: 0, sellingMethod: "weight", weightLabel: "", selectedSize };
-        const cheapest = opts.reduce((a, b) => a.price < b.price ? a : b);
-        return { price: cheapest.price, sellingMethod: "weight", weightLabel: cheapest.label, selectedSize };
+        // Pick the highest-value tier that fits within slotBudget; fall back to cheapest if none fit
+        const affordable = opts.filter(o => o.price <= slotBudget);
+        const best = affordable.length > 0
+          ? affordable.reduce((a, b) => a.price > b.price ? a : b)
+          : opts.reduce((a, b) => a.price < b.price ? a : b);
+        return { price: best.price, sellingMethod: "weight", weightLabel: best.label, selectedSize };
       }
       const v = parseFloat(p.price ?? "");
       return { price: !isNaN(v) && v > 0 ? v : 0, sellingMethod: "units", weightLabel: "", selectedSize };
@@ -3342,9 +3347,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let categorySelections: Array<{ categoryId: number; count: number }> = [];
     try { categorySelections = bag.categorySelections ? JSON.parse(bag.categorySelections) : []; } catch { /* ignore */ }
 
-    // Compute how much of the target remains after specific products, distributed across categories by count
+    // Compute how much of the target remains after specific products
     const remainingTarget = Math.max(0, targetTotal - runningTotal);
-    // Fetch all category pools first, then process with dynamic budget tracking
+
+    // Fair per-slot budget: divide evenly across all requested slots so every category gets a share
+    const totalSlots = categorySelections.reduce((s, c) => s + c.count, 0);
+    const slotBudget = totalSlots > 0 ? remainingTarget / totalSlots : remainingTarget;
+
+    // Fetch all category pools, resolving weight tiers against the per-slot budget for variety
     type PoolEntry = { sel: { categoryId: number; count: number }; pool: Array<{ id: number; name: string; price: number; sku: string; sellingMethod: string; weightLabel: string; selectedSize?: string; imageUrl?: string | null; imageUrls?: string | null }> };
     const poolEntries: PoolEntry[] = [];
     for (const sel of categorySelections) {
@@ -3352,7 +3362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const allInCat = await storage.getProducts({ categoryId: sel.categoryId, isActive: true });
         const pool = allInCat
           .filter(p => !selectedProducts.find(s => s.id === p.id) && !blacklistedIds.includes(p.id))
-          .map(p => { const r = resolveProduct(p); return { id: p.id, name: p.name, price: r.price, sku: p.sku, sellingMethod: r.sellingMethod, weightLabel: r.weightLabel, selectedSize: r.selectedSize, imageUrl: p.imageUrl, imageUrls: p.imageUrls }; })
+          .map(p => { const r = resolveProduct(p, slotBudget); return { id: p.id, name: p.name, price: r.price, sku: p.sku, sellingMethod: r.sellingMethod, weightLabel: r.weightLabel, selectedSize: r.selectedSize, imageUrl: p.imageUrl, imageUrls: p.imageUrls }; })
           .filter(p => p.price > 0);
         if (pool.length === 0) {
           warnings.push(`"${catLabel(sel.categoryId)}" has no eligible products.`);
@@ -3364,11 +3374,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
-    // Single global remaining budget — passes the full remainder to each category in sequence
-    let remainingBudget = remainingTarget;
-
+    // Each category gets its proportional budget share (slotBudget × count) — no starvation
     for (const { sel, pool } of poolEntries) {
-      const picked = pickBestUnder(pool, sel.count, remainingBudget);
+      const categoryBudget = slotBudget * sel.count;
+      const picked = pickBestUnder(pool, sel.count, categoryBudget);
       const pickedTotal = picked.reduce((s, p) => s + p.price, 0);
       for (const p of picked) {
         if (!selectedProducts.find(s => s.id === p.id)) {
@@ -3376,7 +3385,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           runningTotal += p.price;
         }
       }
-      remainingBudget -= pickedTotal;
       if (picked.length < sel.count) {
         warnings.push(`Only ${picked.length} of ${sel.count} requested items could be found within budget for "${catLabel(sel.categoryId)}".`);
       }
