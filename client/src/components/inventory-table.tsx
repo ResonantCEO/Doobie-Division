@@ -31,6 +31,25 @@ import { MoreHorizontal, Edit, QrCode, TrendingUp, TrendingDown, Package, Eye, A
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Product, Category, User, ProductSize } from "@shared/schema";
 
+function applyDiscount(price: number, product: any): number {
+  const pct = parseFloat(product.discountPercentage || "0");
+  if (pct > 0) return price * (1 - pct / 100);
+  const amt = parseFloat(product.discountAmount || "0");
+  if (amt > 0) return Math.max(0, price - amt);
+  return price;
+}
+function hasActiveDiscount(product: any): boolean {
+  return parseFloat(product.discountPercentage || "0") > 0 ||
+         parseFloat(product.discountAmount || "0") > 0;
+}
+function discountLabel(product: any): string {
+  const pct = parseFloat(product.discountPercentage || "0");
+  if (pct > 0) return `${pct}% off`;
+  const amt = parseFloat(product.discountAmount || "0");
+  if (amt > 0) return `-$${amt.toFixed(2)}`;
+  return "";
+}
+
 type SortField = 'name' | 'sku' | 'category' | 'price' | 'stock' | 'status';
 type SortDirection = 'asc' | 'desc';
 
@@ -520,13 +539,13 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                       <div className="space-y-0.5">
                         {product.pricePerGram && (
                           <div>
-                            {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                            {hasActiveDiscount(product) ? (
                               <>
                                 <span className="line-through text-gray-400 text-xs mr-1">
                                   ${Number(product.pricePerGram).toFixed(2)}/g
                                 </span>
                                 <span className="text-green-600">
-                                  ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
+                                  ${applyDiscount(Number(product.pricePerGram), product).toFixed(2)}/g
                                 </span>
                               </>
                             ) : (
@@ -540,13 +559,13 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                       </div>
                     ) : (
                       <div>
-                        {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                        {hasActiveDiscount(product) ? (
                           <>
                             <span className="line-through text-gray-400 text-xs mr-1">
                               ${Number(product.price || 0).toFixed(2)}
                             </span>
                             <span className="text-green-600">
-                              ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
+                              ${applyDiscount(Number(product.price || 0), product).toFixed(2)}
                             </span>
                           </>
                         ) : (
@@ -746,15 +765,15 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                     <div className="text-sm">
                       {product.pricePerGram && (
                         <div className="space-y-1">
-                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                          {hasActiveDiscount(product) ? (
                             <div>
                               <span className="line-through text-gray-500">
                                 ${Number(product.pricePerGram).toFixed(2)}/g
                               </span>
                               <span className="ml-2 text-green-600">
-                                ${(parseFloat(product.pricePerGram) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/g
+                                ${applyDiscount(Number(product.pricePerGram), product).toFixed(2)}/g
                               </span>
-                              <span className="ml-1 text-xs text-green-600">({product.discountPercentage}% off)</span>
+                              <span className="ml-1 text-xs text-green-600">({discountLabel(product)})</span>
                             </div>
                           ) : (
                             <div>
@@ -765,11 +784,11 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                       )}
                       {product.pricePerOunce && (
                         <div className="space-y-1">
-                          {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                          {hasActiveDiscount(product) ? (
                             <div>
                               <span className="line-through text-gray-500">${product.pricePerOunce}/oz</span>
                               <span className="ml-2 text-green-600">
-                                ${(parseFloat(product.pricePerOunce) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}/oz
+                                ${applyDiscount(Number(product.pricePerOunce), product).toFixed(2)}/oz
                               </span>
                             </div>
                           ) : (
@@ -795,13 +814,13 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                     </div>
                   ) : (
                     <div>
-                      {product.discountPercentage && parseFloat(product.discountPercentage) > 0 ? (
+                      {hasActiveDiscount(product) ? (
                         <div className="space-y-1">
                           <span className="line-through text-gray-500">${Number(product.price || 0).toFixed(2)}</span>
                           <span className="ml-2 text-green-600">
-                            ${(Number(product.price || 0) * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2)}
+                            ${applyDiscount(Number(product.price || 0), product).toFixed(2)}
                           </span>
-                          <span className="ml-1 text-xs text-green-600">({product.discountPercentage}% off)</span>
+                          <span className="ml-1 text-xs text-green-600">({discountLabel(product)})</span>
                         </div>
                       ) : (
                         `$${Number(product.price || 0).toFixed(2)}`

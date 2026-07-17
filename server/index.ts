@@ -209,6 +209,19 @@ app.use((req, res, next) => {
     }
   }
 
+  // Ensure discount_amount column exists (migration)
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0`);
+    console.log("✓ Verified discount_amount column exists");
+  } catch (error: any) {
+    if (error?.message?.includes("already exists") || error?.message?.includes("duplicate")) {
+      console.log("✓ discount_amount column already exists");
+    } else {
+      console.warn("⚠ Could not verify discount_amount column:", error?.message);
+    }
+  }
+
   // Ensure BOGO columns exist (migration)
   try {
     const { sql } = await import("./db");
