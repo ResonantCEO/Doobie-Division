@@ -199,9 +199,18 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     case 'REMOVE_ITEM': {
       const itemKey = makeItemKey(action.payload.id, action.payload.size, action.payload.isFree);
 
-      const newItems = state.items.filter(item => {
+      let newItems = state.items.filter(item => {
         return makeItemKey(item.product.id, item.size, item.isFree) !== itemKey;
       });
+
+      // If a paid item was removed, also remove the paired free (BOGO) item
+      if (!action.payload.isFree) {
+        const freeKey = makeItemKey(action.payload.id, action.payload.size, true);
+        newItems = newItems.filter(item =>
+          makeItemKey(item.product.id, item.size, item.isFree) !== freeKey
+        );
+      }
+
       const total = computeTotal(newItems);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
       return { items: newItems, total, itemCount };
