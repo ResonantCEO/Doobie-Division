@@ -1987,7 +1987,7 @@ export default function AdminPage() {
           <Tabs value={discountsSubTab} onValueChange={setDiscountsSubTab} className="space-y-4">
             <TabsList className="grid w-full grid-cols-2 max-w-xs">
               <TabsTrigger value="promo-codes">Promo Codes</TabsTrigger>
-              <TabsTrigger value="grab-bags">Bags</TabsTrigger>
+              <TabsTrigger value="bags">Bags</TabsTrigger>
             </TabsList>
 
             {/* ── Promo Codes sub-tab ── */}
