@@ -271,8 +271,7 @@ function openInboundDocument() {
 
   <div class="header">
     <div>
-      <h1>Doobie Division!</h1>
-      <div class="sub">Inbound Delivery Receipt</div>
+      <h1>Inbound Delivery Receipt</h1>
     </div>
   </div>
 
