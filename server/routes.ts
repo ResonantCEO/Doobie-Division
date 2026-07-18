@@ -3454,6 +3454,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemList = confirmedProducts.map(p => `• ${p.name} ($${p.price.toFixed(2)})`).join("\n");
       const description = `🎁 Grab Bag — ${confirmedProducts.length} item${confirmedProducts.length !== 1 ? 's' : ''} (retail value: $${runningTotal.toFixed(2)})\n\n${itemList}`;
 
+      // Find or create "Grab Bags" category
+      const { categories: categoriesTable } = await import("@shared/schema");
+      let grabBagCategory = await db
+        .select()
+        .from(categoriesTable)
+        .where(eq(categoriesTable.name, "Grab Bags"))
+        .limit(1)
+        .then(r => r[0] ?? null);
+
+      if (!grabBagCategory) {
+        grabBagCategory = await storage.createCategory({
+          name: "Grab Bags",
+          description: "Mystery grab bags with curated selections",
+          isActive: true,
+          sortOrder: 0,
+        });
+      }
+
+      // Compute discount percentage: how much customer saves vs retail value
+      const sellingPrice = parseFloat(bag.sellingPrice);
+      const discountPct = runningTotal > 0
+        ? Math.round(((runningTotal - sellingPrice) / runningTotal) * 100)
+        : 0;
+
       const sku = `GRAB-BAG-${bag.id}-${Date.now()}`;
       const newProduct = await storage.createProduct({
         name: bag.name,
@@ -3464,6 +3488,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         physicalInventory: 1,
         isActive: true,
         sellingMethod: "units",
+        categoryId: grabBagCategory.id,
+        discountPercentage: discountPct > 0 ? String(discountPct) : null,
         imageUrl: primaryImage,
         imageUrls: imageUrlsJson,
         adminNotes: `Auto-generated grab bag from template ID ${bag.id}. Contains: ${confirmedProducts.map(p => p.sku).join(", ")}`,
