@@ -218,7 +218,7 @@ function openInboundDocument() {
   const dateStr = now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const docNumber = `INB-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
 
-  const blankRows = Array.from({ length: 10 }, (_, i) => `
+  const blankRows = Array.from({ length: 12 }, (_, i) => `
     <tr>
       <td class="num-cell">${i + 1}</td>
       <td class="w"></td>
