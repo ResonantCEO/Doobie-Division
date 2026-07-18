@@ -249,7 +249,7 @@ function openInboundDocument() {
     thead th.c { text-align: center; }
     tbody td { border-bottom: 1.5px solid #999; height: 42px; padding: 0 6px; font-size: 10px; border-right: 1px solid #bbb; }
     tbody td.num-cell { width: 22px; text-align: center; color: #aaa; font-size: 9px; background: #f5f5f5; border-right: 1.5px solid #999; }
-    tbody td.w { }
+    tbody td.w { border-right: 1.5px solid #999; }
     tbody td.qty { width: 100px; background: #f4fbf4; border-right: 2px solid #7ab87a; }
     thead th.qty-h { border-right: 2px solid #444; }
     tbody td.notes { background: #fafafa; }
@@ -288,7 +288,7 @@ function openInboundDocument() {
       <tr>
         <th>#</th>
         <th>Product / Description</th>
-        <th class="c qty-h">Qty Received</th>
+        <th class="c qty-h">Qty Delivered</th>
         <th class="c">Qty Confirmed</th>
         <th>Notes</th>
       </tr>
