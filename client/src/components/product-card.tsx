@@ -190,11 +190,14 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* Front of card */}
         <Card className="product-card-face product-card-front absolute inset-0 w-full h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col rounded-2xl overflow-hidden">
           <div className="w-full h-1/2 overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl relative group">
-            <img
-              src={currentImage}
-              alt={product.name}
-              className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-300"
-            />
+            {productImages.map((src, idx) => (
+              <img
+                key={src}
+                src={src}
+                alt={product.name}
+                className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out hover:scale-105 ${idx === currentImageIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+              />
+            ))}
             {hasMultipleImages && (
               <>
                 <button
@@ -423,11 +426,14 @@ export default function ProductCard({ product }: ProductCardProps) {
           }}
         >
           <div className="w-full h-1/2 overflow-hidden relative bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl group">
-            <img
-              src={currentImage}
-              alt={product.name}
-              className="w-full h-full object-cover object-center opacity-20"
-            />
+            {productImages.map((src, idx) => (
+              <img
+                key={src}
+                src={src}
+                alt={product.name}
+                className={`absolute inset-0 w-full h-full object-cover object-center opacity-20 transition-opacity duration-700 ease-in-out ${idx === currentImageIndex ? 'opacity-20 z-10' : 'opacity-0 z-0'}`}
+              />
+            ))}
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/50"></div>
             {hasMultipleImages && (
               <>
