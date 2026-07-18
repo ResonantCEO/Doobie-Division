@@ -266,11 +266,13 @@ function openInboundDocument() {
     .note-lines { display: flex; flex-direction: column; gap: 10px; }
     .note-line { border-bottom: 1.5px solid #999; height: 22px; }
     .print-btn { position: fixed; top: 12px; right: 16px; background: #111; color: #fff; border: none; padding: 7px 16px; font-size: 12px; font-weight: 600; border-radius: 5px; cursor: pointer; }
-    @media print { .print-btn { display: none; } }
+    .dl-btn { position: fixed; top: 12px; right: 110px; background: #2d6a2d; color: #fff; border: none; padding: 7px 16px; font-size: 12px; font-weight: 600; border-radius: 5px; cursor: pointer; }
+    @media print { .print-btn { display: none; } .dl-btn { display: none; } }
   </style>
 </head>
 <body>
   <button class="print-btn" onclick="window.print()">🖨 Print</button>
+  <button class="dl-btn" onclick="var b=new Blob([document.documentElement.outerHTML],{type:'text/html'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='inbound-${docNumber}.html';a.click();">⬇ Download</button>
 
   <div class="header">
     <div>
