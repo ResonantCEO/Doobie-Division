@@ -46,7 +46,14 @@ function openInventoryPrintSheet(
 
   const rows: Row[] = [];
 
-  for (const product of products) {
+  const sortedProducts = [...products].sort((a, b) => {
+    const catA = (a.category?.name ?? "").toLowerCase();
+    const catB = (b.category?.name ?? "").toLowerCase();
+    if (catA !== catB) return catA.localeCompare(catB);
+    return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  });
+
+  for (const product of sortedProducts) {
     const category = product.category?.name ?? "";
     const price =
       product.sellingMethod === "weight"
