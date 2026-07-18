@@ -120,7 +120,8 @@ export default function StorefrontPage() {
           (typeof discount === 'number' ? discount : parseFloat(String(discount))) > 0;
         const hasBogo = product.bogoEnabled === true;
         const hasQuantityPricing = Array.isArray((product as any).quantityPricing) && (product as any).quantityPricing.length > 0;
-        return hasDiscount || hasBogo || hasQuantityPricing;
+        const isGrabBag = (product as any).sku?.startsWith("GRAB-BAG-");
+        return hasDiscount || hasBogo || hasQuantityPricing || isGrabBag;
       });
     },
     staleTime: 60000,

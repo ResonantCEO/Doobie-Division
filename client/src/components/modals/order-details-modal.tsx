@@ -1270,6 +1270,20 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                           <p className="text-xs text-gray-600 dark:text-gray-400">
                             ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
                           </p>
+                          {(item.productSku || item.product_sku || "").startsWith("GRAB-BAG-") && (item as any).product?.description && (() => {
+                            const desc: string = (item as any).product.description;
+                            const bagItems = desc.split('\n')
+                              .filter((l: string) => l.trim().startsWith('•'))
+                              .map((l: string) => { const m = l.match(/•\s+(.+?)\s+\(\$([0-9.]+)\)/); return m ? { name: m[1], price: m[2] } : null; })
+                              .filter(Boolean) as { name: string; price: string }[];
+                            return bagItems.length > 0 ? (
+                              <div className="mt-1 space-y-0.5 border-t border-dashed border-gray-300 dark:border-gray-600 pt-1">
+                                {bagItems.map((gi, i) => (
+                                  <p key={i} className="text-xs text-gray-500 dark:text-gray-400">• {gi.name} <span className="opacity-70">(${gi.price})</span></p>
+                                ))}
+                              </div>
+                            ) : null;
+                          })()}
                           {!isRemoved && !item.fulfilled && canScan && (
                             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Click to scan and fulfill item</p>
                           )}

@@ -3472,12 +3472,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Compute discount percentage: how much customer saves vs retail value
-      const sellingPrice = parseFloat(bag.sellingPrice);
-      const discountPct = runningTotal > 0
-        ? Math.round(((runningTotal - sellingPrice) / runningTotal) * 100)
-        : 0;
-
       const sku = `GRAB-BAG-${bag.id}-${Date.now()}`;
       const newProduct = await storage.createProduct({
         name: bag.name,
@@ -3489,7 +3483,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true,
         sellingMethod: "units",
         categoryId: grabBagCategory.id,
-        discountPercentage: discountPct > 0 ? String(discountPct) : null,
         imageUrl: primaryImage,
         imageUrls: imageUrlsJson,
         adminNotes: `Auto-generated grab bag from template ID ${bag.id}. Contains: ${confirmedProducts.map(p => p.sku).join(", ")}`,

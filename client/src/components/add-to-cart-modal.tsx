@@ -332,7 +332,16 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
     return totalPrice.toFixed(2);
   };
 
+  const isGrabBag = (product as any).sku?.startsWith("GRAB-BAG-");
+
+  const parseGrabBagItems = (desc: string): { name: string; price: string }[] =>
+    desc.split('\n')
+      .filter(l => l.trim().startsWith('•'))
+      .map(l => { const m = l.match(/•\s+(.+?)\s+\(\$([0-9.]+)\)/); return m ? { name: m[1], price: m[2] } : null; })
+      .filter(Boolean) as { name: string; price: string }[];
+
   const getPrice = () => {
+    if (isGrabBag) return getOriginalPrice(); // price is already the final sell price
     const totalPrice = parseFloat(getOriginalPrice());
     if (product.discountPercentage && parseFloat(product.discountPercentage) > 0) {
       return (totalPrice * (1 - parseFloat(product.discountPercentage) / 100)).toFixed(2);
@@ -349,8 +358,10 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
     return totalPrice.toFixed(2);
   };
 
-  const hasDiscount = (product.discountPercentage && parseFloat(product.discountPercentage) > 0) ||
-    ((product as any).discountAmount && parseFloat((product as any).discountAmount) > 0);
+  const hasDiscount = !isGrabBag && (
+    (product.discountPercentage && parseFloat(product.discountPercentage) > 0) ||
+    ((product as any).discountAmount && parseFloat((product as any).discountAmount) > 0)
+  );
 
   // ── Free/Discounted Step Content ─────────────────────────────────────────
   const freeTotal = getFreeQuantityTotal();
@@ -589,6 +600,16 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
             {product.category && (
               <p className="text-xs text-muted-foreground">{product.category.name}</p>
             )}
+            {isGrabBag && (product as any).description && (() => {
+              const bagItems = parseGrabBagItems((product as any).description);
+              return bagItems.length > 0 ? (
+                <div className="mt-1.5 space-y-0.5 border-t border-dashed border-muted-foreground/20 pt-1.5">
+                  {bagItems.map((gi, i) => (
+                    <p key={i} className="text-xs text-muted-foreground">• {gi.name} <span className="text-muted-foreground/60">(${gi.price})</span></p>
+                  ))}
+                </div>
+              ) : null;
+            })()}
             <div className="mt-1">
               {isWeightBased ? (
                 <div className="text-sm">

@@ -44,7 +44,15 @@ interface DiscountEvalResult {
   totalSavings: number;
 }
 
+function parseGrabBagItems(desc: string): { name: string; price: string }[] {
+  return desc.split('\n')
+    .filter(l => l.trim().startsWith('•'))
+    .map(l => { const m = l.match(/•\s+(.+?)\s+\(\$([0-9.]+)\)/); return m ? { name: m[1], price: m[2] } : null; })
+    .filter(Boolean) as { name: string; price: string }[];
+}
+
 function applyProductDiscount(product: any, price: number): number {
+  if (product.sku?.startsWith("GRAB-BAG-")) return price; // selling price IS the final price
   const discPct = parseFloat(product.discountPercentage || "0");
   if (discPct > 0) return price * (1 - discPct / 100);
   const discAmt = parseFloat(product.discountAmount || "0");
@@ -621,6 +629,16 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                       {item.product.category && (
                         <p className="text-xs text-muted-foreground">{item.product.category.name}</p>
                       )}
+                      {item.product.sku?.startsWith("GRAB-BAG-") && (item.product as any).description && (() => {
+                        const bagItems = parseGrabBagItems((item.product as any).description);
+                        return bagItems.length > 0 ? (
+                          <div className="mt-1 space-y-0.5 border-t border-dashed border-muted-foreground/20 pt-1">
+                            {bagItems.map((gi, i) => (
+                              <p key={i} className="text-xs text-muted-foreground">• {gi.name} <span className="text-muted-foreground/60">(${gi.price})</span></p>
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
                       <div className="mt-1">
                         {item.isFree ? (
                           <p className="font-semibold text-green-600 dark:text-green-400">FREE</p>
