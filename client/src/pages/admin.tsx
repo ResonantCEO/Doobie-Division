@@ -2023,16 +2023,26 @@ export default function AdminPage() {
                   ) : (
                     <div className="space-y-3">
                       {allPromoCodes.map((p) => (
-                        <div key={p.id} className="flex items-center justify-between p-4 border rounded-lg dark:border-gray-700">
-                          <div className="flex items-start gap-3">
-                            <div className={`mt-0.5 p-2 rounded-md ${p.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
-                              <Tag className="h-4 w-4" />
+                        <div key={p.id} className="border rounded-lg dark:border-gray-700 overflow-hidden">
+
+                          {/* ── Mobile card layout ── */}
+                          <div className="md:hidden">
+                            {/* Header strip */}
+                            <div className={`flex items-center justify-between px-4 py-3 ${p.isActive ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-800/50'}`}>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Tag className={`h-4 w-4 shrink-0 ${p.isActive ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`} />
+                                <span className="font-mono font-bold tracking-wider text-base truncate">{p.code}</span>
+                              </div>
+                              <Badge variant={p.isActive ? "default" : "secondary"} className="shrink-0 ml-2">
+                                {p.isActive ? 'Active' : 'Inactive'}
+                              </Badge>
                             </div>
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-mono font-bold tracking-wider text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{p.code}</span>
-                                <Badge variant={p.isActive ? "default" : "secondary"} className="text-xs">{p.isActive ? 'Active' : 'Inactive'}</Badge>
-                                <Badge variant="outline" className="text-xs">
+
+                            {/* Body */}
+                            <div className="px-4 py-3 space-y-2">
+                              {/* Discount + badges */}
+                              <div className="flex flex-wrap gap-1.5">
+                                <Badge variant="outline" className="text-sm font-semibold">
                                   {p.discountType === 'percent' ? `${p.discountValue}% off` : `$${Number(p.discountValue).toFixed(2)} off`}
                                 </Badge>
                                 {p.minOrderAmount && (
@@ -2042,28 +2052,91 @@ export default function AdminPage() {
                                   <Badge variant="outline" className="text-xs text-blue-600 border-blue-400">Bypasses min. purchase</Badge>
                                 )}
                               </div>
-                              {p.description && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{p.description}</p>}
-                              <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
+
+                              {/* Description */}
+                              {p.description && (
+                                <p className="text-sm text-gray-500 dark:text-gray-400">{p.description}</p>
+                              )}
+
+                              {/* Meta pills */}
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
                                 <span>{p.usageLimitType === 'once_per_user' ? 'Once per customer' : 'Unlimited uses'}</span>
-                                {p.maxTotalUses && <span>· Max {p.maxTotalUses} total uses</span>}
-                                <span>· Used {p.totalUses} time{p.totalUses !== 1 ? 's' : ''}</span>
-                                {(p.validFrom || p.validTo) && (
-                                  <span>
-                                    · {p.validFrom ? `From ${format(new Date(p.validFrom), 'MMM d, yyyy')}` : ''}
-                                    {p.validFrom && p.validTo ? ' – ' : ''}
-                                    {p.validTo ? `Until ${format(new Date(p.validTo), 'MMM d, yyyy')}` : ''}
-                                  </span>
-                                )}
+                                {p.maxTotalUses && <span>· Max {p.maxTotalUses} uses</span>}
+                                <span>· Used {p.totalUses}×</span>
+                              </div>
+                              {(p.validFrom || p.validTo) && (
+                                <div className="text-xs text-gray-400">
+                                  {p.validFrom && `From ${format(new Date(p.validFrom), 'MMM d, yyyy')}`}
+                                  {p.validFrom && p.validTo && ' – '}
+                                  {p.validTo && `Until ${format(new Date(p.validTo), 'MMM d, yyyy')}`}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Action footer */}
+                            <div className="flex items-center justify-between px-4 py-2 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30">
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={p.isActive}
+                                  onCheckedChange={(checked) => togglePromoCodeMutation.mutate({ id: p.id, isActive: checked })}
+                                />
+                                <span className="text-xs text-gray-500">{p.isActive ? 'Enabled' : 'Disabled'}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEditPromoCode(p)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => { setPromoCodeToDelete(p); setDeletePromoCodeConfirmOpen(true); }}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Switch checked={p.isActive} onCheckedChange={(checked) => togglePromoCodeMutation.mutate({ id: p.id, isActive: checked })} />
-                            <Button variant="ghost" size="sm" onClick={() => openEditPromoCode(p)}><Pencil className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setPromoCodeToDelete(p); setDeletePromoCodeConfirmOpen(true); }}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+
+                          {/* ── Desktop card layout (unchanged) ── */}
+                          <div className="hidden md:flex items-center justify-between p-4">
+                            <div className="flex items-start gap-3">
+                              <div className={`mt-0.5 p-2 rounded-md ${p.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                                <Tag className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-mono font-bold tracking-wider text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{p.code}</span>
+                                  <Badge variant={p.isActive ? "default" : "secondary"} className="text-xs">{p.isActive ? 'Active' : 'Inactive'}</Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    {p.discountType === 'percent' ? `${p.discountValue}% off` : `$${Number(p.discountValue).toFixed(2)} off`}
+                                  </Badge>
+                                  {p.minOrderAmount && (
+                                    <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">Min. ${Number(p.minOrderAmount).toFixed(2)}</Badge>
+                                  )}
+                                  {p.bypassPurchaseMinimum && (
+                                    <Badge variant="outline" className="text-xs text-blue-600 border-blue-400">Bypasses min. purchase</Badge>
+                                  )}
+                                </div>
+                                {p.description && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{p.description}</p>}
+                                <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
+                                  <span>{p.usageLimitType === 'once_per_user' ? 'Once per customer' : 'Unlimited uses'}</span>
+                                  {p.maxTotalUses && <span>· Max {p.maxTotalUses} total uses</span>}
+                                  <span>· Used {p.totalUses} time{p.totalUses !== 1 ? 's' : ''}</span>
+                                  {(p.validFrom || p.validTo) && (
+                                    <span>
+                                      · {p.validFrom ? `From ${format(new Date(p.validFrom), 'MMM d, yyyy')}` : ''}
+                                      {p.validFrom && p.validTo ? ' – ' : ''}
+                                      {p.validTo ? `Until ${format(new Date(p.validTo), 'MMM d, yyyy')}` : ''}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Switch checked={p.isActive} onCheckedChange={(checked) => togglePromoCodeMutation.mutate({ id: p.id, isActive: checked })} />
+                              <Button variant="ghost" size="sm" onClick={() => openEditPromoCode(p)}><Pencil className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setPromoCodeToDelete(p); setDeletePromoCodeConfirmOpen(true); }}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
+
                         </div>
                       ))}
                     </div>
