@@ -73,6 +73,16 @@ export default function ProductCard({ product }: ProductCardProps) {
     setCurrentImageIndex(0);
   }, [product.id]);
 
+  // Auto-rotate images for grab bag products (same 3s timing as Today's Amazing Deals)
+  const isGrabBag = product.sku?.startsWith("GRAB-BAG-");
+  useEffect(() => {
+    if (!isGrabBag || productImages.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentImageIndex(prev => (prev >= productImages.length - 1 ? 0 : prev + 1));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [isGrabBag, productImages.length]);
+
   const currentImage = productImages[currentImageIndex] || productImages[0];
   const hasMultipleImages = productImages.length > 1;
   
