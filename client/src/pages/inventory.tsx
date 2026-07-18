@@ -132,9 +132,9 @@ function openInventoryPrintSheet(
         <h1>Inventory Count Sheet</h1>
         <p>Exported ${dateStr} at ${timeStr} &nbsp;·&nbsp; ${products.length} products total</p>
       </div>
-      <div class="page-num">Page ${sectionIdx + 1} of ${categoryNames.length}</div>
+      <div class="page-num"><span class="cat-label">${esc(catName)}</span> &nbsp;·&nbsp; Page ${sectionIdx + 1} of ${categoryNames.length}</div>
     </div>
-    <div class="category-banner">${esc(catName)} &nbsp;<span class="cat-count">${catRows.length} item${catRows.length !== 1 ? "s" : ""}</span></div>
+    <div class="category-banner"><span class="cat-count">${catRows.length} item${catRows.length !== 1 ? "s" : ""}</span></div>
     <div class="legend">
       <span><span class="dot" style="background:#27ae60"></span> In Stock</span>
       <span><span class="dot" style="background:#e67e22"></span> Low Stock</span>
@@ -173,9 +173,10 @@ function openInventoryPrintSheet(
     .page-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 12px 16px 8px; border-bottom: 2px solid #111; }
     .page-header h1 { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
     .page-header p { font-size: 10px; color: #555; }
-    .page-num { font-size: 10px; font-weight: 600; color: #555; white-space: nowrap; }
-    .category-banner { padding: 6px 16px; background: #1a1a2e; color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-    .cat-count { font-size: 10px; font-weight: 400; opacity: 0.7; }
+    .page-num { font-size: 11px; font-weight: 600; color: #111; white-space: nowrap; text-align: right; }
+    .cat-label { font-size: 14px; font-weight: 800; color: #111; }
+    .category-banner { padding: 4px 16px; background: #f0f0f0; border-bottom: 1px solid #ccc; display: flex; align-items: center; gap: 10px; }
+    .cat-count { font-size: 10px; font-weight: 600; color: #555; }
     .legend { display: flex; gap: 16px; padding: 5px 16px; font-size: 9px; border-bottom: 1px solid #ccc; }
     .legend span { display: flex; align-items: center; gap: 4px; }
     .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
