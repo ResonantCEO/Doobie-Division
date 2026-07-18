@@ -17,8 +17,108 @@ import StockAdjustmentModal from "@/components/modals/stock-adjustment-modal";
 import CategoryManagementModal from "@/components/modals/category-management-modal";
 import BulkQRModal from "@/components/modals/bulk-qr-modal";
 import PriceTemplatesModal from "@/components/modals/price-templates-modal";
-import { Plus, QrCode, AlertTriangle, Settings, FileText } from "lucide-react";
+import { Plus, QrCode, AlertTriangle, Settings, FileText, Download } from "lucide-react";
 import type { Product, Category, ProductSize } from "@shared/schema";
+
+function exportInventoryToCSV(
+  products: (Product & { category: Category | null; sizes?: ProductSize[] })[],
+  filename: string
+) {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+  const headers = [
+    "SKU",
+    "Product Name",
+    "Category",
+    "Selling Method",
+    "Price",
+    "System Stock",
+    "Size",
+    "Physical Count",
+    "Variance",
+    "Status",
+    "Notes",
+  ];
+
+  const rows: string[][] = [];
+
+  for (const product of products) {
+    const category = product.category?.name ?? "";
+    const method = product.sellingMethod === "weight" ? "Weight (g)" : "Units";
+    const price =
+      product.sellingMethod === "weight"
+        ? product.pricePerGram
+          ? `$${Number(product.pricePerGram).toFixed(2)}/g`
+          : ""
+        : `$${Number(product.price ?? 0).toFixed(2)}`;
+    const status =
+      product.stock === 0
+        ? "Out of Stock"
+        : product.stock <= product.minStockThreshold
+        ? "Low Stock"
+        : "In Stock";
+
+    if (product.sizes && product.sizes.length > 0) {
+      for (const size of product.sizes) {
+        rows.push([
+          product.sku,
+          product.name,
+          category,
+          method,
+          price,
+          String(size.quantity),
+          size.size,
+          "",
+          "",
+          status,
+          "",
+        ]);
+      }
+    } else {
+      const stockDisplay =
+        product.sellingMethod === "weight"
+          ? `${product.stock}g`
+          : String(product.stock);
+      rows.push([
+        product.sku,
+        product.name,
+        category,
+        method,
+        price,
+        stockDisplay,
+        "",
+        "",
+        "",
+        status,
+        "",
+      ]);
+    }
+  }
+
+  const escape = (val: string) => `"${val.replace(/"/g, '""')}"`;
+
+  const metaLine = `"Inventory Export — ${dateStr} at ${timeStr}"`;
+  const countLine = `"Total Products: ${products.length}"`;
+  const csvContent = [
+    metaLine,
+    countLine,
+    "",
+    headers.map(escape).join(","),
+    ...rows.map((r) => r.map(escape).join(",")),
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 export default function InventoryPage() {
   const [searchInput, setSearchInput] = useState("");
@@ -242,6 +342,20 @@ export default function InventoryPage() {
             <FileText className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Templates</span>
             <span className="sm:hidden">Templates</span>
+          </Button>
+          <Button
+            onClick={() => {
+              const now = new Date();
+              const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+              exportInventoryToCSV(products, `inventory-${stamp}.csv`);
+            }}
+            variant="outline"
+            className="flex-1 sm:flex-initial"
+            disabled={products.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Export CSV</span>
+            <span className="sm:hidden">Export</span>
           </Button>
         </div>
       </div>
