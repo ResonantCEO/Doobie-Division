@@ -20,33 +20,34 @@ import PriceTemplatesModal from "@/components/modals/price-templates-modal";
 import { Plus, QrCode, AlertTriangle, Settings, FileText, Download } from "lucide-react";
 import type { Product, Category, ProductSize } from "@shared/schema";
 
-function exportInventoryToCSV(
-  products: (Product & { category: Category | null; sizes?: ProductSize[] })[],
-  filename: string
+function openInventoryPrintSheet(
+  products: (Product & { category: Category | null; sizes?: ProductSize[] })[]
 ) {
   const now = new Date();
-  const dateStr = now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  const dateStr = now.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
-  const headers = [
-    "SKU",
-    "Product Name",
-    "Category",
-    "Selling Method",
-    "Price",
-    "System Stock",
-    "Size",
-    "Physical Count",
-    "Variance",
-    "Status",
-    "Notes",
-  ];
+  type Row = {
+    sku: string;
+    name: string;
+    category: string;
+    price: string;
+    systemStock: string;
+    size: string;
+    status: string;
+  };
 
-  const rows: string[][] = [];
+  const rows: Row[] = [];
 
   for (const product of products) {
     const category = product.category?.name ?? "";
-    const method = product.sellingMethod === "weight" ? "Weight (g)" : "Units";
     const price =
       product.sellingMethod === "weight"
         ? product.pricePerGram
@@ -62,62 +63,147 @@ function exportInventoryToCSV(
 
     if (product.sizes && product.sizes.length > 0) {
       for (const size of product.sizes) {
-        rows.push([
-          product.sku,
-          product.name,
+        rows.push({
+          sku: product.sku,
+          name: product.name,
           category,
-          method,
           price,
-          String(size.quantity),
-          size.size,
-          "",
-          "",
+          systemStock: String(size.quantity),
+          size: size.size,
           status,
-          "",
-        ]);
+        });
       }
     } else {
       const stockDisplay =
         product.sellingMethod === "weight"
           ? `${product.stock}g`
           : String(product.stock);
-      rows.push([
-        product.sku,
-        product.name,
+      rows.push({
+        sku: product.sku,
+        name: product.name,
         category,
-        method,
         price,
-        stockDisplay,
-        "",
-        "",
-        "",
+        systemStock: stockDisplay,
+        size: "",
         status,
-        "",
-      ]);
+      });
     }
   }
 
-  const escape = (val: string) => `"${val.replace(/"/g, '""')}"`;
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  const metaLine = `"Inventory Export — ${dateStr} at ${timeStr}"`;
-  const countLine = `"Total Products: ${products.length}"`;
-  const csvContent = [
-    metaLine,
-    countLine,
-    "",
-    headers.map(escape).join(","),
-    ...rows.map((r) => r.map(escape).join(",")),
-  ].join("\n");
+  const tableRows = rows
+    .map(
+      (r, i) => `
+      <tr class="${i % 2 === 0 ? "even" : "odd"}">
+        <td>${esc(r.sku)}</td>
+        <td class="name">${esc(r.name)}${r.size ? `<span class="size-tag">${esc(r.size)}</span>` : ""}</td>
+        <td>${esc(r.category)}</td>
+        <td class="num">${esc(r.price)}</td>
+        <td class="num stock ${r.status === "Out of Stock" ? "out" : r.status === "Low Stock" ? "low" : ""}">${esc(r.systemStock)}</td>
+        <td class="write"></td>
+        <td class="write"></td>
+        <td class="notes"></td>
+      </tr>`
+    )
+    .join("");
 
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Inventory Sheet — ${dateStr}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: #fff; }
+    .header { padding: 12px 16px 8px; border-bottom: 2px solid #111; }
+    .header h1 { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+    .header p { font-size: 10px; color: #555; }
+    .legend { display: flex; gap: 16px; padding: 6px 16px; font-size: 9px; border-bottom: 1px solid #ccc; }
+    .legend span { display: flex; align-items: center; gap: 4px; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: #1a1a2e;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 6px 8px;
+      text-align: left;
+      border-right: 1px solid #333;
+    }
+    thead th.num { text-align: right; }
+    thead th.write { background: #2d4a2d; text-align: center; }
+    thead th.notes { background: #1a2d4a; }
+    tbody tr.even { background: #f9f9f9; }
+    tbody tr.odd { background: #fff; }
+    tbody tr:hover { background: #f0f4ff; }
+    td { padding: 5px 8px; border-bottom: 1px solid #e0e0e0; border-right: 1px solid #e8e8e8; vertical-align: middle; }
+    td.num { text-align: right; }
+    td.stock { font-weight: 600; }
+    td.stock.out { color: #c0392b; }
+    td.stock.low { color: #e67e22; }
+    td.write { background: #f4fbf4; min-width: 70px; border-right: 1px solid #b0d4b0; }
+    td.notes { background: #f0f4ff; min-width: 120px; }
+    td.name { font-weight: 500; }
+    .size-tag { display: inline-block; margin-left: 5px; font-size: 9px; background: #e8e8e8; color: #555; padding: 1px 5px; border-radius: 3px; font-weight: normal; }
+    .print-btn {
+      position: fixed; top: 12px; right: 16px;
+      background: #1a1a2e; color: #fff; border: none; padding: 8px 18px;
+      font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer;
+    }
+    .print-btn:hover { background: #333; }
+    .footer { padding: 8px 16px; font-size: 9px; color: #888; border-top: 1px solid #ccc; margin-top: 4px; }
+    @media print {
+      .print-btn { display: none; }
+      body { font-size: 10px; }
+      thead th { font-size: 8px; padding: 4px 6px; }
+      td { padding: 4px 6px; }
+    }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">🖨 Print</button>
+  <div class="header">
+    <h1>Inventory Count Sheet</h1>
+    <p>Exported ${dateStr} at ${timeStr} &nbsp;·&nbsp; ${products.length} products &nbsp;·&nbsp; ${rows.length} line items</p>
+  </div>
+  <div class="legend">
+    <span><span class="dot" style="background:#27ae60"></span> In Stock</span>
+    <span><span class="dot" style="background:#e67e22"></span> Low Stock</span>
+    <span><span class="dot" style="background:#c0392b"></span> Out of Stock</span>
+    <span style="margin-left:auto; color:#2d6a2d">■ Green columns = write in your physical count</span>
+    <span style="color:#1a4a6a">■ Blue column = notes</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>SKU</th>
+        <th>Product / Size</th>
+        <th>Category</th>
+        <th class="num">Price</th>
+        <th class="num">System Stock</th>
+        <th class="write">Physical Count</th>
+        <th class="write">Variance</th>
+        <th class="notes">Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tableRows}
+    </tbody>
+  </table>
+  <div class="footer">Doobie Division! · Inventory Count Sheet · ${dateStr}</div>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank");
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+  }
 }
 
 export default function InventoryPage() {
@@ -344,18 +430,14 @@ export default function InventoryPage() {
             <span className="sm:hidden">Templates</span>
           </Button>
           <Button
-            onClick={() => {
-              const now = new Date();
-              const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-              exportInventoryToCSV(products, `inventory-${stamp}.csv`);
-            }}
+            onClick={() => openInventoryPrintSheet(products)}
             variant="outline"
             className="flex-1 sm:flex-initial"
             disabled={products.length === 0}
           >
             <Download className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Export CSV</span>
-            <span className="sm:hidden">Export</span>
+            <span className="hidden sm:inline">Print Sheet</span>
+            <span className="sm:hidden">Print</span>
           </Button>
         </div>
       </div>
