@@ -247,7 +247,7 @@ function openInboundDocument() {
     table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
     thead th { background: #111; color: #fff; font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 5px 7px; text-align: left; }
     thead th.c { text-align: center; }
-    tbody td { border-bottom: 1px solid #ddd; height: 32px; padding: 0 6px; font-size: 10px; }
+    tbody td { border-bottom: 1px solid #ddd; height: 42px; padding: 0 6px; font-size: 10px; }
     tbody td.num-cell { width: 22px; text-align: center; color: #bbb; font-size: 9px; background: #f9f9f9; border-right: 1px solid #eee; }
     tbody td.w { }
     tbody td.qty { width: 100px; background: #f4fbf4; border-right: 1px solid #b0d4b0; }
