@@ -218,10 +218,10 @@ function openInboundDocument() {
   const dateStr = now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const docNumber = `INB-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
 
-  const blankRows = Array.from({ length: 12 }, (_, i) => `
+  const blankRows = Array.from({ length: 15 }, (_, i) => `
     <tr>
       <td class="num-cell">${i + 1}</td>
-      <td class="w"></td>
+      <td class="product-col"></td>
       <td class="w flavor"></td>
       <td class="w qty"></td>
       <td class="w qty"></td>
@@ -252,6 +252,7 @@ function openInboundDocument() {
     tbody td.num-cell { width: 22px; text-align: center; color: #aaa; font-size: 9px; background: #f5f5f5; border-right: 1.5px solid #999; }
     tbody td.w { border-right: 1.5px solid #999; }
     tbody td.flavor { border-right: 1.5px solid #999; }
+    tbody td.product-col { border-right: none; }
     thead th.flavor-h { border-right: 1.5px solid #444; }
     tbody td.qty { width: 100px; background: #f4fbf4; border-right: 2px solid #7ab87a; }
     thead th.qty-h { border-right: 2px solid #444; }
