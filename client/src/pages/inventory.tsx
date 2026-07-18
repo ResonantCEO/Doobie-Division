@@ -274,15 +274,11 @@ function openInboundDocument() {
       <h1>Doobie Division!</h1>
       <div class="sub">Inbound Delivery Receipt</div>
     </div>
-    <div>
-      <div class="doc-id">${docNumber}</div>
-      <div class="doc-date">${dateStr}</div>
-    </div>
   </div>
 
   <div class="fields">
     <div class="field"><label>Vendor / Supplier</label><div class="line"></div></div>
-    <div class="field"><label>Invoice #</label><div class="line"></div></div>
+    <div class="field"><label>Delivered By</label><div class="line"></div></div>
     <div class="field"><label>Received By</label><div class="line"></div></div>
     <div class="field"><label>Delivery Date</label><div class="line"></div></div>
   </div>
@@ -301,17 +297,14 @@ function openInboundDocument() {
   </table>
 
   <div class="footer-row">
-    <div class="notes-block">
-      <label>Discrepancy / Notes</label>
+    <div class="notes-block" style="grid-column: 1 / -1;">
+      <label>Notes</label>
       <div class="note-lines">
         <div class="note-line"></div>
         <div class="note-line"></div>
         <div class="note-line"></div>
+        <div class="note-line"></div>
       </div>
-    </div>
-    <div class="sig">
-      <div class="sig-line-row"><span class="sig-label">Received By</span><div class="sig-line"></div></div>
-      <div class="sig-line-row"><span class="sig-label">Date</span><div class="sig-line"></div></div>
     </div>
   </div>
 </body>
