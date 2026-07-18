@@ -242,7 +242,7 @@ function openInboundDocument() {
     .header .doc-date { font-size: 9px; color: #888; }
     .fields { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0 24px; margin-bottom: 12px; }
     .field { display: flex; flex-direction: column; gap: 2px; }
-    .field label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #888; }
+    .field label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #111; }
     .field .line { border-bottom: 1px solid #555; height: 28px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
     thead th { background: #111; color: #fff; font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 5px 7px; text-align: left; }
@@ -261,7 +261,7 @@ function openInboundDocument() {
     .sig-line { flex: 1; border-bottom: 1px solid #555; height: 16px; }
     .notes-block label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #888; display: block; margin-bottom: 4px; }
     .note-lines { display: flex; flex-direction: column; gap: 10px; }
-    .note-line { border-bottom: 1.5px solid #999; height: 14px; }
+    .note-line { border-bottom: 1.5px solid #999; height: 22px; }
     .print-btn { position: fixed; top: 12px; right: 16px; background: #111; color: #fff; border: none; padding: 7px 16px; font-size: 12px; font-weight: 600; border-radius: 5px; cursor: pointer; }
     @media print { .print-btn { display: none; } }
   </style>
