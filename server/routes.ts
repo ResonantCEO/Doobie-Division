@@ -3359,7 +3359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const poolEntries: PoolEntry[] = [];
     for (const sel of categorySelections) {
       try {
-        const allInCat = await storage.getProducts({ categoryId: sel.categoryId, isActive: true });
+        const allInCat = await storage.getProducts({ categoryIds: [sel.categoryId], isActive: true });
         const pool = allInCat
           .filter(p => !selectedProducts.find(s => s.id === p.id) && !blacklistedIds.includes(p.id))
           .map(p => { const r = resolveProduct(p, slotBudget); return { id: p.id, name: p.name, price: r.price, sku: p.sku, sellingMethod: r.sellingMethod, weightLabel: r.weightLabel, selectedSize: r.selectedSize, imageUrl: p.imageUrl, imageUrls: p.imageUrls }; })
