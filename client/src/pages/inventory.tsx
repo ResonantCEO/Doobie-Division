@@ -100,21 +100,63 @@ function openInventoryPrintSheet(
   const esc = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  const tableRows = rows
-    .map(
-      (r, i) => `
+  const categoryMap = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const cat = row.category || "Uncategorized";
+    if (!categoryMap.has(cat)) categoryMap.set(cat, []);
+    categoryMap.get(cat)!.push(row);
+  }
+
+  const categoryNames = Array.from(categoryMap.keys());
+
+  const categorySections = categoryNames.map((catName, sectionIdx) => {
+    const catRows = categoryMap.get(catName)!;
+    const tableRows = catRows.map((r, i) => `
       <tr class="${i % 2 === 0 ? "even" : "odd"}">
         <td>${esc(r.sku)}</td>
         <td class="name">${esc(r.name)}${r.size ? `<span class="size-tag">${esc(r.size)}</span>` : ""}</td>
-        <td>${esc(r.category)}</td>
         <td class="num">${esc(r.price)}</td>
         <td class="num stock ${r.status === "Out of Stock" ? "out" : r.status === "Low Stock" ? "low" : ""}">${esc(r.systemStock)}</td>
         <td class="write"></td>
         <td class="write"></td>
         <td class="notes"></td>
-      </tr>`
-    )
-    .join("");
+      </tr>`).join("");
+
+    const isLast = sectionIdx === categoryNames.length - 1;
+    return `
+  <div class="page-section${isLast ? " last-section" : ""}">
+    <div class="page-header">
+      <div>
+        <h1>Inventory Count Sheet</h1>
+        <p>Exported ${dateStr} at ${timeStr} &nbsp;·&nbsp; ${products.length} products total</p>
+      </div>
+      <div class="page-num">Page ${sectionIdx + 1} of ${categoryNames.length}</div>
+    </div>
+    <div class="category-banner">${esc(catName)} &nbsp;<span class="cat-count">${catRows.length} item${catRows.length !== 1 ? "s" : ""}</span></div>
+    <div class="legend">
+      <span><span class="dot" style="background:#27ae60"></span> In Stock</span>
+      <span><span class="dot" style="background:#e67e22"></span> Low Stock</span>
+      <span><span class="dot" style="background:#c0392b"></span> Out of Stock</span>
+      <span style="margin-left:auto; color:#2d6a2d">■ Green = physical count</span>
+      <span style="color:#1a4a6a">■ Blue = notes</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Product / Size</th>
+          <th class="num">Price</th>
+          <th class="num">System Stock</th>
+          <th class="write">Physical Count</th>
+          <th class="write">Variance</th>
+          <th class="notes">Notes</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+    <div class="footer">Doobie Division! · Inventory Count Sheet · ${dateStr} · ${esc(catName)}</div>
+  </div>`;
+  }).join("");
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -124,15 +166,20 @@ function openInventoryPrintSheet(
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: #fff; }
-    .header { padding: 12px 16px 8px; border-bottom: 2px solid #111; }
-    .header h1 { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
-    .header p { font-size: 10px; color: #555; }
-    .legend { display: flex; gap: 16px; padding: 6px 16px; font-size: 9px; border-bottom: 1px solid #ccc; }
+    .page-section { page-break-after: always; }
+    .page-section.last-section { page-break-after: auto; }
+    .page-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 12px 16px 8px; border-bottom: 2px solid #111; }
+    .page-header h1 { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+    .page-header p { font-size: 10px; color: #555; }
+    .page-num { font-size: 10px; font-weight: 600; color: #555; white-space: nowrap; }
+    .category-banner { padding: 6px 16px; background: #1a1a2e; color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .cat-count { font-size: 10px; font-weight: 400; opacity: 0.7; }
+    .legend { display: flex; gap: 16px; padding: 5px 16px; font-size: 9px; border-bottom: 1px solid #ccc; }
     .legend span { display: flex; align-items: center; gap: 4px; }
     .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
     table { width: 100%; border-collapse: collapse; }
     thead th {
-      background: #1a1a2e;
+      background: #2a2a4e;
       color: #fff;
       font-size: 9px;
       font-weight: 600;
@@ -140,14 +187,13 @@ function openInventoryPrintSheet(
       letter-spacing: 0.5px;
       padding: 6px 8px;
       text-align: left;
-      border-right: 1px solid #333;
+      border-right: 1px solid #444;
     }
     thead th.num { text-align: right; }
     thead th.write { background: #2d4a2d; text-align: center; }
     thead th.notes { background: #1a2d4a; }
     tbody tr.even { background: #f9f9f9; }
     tbody tr.odd { background: #fff; }
-    tbody tr:hover { background: #f0f4ff; }
     td { padding: 5px 8px; border-bottom: 1px solid #e0e0e0; border-right: 1px solid #e8e8e8; vertical-align: middle; }
     td.num { text-align: right; }
     td.stock { font-weight: 600; }
@@ -157,13 +203,13 @@ function openInventoryPrintSheet(
     td.notes { background: #f0f4ff; min-width: 120px; }
     td.name { font-weight: 500; }
     .size-tag { display: inline-block; margin-left: 5px; font-size: 9px; background: #e8e8e8; color: #555; padding: 1px 5px; border-radius: 3px; font-weight: normal; }
+    .footer { padding: 8px 16px; font-size: 9px; color: #888; border-top: 1px solid #ccc; margin-top: 4px; }
     .print-btn {
       position: fixed; top: 12px; right: 16px;
       background: #1a1a2e; color: #fff; border: none; padding: 8px 18px;
-      font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; z-index: 999;
     }
     .print-btn:hover { background: #333; }
-    .footer { padding: 8px 16px; font-size: 9px; color: #888; border-top: 1px solid #ccc; margin-top: 4px; }
     @media print {
       .print-btn { display: none; }
       body { font-size: 10px; }
@@ -174,35 +220,7 @@ function openInventoryPrintSheet(
 </head>
 <body>
   <button class="print-btn" onclick="window.print()">🖨 Print</button>
-  <div class="header">
-    <h1>Inventory Count Sheet</h1>
-    <p>Exported ${dateStr} at ${timeStr} &nbsp;·&nbsp; ${products.length} products &nbsp;·&nbsp; ${rows.length} line items</p>
-  </div>
-  <div class="legend">
-    <span><span class="dot" style="background:#27ae60"></span> In Stock</span>
-    <span><span class="dot" style="background:#e67e22"></span> Low Stock</span>
-    <span><span class="dot" style="background:#c0392b"></span> Out of Stock</span>
-    <span style="margin-left:auto; color:#2d6a2d">■ Green columns = write in your physical count</span>
-    <span style="color:#1a4a6a">■ Blue column = notes</span>
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th>SKU</th>
-        <th>Product / Size</th>
-        <th>Category</th>
-        <th class="num">Price</th>
-        <th class="num">System Stock</th>
-        <th class="write">Physical Count</th>
-        <th class="write">Variance</th>
-        <th class="notes">Notes</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${tableRows}
-    </tbody>
-  </table>
-  <div class="footer">Doobie Division! · Inventory Count Sheet · ${dateStr}</div>
+  ${categorySections}
 </body>
 </html>`;
 
