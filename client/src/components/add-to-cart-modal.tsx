@@ -49,15 +49,30 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
   const [paidQtyForBogo, setPaidQtyForBogo] = useState(0);
 
   const { toast } = useToast();
-  const { addItem, addFreeItem, addDiscountedItem } = useCart();
+  const { addItem, addFreeItem, addDiscountedItem, state: cartState } = useCart();
 
   if (!product) return null;
 
   const isWeightBased = product.sellingMethod === "weight";
   const hasSizes = product.sizes && product.sizes.length > 0;
-  const allSizesOutOfStock = hasSizes && product.sizes!.every(s => s.quantity <= 0);
-  const maxStock = product.stock;
   const isBogoProduct = (product as any).bogoEnabled === true;
+
+  // How many of this product (non-free) are already in the cart?
+  const cartQtyForProduct = cartState.items
+    .filter(i => i.product.id === product.id && !i.isFree)
+    .reduce((sum, i) => sum + i.quantity, 0);
+
+  // Per-size cart quantities
+  const cartQtyPerSize: Record<string, number> = {};
+  cartState.items
+    .filter(i => i.product.id === product.id && !i.isFree && i.size)
+    .forEach(i => {
+      cartQtyPerSize[i.size!] = (cartQtyPerSize[i.size!] || 0) + i.quantity;
+    });
+
+  // Remaining available stock (accounting for what's already in cart)
+  const maxStock = Math.max(0, product.stock - cartQtyForProduct);
+  const allSizesOutOfStock = hasSizes && product.sizes!.every(s => Math.max(0, s.quantity - (cartQtyPerSize[s.size] || 0)) <= 0);
 
   const weightOptions = useMemo(() => {
     if (!isWeightBased) return [];
@@ -151,8 +166,13 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
       if (product.sizes) {
         for (const size of product.sizes) {
           const requestedQty = sizeQuantities[size.size] || 0;
-          if (requestedQty > size.quantity) {
-            toast({ title: "Insufficient Stock", description: `Only ${size.quantity} units available in size ${size.size}.`, variant: "destructive" });
+          const remainingForSize = size.quantity - (cartQtyPerSize[size.size] || 0);
+          if (requestedQty > remainingForSize) {
+            const alreadyInCart = cartQtyPerSize[size.size] || 0;
+            const availMsg = remainingForSize <= 0
+              ? `${size.size} is out of stock${alreadyInCart > 0 ? ` (you already have ${alreadyInCart} in your cart)` : ''}.`
+              : `Only ${remainingForSize} more available for size ${size.size}${alreadyInCart > 0 ? ` (${alreadyInCart} already in cart)` : ''}.`;
+            toast({ title: "Insufficient Stock", description: availMsg, variant: "destructive" });
             return;
           }
         }
@@ -657,8 +677,8 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                           variant="outline"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => setSizeQuantities({ ...sizeQuantities, [size.size]: Math.min(size.quantity, (sizeQuantities[size.size] || 0) + 1) })}
-                          disabled={(sizeQuantities[size.size] || 0) >= size.quantity}
+                          onClick={() => { const remaining = size.quantity - (cartQtyPerSize[size.size] || 0); setSizeQuantities({ ...sizeQuantities, [size.size]: Math.min(remaining, (sizeQuantities[size.size] || 0) + 1) }); }}
+                          disabled={(sizeQuantities[size.size] || 0) >= Math.max(0, size.quantity - (cartQtyPerSize[size.size] || 0))}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
@@ -761,8 +781,8 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                  disabled={quantity >= product.stock || maxStock === 0}
+                  onClick={() => setQuantity(Math.min(maxStock, quantity + 1))}
+                  disabled={quantity >= maxStock || maxStock === 0}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
