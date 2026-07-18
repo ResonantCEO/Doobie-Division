@@ -216,271 +216,104 @@ function openInventoryPrintSheet(
 function openInboundDocument() {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  const docNumber = `INB-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+  const docNumber = `INB-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
 
-  const blankRows = Array.from({ length: 20 }, (_, i) => `
+  const blankRows = Array.from({ length: 25 }, (_, i) => `
     <tr>
-      <td class="row-num">${i + 1}</td>
-      <td class="write-cell"></td>
-      <td class="write-cell"></td>
-      <td class="write-cell sku-col"></td>
-      <td class="write-cell unit-col"></td>
-      <td class="write-cell qty-col"></td>
-      <td class="write-cell qty-col"></td>
-      <td class="write-cell cond-col"></td>
-      <td class="write-cell notes-col"></td>
+      <td class="num-cell">${i + 1}</td>
+      <td class="w"></td>
+      <td class="w sku"></td>
+      <td class="w qty"></td>
+      <td class="w notes"></td>
     </tr>`).join("");
 
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Inbound Delivery Receipt — ${docNumber}</title>
+  <title>Inbound — ${docNumber}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: #fff; }
-
-    /* ── Header ── */
-    .page-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 18px 10px; border-bottom: 3px solid #1a1a2e; }
-    .page-header .brand { }
-    .page-header .brand h1 { font-size: 20px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.5px; }
-    .page-header .brand p { font-size: 9px; color: #666; margin-top: 1px; text-transform: uppercase; letter-spacing: 1px; }
-    .page-header .doc-meta { text-align: right; }
-    .page-header .doc-meta .doc-num { font-size: 13px; font-weight: 700; color: #1a1a2e; }
-    .page-header .doc-meta .doc-date { font-size: 9px; color: #666; margin-top: 2px; }
-    .doc-title-bar { background: #1a1a2e; color: #fff; text-align: center; padding: 5px; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
-
-    /* ── Info Sections ── */
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 2px solid #1a1a2e; }
-    .info-block { padding: 10px 14px; border-right: 1px solid #ccc; }
-    .info-block:last-child { border-right: none; }
-    .info-block h3 { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 7px; border-bottom: 1px solid #e0e0e0; padding-bottom: 3px; }
-    .field-row { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 7px; }
-    .field-label { font-size: 9px; font-weight: 600; color: #444; white-space: nowrap; min-width: 80px; }
-    .field-line { flex: 1; border-bottom: 1px solid #555; height: 14px; }
-    .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 7px; }
-    .field-mini { display: flex; flex-direction: column; gap: 2px; }
-    .field-mini .field-label { font-size: 8px; color: #555; }
-    .field-mini .field-line { border-bottom: 1px solid #555; height: 14px; }
-
-    /* ── Receiving Table ── */
-    .section-label { background: #f0f0f5; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; padding: 4px 14px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #1a1a2e; display: flex; justify-content: space-between; }
-    table { width: 100%; border-collapse: collapse; }
-    thead th { background: #1a1a2e; color: #fff; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 5px 6px; text-align: left; border-right: 1px solid #333; }
-    thead th.center { text-align: center; }
-    thead th.write-h { background: #2d4a2d; }
-    .row-num { font-size: 9px; color: #aaa; text-align: center; background: #f9f9f9; width: 20px; border-right: 1px solid #e0e0e0; border-bottom: 1px solid #e8e8e8; padding: 0 3px; }
-    .write-cell { border-bottom: 1px solid #d0d0d0; border-right: 1px solid #e8e8e8; padding: 0 4px; height: 22px; background: #fff; }
-    .write-cell.sku-col { width: 72px; }
-    .write-cell.unit-col { width: 44px; }
-    .write-cell.qty-col { width: 58px; background: #f4fbf4; }
-    .write-cell.cond-col { width: 60px; }
-    .write-cell.notes-col { background: #f8f8ff; }
-    tr:nth-child(even) .write-cell { background: #fafafa; }
-    tr:nth-child(even) .write-cell.qty-col { background: #eef7ee; }
-    tr:nth-child(even) .write-cell.notes-col { background: #f5f5ff; }
-
-    /* ── Footer sections ── */
-    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; border-top: 2px solid #1a1a2e; }
-    .summary-block { padding: 10px 14px; border-right: 1px solid #ccc; }
-    .summary-block:last-child { border-right: none; }
-    .summary-block h3 { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 8px; }
-    .summary-lines { display: flex; flex-direction: column; gap: 8px; }
-    .sig-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px; }
-    .sig-label { font-size: 9px; font-weight: 600; white-space: nowrap; min-width: 90px; }
-    .sig-line { flex: 1; border-bottom: 1.5px solid #333; height: 18px; }
-    .sig-date { min-width: 55px; }
-    .discrepancy-box { border: 1.5px solid #c0392b; border-radius: 3px; padding: 6px 10px; margin-top: 6px; }
-    .discrepancy-box h4 { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #c0392b; margin-bottom: 5px; }
-    .discrepancy-lines { display: flex; flex-direction: column; gap: 10px; }
-    .disc-line { border-bottom: 1px solid #e0a0a0; height: 14px; }
-    .tally-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-    .tally-item { display: flex; flex-direction: column; gap: 2px; }
-    .tally-item .tally-label { font-size: 8px; color: #555; font-weight: 600; }
-    .tally-item .tally-box { border: 1px solid #999; border-radius: 2px; height: 22px; background: #f9f9f9; }
-
-    /* ── Status checkboxes ── */
-    .check-row { display: flex; gap: 12px; margin-top: 4px; }
-    .check-item { display: flex; align-items: center; gap: 4px; font-size: 9px; }
-    .check-box { width: 10px; height: 10px; border: 1.5px solid #444; display: inline-block; flex-shrink: 0; }
-
-    /* ── Print button ── */
-    .print-btn { position: fixed; top: 12px; right: 16px; background: #1a1a2e; color: #fff; border: none; padding: 8px 18px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; }
-    .print-btn:hover { background: #333; }
-    .page-footer { padding: 5px 14px; font-size: 8px; color: #aaa; text-align: center; border-top: 1px solid #e0e0e0; margin-top: 4px; }
-
-    @media print {
-      .print-btn { display: none; }
-      body { font-size: 10px; }
-    }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: #fff; padding: 16px 20px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 8px; border-bottom: 2px solid #111; margin-bottom: 10px; }
+    .header h1 { font-size: 18px; font-weight: 800; }
+    .header .sub { font-size: 10px; color: #666; margin-top: 2px; }
+    .header .doc-id { font-size: 11px; font-weight: 700; text-align: right; }
+    .header .doc-date { font-size: 9px; color: #888; }
+    .fields { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0 24px; margin-bottom: 12px; }
+    .field { display: flex; flex-direction: column; gap: 2px; }
+    .field label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #888; }
+    .field .line { border-bottom: 1px solid #555; height: 18px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    thead th { background: #111; color: #fff; font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 5px 7px; text-align: left; }
+    thead th.c { text-align: center; }
+    tbody td { border-bottom: 1px solid #ddd; height: 24px; padding: 0 6px; font-size: 10px; }
+    tbody td.num-cell { width: 22px; text-align: center; color: #bbb; font-size: 9px; background: #f9f9f9; border-right: 1px solid #eee; }
+    tbody td.w { }
+    tbody td.sku { width: 80px; }
+    tbody td.qty { width: 80px; background: #f4fbf4; }
+    tbody td.notes { background: #fafafa; }
+    tr:nth-child(even) td.qty { background: #eaf6ea; }
+    .footer-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; border-top: 1px solid #ccc; padding-top: 10px; }
+    .sig { display: flex; flex-direction: column; gap: 10px; }
+    .sig-line-row { display: flex; align-items: flex-end; gap: 8px; }
+    .sig-label { font-size: 9px; font-weight: 600; white-space: nowrap; min-width: 100px; }
+    .sig-line { flex: 1; border-bottom: 1px solid #555; height: 16px; }
+    .notes-block label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #888; display: block; margin-bottom: 4px; }
+    .note-lines { display: flex; flex-direction: column; gap: 10px; }
+    .note-line { border-bottom: 1px solid #ccc; height: 14px; }
+    .print-btn { position: fixed; top: 12px; right: 16px; background: #111; color: #fff; border: none; padding: 7px 16px; font-size: 12px; font-weight: 600; border-radius: 5px; cursor: pointer; }
+    @media print { .print-btn { display: none; } }
   </style>
 </head>
 <body>
   <button class="print-btn" onclick="window.print()">🖨 Print</button>
 
-  <!-- Header -->
-  <div class="page-header">
-    <div class="brand">
+  <div class="header">
+    <div>
       <h1>Doobie Division!</h1>
-      <p>Inventory Management System</p>
+      <div class="sub">Inbound Delivery Receipt</div>
     </div>
-    <div class="doc-meta">
-      <div class="doc-num">${docNumber}</div>
-      <div class="doc-date">Generated: ${dateStr}</div>
-    </div>
-  </div>
-  <div class="doc-title-bar">Inbound Delivery Receipt</div>
-
-  <!-- Vendor / Delivery Info -->
-  <div class="info-grid">
-    <div class="info-block">
-      <h3>Vendor / Supplier</h3>
-      <div class="field-row">
-        <span class="field-label">Vendor Name</span>
-        <div class="field-line"></div>
-      </div>
-      <div class="field-row">
-        <span class="field-label">Contact</span>
-        <div class="field-line"></div>
-      </div>
-      <div class="field-row">
-        <span class="field-label">Invoice #</span>
-        <div class="field-line"></div>
-      </div>
-      <div class="field-row">
-        <span class="field-label">PO / Order #</span>
-        <div class="field-line"></div>
-      </div>
-    </div>
-    <div class="info-block">
-      <h3>Delivery Information</h3>
-      <div class="field-row">
-        <span class="field-label">Delivery Date</span>
-        <div class="field-line"></div>
-      </div>
-      <div class="field-row">
-        <span class="field-label">Arrival Time</span>
-        <div class="field-line"></div>
-      </div>
-      <div class="field-row">
-        <span class="field-label">Driver Name</span>
-        <div class="field-line"></div>
-      </div>
-      <div class="field-row">
-        <span class="field-label">Vehicle / ID</span>
-        <div class="field-line"></div>
-      </div>
+    <div>
+      <div class="doc-id">${docNumber}</div>
+      <div class="doc-date">${dateStr}</div>
     </div>
   </div>
 
-  <!-- Delivery Overview -->
-  <div class="info-grid" style="border-top: 1px solid #ddd;">
-    <div class="info-block">
-      <h3>Package Summary</h3>
-      <div class="field-row-3">
-        <div class="field-mini"><span class="field-label">Total Packages</span><div class="field-line"></div></div>
-        <div class="field-mini"><span class="field-label">Sealed / Intact</span><div class="field-line"></div></div>
-        <div class="field-mini"><span class="field-label">Damaged</span><div class="field-line"></div></div>
-      </div>
-      <div style="margin-top: 4px;">
-        <span style="font-size:9px; font-weight:600; color:#444;">Delivery Condition:</span>
-        <div class="check-row">
-          <div class="check-item"><div class="check-box"></div> As Expected</div>
-          <div class="check-item"><div class="check-box"></div> Partial Delivery</div>
-          <div class="check-item"><div class="check-box"></div> Discrepancy Found</div>
-          <div class="check-item"><div class="check-box"></div> Refused</div>
-        </div>
-      </div>
-    </div>
-    <div class="info-block">
-      <h3>Receiving Staff</h3>
-      <div class="field-row">
-        <span class="field-label">Received By</span>
-        <div class="field-line"></div>
-      </div>
-      <div class="field-row">
-        <span class="field-label">Staff ID / Role</span>
-        <div class="field-line"></div>
-      </div>
-      <div class="field-row">
-        <span class="field-label">Secondary Check</span>
-        <div class="field-line"></div>
-      </div>
-    </div>
+  <div class="fields">
+    <div class="field"><label>Vendor / Supplier</label><div class="line"></div></div>
+    <div class="field"><label>Invoice #</label><div class="line"></div></div>
+    <div class="field"><label>Received By</label><div class="line"></div></div>
+    <div class="field"><label>Delivery Date</label><div class="line"></div></div>
   </div>
 
-  <!-- Receiving Table -->
-  <div class="section-label">
-    <span>Items Received</span>
-    <span style="font-weight:400; color:#555;">Enter each product category / SKU as received — do not leave blanks unfilled</span>
-  </div>
   <table>
     <thead>
       <tr>
-        <th style="width:20px">#</th>
-        <th>Category</th>
+        <th>#</th>
         <th>Product / Description</th>
-        <th class="center sku-col">SKU</th>
-        <th class="center unit-col">Unit</th>
-        <th class="center write-h qty-col">Expected Qty</th>
-        <th class="center write-h qty-col">Received Qty</th>
-        <th class="center cond-col">Condition</th>
-        <th class="notes-col">Notes / Discrepancy</th>
+        <th>SKU</th>
+        <th class="c">Qty Received</th>
+        <th>Notes</th>
       </tr>
     </thead>
-    <tbody>
-      ${blankRows}
-    </tbody>
+    <tbody>${blankRows}</tbody>
   </table>
 
-  <!-- Footer: Totals + Sign-off -->
-  <div class="summary-grid">
-    <div class="summary-block">
-      <h3>Receiving Totals</h3>
-      <div class="tally-grid">
-        <div class="tally-item"><span class="tally-label">Total Line Items</span><div class="tally-box"></div></div>
-        <div class="tally-item"><span class="tally-label">Total Units Received</span><div class="tally-box"></div></div>
-        <div class="tally-item"><span class="tally-label">Units w/ Discrepancy</span><div class="tally-box"></div></div>
-        <div class="tally-item"><span class="tally-label">Items Refused / Returned</span><div class="tally-box"></div></div>
-      </div>
-      <div class="discrepancy-box" style="margin-top:8px;">
-        <h4>⚠ Discrepancy / Exception Notes</h4>
-        <div class="discrepancy-lines">
-          <div class="disc-line"></div>
-          <div class="disc-line"></div>
-          <div class="disc-line"></div>
-        </div>
+  <div class="footer-row">
+    <div class="notes-block">
+      <label>Discrepancy / Notes</label>
+      <div class="note-lines">
+        <div class="note-line"></div>
+        <div class="note-line"></div>
+        <div class="note-line"></div>
       </div>
     </div>
-    <div class="summary-block">
-      <h3>Acknowledgement &amp; Sign-Off</h3>
-      <div class="summary-lines">
-        <div class="sig-row">
-          <span class="sig-label">Receiver Signature</span>
-          <div class="sig-line"></div>
-        </div>
-        <div class="sig-row">
-          <span class="sig-label">Printed Name</span>
-          <div class="sig-line"></div>
-          <div class="sig-line sig-date"></div>
-        </div>
-        <div class="sig-row" style="margin-top:8px;">
-          <span class="sig-label">Driver Signature</span>
-          <div class="sig-line"></div>
-        </div>
-        <div class="sig-row">
-          <span class="sig-label">Printed Name</span>
-          <div class="sig-line"></div>
-          <div class="sig-line sig-date"></div>
-        </div>
-        <div style="margin-top: 6px; font-size: 8px; color: #888; line-height: 1.4;">
-          By signing above, both parties confirm that the items listed have been delivered and received as documented. Any discrepancies noted above must be resolved before inventory entry into the system.
-        </div>
-      </div>
+    <div class="sig">
+      <div class="sig-line-row"><span class="sig-label">Received By</span><div class="sig-line"></div></div>
+      <div class="sig-line-row"><span class="sig-label">Date</span><div class="sig-line"></div></div>
     </div>
   </div>
-
-  <div class="page-footer">Doobie Division! · Inbound Delivery Receipt · Doc # ${docNumber} · ${dateStr}</div>
 </body>
 </html>`;
 
