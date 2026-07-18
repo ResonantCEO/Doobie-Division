@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -351,6 +353,8 @@ export default function InventoryPage() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showBulkQRModal, setShowBulkQRModal] = useState(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [showPrintCategoryDialog, setShowPrintCategoryDialog] = useState(false);
+  const [selectedPrintCategories, setSelectedPrintCategories] = useState<Set<string>>(new Set());
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedProductWithCategory, setSelectedProductWithCategory] = useState<(Product & { category: Category | null }) | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
@@ -473,6 +477,28 @@ export default function InventoryPage() {
     placeholderData: (previousData) => previousData,
   });
 
+  // Unique category names present in the current product list
+  const allPrintCategories = useMemo(() => {
+    const names = new Set<string>();
+    for (const p of products) {
+      names.add(p.category?.name ?? "Uncategorized");
+    }
+    return Array.from(names).sort();
+  }, [products]);
+
+  function openPrintDialog() {
+    setSelectedPrintCategories(new Set(allPrintCategories));
+    setShowPrintCategoryDialog(true);
+  }
+
+  function togglePrintCategory(name: string) {
+    setSelectedPrintCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  }
+
   // Fetch low stock products for alerts
   const { data: lowStockProducts = [] } = useQuery<Product[]>({
     queryKey: ["/api/products/low-stock"],
@@ -564,7 +590,7 @@ export default function InventoryPage() {
             <span className="sm:hidden">Templates</span>
           </Button>
           <Button
-            onClick={() => openInventoryPrintSheet(products)}
+            onClick={openPrintDialog}
             variant="outline"
             className="flex-1 sm:flex-initial"
             disabled={products.length === 0}
@@ -739,6 +765,63 @@ export default function InventoryPage() {
         open={showTemplatesModal}
         onOpenChange={setShowTemplatesModal}
       />
+
+      <Dialog open={showPrintCategoryDialog} onOpenChange={setShowPrintCategoryDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Select Categories to Print</DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-2 mb-3">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs"
+              onClick={() => setSelectedPrintCategories(new Set(allPrintCategories))}
+            >
+              Select All
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs"
+              onClick={() => setSelectedPrintCategories(new Set())}
+            >
+              Deselect All
+            </Button>
+          </div>
+          <div className="flex flex-col gap-3 max-h-72 overflow-y-auto pr-1">
+            {allPrintCategories.map(cat => (
+              <label key={cat} className="flex items-center gap-3 cursor-pointer select-none">
+                <Checkbox
+                  checked={selectedPrintCategories.has(cat)}
+                  onCheckedChange={() => togglePrintCategory(cat)}
+                />
+                <span className="text-sm">{cat}</span>
+              </label>
+            ))}
+          </div>
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowPrintCategoryDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={selectedPrintCategories.size === 0}
+              onClick={() => {
+                setShowPrintCategoryDialog(false);
+                const filtered = products.filter(p =>
+                  selectedPrintCategories.has(p.category?.name ?? "Uncategorized")
+                );
+                openInventoryPrintSheet(filtered);
+              }}
+            >
+              Generate Sheet
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
