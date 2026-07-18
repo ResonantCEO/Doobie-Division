@@ -247,11 +247,11 @@ function openInboundDocument() {
     table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
     thead th { background: #111; color: #fff; font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 5px 7px; text-align: left; }
     thead th.c { text-align: center; }
-    tbody td { border-bottom: 1px solid #ddd; height: 42px; padding: 0 6px; font-size: 10px; }
-    tbody td.num-cell { width: 22px; text-align: center; color: #bbb; font-size: 9px; background: #f9f9f9; border-right: 1px solid #eee; }
+    tbody td { border-bottom: 1.5px solid #999; height: 42px; padding: 0 6px; font-size: 10px; border-right: 1px solid #bbb; }
+    tbody td.num-cell { width: 22px; text-align: center; color: #aaa; font-size: 9px; background: #f5f5f5; border-right: 1.5px solid #999; }
     tbody td.w { }
-    tbody td.qty { width: 100px; background: #f4fbf4; border-right: 1px solid #b0d4b0; }
-    thead th.qty-h { border-right: 1px solid #444; }
+    tbody td.qty { width: 100px; background: #f4fbf4; border-right: 2px solid #7ab87a; }
+    thead th.qty-h { border-right: 2px solid #444; }
     tbody td.notes { background: #fafafa; }
     tr:nth-child(even) td.qty { background: #eaf6ea; }
     .footer-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; border-top: 1px solid #ccc; padding-top: 10px; }
@@ -261,7 +261,7 @@ function openInboundDocument() {
     .sig-line { flex: 1; border-bottom: 1px solid #555; height: 16px; }
     .notes-block label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #888; display: block; margin-bottom: 4px; }
     .note-lines { display: flex; flex-direction: column; gap: 10px; }
-    .note-line { border-bottom: 1px solid #ccc; height: 14px; }
+    .note-line { border-bottom: 1.5px solid #999; height: 14px; }
     .print-btn { position: fixed; top: 12px; right: 16px; background: #111; color: #fff; border: none; padding: 7px 16px; font-size: 12px; font-weight: 600; border-radius: 5px; cursor: pointer; }
     @media print { .print-btn { display: none; } }
   </style>
