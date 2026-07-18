@@ -303,6 +303,21 @@ app.use((req, res, next) => {
     console.warn("⚠ Could not reset user_activity_logs sequence:", error?.message);
   }
 
+  // Fix products sequence if it has fallen behind actual data
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`
+      SELECT setval(
+        pg_get_serial_sequence('products', 'id'),
+        COALESCE((SELECT MAX(id) FROM products), 0) + 1,
+        false
+      )
+    `);
+    console.log("✓ Products sequence verified/reset");
+  } catch (error: any) {
+    console.warn("⚠ Could not reset products sequence:", error?.message);
+  }
+
   // Add health check endpoint
   app.get("/api/health", async (req, res) => {
     const dbConnected = await checkDatabaseConnection();
