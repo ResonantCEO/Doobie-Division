@@ -250,7 +250,8 @@ function openInboundDocument() {
     tbody td { border-bottom: 1px solid #ddd; height: 48px; padding: 0 6px; font-size: 10px; }
     tbody td.num-cell { width: 22px; text-align: center; color: #bbb; font-size: 9px; background: #f9f9f9; border-right: 1px solid #eee; }
     tbody td.w { }
-    tbody td.qty { width: 100px; background: #f4fbf4; }
+    tbody td.qty { width: 100px; background: #f4fbf4; border-right: 1px solid #b0d4b0; }
+    thead th.qty-h { border-right: 1px solid #444; }
     tbody td.notes { background: #fafafa; }
     tr:nth-child(even) td.qty { background: #eaf6ea; }
     .footer-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; border-top: 1px solid #ccc; padding-top: 10px; }
@@ -287,7 +288,7 @@ function openInboundDocument() {
       <tr>
         <th>#</th>
         <th>Product / Description</th>
-        <th class="c">Qty Received</th>
+        <th class="c qty-h">Qty Received</th>
         <th class="c">Qty Confirmed</th>
         <th>Notes</th>
       </tr>
