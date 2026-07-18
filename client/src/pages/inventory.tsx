@@ -222,6 +222,7 @@ function openInboundDocument() {
     <tr>
       <td class="num-cell">${i + 1}</td>
       <td class="w"></td>
+      <td class="w flavor"></td>
       <td class="w qty"></td>
       <td class="w qty"></td>
       <td class="w notes"></td>
@@ -250,6 +251,8 @@ function openInboundDocument() {
     tbody td { border-bottom: 1.5px solid #999; height: 42px; padding: 0 6px; font-size: 10px; border-right: 1px solid #bbb; }
     tbody td.num-cell { width: 22px; text-align: center; color: #aaa; font-size: 9px; background: #f5f5f5; border-right: 1.5px solid #999; }
     tbody td.w { border-right: 1.5px solid #999; }
+    tbody td.flavor { border-right: 1.5px solid #999; }
+    thead th.flavor-h { border-right: 1.5px solid #444; }
     tbody td.qty { width: 100px; background: #f4fbf4; border-right: 2px solid #7ab87a; }
     thead th.qty-h { border-right: 2px solid #444; }
     tbody td.notes { background: #fafafa; }
@@ -286,7 +289,8 @@ function openInboundDocument() {
     <thead>
       <tr>
         <th>#</th>
-        <th>Product / Description</th>
+        <th>Product</th>
+        <th class="flavor-h">Flavor / Size</th>
         <th class="c qty-h">Qty Delivered</th>
         <th class="c">Qty Confirmed</th>
         <th>Notes</th>
