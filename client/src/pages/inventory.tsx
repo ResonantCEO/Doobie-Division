@@ -145,6 +145,12 @@ function openInventoryPrintSheet(
     <table>
       <thead>
         <tr>
+          <th colspan="7" style="background:#fff; color:#111; padding: 6px 8px 4px; border-bottom: 1px solid #ddd; border-right: none;">
+            <span style="font-size:14px; font-weight:800; color:#111;">${esc(catName)}</span>
+            <span style="float:right; font-size:11px; font-weight:600; color:#111;">Page ${sectionIdx + 1} of ${categoryNames.length}</span>
+          </th>
+        </tr>
+        <tr>
           <th>SKU</th>
           <th>Product / Size</th>
           <th class="num">Price</th>
