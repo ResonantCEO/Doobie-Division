@@ -132,7 +132,6 @@ function openInventoryPrintSheet(
         <h1>Inventory Count Sheet</h1>
         <p>Exported ${dateStr} at ${timeStr} &nbsp;·&nbsp; ${products.length} products total</p>
       </div>
-      <div class="page-num"><span class="cat-label">${esc(catName)}</span> &nbsp;·&nbsp; Page ${sectionIdx + 1} of ${categoryNames.length}</div>
     </div>
     <div class="category-banner"><span class="cat-count">${catRows.length} item${catRows.length !== 1 ? "s" : ""}</span></div>
     <div class="legend">
