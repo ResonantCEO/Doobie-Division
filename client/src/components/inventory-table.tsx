@@ -27,7 +27,7 @@ import QRCodeModal from "@/components/modals/qr-code-modal";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { MoreHorizontal, Edit, QrCode, TrendingUp, TrendingDown, Package, Eye, ArrowUpDown, ArrowUp, ArrowDown, Trash2, EyeOff } from "lucide-react";
+import { MoreHorizontal, Edit, QrCode, TrendingUp, TrendingDown, Package, Eye, ArrowUpDown, ArrowUp, ArrowDown, Trash2, EyeOff, Archive, ArchiveRestore } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Product, Category, User, ProductSize } from "@shared/schema";
 
@@ -460,19 +460,17 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                 key={product.id}
                 className={`p-4 ${selectedProducts && selectedProducts.includes(product.id) ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
               >
-                {/* Top row: checkbox + image + name/meta + menu */}
+                {/* Top row: archive icon + image + name/meta + menu */}
                 <div className="flex items-center gap-3">
-                  <Checkbox
-                    checked={selectedProducts ? selectedProducts.includes(product.id) : false}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        onSelectionChange([...(selectedProducts || []), product.id]);
-                      } else {
-                        onSelectionChange((selectedProducts || []).filter(id => id !== product.id));
-                      }
-                    }}
-                    className="rounded border-gray-300 shrink-0"
-                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`shrink-0 h-8 w-8 p-0 ${product.isActive ? 'text-green-600 hover:text-orange-500' : 'text-gray-400 hover:text-green-600'}`}
+                    onClick={() => toggleVisibilityMutation.mutate({ productId: product.id, isActive: product.isActive })}
+                    title={product.isActive ? 'Active – tap to archive' : 'Archived – tap to restore'}
+                  >
+                    {product.isActive ? <Archive className="h-5 w-5" /> : <ArchiveRestore className="h-5 w-5" />}
+                  </Button>
                   <Avatar className="h-11 w-11 shrink-0">
                     <AvatarImage src={product.imageUrl || undefined} />
                     <AvatarFallback>{product.name.charAt(0)}</AvatarFallback>
