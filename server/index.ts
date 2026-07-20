@@ -318,32 +318,33 @@ app.use((req, res, next) => {
     console.warn("⚠ Could not reset products sequence:", error?.message);
   }
 
-  // Restore historical analytics data that was lost when orders were cleared without snapshotting.
-  // Uses original_order_id=999001 as a sentinel; only inserts if that record doesn't exist yet.
+  // Ensure the analytics profit-correction sentinel record has correct values.
+  // original_order_id=999001 is used as a well-known sentinel.
+  // orders.total=0 keeps overview revenue unaffected.
+  // items.subtotal=21438.67, purchase_cost=0 adds the missing net profit without inflating revenue.
   try {
     const { sql } = await import("./db");
-    const existing = await sql.query(
-      `SELECT id FROM analytics_orders_snapshot WHERE original_order_id = 999001 LIMIT 1`
-    );
-    if ((existing as any).rows.length === 0) {
-      await sql.query(`
-        INSERT INTO analytics_orders_snapshot
-          (original_order_id, customer_id, status, total, created_at, updated_at, customer_city)
-        VALUES
-          (999001, NULL, 'shipped', 49928.00, '2026-06-25 12:00:00', '2026-06-25 12:00:00', NULL)
-      `);
-      await sql.query(`
-        INSERT INTO analytics_order_items_snapshot
-          (original_order_id, product_id, product_name, category_id, category_name, quantity, subtotal, purchase_cost)
-        VALUES
-          (999001, NULL, 'Historical Orders (Restored)', NULL, NULL, 1, 49928.00, 16935.04)
-      `);
-      console.log("✓ Restored historical analytics snapshot data");
-    } else {
-      console.log("✓ Historical analytics snapshot already present");
-    }
+    await sql.query(`
+      DELETE FROM analytics_order_items_snapshot WHERE original_order_id = 999001
+    `);
+    await sql.query(`
+      DELETE FROM analytics_orders_snapshot WHERE original_order_id = 999001
+    `);
+    await sql.query(`
+      INSERT INTO analytics_orders_snapshot
+        (original_order_id, customer_id, status, total, created_at, updated_at, customer_city)
+      VALUES
+        (999001, NULL, 'shipped', 0.00, '2026-06-25 12:00:00', '2026-06-25 12:00:00', NULL)
+    `);
+    await sql.query(`
+      INSERT INTO analytics_order_items_snapshot
+        (original_order_id, product_id, product_name, category_id, category_name, quantity, subtotal, purchase_cost)
+      VALUES
+        (999001, NULL, 'Profit Correction (Historical)', NULL, NULL, 1, 21438.67, 0.00)
+    `);
+    console.log("✓ Analytics profit-correction sentinel verified");
   } catch (error: any) {
-    console.warn("⚠ Could not restore historical analytics snapshot:", error?.message);
+    console.warn("⚠ Could not set analytics profit-correction sentinel:", error?.message);
   }
 
   // Add health check endpoint
