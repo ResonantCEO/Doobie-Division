@@ -1267,6 +1267,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete all archived orders — must be before /:id to avoid "archived" being parsed as an id
+  app.delete('/api/orders/archived', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const { sql: pool } = await import("./db");
+      // Snapshot archived orders before deleting so analytics data is preserved
+      const archivedIds = await pool.query(`SELECT id FROM orders WHERE archived = true`);
+      const ids = (archivedIds as any).rows.map((r: any) => r.id) as number[];
+      if (ids.length > 0) {
+        try {
+          await storage.snapshotOrdersBeforeArchiveDeletion(ids);
+        } catch (e) {
+          console.warn('Failed to snapshot archived orders for analytics:', e);
+        }
+      }
+      await pool.query(`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE archived = true)`);
+      await pool.query(`DELETE FROM orders WHERE archived = true`);
+      res.json({ message: "All archived orders have been cleared" });
+    } catch (error) {
+      console.error('Failed to clear archived orders:', error);
+      res.status(500).json({ message: "Failed to clear archived orders" });
+    }
+  });
+
   app.delete('/api/orders/:id', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -1302,29 +1325,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Failed to archive shipped orders:', error);
       res.status(500).json({ message: "Failed to archive shipped orders" });
-    }
-  });
-
-  // Delete all archived orders
-  app.delete('/api/orders/archived', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
-    try {
-      const { sql: pool } = await import("./db");
-      // Snapshot archived orders before deleting so analytics data is preserved
-      const archivedIds = await pool.query(`SELECT id FROM orders WHERE archived = true`);
-      const ids = (archivedIds as any).rows.map((r: any) => r.id) as number[];
-      if (ids.length > 0) {
-        try {
-          await storage.snapshotOrdersBeforeArchiveDeletion(ids);
-        } catch (e) {
-          console.warn('Failed to snapshot archived orders for analytics:', e);
-        }
-      }
-      await pool.query(`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE archived = true)`);
-      await pool.query(`DELETE FROM orders WHERE archived = true`);
-      res.json({ message: "All archived orders have been cleared" });
-    } catch (error) {
-      console.error('Failed to clear archived orders:', error);
-      res.status(500).json({ message: "Failed to clear archived orders" });
     }
   });
 
