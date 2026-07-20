@@ -2520,94 +2520,107 @@ export class DatabaseStorage implements IStorage {
     return this.snapshotOrdersBeforeDeletion(orderIds);
   }
 
-  // Snapshot orders and their items before deletion so analytics data is preserved
+  // Snapshot orders and their items before deletion so analytics data is preserved.
+  // Processes in batches of 100 so very large order sets never exceed DB parameter limits.
   private async snapshotOrdersBeforeDeletion(orderIds: number[]): Promise<void> {
     if (orderIds.length === 0) return;
 
-    // Avoid double-snapshotting already-snapshotted orders
-    const alreadySnapped = await db
-      .select({ originalOrderId: analyticsOrdersSnapshot.originalOrderId })
-      .from(analyticsOrdersSnapshot)
-      .where(inArray(analyticsOrdersSnapshot.originalOrderId, orderIds));
-    const alreadySnappedIds = new Set(alreadySnapped.map(r => r.originalOrderId));
+    const BATCH = 100;
+
+    // Avoid double-snapshotting: check all existing snapshots in batches
+    const alreadySnappedIds = new Set<number>();
+    for (let i = 0; i < orderIds.length; i += BATCH) {
+      const chunk = orderIds.slice(i, i + BATCH);
+      const rows = await db
+        .select({ originalOrderId: analyticsOrdersSnapshot.originalOrderId })
+        .from(analyticsOrdersSnapshot)
+        .where(inArray(analyticsOrdersSnapshot.originalOrderId, chunk));
+      rows.forEach(r => alreadySnappedIds.add(r.originalOrderId));
+    }
     const toSnapshot = orderIds.filter(id => !alreadySnappedIds.has(id));
     if (toSnapshot.length === 0) return;
 
-    // Fetch orders with customer city
-    const ordersToSnap = await db
-      .select({
-        id: orders.id,
-        customerId: orders.customerId,
-        status: orders.status,
-        total: orders.total,
-        createdAt: orders.createdAt,
-        updatedAt: orders.updatedAt,
-        customerCity: users.city,
-      })
-      .from(orders)
-      .leftJoin(users, eq(orders.customerId, users.id))
-      .where(inArray(orders.id, toSnapshot));
+    // Snapshot orders in batches
+    for (let i = 0; i < toSnapshot.length; i += BATCH) {
+      const chunk = toSnapshot.slice(i, i + BATCH);
+      const ordersToSnap = await db
+        .select({
+          id: orders.id,
+          customerId: orders.customerId,
+          status: orders.status,
+          total: orders.total,
+          createdAt: orders.createdAt,
+          updatedAt: orders.updatedAt,
+          customerCity: users.city,
+        })
+        .from(orders)
+        .leftJoin(users, eq(orders.customerId, users.id))
+        .where(inArray(orders.id, chunk));
 
-    if (ordersToSnap.length > 0) {
-      await db.insert(analyticsOrdersSnapshot).values(
-        ordersToSnap.map(o => ({
-          originalOrderId: o.id,
-          customerId: o.customerId,
-          status: o.status,
-          total: o.total,
-          createdAt: o.createdAt!,
-          updatedAt: o.updatedAt,
-          customerCity: o.customerCity,
-        }))
-      );
+      if (ordersToSnap.length > 0) {
+        await db.insert(analyticsOrdersSnapshot).values(
+          ordersToSnap.map(o => ({
+            originalOrderId: o.id,
+            customerId: o.customerId,
+            status: o.status,
+            total: o.total,
+            createdAt: o.createdAt!,
+            updatedAt: o.updatedAt,
+            customerCity: o.customerCity,
+          }))
+        );
+      }
     }
 
-    // Fetch order items with product/category info and calculate purchase cost
-    const itemsToSnap = await db
-      .select({
-        orderId: orderItems.orderId,
-        productId: orderItems.productId,
-        productName: orderItems.productName,
-        categoryId: products.categoryId,
-        categoryName: categories.name,
-        quantity: orderItems.quantity,
-        subtotal: orderItems.subtotal,
-        purchasePrice: products.purchasePrice,
-        purchasePriceMethod: products.purchasePriceMethod,
-        purchasePricePerGram: products.purchasePricePerGram,
-        purchasePricePerOunce: products.purchasePricePerOunce,
-        pricePerGram: products.pricePerGram,
-        pricePerOunce: products.pricePerOunce,
-      })
-      .from(orderItems)
-      .leftJoin(products, eq(orderItems.productId, products.id))
-      .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(inArray(orderItems.orderId, toSnapshot));
-
-    if (itemsToSnap.length > 0) {
-      await db.insert(analyticsOrderItemsSnapshot).values(
-        itemsToSnap.map(item => {
-          const subtotal = parseFloat(item.subtotal || '0');
-          let purchaseCost = subtotal * 0.7;
-          if (item.purchasePrice) {
-            purchaseCost = parseFloat(item.purchasePrice) * (item.quantity || 0);
-          } else if (item.purchasePricePerGram && item.pricePerGram && parseFloat(item.pricePerGram) > 0) {
-            purchaseCost = parseFloat(item.purchasePricePerGram) * (subtotal / parseFloat(item.pricePerGram));
-          } else if (item.purchasePricePerOunce && item.pricePerOunce && parseFloat(item.pricePerOunce) > 0) {
-            purchaseCost = parseFloat(item.purchasePricePerOunce) * (subtotal / parseFloat(item.pricePerOunce));
-          }
-          return {
-            originalOrderId: item.orderId!,
-            productId: item.productId,
-            productName: item.productName,
-            categoryId: item.categoryId,
-            categoryName: item.categoryName,
-            quantity: item.quantity,
-            subtotal: item.subtotal,
-            purchaseCost: purchaseCost.toFixed(2),
-          };
+    // Snapshot order items in batches
+    for (let i = 0; i < toSnapshot.length; i += BATCH) {
+      const chunk = toSnapshot.slice(i, i + BATCH);
+      const itemsToSnap = await db
+        .select({
+          orderId: orderItems.orderId,
+          productId: orderItems.productId,
+          productName: orderItems.productName,
+          categoryId: products.categoryId,
+          categoryName: categories.name,
+          quantity: orderItems.quantity,
+          subtotal: orderItems.subtotal,
+          purchasePrice: products.purchasePrice,
+          purchasePriceMethod: products.purchasePriceMethod,
+          purchasePricePerGram: products.purchasePricePerGram,
+          purchasePricePerOunce: products.purchasePricePerOunce,
+          pricePerGram: products.pricePerGram,
+          pricePerOunce: products.pricePerOunce,
         })
-      );
+        .from(orderItems)
+        .leftJoin(products, eq(orderItems.productId, products.id))
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .where(inArray(orderItems.orderId, chunk));
+
+      if (itemsToSnap.length > 0) {
+        await db.insert(analyticsOrderItemsSnapshot).values(
+          itemsToSnap.map(item => {
+            const subtotal = parseFloat(item.subtotal || '0');
+            let purchaseCost = subtotal * 0.7;
+            if (item.purchasePrice) {
+              purchaseCost = parseFloat(item.purchasePrice) * (item.quantity || 0);
+            } else if (item.purchasePricePerGram && item.pricePerGram && parseFloat(item.pricePerGram) > 0) {
+              purchaseCost = parseFloat(item.purchasePricePerGram) * (subtotal / parseFloat(item.pricePerGram));
+            } else if (item.purchasePricePerOunce && item.pricePerOunce && parseFloat(item.pricePerOunce) > 0) {
+              purchaseCost = parseFloat(item.purchasePricePerOunce) * (subtotal / parseFloat(item.pricePerOunce));
+            }
+            return {
+              originalOrderId: item.orderId!,
+              productId: item.productId,
+              productName: item.productName,
+              categoryId: item.categoryId,
+              categoryName: item.categoryName,
+              quantity: item.quantity,
+              subtotal: item.subtotal,
+              purchaseCost: purchaseCost.toFixed(2),
+            };
+          })
+        );
+      }
     }
   }
 

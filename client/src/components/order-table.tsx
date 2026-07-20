@@ -540,13 +540,17 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
   const [showClearAllDialog, setShowClearAllDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const invalidateAnalytics = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/analytics"] });
+  };
+
   const deleteOrderMutation = useMutation({
     mutationFn: async (orderId: number) => {
       await apiRequest("DELETE", `/api/orders/${orderId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/analytics/order-status-breakdown"] });
+      invalidateAnalytics();
       toast({ title: "Order Deleted", description: "The order has been removed." });
     },
     onError: (error) => {
@@ -583,7 +587,7 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/analytics/order-status-breakdown"] });
+      invalidateAnalytics();
       toast({ title: "Orders Cleared", description: "The selected orders have been removed." });
     },
     onError: (error) => {
@@ -639,6 +643,7 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      invalidateAnalytics();
       toast({ title: "Cleared", description: "All archived orders have been permanently removed." });
     },
     onError: (error) => {

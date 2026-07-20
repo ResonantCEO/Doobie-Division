@@ -1271,6 +1271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/orders/archived', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
       const { sql: pool } = await import("./db");
+      const { invalidateCache } = await import("./cache");
       // Snapshot archived orders before deleting so analytics data is preserved
       const archivedIds = await pool.query(`SELECT id FROM orders WHERE archived = true`);
       const ids = (archivedIds as any).rows.map((r: any) => r.id) as number[];
@@ -1283,6 +1284,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await pool.query(`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE archived = true)`);
       await pool.query(`DELETE FROM orders WHERE archived = true`);
+      // Invalidate server-side analytics cache so next request returns fresh data
+      try { invalidateCache.analytics(); } catch (e) { console.warn('Cache invalidation error:', e); }
       res.json({ message: "All archived orders have been cleared" });
     } catch (error) {
       console.error('Failed to clear archived orders:', error);
