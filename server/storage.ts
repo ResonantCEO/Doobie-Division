@@ -106,6 +106,7 @@ export interface IStorage {
   updateOrderStatus(id: number, status: string): Promise<Order>;
   updateOrderTotal(id: number, total: number): Promise<Order>;
   updateOrderPaymentPhoto(id: number, photoUrl: string | null): Promise<Order>;
+  updateOrderPaymentMethod(id: number, paymentMethod: string, photoUrl?: string | null): Promise<Order>;
   fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
   unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
   substituteOrderItem(orderId: number, oldItemId: number, newProductId: number, quantity: number, userId: string): Promise<void>;
@@ -2044,6 +2045,22 @@ export class DatabaseStorage implements IStorage {
       db
         .update(orders)
         .set({ paymentPhotoUrl: photoUrl, updatedAt: new Date() })
+        .where(eq(orders.id, orderId))
+        .returning()
+    );
+    if (!updatedOrder) {
+      throw new Error("Order not found");
+    }
+    return updatedOrder;
+  }
+
+  async updateOrderPaymentMethod(orderId: number, paymentMethod: string, photoUrl?: string | null): Promise<Order> {
+    const setFields: Record<string, any> = { paymentMethod, updatedAt: new Date() };
+    if (photoUrl !== undefined) setFields.paymentPhotoUrl = photoUrl;
+    const [updatedOrder] = await retryQuery(() =>
+      db
+        .update(orders)
+        .set(setFields)
         .where(eq(orders.id, orderId))
         .returning()
     );

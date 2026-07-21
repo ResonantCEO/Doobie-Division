@@ -57,6 +57,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [paymentPhotoUploading, setPaymentPhotoUploading] = useState(false);
   const paymentPhotoInputRef = useRef<HTMLInputElement>(null);
 
+  // Payment method edit state
+  const [editingPaymentMethod, setEditingPaymentMethod] = useState(false);
+  const [pendingPaymentMethod, setPendingPaymentMethod] = useState<"prepay" | "cod">("cod");
+  const [pendingPaymentPhoto, setPendingPaymentPhoto] = useState<File | null>(null);
+  const [pendingPaymentPhotoPreview, setPendingPaymentPhotoPreview] = useState<string | null>(null);
+  const [paymentMethodSaving, setPaymentMethodSaving] = useState(false);
+  const pendingPaymentPhotoInputRef = useRef<HTMLInputElement>(null);
+
   const isFulfillingRef = useRef(false);
   const isScanningRef = useRef(false);
   const lastScanTimeRef = useRef(0);
@@ -621,7 +629,130 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                     <ShoppingBag className="h-3 w-3" /> Pay Upon Arrival
                   </span>
                 )}
+                {isAdmin && !editingPaymentMethod && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-muted-foreground"
+                    onClick={() => {
+                      const current = displayOrder.paymentMethod === "prepay" || (displayOrder as any).payment_method === "prepay" ? "prepay" : "cod";
+                      setPendingPaymentMethod(current);
+                      setPendingPaymentPhoto(null);
+                      setPendingPaymentPhotoPreview(null);
+                      setEditingPaymentMethod(true);
+                    }}
+                  >
+                    <Pencil className="h-3 w-3 mr-1" />Change
+                  </Button>
+                )}
               </div>
+
+              {/* Admin: edit payment method inline */}
+              {isAdmin && editingPaymentMethod && (
+                <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-3 space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Change Payment Method</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setPendingPaymentMethod("prepay"); }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold border transition-colors ${pendingPaymentMethod === "prepay" ? "bg-green-100 border-green-400 text-green-800 dark:bg-green-900/40 dark:border-green-600 dark:text-green-300" : "border-gray-200 dark:border-gray-600 hover:border-green-300 text-gray-600 dark:text-gray-400"}`}
+                    >
+                      <CreditCard className="h-3.5 w-3.5" /> Pre-Paid
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPendingPaymentMethod("cod"); setPendingPaymentPhoto(null); setPendingPaymentPhotoPreview(null); }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold border transition-colors ${pendingPaymentMethod === "cod" ? "bg-orange-100 border-orange-400 text-orange-800 dark:bg-orange-900/40 dark:border-orange-600 dark:text-orange-300" : "border-gray-200 dark:border-gray-600 hover:border-orange-300 text-gray-600 dark:text-gray-400"}`}
+                    >
+                      <ShoppingBag className="h-3.5 w-3.5" /> Pay Upon Arrival
+                    </button>
+                  </div>
+
+                  {pendingPaymentMethod === "prepay" && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Attach payment photo (optional)</p>
+                      {pendingPaymentPhotoPreview ? (
+                        <div className="relative inline-block">
+                          <img src={pendingPaymentPhotoPreview} alt="Preview" className="max-h-32 rounded-lg border object-contain" />
+                          <button
+                            type="button"
+                            onClick={() => { setPendingPaymentPhoto(null); setPendingPaymentPhotoPreview(null); }}
+                            className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => pendingPaymentPhotoInputRef.current?.click()}
+                          className="flex items-center gap-2 px-3 py-2 border border-dashed rounded-md text-xs text-muted-foreground hover:border-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                        >
+                          <ImageIcon className="h-3.5 w-3.5" /> Add photo
+                        </button>
+                      )}
+                      <input
+                        ref={pendingPaymentPhotoInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setPendingPaymentPhoto(file);
+                          setPendingPaymentPhotoPreview(URL.createObjectURL(file));
+                          if (pendingPaymentPhotoInputRef.current) pendingPaymentPhotoInputRef.current.value = "";
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs"
+                      disabled={paymentMethodSaving}
+                      onClick={async () => {
+                        if (!displayOrder?.id) return;
+                        setPaymentMethodSaving(true);
+                        try {
+                          const formData = new FormData();
+                          formData.append("paymentMethod", pendingPaymentMethod);
+                          if (pendingPaymentPhoto) formData.append("photo", pendingPaymentPhoto);
+                          const res = await fetch(`/api/orders/${displayOrder.id}/payment-method`, {
+                            method: "PATCH",
+                            credentials: "include",
+                            body: formData,
+                          });
+                          if (!res.ok) throw new Error("Failed to update");
+                          await queryClient.invalidateQueries({ queryKey: ["/api/orders", displayOrder.id] });
+                          await queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+                          toast({ title: "Payment method updated" });
+                          setEditingPaymentMethod(false);
+                          setPendingPaymentPhoto(null);
+                          setPendingPaymentPhotoPreview(null);
+                        } catch {
+                          toast({ title: "Failed to update payment method", variant: "destructive" });
+                        } finally {
+                          setPaymentMethodSaving(false);
+                        }
+                      }}
+                    >
+                      {paymentMethodSaving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                      Save
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      disabled={paymentMethodSaving}
+                      onClick={() => { setEditingPaymentMethod(false); setPendingPaymentPhoto(null); setPendingPaymentPhotoPreview(null); }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
               {(() => {
                 const photoUrl = (displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url;
                 return (

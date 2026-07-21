@@ -1230,6 +1230,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: change payment method (prepay / cod), optionally uploading a photo
+  app.patch('/api/orders/:id/payment-method', isAuthenticated, requireRole(['admin']), upload.single('photo'), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { paymentMethod } = req.body;
+      if (!paymentMethod || !['prepay', 'cod'].includes(paymentMethod)) {
+        return res.status(400).json({ message: 'paymentMethod must be "prepay" or "cod"' });
+      }
+
+      const existingOrder = await storage.getOrder(id);
+      if (!existingOrder) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      let photoUrl: string | null | undefined = undefined;
+
+      if (req.file) {
+        const objectStorageService = new ObjectStorageService();
+        const privateDir = objectStorageService.getPrivateObjectDir();
+        const uniqueId = uuidv4();
+        const extension = path.extname(req.file.originalname) || '.jpg';
+        const objectName = `payment-photos/${uniqueId}${extension}`;
+        const fullPath = `${privateDir}/${objectName}`;
+        const parts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
+        const bucketName = parts[0];
+        const objectKey = parts.slice(1).join('/');
+        const bucket = objectStorageClient.bucket(bucketName);
+        const file = bucket.file(objectKey);
+        await file.save(req.file.buffer, { metadata: { contentType: req.file.mimetype } });
+        photoUrl = `/api/payment-photos/${uniqueId}${extension}`;
+      } else if (paymentMethod === 'cod') {
+        // Switching to COD — clear existing photo
+        photoUrl = null;
+      }
+
+      const updatedOrder = await storage.updateOrderPaymentMethod(id, paymentMethod, photoUrl);
+      res.json(updatedOrder);
+    } catch (error) {
+      console.error('Failed to update payment method:', error);
+      res.status(500).json({ message: 'Failed to update payment method' });
+    }
+  });
+
   // Admin: upload/replace payment photo for an order
   app.post('/api/orders/:id/payment-photo', isAuthenticated, requireRole(['admin']), upload.single('photo'), async (req: any, res) => {
     try {
