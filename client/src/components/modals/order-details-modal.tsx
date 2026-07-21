@@ -13,6 +13,13 @@ import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import type { Order, Product } from "@shared/schema";
 
+function getTieredUnitPrice(basePrice: number, tiers: Array<{ minQuantity: number; pricePerItem: string }> | undefined, totalQty: number): number {
+  if (!tiers || tiers.length === 0) return basePrice;
+  const sorted = [...tiers].sort((a, b) => b.minQuantity - a.minQuantity);
+  const applicable = sorted.find(t => totalQty >= t.minQuantity);
+  return applicable ? Number(applicable.pricePerItem) : basePrice;
+}
+
 interface OrderDetailsModalProps {
   order: Order | null;
   isOpen: boolean;
@@ -1090,17 +1097,23 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                   ? Object.values(addItemSizeQuantities).reduce((s, q) => s + q, 0)
                   : 0;
 
+                const tiers = ap?.quantityPricing as Array<{ minQuantity: number; pricePerItem: string }> | undefined;
+
                 const resolvedUnitPrice = (() => {
                   if (!ap) return 0;
                   if (hasSizes) {
-                    if (isWeightBased) return Number(ap.pricePerGram) || 0;
-                    return Number(ap.price) || 0;
+                    const basePrice = isWeightBased ? (Number(ap.pricePerGram) || 0) : (Number(ap.price) || 0);
+                    return getTieredUnitPrice(basePrice, tiers, totalSizeQty);
                   }
                   if (hasWeightOptions) {
                     const opt = weightOptions.find(o => o.key === selectedAddUnit);
-                    return opt ? opt.price : weightOptions[0]?.price || 0;
+                    const basePrice = opt ? opt.price : weightOptions[0]?.price || 0;
+                    const qty = Math.max(1, parseInt(addItemQuantity) || 1);
+                    return getTieredUnitPrice(basePrice, tiers, qty);
                   }
-                  return Number(ap.price) || 0;
+                  const basePrice = Number(ap.price) || 0;
+                  const qty = Math.max(1, parseInt(addItemQuantity) || 1);
+                  return getTieredUnitPrice(basePrice, tiers, qty);
                 })();
 
                 const unitLabel = hasWeightOptions
