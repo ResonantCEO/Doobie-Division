@@ -1092,7 +1092,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
                 const resolvedUnitPrice = (() => {
                   if (!ap) return 0;
-                  if (hasSizes) return Number(ap.price) || 0;
+                  if (hasSizes) {
+                    if (isWeightBased) return Number(ap.pricePerGram) || 0;
+                    return Number(ap.price) || 0;
+                  }
                   if (hasWeightOptions) {
                     const opt = weightOptions.find(o => o.key === selectedAddUnit);
                     return opt ? opt.price : weightOptions[0]?.price || 0;
@@ -1280,11 +1283,9 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                 const pa = p as any;
                                 const isWB = pa.sellingMethod === "weight";
                                 const pHasSizes = pa.sizes && pa.sizes.length > 0;
-                                const displayPrice = pHasSizes
-                                  ? `$${parseFloat(p.price).toFixed(2)}`
-                                  : isWB
-                                    ? (pa.pricePerGram ? `$${Number(pa.pricePerGram).toFixed(2)}/g` : pa.pricePerOunce ? `$${Number(pa.pricePerOunce).toFixed(2)}/oz` : "—")
-                                    : (p.price ? `$${parseFloat(p.price).toFixed(2)}` : "—");
+                                const displayPrice = isWB
+                                  ? (pa.pricePerGram ? `$${Number(pa.pricePerGram).toFixed(2)}/g` : pa.pricePerOunce ? `$${Number(pa.pricePerOunce).toFixed(2)}/oz` : "—")
+                                  : (p.price ? `$${parseFloat(p.price).toFixed(2)}` : "—");
                                 return (
                                   <button
                                     key={p.id}

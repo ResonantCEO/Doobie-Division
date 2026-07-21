@@ -728,34 +728,49 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
           <div className="space-y-3">
             <Label>Weight Options</Label>
             <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-              {weightOptions.map((opt) => (
-                <div key={opt.key} className="flex items-center justify-between">
-                  <div className="flex-1 flex items-center gap-2">
-                    <Label className="text-sm font-medium">{opt.label}</Label>
-                    <span className="text-xs text-muted-foreground">${Number(opt.price || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setWeightOptionQuantities({ ...weightOptionQuantities, [opt.key]: Math.max(0, (weightOptionQuantities[opt.key] || 0) - 1) })}
-                      disabled={(weightOptionQuantities[opt.key] || 0) <= 0}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <span className="text-sm font-semibold w-8 text-center">{weightOptionQuantities[opt.key] || 0}</span>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setWeightOptionQuantities({ ...weightOptionQuantities, [opt.key]: (weightOptionQuantities[opt.key] || 0) + 1 })}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+              {(() => {
+                const gramMap: Record<string, number> = { grams: 1, eighth: 3.5, quarter: 7, half: 14, ounce: 28 };
+                const totalGramsSelected = Object.entries(weightOptionQuantities).reduce(
+                  (sum, [key, qty]) => sum + qty * (gramMap[key] ?? 1), 0
+                );
+                return weightOptions.map((opt) => {
+                  const gramsPerUnit = gramMap[opt.key] ?? 1;
+                  const canAddMore = totalGramsSelected + gramsPerUnit <= maxStock;
+                  const availableUnits = Math.floor((maxStock - totalGramsSelected + (weightOptionQuantities[opt.key] || 0) * gramsPerUnit) / gramsPerUnit);
+                  return (
+                    <div key={opt.key} className="flex items-center justify-between">
+                      <div className="flex-1 flex items-center gap-2">
+                        <Label className="text-sm font-medium">{opt.label}</Label>
+                        <span className="text-xs text-muted-foreground">${Number(opt.price || 0).toFixed(2)}</span>
+                        {availableUnits === 0 && (weightOptionQuantities[opt.key] || 0) === 0 && (
+                          <span className="text-xs text-red-500 font-medium">Not enough stock</span>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setWeightOptionQuantities({ ...weightOptionQuantities, [opt.key]: Math.max(0, (weightOptionQuantities[opt.key] || 0) - 1) })}
+                          disabled={(weightOptionQuantities[opt.key] || 0) <= 0}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="text-sm font-semibold w-8 text-center">{weightOptionQuantities[opt.key] || 0}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setWeightOptionQuantities({ ...weightOptionQuantities, [opt.key]: (weightOptionQuantities[opt.key] || 0) + 1 })}
+                          disabled={!canAddMore || (weightOptionQuantities[opt.key] || 0) >= availableUnits}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
             {(() => {
               const paidQty = Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0);
