@@ -2494,7 +2494,7 @@ export default function AdminPage() {
                       <SelectGroup key={g.label}>
                         <SelectLabel>{g.label}</SelectLabel>
                         {g.prods.map(p => (
-                          <SelectItem key={p.id} value={p.id.toString()}>
+                          <SelectItem key={p.id} value={p.id.toString()} className="pl-8">
                             {p.name} — ${Number(p.price).toFixed(2)}
                           </SelectItem>
                         ))}
@@ -2618,7 +2618,7 @@ export default function AdminPage() {
                       <SelectGroup key={g.label}>
                         <SelectLabel>{g.label}</SelectLabel>
                         {g.prods.map(p => (
-                          <SelectItem key={p.id} value={p.id.toString()}>
+                          <SelectItem key={p.id} value={p.id.toString()} className="pl-8">
                             {p.name} — ${Number(p.price).toFixed(2)}
                           </SelectItem>
                         ))}
