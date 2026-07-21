@@ -15,8 +15,10 @@ import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount, PromoCode, GrabBag, Category } from "@shared/schema";
+import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount, PromoCode, GrabBag, Category, ProductSize } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+
+type ProductWithSizes = Product & { sizes?: ProductSize[] };
 
 function toLocalDateTimeString(date: Date): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -122,6 +124,7 @@ export default function AdminPage() {
   const [grabBagToDelete, setGrabBagToDelete] = useState<GrabBag | null>(null);
   const [deleteGrabBagConfirmOpen, setDeleteGrabBagConfirmOpen] = useState(false);
   const [grabBagToGenerate, setGrabBagToGenerate] = useState<GrabBag | null>(null);
+  const [flavorPickerProduct, setFlavorPickerProduct] = useState<ProductWithSizes | null>(null);
   const [generateResultOpen, setGenerateResultOpen] = useState(false);
   type GrabBagPreview = { selectedProducts: { id: number; name: string; price: number; sku: string; sellingMethod?: string; weightLabel?: string; selectedSize?: string; imageUrl?: string | null; imageUrls?: string | null }[]; retailValue: number; sellingPrice: number; bagId: number; bagName: string; warnings?: string[] };
   const [generatePreview, setGeneratePreview] = useState<GrabBagPreview | null>(null);
@@ -131,7 +134,7 @@ export default function AdminPage() {
     description: "",
     sellingPrice: "",
     maxTotalItemPrice: "",
-    specificProductIds: [] as number[],
+    specificProductIds: [] as { id: number; size?: string }[],
     categorySelections: [] as { categoryId: number; count: number }[],
     blacklistedProductIds: [] as number[],
     isActive: true,
@@ -149,7 +152,13 @@ export default function AdminPage() {
       description: g.description || "",
       sellingPrice: g.sellingPrice?.toString() || "",
       maxTotalItemPrice: g.maxTotalItemPrice?.toString() || "",
-      specificProductIds: g.specificProductIds ? JSON.parse(g.specificProductIds) : [],
+      specificProductIds: (() => {
+        if (!g.specificProductIds) return [];
+        try {
+          const parsed = JSON.parse(g.specificProductIds);
+          return parsed.map((item: any) => typeof item === 'number' ? { id: item } : item);
+        } catch { return []; }
+      })(),
       categorySelections: g.categorySelections ? JSON.parse(g.categorySelections) : [],
       blacklistedProductIds: g.blacklistedProductIds ? JSON.parse(g.blacklistedProductIds) : [],
       isActive: g.isActive,
@@ -289,7 +298,7 @@ export default function AdminPage() {
     },
   });
 
-  const { data: allProducts = [] } = useQuery<Product[]>({
+  const { data: allProducts = [] } = useQuery<ProductWithSizes[]>({
     queryKey: ["/api/products"],
     queryFn: async () => {
       const res = await fetch("/api/products", { credentials: "include" });
@@ -2468,8 +2477,12 @@ export default function AdminPage() {
               <Select
                 onValueChange={(val) => {
                   const id = parseInt(val);
-                  if (!grabBagForm.specificProductIds.includes(id)) {
-                    setGrabBagForm(f => ({ ...f, specificProductIds: [...f.specificProductIds, id] }));
+                  const prod = allProducts.find(p => p.id === id);
+                  if (!prod) return;
+                  if (prod.sizes && prod.sizes.length > 0) {
+                    setFlavorPickerProduct(prod);
+                  } else {
+                    setGrabBagForm(f => ({ ...f, specificProductIds: [...f.specificProductIds, { id }] }));
                   }
                 }}
                 value=""
@@ -2479,7 +2492,7 @@ export default function AdminPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {(() => {
-                    const eligible = allProducts.filter(p => !grabBagForm.specificProductIds.includes(p.id) && p.price);
+                    const eligible = allProducts.filter(p => p.price);
                     const catMap = new Map<number | null, typeof eligible>();
                     for (const p of eligible) {
                       const cid = p.categoryId ?? null;
@@ -2493,11 +2506,18 @@ export default function AdminPage() {
                     return groups.map(g => (
                       <SelectGroup key={g.label}>
                         <SelectLabel>{g.label}</SelectLabel>
-                        {g.prods.map(p => (
-                          <SelectItem key={p.id} value={p.id.toString()} style={{ paddingLeft: '2.5rem' }}>
-                            {p.name} — ${Number(p.price).toFixed(2)}
-                          </SelectItem>
-                        ))}
+                        {g.prods.map(p => {
+                          const totalStock = p.sizes && p.sizes.length > 0
+                            ? p.sizes.reduce((s, sz) => s + (sz.quantity ?? 0), 0)
+                            : (p.stock ?? 0);
+                          const hasFlavors = p.sizes && p.sizes.length > 0;
+                          return (
+                            <SelectItem key={p.id} value={p.id.toString()} style={{ paddingLeft: '2.5rem' }}>
+                              {p.name} — ${Number(p.price).toFixed(2)}
+                              {hasFlavors ? ` · ${p.sizes!.length} flavors` : ` · ${totalStock} in stock`}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectGroup>
                     ));
                   })()}
@@ -2505,13 +2525,19 @@ export default function AdminPage() {
               </Select>
               {grabBagForm.specificProductIds.length > 0 && (
                 <div className="space-y-1 mt-2">
-                  {grabBagForm.specificProductIds.map(pid => {
-                    const prod = allProducts.find(p => p.id === pid);
+                  {grabBagForm.specificProductIds.map((entry, idx) => {
+                    const prod = allProducts.find(p => p.id === entry.id);
                     const cat = prod ? allCategories.find(c => c.id === prod.categoryId) : null;
+                    const sizeData = entry.size && prod?.sizes ? prod.sizes.find(s => s.size === entry.size) : null;
                     return (
-                      <div key={pid} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
-                        <span>{prod ? `${prod.name}${cat ? ` (${cat.name})` : ''} — $${Number(prod.price).toFixed(2)}` : `Product #${pid}`}</span>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setGrabBagForm(f => ({ ...f, specificProductIds: f.specificProductIds.filter(id => id !== pid) }))}>
+                      <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
+                        <span>
+                          {prod ? prod.name : `Product #${entry.id}`}
+                          {entry.size && <span className="text-blue-500 ml-1">({entry.size}{sizeData ? ` · ${sizeData.quantity} in stock` : ''})</span>}
+                          {cat && !entry.size && <span className="text-gray-400 ml-1">({cat.name})</span>}
+                          {prod && ` — $${Number(prod.price).toFixed(2)}`}
+                        </span>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setGrabBagForm(f => ({ ...f, specificProductIds: f.specificProductIds.filter((_, i) => i !== idx) }))}>
                           <Trash2 className="h-3.5 w-3.5 text-gray-400" />
                         </Button>
                       </div>
@@ -2668,6 +2694,42 @@ export default function AdminPage() {
             >
               {editingGrabBag ? "Save Changes" : "Create Template"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Flavor Picker Dialog */}
+      <Dialog open={!!flavorPickerProduct} onOpenChange={(open) => { if (!open) setFlavorPickerProduct(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Choose a Flavor</DialogTitle>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {flavorPickerProduct?.name} — select a flavor to add to the bag.
+            </p>
+          </DialogHeader>
+          <div className="space-y-2 max-h-80 overflow-y-auto py-1">
+            {flavorPickerProduct?.sizes?.map(sz => (
+              <button
+                key={sz.size}
+                type="button"
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                onClick={() => {
+                  setGrabBagForm(f => ({
+                    ...f,
+                    specificProductIds: [...f.specificProductIds, { id: flavorPickerProduct.id, size: sz.size }],
+                  }));
+                  setFlavorPickerProduct(null);
+                }}
+              >
+                <span className="font-medium text-sm">{sz.size}</span>
+                <span className={`text-sm ${sz.quantity > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                  {sz.quantity} in stock
+                </span>
+              </button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFlavorPickerProduct(null)}>Cancel</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

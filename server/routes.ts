@@ -3405,12 +3405,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Helper: resolve effective price + label + selected size for flat-price AND weight-based products.
     // slotBudget: the per-item budget — weight-based items pick the highest tier that fits within it.
-    function resolveProduct(p: any, slotBudget = Infinity): { price: number; sellingMethod: string; weightLabel: string; selectedSize?: string } {
-      // Pick a size option if this product has sizes (prefer one with stock, else first)
+    function resolveProduct(p: any, slotBudget = Infinity, preferredSize?: string): { price: number; sellingMethod: string; weightLabel: string; selectedSize?: string } {
+      // Pick a size option if this product has sizes
       let selectedSize: string | undefined;
       if (Array.isArray(p.sizes) && p.sizes.length > 0) {
-        const withStock = p.sizes.find((s: any) => (s.quantity ?? 0) > 0);
-        selectedSize = (withStock ?? p.sizes[0]).size;
+        if (preferredSize) {
+          // Honor the pinned flavor; fall back to auto-pick if not found
+          const exact = p.sizes.find((s: any) => s.size === preferredSize);
+          selectedSize = exact ? exact.size : preferredSize;
+        } else {
+          const withStock = p.sizes.find((s: any) => (s.quantity ?? 0) > 0);
+          selectedSize = (withStock ?? p.sizes[0]).size;
+        }
       }
 
       if (p.sellingMethod === "weight") {
@@ -3478,13 +3484,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     // 1. Always include specific products
-    let specificIds: number[] = [];
-    try { specificIds = bag.specificProductIds ? JSON.parse(bag.specificProductIds) : []; } catch { /* ignore */ }
-    for (const pid of specificIds) {
+    let specificItems: { id: number; size?: string }[] = [];
+    try {
+      const parsed = bag.specificProductIds ? JSON.parse(bag.specificProductIds) : [];
+      // Support both legacy number[] format and new { id, size? }[] format
+      specificItems = parsed.map((item: any) => typeof item === 'number' ? { id: item } : item);
+    } catch { /* ignore */ }
+    for (const item of specificItems) {
       try {
-        const p = await storage.getProduct(pid);
+        const p = await storage.getProduct(item.id);
         if (p) {
-          const { price, sellingMethod, weightLabel, selectedSize } = resolveProduct(p);
+          const { price, sellingMethod, weightLabel, selectedSize } = resolveProduct(p, Infinity, item.size);
           if (price > 0) {
             selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, sellingMethod, weightLabel, selectedSize, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
             runningTotal += price;
@@ -3492,9 +3502,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             warnings.push(`"${p.name}" has no resolvable price — skipped.`);
           }
         } else {
-          warnings.push(`Product ID ${pid} not found — skipped.`);
+          warnings.push(`Product ID ${item.id} not found — skipped.`);
         }
-      } catch { warnings.push(`Could not fetch product ID ${pid} — skipped.`); }
+      } catch { warnings.push(`Could not fetch product ID ${item.id} — skipped.`); }
     }
 
     // 2. Pick items from category selections targeting the remaining value
