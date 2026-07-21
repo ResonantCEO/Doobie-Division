@@ -1230,6 +1230,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: upload/replace payment photo for an order
+  app.post('/api/orders/:id/payment-photo', isAuthenticated, requireRole(['admin']), upload.single('photo'), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!req.file) {
+        return res.status(400).json({ message: 'No photo file provided' });
+      }
+
+      const existingOrder = await storage.getOrder(id);
+      if (!existingOrder) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const uniqueId = uuidv4();
+      const extension = path.extname(req.file.originalname) || '.jpg';
+      const objectName = `payment-photos/${uniqueId}${extension}`;
+      const fullPath = `${privateDir}/${objectName}`;
+
+      const parts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join('/');
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectKey);
+
+      await file.save(req.file.buffer, {
+        metadata: { contentType: req.file.mimetype },
+      });
+
+      const photoUrl = `/api/payment-photos/${uniqueId}${extension}`;
+      const updatedOrder = await storage.updateOrderPaymentPhoto(id, photoUrl);
+      res.json(updatedOrder);
+    } catch (error) {
+      console.error('Failed to upload payment photo:', error);
+      res.status(500).json({ message: 'Failed to upload payment photo' });
+    }
+  });
+
+  // Admin: delete payment photo for an order
+  app.delete('/api/orders/:id/payment-photo', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const existingOrder = await storage.getOrder(id);
+      if (!existingOrder) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+      const updatedOrder = await storage.updateOrderPaymentPhoto(id, null);
+      res.json(updatedOrder);
+    } catch (error) {
+      console.error('Failed to delete payment photo:', error);
+      res.status(500).json({ message: 'Failed to delete payment photo' });
+    }
+  });
+
   app.patch('/api/orders/:id/items/:itemId/price', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {
       const orderId = parseInt(req.params.id);

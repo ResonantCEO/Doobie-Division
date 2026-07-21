@@ -53,6 +53,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [customItemName, setCustomItemName] = useState("");
   const [customItemPrice, setCustomItemPrice] = useState("");
 
+  // Payment photo state
+  const [paymentPhotoUploading, setPaymentPhotoUploading] = useState(false);
+  const paymentPhotoInputRef = useRef<HTMLInputElement>(null);
+
   const isFulfillingRef = useRef(false);
   const isScanningRef = useRef(false);
   const lastScanTimeRef = useRef(0);
@@ -618,15 +622,102 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                   </span>
                 )}
               </div>
-              {(displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url ? (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Payment Photo</p>
-                  <a href={(displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url} target="_blank" rel="noopener noreferrer" className="inline-block">
-                    <img src={(displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url} alt="Payment photo" className="max-h-48 rounded-lg border object-contain cursor-pointer hover:opacity-90 transition-opacity" />
-                  </a>
-                  <p className="text-xs text-muted-foreground">Click to open full size</p>
-                </div>
-              ) : null}
+              {(() => {
+                const photoUrl = (displayOrder as any).paymentPhotoUrl || (displayOrder as any).payment_photo_url;
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Payment Photo</p>
+                      {isAdmin && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            disabled={paymentPhotoUploading}
+                            onClick={() => paymentPhotoInputRef.current?.click()}
+                          >
+                            {paymentPhotoUploading ? (
+                              <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                            ) : (
+                              <ImageIcon className="h-3.5 w-3.5 mr-1" />
+                            )}
+                            {photoUrl ? "Replace" : "Upload"}
+                          </Button>
+                          {photoUrl && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20"
+                              disabled={paymentPhotoUploading}
+                              onClick={async () => {
+                                if (!displayOrder?.id) return;
+                                setPaymentPhotoUploading(true);
+                                try {
+                                  const res = await fetch(`/api/orders/${displayOrder.id}/payment-photo`, {
+                                    method: "DELETE",
+                                    credentials: "include",
+                                  });
+                                  if (!res.ok) throw new Error("Failed to delete");
+                                  await queryClient.invalidateQueries({ queryKey: ["/api/orders", displayOrder.id] });
+                                  await queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+                                  toast({ title: "Payment photo removed" });
+                                } catch {
+                                  toast({ title: "Failed to remove photo", variant: "destructive" });
+                                } finally {
+                                  setPaymentPhotoUploading(false);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-1" />
+                              Delete
+                            </Button>
+                          )}
+                          <input
+                            ref={paymentPhotoInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file || !displayOrder?.id) return;
+                              setPaymentPhotoUploading(true);
+                              try {
+                                const formData = new FormData();
+                                formData.append("photo", file);
+                                const res = await fetch(`/api/orders/${displayOrder.id}/payment-photo`, {
+                                  method: "POST",
+                                  credentials: "include",
+                                  body: formData,
+                                });
+                                if (!res.ok) throw new Error("Failed to upload");
+                                await queryClient.invalidateQueries({ queryKey: ["/api/orders", displayOrder.id] });
+                                await queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+                                toast({ title: "Payment photo updated" });
+                              } catch {
+                                toast({ title: "Failed to upload photo", variant: "destructive" });
+                              } finally {
+                                setPaymentPhotoUploading(false);
+                                if (paymentPhotoInputRef.current) paymentPhotoInputRef.current.value = "";
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    {photoUrl ? (
+                      <>
+                        <a href={photoUrl} target="_blank" rel="noopener noreferrer" className="inline-block">
+                          <img src={photoUrl} alt="Payment photo" className="max-h-48 rounded-lg border object-contain cursor-pointer hover:opacity-90 transition-opacity" />
+                        </a>
+                        <p className="text-xs text-muted-foreground">Click to open full size</p>
+                      </>
+                    ) : isAdmin ? (
+                      <p className="text-sm text-muted-foreground italic">No payment photo attached.</p>
+                    ) : null}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Order Items */}
