@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -537,7 +537,7 @@ export default function AdminPage() {
     },
   });
 
-  const { data: allCategories = [] } = useQuery<Category[]>({
+  const { data: categoriesResponse = [] } = useQuery<(Category & { children?: Category[] })[]>({
     queryKey: ["/api/categories"],
     queryFn: async () => {
       const res = await fetch("/api/categories", { credentials: "include" });
@@ -545,6 +545,19 @@ export default function AdminPage() {
       return res.json();
     },
   });
+
+  const allCategories = useMemo(() => {
+    const flatten = (cats: (Category & { children?: Category[] })[]): Category[] => {
+      const result: Category[] = [];
+      for (const cat of cats) {
+        const { children, ...rest } = cat;
+        result.push(rest);
+        if (children && children.length > 0) result.push(...flatten(children));
+      }
+      return result;
+    };
+    return flatten(categoriesResponse);
+  }, [categoriesResponse]);
 
   const createGrabBagMutation = useMutation({
     mutationFn: async (data: typeof grabBagForm) => {
