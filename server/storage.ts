@@ -1839,6 +1839,7 @@ export class DatabaseStorage implements IStorage {
     const orderNumber = `${datePrefix}-${nextSequential}`;
 
     for (const item of items) {
+      if (!item.productId) continue; // discount/virtual items have no product — skip stock check
       try {
         const stockResult = await retryQuery(() =>
           db.execute(sql`SELECT stock, name FROM products WHERE id = ${item.productId}`)
@@ -1936,7 +1937,7 @@ export class DatabaseStorage implements IStorage {
     } catch (itemsErr) {
       console.warn('[createOrder] Order items insert via ORM failed, using raw SQL:', itemsErr);
       for (const item of orderItemsData) {
-        await db.execute(sql`INSERT INTO order_items (order_id, product_id, product_name, product_price, quantity, subtotal, size) VALUES (${item.orderId}, ${item.productId}, ${item.productName}, ${item.productPrice}, ${item.quantity}, ${item.subtotal}, ${item.size || null})`);
+        await db.execute(sql`INSERT INTO order_items (order_id, product_id, product_name, product_sku, product_price, quantity, subtotal, size, fulfilled, removed) VALUES (${item.orderId}, ${item.productId ?? null}, ${item.productName}, ${(item as any).productSku ?? null}, ${item.productPrice}, ${item.quantity}, ${item.subtotal}, ${(item as any).size || null}, ${(item as any).fulfilled ?? false}, ${(item as any).removed ?? false})`);
       }
     }
 

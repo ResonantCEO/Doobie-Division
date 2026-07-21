@@ -1090,9 +1090,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const itemsData = enrichedItems.map((item: any) => insertOrderItemSchema.parse(item));
+      // Expand grab bag products into individual line items + a discount line
+      const finalItems: any[] = [];
+      const grabBagProductIdsToDeduct: number[] = [];
+
+      for (const item of enrichedItems) {
+        const product = await storage.getProduct(item.productId);
+        const sku: string = product?.sku ?? "";
+        if (product && sku.startsWith("GRAB-BAG-") && !sku.startsWith("GRAB-BAG-DISCOUNT")) {
+          type BagItem = { productId: number | null; name: string; sku: string | null; price: number };
+          let bagItems: BagItem[] | null = null;
+
+          // Try structured JSON in adminNotes (new format)
+          if (product.adminNotes) {
+            try {
+              const parsed = JSON.parse(product.adminNotes as string);
+              if (parsed.items && Array.isArray(parsed.items)) {
+                bagItems = parsed.items.map((bi: any) => ({
+                  productId: bi.productId ? Number(bi.productId) : null,
+                  name: String(bi.name),
+                  sku: bi.sku ? String(bi.sku) : null,
+                  price: Number(bi.price),
+                }));
+              }
+            } catch { /* fall through */ }
+          }
+
+          // Fallback: parse description bullet format (old bags)
+          if (!bagItems && product.description) {
+            bagItems = (product.description as string).split("\n")
+              .filter((l: string) => l.trim().startsWith("•"))
+              .map((l: string) => {
+                const m = l.match(/•\s+(.+?)\s+\(\$([0-9.]+)\)/);
+                return m ? { productId: null, name: m[1], sku: null, price: parseFloat(m[2]) } : null;
+              })
+              .filter(Boolean) as BagItem[];
+          }
+
+          if (bagItems && bagItems.length > 0) {
+            const sellingPrice = parseFloat(String(product.price));
+            const retailTotal = bagItems.reduce((s, bi) => s + bi.price, 0);
+            const discount = sellingPrice - retailTotal; // negative = savings for customer
+
+            for (const bi of bagItems) {
+              finalItems.push({
+                productId: bi.productId,
+                productName: bi.name,
+                productSku: bi.sku ?? undefined,
+                productPrice: bi.price.toFixed(2),
+                quantity: 1,
+                subtotal: bi.price.toFixed(2),
+                fulfilled: false,
+                removed: false,
+              });
+            }
+
+            // Add discount line only when there is a real discount
+            if (Math.abs(discount) > 0.001) {
+              finalItems.push({
+                productId: null,
+                productName: `🎁 Grab Bag Discount — ${product.name}`,
+                productSku: "GRAB-BAG-DISCOUNT",
+                productPrice: discount.toFixed(2),
+                quantity: 1,
+                subtotal: discount.toFixed(2),
+                fulfilled: true,
+                removed: false,
+              });
+            }
+
+            grabBagProductIdsToDeduct.push(product.id);
+            continue; // skip the bag container item itself
+          }
+        }
+
+        finalItems.push(item);
+      }
+
+      const itemsData = finalItems.map((item: any) => insertOrderItemSchema.parse(item));
 
       const newOrder = await storage.createOrder(orderData, itemsData);
+
+      // Deduct stock for expanded grab bag container products (not in order items, createOrder won't handle them)
+      for (const bagProductId of grabBagProductIdsToDeduct) {
+        try {
+          await db.execute(sql`UPDATE products SET stock = GREATEST(0, stock - 1), updated_at = NOW() WHERE id = ${bagProductId}`);
+        } catch (err) {
+          console.warn("[createOrder] Failed to deduct grab bag product stock:", err);
+        }
+      }
 
       // Invalidate the products cache so updated stock counts are reflected immediately
       try {
@@ -3652,7 +3738,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         categoryId: grabBagCategory.id,
         imageUrl: primaryImage,
         imageUrls: imageUrlsJson,
-        adminNotes: `Auto-generated grab bag from template ID ${bag.id}. Contains: ${confirmedProducts.map(p => p.sku).join(", ")}`,
+        adminNotes: JSON.stringify({
+          templateId: bag.id,
+          bagName: bag.name,
+          items: confirmedProducts.map(p => ({ productId: p.id, name: p.name, sku: p.sku, price: p.price })),
+        }),
       } as any);
 
       res.status(201).json({

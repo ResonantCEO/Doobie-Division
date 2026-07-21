@@ -1458,6 +1458,34 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                   {displayOrder.items.map((item: any, index: number) => {
                     const isRemoved = item.removed === true;
                     const isSubstitute = !!item.substitutedForItemId;
+                    const isDiscount = (item.productSku || item.product_sku) === "GRAB-BAG-DISCOUNT";
+
+                    // ── Grab Bag Discount row ──────────────────────────────────────
+                    if (isDiscount) {
+                      const discountAmt = Math.abs(parseFloat(item.subtotal?.toString() ?? "0"));
+                      return (
+                        <div
+                          key={item.id || index}
+                          className="flex items-center justify-between p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800"
+                        >
+                          <div className="flex-1">
+                            <h4 className="font-medium text-sm text-emerald-800 dark:text-emerald-300">
+                              {item.productName || item.product_name}
+                            </h4>
+                            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">Applied at checkout</p>
+                          </div>
+                          <div className="text-right ml-3 flex flex-col items-end gap-1">
+                            <p className="font-semibold text-sm text-emerald-700 dark:text-emerald-300">
+                              −${discountAmt.toFixed(2)}
+                            </p>
+                            <Badge className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                              <CheckCircle className="h-3 w-3 mr-1" />Discount
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div
                         key={item.id || index}
@@ -1492,20 +1520,6 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                           <p className="text-xs text-gray-600 dark:text-gray-400">
                             ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
                           </p>
-                          {(item.productSku || item.product_sku || "").startsWith("GRAB-BAG-") && (item as any).product?.description && (() => {
-                            const desc: string = (item as any).product.description;
-                            const bagItems = desc.split('\n')
-                              .filter((l: string) => l.trim().startsWith('•'))
-                              .map((l: string) => { const m = l.match(/•\s+(.+?)\s+\(\$([0-9.]+)\)/); return m ? { name: m[1], price: m[2] } : null; })
-                              .filter(Boolean) as { name: string; price: string }[];
-                            return bagItems.length > 0 ? (
-                              <div className="mt-1 space-y-0.5 border-t border-dashed border-gray-300 dark:border-gray-600 pt-1">
-                                {bagItems.map((gi, i) => (
-                                  <p key={i} className="text-xs text-gray-500 dark:text-gray-400">• {gi.name} <span className="opacity-70">(${gi.price})</span></p>
-                                ))}
-                              </div>
-                            ) : null;
-                          })()}
                           {!isRemoved && !item.fulfilled && canScan && (
                             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Click to scan and fulfill item</p>
                           )}
