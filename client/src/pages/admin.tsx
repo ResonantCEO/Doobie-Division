@@ -2568,7 +2568,7 @@ export default function AdminPage() {
                     <SelectValue placeholder="Add a category…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {allCategories.filter(c => c.isActive && !grabBagForm.categorySelections.find(s => s.categoryId === c.id)).map(c => (
+                    {allCategories.filter(c => c.isActive && !grabBagForm.categorySelections.find(s => s.categoryId === c.id)).sort((a, b) => a.name.localeCompare(b.name)).map(c => (
                       <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
                     ))}
                   </SelectContent>
