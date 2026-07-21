@@ -1122,12 +1122,13 @@ export default function AdminPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="support">Support Tickets</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="purchase-limits">Purchase Limits</TabsTrigger>
           <TabsTrigger value="access">Access</TabsTrigger>
           <TabsTrigger value="discounts">Discounts</TabsTrigger>
+          <TabsTrigger value="bags">Bags</TabsTrigger>
         </TabsList>
 
         <TabsContent value="logs">
@@ -1982,15 +1983,8 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
 
-        {/* Discounts Tab — inner tabs: Promo Codes / Bags */}
+        {/* Discounts Tab — Promo Codes */}
         <TabsContent value="discounts">
-          <Tabs value={discountsSubTab} onValueChange={setDiscountsSubTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-1 max-w-xs">
-              <TabsTrigger value="promo-codes">Promo Codes</TabsTrigger>
-            </TabsList>
-
-            {/* ── Promo Codes sub-tab ── */}
-            <TabsContent value="promo-codes">
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -2143,10 +2137,10 @@ export default function AdminPage() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+        </TabsContent>
 
-            {/* ── Bags sub-tab ── */}
-            <TabsContent value="bags">
+        {/* Bags Tab */}
+        <TabsContent value="bags">
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -2229,8 +2223,6 @@ export default function AdminPage() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
-          </Tabs>
         </TabsContent>
 
       </Tabs>
