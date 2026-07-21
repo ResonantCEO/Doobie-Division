@@ -54,9 +54,10 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
     }
   }, [user.role, notificationTab]);
 
-  // Fetch notifications
+  // Fetch notifications — staleTime prevents hammering the server on every tab focus
   const { data: notifications = [], refetch } = useQuery<any[]>({
     queryKey: ["/api/notifications"],
+    staleTime: 30 * 1000,
   });
 
   const unreadCount = notifications.filter((n: any) => !n.isRead).length;
@@ -305,39 +306,49 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                                 <span className="text-xs text-muted-foreground">
                                   {getUnreadCount(tabValue)} unread
                                 </span>
-                                {getFilteredNotifications().length > 0 && tabValue !== 'all' && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-xs h-6 px-2"
-                                    onClick={async () => {
-                                      try {
-                                        // Delete all notifications for the current tab
-                                        const notificationsToDelete = getFilteredNotifications();
-                                        for (const notification of notificationsToDelete) {
-                                          await fetch(`/api/notifications/${notification.id}`, {
+                                <div className="flex gap-1">
+                                  {getUnreadCount(tabValue) > 0 && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-xs h-6 px-2"
+                                      onClick={async () => {
+                                        try {
+                                          await fetch('/api/notifications/mark-all-read', {
+                                            method: 'PUT',
+                                            credentials: 'include',
+                                          });
+                                          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+                                        } catch (error) {
+                                          toast({ title: "Error", description: "Failed to mark all as read.", variant: "destructive" });
+                                        }
+                                      }}
+                                    >
+                                      Mark all read
+                                    </Button>
+                                  )}
+                                  {notifications.some((n: any) => n.isRead) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-xs h-6 px-2"
+                                      onClick={async () => {
+                                        try {
+                                          await fetch('/api/notifications/clear-read', {
                                             method: 'DELETE',
                                             credentials: 'include',
                                           });
+                                          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+                                          toast({ title: "Cleared", description: "Read notifications removed." });
+                                        } catch (error) {
+                                          toast({ title: "Error", description: "Failed to clear notifications.", variant: "destructive" });
                                         }
-                                        refetch(); // Refresh notifications
-                                        toast({
-                                          title: "Notifications cleared",
-                                          description: `Cleared ${notificationsToDelete.length} ${tabValue === 'all' ? '' : tabValue + ' '}notifications.`,
-                                        });
-                                      } catch (error) {
-                                        console.error('Failed to clear notifications:', error);
-                                        toast({
-                                          title: "Error",
-                                          description: "Failed to clear notifications.",
-                                          variant: "destructive",
-                                        });
-                                      }
-                                    }}
-                                  >
-                                    Clear all
-                                  </Button>
-                                )}
+                                      }}
+                                    >
+                                      Clear read
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                               <div className="space-y-2 max-h-64 overflow-y-auto">
                                 {getFilteredNotifications().map((notification: any) => (

@@ -2063,6 +2063,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mark ALL notifications as read (bulk)
+  app.put("/api/notifications/mark-all-read", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.markAllNotificationsAsRead(req.currentUser.id);
+      res.status(200).json({ message: "All notifications marked as read" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // Delete all read notifications (bulk)
+  app.delete("/api/notifications/clear-read", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.clearReadNotifications(req.currentUser.id);
+      res.status(200).json({ message: "Read notifications cleared" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to clear read notifications" });
+    }
+  });
+
   // Mark notification as read
   app.put("/api/notifications/:id/read", isAuthenticated, async (req, res) => {
     try {

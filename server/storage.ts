@@ -156,6 +156,8 @@ export interface IStorage {
   getNotifications(userId?: string): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
   markNotificationAsRead(id: number): Promise<void>;
+  markAllNotificationsAsRead(userId: string): Promise<void>;
+  clearReadNotifications(userId: string): Promise<void>;
   deleteNotification(id: number): Promise<void>;
 
   // User management
@@ -3315,14 +3317,19 @@ export class DatabaseStorage implements IStorage {
 
   // Notification operations
   async getNotifications(userId?: string): Promise<Notification[]> {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     if (userId) {
+      // Auto-purge read notifications older than 30 days to prevent accumulation
+      await db.delete(notifications).where(
+        and(eq(notifications.userId, userId), eq(notifications.isRead, true), lt(notifications.createdAt, thirtyDaysAgo))
+      );
       return await retryQuery(() =>
-        db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt))
+        db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(200)
       );
     }
 
     return await retryQuery(() =>
-      db.select().from(notifications).orderBy(desc(notifications.createdAt))
+      db.select().from(notifications).orderBy(desc(notifications.createdAt)).limit(200)
     );
   }
 
@@ -3333,6 +3340,18 @@ export class DatabaseStorage implements IStorage {
 
   async markNotificationAsRead(id: number): Promise<void> {
     await retryQuery(() => db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id)));
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<void> {
+    await retryQuery(() =>
+      db.update(notifications).set({ isRead: true }).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)))
+    );
+  }
+
+  async clearReadNotifications(userId: string): Promise<void> {
+    await retryQuery(() =>
+      db.delete(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, true)))
+    );
   }
 
   async deleteNotification(id: number): Promise<void> {
