@@ -3317,11 +3317,11 @@ export class DatabaseStorage implements IStorage {
 
   // Notification operations
   async getNotifications(userId?: string): Promise<Notification[]> {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const eightHoursAgo = new Date(Date.now() - 8 * 60 * 60 * 1000);
     if (userId) {
-      // Auto-purge read notifications older than 30 days to prevent accumulation
+      // Auto-purge notifications older than 8 hours to prevent accumulation
       await db.delete(notifications).where(
-        and(eq(notifications.userId, userId), eq(notifications.isRead, true), lt(notifications.createdAt, thirtyDaysAgo))
+        and(eq(notifications.userId, userId), lt(notifications.createdAt, eightHoursAgo))
       );
       return await retryQuery(() =>
         db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(200)
