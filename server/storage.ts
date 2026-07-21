@@ -1856,9 +1856,12 @@ export class DatabaseStorage implements IStorage {
             if (Number(sizeRow.quantity) < item.quantity) {
               throw new Error(`Insufficient stock for ${product.name} (${itemSize}). Available: ${sizeRow.quantity}, Requested: ${item.quantity}`);
             }
-          } else if (Number(product.stock) < item.quantity) {
-            // Weight-based or flat-stock product — validate against product.stock
-            throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
+          } else {
+            // Weight-based product — must account for gram conversion
+            const gramsNeeded = item.quantity * this.getGramEquivalentFromSize(itemSize);
+            if (Number(product.stock) < gramsNeeded) {
+              throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}g, Requested: ${gramsNeeded}g`);
+            }
           }
         } else if (Number(product.stock) < item.quantity) {
           throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
@@ -1961,7 +1964,8 @@ export class DatabaseStorage implements IStorage {
           sql`UPDATE products SET stock = stock - ${stockToDeduct}, updated_at = NOW() WHERE id = ${item.productId}`
         );
 
-        const sizeName = this.extractSizeFromProductName(item.productName);
+        // Use item.size directly (preferred) or fall back to extracting from product name
+        const sizeName = (item as any).size || this.extractSizeFromProductName(item.productName);
         if (sizeName) {
           await db.execute(
             sql`UPDATE product_sizes SET quantity = quantity - ${item.quantity}, updated_at = NOW() WHERE product_id = ${item.productId} AND size = ${sizeName}`

@@ -1030,6 +1030,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Helper: convert a size/weight label to its gram equivalent for stock comparison
+      const getGramEquivalentForCheck = (sizeLabel: string | undefined): number => {
+        if (!sizeLabel) return 1;
+        const s = sizeLabel.toLowerCase().trim();
+        if (s.includes('1/8') || s.includes('⅛')) return 3.5;
+        if (s.includes('1/4') || s.includes('¼')) return 7;
+        if (s.includes('1/2') || s.includes('½')) return 14;
+        if ((s.includes('1') && s.includes('oz')) || s === '1oz' || s === 'ounce') return 28;
+        if (s.includes('gram') || s === 'grams') return 1;
+        return 1;
+      };
+
       // Validate stock availability and enrich items with product SKU data
       const enrichedItems = [];
       const stockErrors = [];
@@ -1051,10 +1063,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               stockErrors.push(`Insufficient stock for ${product.name} (${item.size}). Available: ${sizeData.quantity}, Requested: ${item.quantity}`);
               continue;
             }
-          } else if (product.stock < item.quantity) {
-            // Weight option or no matching size row — fall back to product.stock
-            stockErrors.push(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
-            continue;
+          } else {
+            // Weight option or no matching size row — compare grams needed vs grams in stock
+            const gramsNeeded = item.quantity * getGramEquivalentForCheck(item.size);
+            if (product.stock < gramsNeeded) {
+              stockErrors.push(`Insufficient stock for ${product.name}. Available: ${product.stock}g, Requested: ${gramsNeeded}g`);
+              continue;
+            }
           }
         } else if (product.stock < item.quantity) {
           stockErrors.push(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
@@ -1078,6 +1093,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemsData = enrichedItems.map((item: any) => insertOrderItemSchema.parse(item));
 
       const newOrder = await storage.createOrder(orderData, itemsData);
+
+      // Invalidate the products cache so updated stock counts are reflected immediately
+      try {
+        const { invalidateCache } = await import("./cache");
+        invalidateCache.products();
+      } catch (cacheErr) {
+        console.warn('[createOrder] Cache invalidation failed:', cacheErr);
+      }
 
       // Track promo code usage
       if (promoCodeStr) {
@@ -1441,8 +1464,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: `Order only requires ${orderItem.quantity} units` });
       }
 
-      // Fulfill the item (reduce stock and mark as fulfilled)
+      // Fulfill the item (reduce physical inventory and mark as fulfilled)
       await storage.fulfillOrderItem(orderId, productId, quantity, req.currentUser.id, orderItemId);
+
+      // Invalidate products cache so physical inventory reflects immediately
+      try {
+        const { invalidateCache } = await import("./cache");
+        invalidateCache.products();
+      } catch (_) {}
 
       res.status(200).json({ message: "Order item fulfilled successfully" });
     } catch (error: any) {
@@ -1492,9 +1521,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "This order item is not fulfilled" });
       }
 
-      // Unfulfill the item (restore stock and mark as not fulfilled)
+      // Unfulfill the item (restore physical inventory and mark as not fulfilled)
       // Use the order item's actual quantity instead of client-supplied value for security
       await storage.unfulfillOrderItem(orderId, productId, orderItem.quantity, req.currentUser.id, orderItemId);
+
+      // Invalidate products cache so physical inventory reflects immediately
+      try {
+        const { invalidateCache } = await import("./cache");
+        invalidateCache.products();
+      } catch (_) {}
 
       res.status(200).json({ message: "Order item unfulfilled successfully" });
     } catch (error) {
