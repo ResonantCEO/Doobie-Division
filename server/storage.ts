@@ -3534,7 +3534,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .where(
-        sql`(id_image_url IS NOT NULL OR verification_photo_url IS NOT NULL) AND (
+        sql`verification_photo_url IS NOT NULL AND (
           (verified_at IS NOT NULL AND verified_at < ${cutoff})
           OR (verified_at IS NULL AND status = 'active' AND created_at < ${cutoff})
         )`
@@ -3547,19 +3547,16 @@ export class DatabaseStorage implements IStorage {
 
     for (const user of staleUsers) {
       try {
-        if (user.idImageUrl) {
-          await objectStorage.deleteObjectEntity(user.idImageUrl);
-        }
         if (user.verificationPhotoUrl) {
           await objectStorage.deleteObjectEntity(user.verificationPhotoUrl);
         }
         await db
           .update(users)
-          .set({ idImageUrl: null, verificationPhotoUrl: null, updatedAt: new Date() })
+          .set({ verificationPhotoUrl: null, updatedAt: new Date() })
           .where(eq(users.id, user.id));
-        console.log(`Deleted verification files for user ${user.id}`);
+        console.log(`Deleted verification video for user ${user.id}`);
       } catch (err) {
-        console.error(`Error cleaning up verification files for user ${user.id}:`, err);
+        console.error(`Error cleaning up verification video for user ${user.id}:`, err);
       }
     }
   }
