@@ -219,7 +219,6 @@ export default function StorefrontPage() {
 
   const slides: Slide[] = useMemo(() => {
     const result: Slide[] = [];
-    if (allDiscountedProducts.length > 0) result.push({ type: 'deals' });
     activeAds.forEach(ad => result.push({ type: 'ad', ad }));
     return result;
   }, [allDiscountedProducts.length, activeAds]);
@@ -603,50 +602,7 @@ export default function StorefrontPage() {
           {/* Slides */}
           {slides.map((slide, slideIdx) => {
             const isActive = currentSlideIndex === slideIdx;
-            if (slide.type === 'deals') {
-              return (
-                <div
-                  key="deals"
-                  className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-                >
-                  {/* Rotating product background images */}
-                  {allDiscountedProducts.map((product: Product, imgIdx: number) => (
-                    <div
-                      key={product.id}
-                      className={`absolute inset-0 transition-opacity duration-1000 ${currentImageIndex === imgIdx ? 'opacity-100' : 'opacity-0'}`}
-                    >
-                      <img
-                        src={(product as any).imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=1200&h=400&fit=crop"}
-                        alt={product.name}
-                        className="w-full h-full object-cover object-center"
-                      />
-                      <div className="absolute inset-0 bg-black/50" />
-                    </div>
-                  ))}
-                  {/* Content */}
-                  <div className="relative z-10 py-16 px-8">
-                    <div className="max-w-2xl">
-                      <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-lg">Today's Amazing Deals!</h2>
-                      <p className="text-xl mb-6 text-white/90 drop-shadow-md">
-                        Check out our special discounts on selected products every day!
-                      </p>
-                      <Button
-                        className="bg-white text-primary hover:bg-white/90 drop-shadow-md"
-                        onClick={() => {
-                          const currentState = { parentCategory: currentParentCategory, selectedCategory, showDealsOnly };
-                          setNavigationHistory(prev => [...prev, currentState]);
-                          setShowDealsOnly(true);
-                        }}
-                      >
-                        Shop Now
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            } else {
-              // Promotional ad slide
-              const { ad } = slide;
+            const { ad } = slide as { type: 'ad'; ad: PromotionalAd };
               return (
                 <div
                   key={`ad-${ad.id}`}
@@ -686,7 +642,6 @@ export default function StorefrontPage() {
                   </div>
                 </div>
               );
-            }
           })}
 
           {/* Slide dots */}
