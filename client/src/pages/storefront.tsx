@@ -115,9 +115,12 @@ export default function StorefrontPage() {
       return products.filter((product: Product) => {
         if (product.stock <= 0) return false;
         const discount = product.discountPercentage;
-        const hasDiscount = discount && discount !== "0" && discount !== 0 &&
+        const hasDiscountPct = discount && discount !== "0" && discount !== 0 &&
           !isNaN(typeof discount === 'number' ? discount : parseFloat(String(discount))) &&
           (typeof discount === 'number' ? discount : parseFloat(String(discount))) > 0;
+        const discountAmt = (product as any).discountAmount;
+        const hasDiscountAmt = discountAmt && parseFloat(String(discountAmt)) > 0;
+        const hasDiscount = hasDiscountPct || hasDiscountAmt;
         const hasBogo = product.bogoEnabled === true;
         const hasQuantityPricing = Array.isArray((product as any).quantityPricing) && (product as any).quantityPricing.length > 0;
         const isGrabBag = (product as any).sku?.startsWith("GRAB-BAG-");
@@ -348,7 +351,9 @@ export default function StorefrontPage() {
     return allProducts.filter((product: Product & { category: Category | null }) => {
       const hasStock = product.stock > 0;
       if (!showDealsOnly) return hasStock;
-      const hasDiscount = product.discountPercentage && parseFloat(String(product.discountPercentage)) > 0;
+      const hasDiscountPct = product.discountPercentage && parseFloat(String(product.discountPercentage)) > 0;
+      const hasDiscountAmt = (product as any).discountAmount && parseFloat(String((product as any).discountAmount)) > 0;
+      const hasDiscount = hasDiscountPct || hasDiscountAmt;
       const hasBogo = product.bogoEnabled === true;
       const hasQuantityPricing = Array.isArray((product as any).quantityPricing) && (product as any).quantityPricing.length > 0;
       return hasStock && (hasDiscount || hasBogo || hasQuantityPricing);
