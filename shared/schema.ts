@@ -776,6 +776,7 @@ export const grabBags = pgTable("grab_bags", {
   specificProductIds: text("specific_product_ids"), // JSON array of product IDs always included
   categorySelections: text("category_selections"), // JSON array of { categoryId, count }
   blacklistedProductIds: text("blacklisted_product_ids"), // JSON array of product IDs never picked from category selections
+  hideItems: boolean("hide_items").notNull().default(false), // hide item list from customers
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

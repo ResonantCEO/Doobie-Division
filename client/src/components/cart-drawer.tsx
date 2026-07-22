@@ -630,6 +630,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         <p className="text-xs text-muted-foreground">{item.product.category.name}</p>
                       )}
                       {item.product.sku?.startsWith("GRAB-BAG-") && (item.product as any).description && (() => {
+                        const grabBagMeta = (() => { try { return JSON.parse((item.product as any).adminNotes || "{}"); } catch { return {}; } })();
+                        if (grabBagMeta.hideItems) return null;
                         const bagItems = parseGrabBagItems((item.product as any).description);
                         return bagItems.length > 0 ? (
                           <div className="mt-1 space-y-0.5 border-t border-dashed border-muted-foreground/20 pt-1">

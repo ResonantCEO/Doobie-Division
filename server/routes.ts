@@ -3776,6 +3776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         adminNotes: JSON.stringify({
           templateId: bag.id,
           bagName: bag.name,
+          hideItems: bag.hideItems ?? false,
           items: confirmedProducts.map(p => ({ productId: p.id, name: p.name, sku: p.sku, price: p.price })),
         }),
       } as any);

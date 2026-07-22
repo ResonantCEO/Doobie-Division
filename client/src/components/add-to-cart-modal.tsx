@@ -601,6 +601,8 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
               <p className="text-xs text-muted-foreground">{product.category.name}</p>
             )}
             {isGrabBag && (product as any).description && (() => {
+              const grabBagMeta = (() => { try { return JSON.parse((product as any).adminNotes || "{}"); } catch { return {}; } })();
+              if (grabBagMeta.hideItems) return null;
               const bagItems = parseGrabBagItems((product as any).description);
               return bagItems.length > 0 ? (
                 <div className="mt-1.5 space-y-0.5 border-t border-dashed border-muted-foreground/20 pt-1.5">

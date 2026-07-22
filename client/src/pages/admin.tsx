@@ -137,12 +137,13 @@ export default function AdminPage() {
     specificProductIds: [] as { id: number; size?: string }[],
     categorySelections: [] as { categoryId: number; count: number }[],
     blacklistedProductIds: [] as number[],
+    hideItems: false,
     isActive: true,
   });
 
   const resetGrabBagForm = () => setGrabBagForm({
     name: "", description: "", sellingPrice: "", maxTotalItemPrice: "",
-    specificProductIds: [], categorySelections: [], blacklistedProductIds: [], isActive: true,
+    specificProductIds: [], categorySelections: [], blacklistedProductIds: [], hideItems: false, isActive: true,
   });
 
   const openEditGrabBag = (g: GrabBag) => {
@@ -161,6 +162,7 @@ export default function AdminPage() {
       })(),
       categorySelections: g.categorySelections ? JSON.parse(g.categorySelections) : [],
       blacklistedProductIds: g.blacklistedProductIds ? JSON.parse(g.blacklistedProductIds) : [],
+      hideItems: g.hideItems ?? false,
       isActive: g.isActive,
     });
     setShowGrabBagModal(true);
@@ -578,6 +580,7 @@ export default function AdminPage() {
         specificProductIds: data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
         categorySelections: data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
         blacklistedProductIds: data.blacklistedProductIds.length > 0 ? JSON.stringify(data.blacklistedProductIds) : null,
+        hideItems: data.hideItems,
         isActive: data.isActive,
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
@@ -602,6 +605,7 @@ export default function AdminPage() {
         specificProductIds: data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
         categorySelections: data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
         blacklistedProductIds: data.blacklistedProductIds.length > 0 ? JSON.stringify(data.blacklistedProductIds) : null,
+        hideItems: data.hideItems,
         isActive: data.isActive,
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
@@ -2669,6 +2673,17 @@ export default function AdminPage() {
                   })}
                 </div>
               )}
+            </div>
+
+            {/* Hide items toggle */}
+            <div className="flex items-center justify-between rounded-lg border p-3 dark:border-gray-700">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">Hide bag contents from customers</Label>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  When on, customers won't see the item list on the storefront, add-to-cart screen, or shopping cart. Staff can always see the full contents on fulfillment screens.
+                </p>
+              </div>
+              <Switch checked={grabBagForm.hideItems} onCheckedChange={v => setGrabBagForm(f => ({ ...f, hideItems: v }))} />
             </div>
 
             {/* Active toggle */}

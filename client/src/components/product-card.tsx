@@ -503,7 +503,17 @@ export default function ProductCard({ product }: ProductCardProps) {
                 onWheel={(e) => e.stopPropagation()}
               >
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-                  {product.description || "No description available"}
+                  {(() => {
+                    if (isGrabBag) {
+                      const meta = (() => { try { return JSON.parse((product as any).adminNotes || "{}"); } catch { return {}; } })();
+                      if (meta.hideItems) {
+                        // Show only the first line (e.g. "🎁 Grab Bag — X items (retail value: $Y)") without the item list
+                        const firstLine = (product.description || "").split("\n")[0];
+                        return firstLine || "Mystery grab bag";
+                      }
+                    }
+                    return product.description || "No description available";
+                  })()}
                 </p>
               </div>
             </div>
