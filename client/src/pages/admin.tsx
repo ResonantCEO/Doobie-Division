@@ -1150,6 +1150,7 @@ export default function AdminPage() {
           <TabsTrigger value="purchase-limits">Purchase Limits</TabsTrigger>
           <TabsTrigger value="access">Access</TabsTrigger>
           <TabsTrigger value="discounts">Discounts</TabsTrigger>
+          <TabsTrigger value="bags">Bags</TabsTrigger>
         </TabsList>
 
         <TabsContent value="logs">
