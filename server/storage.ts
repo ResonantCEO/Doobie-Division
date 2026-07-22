@@ -3528,11 +3528,16 @@ export class DatabaseStorage implements IStorage {
 
   async cleanupVerificationFiles(): Promise<void> {
     const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000);
+    // Include users verified >72h ago, OR active users with no verifiedAt set
+    // (i.e. accounts that were active before the verifiedAt column was added)
     const staleUsers = await db
       .select()
       .from(users)
       .where(
-        sql`verified_at IS NOT NULL AND verified_at < ${cutoff} AND (id_image_url IS NOT NULL OR verification_photo_url IS NOT NULL)`
+        sql`(id_image_url IS NOT NULL OR verification_photo_url IS NOT NULL) AND (
+          (verified_at IS NOT NULL AND verified_at < ${cutoff})
+          OR (verified_at IS NULL AND status = 'active' AND created_at < ${cutoff})
+        )`
       );
 
     if (staleUsers.length === 0) return;

@@ -591,9 +591,9 @@ export default function UsersPage() {
                         ) : (
                           <div className="flex flex-col items-center">
                             <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded border flex items-center justify-center">
-                              <span className="text-xs text-gray-400">No Verify</span>
+                              <span className="text-xs text-gray-500 font-medium">N/A</span>
                             </div>
-                            <span className="text-xs text-gray-500 mt-0.5">Verify</span>
+                            <span className="text-xs text-gray-500 mt-0.5">Verification</span>
                           </div>
                         )}
                       </div>
@@ -790,8 +790,8 @@ export default function UsersPage() {
                               </div>
                             ) : (
                               <div className="flex flex-col items-center">
-                                <div className="w-12 h-12 bg-gray-100 rounded border flex items-center justify-center">
-                                  <span className="text-xs text-gray-400">No Verify</span>
+                                <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded border flex items-center justify-center">
+                                  <span className="text-xs text-gray-500 font-medium">N/A</span>
                                 </div>
                                 <span className="text-xs text-gray-500 mt-1">Verification</span>
                               </div>
