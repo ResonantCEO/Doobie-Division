@@ -129,6 +129,7 @@ export default function AdminPage() {
   const [deleteGrabBagConfirmOpen, setDeleteGrabBagConfirmOpen] = useState(false);
   const [grabBagToGenerate, setGrabBagToGenerate] = useState<GrabBag | null>(null);
   const [flavorPickerProduct, setFlavorPickerProduct] = useState<ProductWithSizes | null>(null);
+  const [weightPickerProduct, setWeightPickerProduct] = useState<ProductWithSizes | null>(null);
   const [generateResultOpen, setGenerateResultOpen] = useState(false);
   type GrabBagPreview = { selectedProducts: { id: number; name: string; price: number; sku: string; sellingMethod?: string; weightLabel?: string; selectedSize?: string; imageUrl?: string | null; imageUrls?: string | null }[]; retailValue: number; sellingPrice: number; bagId: number; bagName: string; warnings?: string[] };
   const [generatePreview, setGeneratePreview] = useState<GrabBagPreview | null>(null);
@@ -2520,6 +2521,8 @@ export default function AdminPage() {
                           onMouseDown={() => {
                             if (hasFlavors) {
                               setFlavorPickerProduct(p);
+                            } else if (p.sellingMethod === "weight") {
+                              setWeightPickerProduct(p);
                             } else {
                               setGrabBagForm(f => ({ ...f, specificProductIds: [...f.specificProductIds, { id: p.id }] }));
                             }
@@ -2540,14 +2543,27 @@ export default function AdminPage() {
                   {grabBagForm.specificProductIds.map((entry, idx) => {
                     const prod = allProducts.find(p => p.id === entry.id);
                     const cat = prod ? allCategories.find(c => c.id === prod.categoryId) : null;
+                    const isWeightBased = prod?.sellingMethod === "weight";
                     const sizeData = entry.size && prod?.sizes ? prod.sizes.find(s => s.size === entry.size) : null;
+                    const weightTiers: Record<string, string | null | undefined> = prod ? {
+                      "g": (prod as any).pricePerGram,
+                      "⅛ oz": (prod as any).pricePerEighth,
+                      "¼ oz": (prod as any).pricePerQuarter,
+                      "½ oz": (prod as any).pricePerHalf,
+                      "oz": (prod as any).pricePerOunce,
+                    } : {};
+                    const pinnedWeightPrice = isWeightBased && entry.size ? weightTiers[entry.size] : null;
+                    const displayPrice = isWeightBased
+                      ? (pinnedWeightPrice ? `$${Number(pinnedWeightPrice).toFixed(2)}/${entry.size}` : "weight-based")
+                      : prod?.price ? `$${Number(prod.price).toFixed(2)}` : null;
                     return (
                       <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
                         <span>
                           {prod ? prod.name : `Product #${entry.id}`}
-                          {entry.size && <span className="text-blue-500 ml-1">({entry.size}{sizeData ? ` · ${sizeData.quantity} in stock` : ''})</span>}
+                          {entry.size && !isWeightBased && <span className="text-blue-500 ml-1">({entry.size}{sizeData ? ` · ${sizeData.quantity} in stock` : ''})</span>}
+                          {isWeightBased && entry.size && <span className="text-purple-500 ml-1">({entry.size})</span>}
                           {cat && !entry.size && <span className="text-gray-400 ml-1">({cat.name})</span>}
-                          {prod && ` — $${Number(prod.price).toFixed(2)}`}
+                          {displayPrice && <span className="text-gray-500"> — {displayPrice}</span>}
                         </span>
                         <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setGrabBagForm(f => ({ ...f, specificProductIds: f.specificProductIds.filter((_, i) => i !== idx) }))}>
                           <Trash2 className="h-3.5 w-3.5 text-gray-400" />
@@ -2763,6 +2779,50 @@ export default function AdminPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setFlavorPickerProduct(null)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Weight Picker Dialog */}
+      <Dialog open={!!weightPickerProduct} onOpenChange={(open) => { if (!open) setWeightPickerProduct(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Choose a Weight</DialogTitle>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {weightPickerProduct?.name} — select which weight to always include in the bag.
+            </p>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            {weightPickerProduct && (() => {
+              const p = weightPickerProduct as any;
+              const tiers = [
+                { label: "g",    price: p.pricePerGram },
+                { label: "⅛ oz", price: p.pricePerEighth },
+                { label: "¼ oz", price: p.pricePerQuarter },
+                { label: "½ oz", price: p.pricePerHalf },
+                { label: "oz",   price: p.pricePerOunce },
+              ].filter(t => t.price != null && parseFloat(t.price) > 0);
+              return tiers.map(t => (
+                <button
+                  key={t.label}
+                  type="button"
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                  onClick={() => {
+                    setGrabBagForm(f => ({
+                      ...f,
+                      specificProductIds: [...f.specificProductIds, { id: weightPickerProduct.id, size: t.label }],
+                    }));
+                    setWeightPickerProduct(null);
+                  }}
+                >
+                  <span className="font-medium text-sm">{t.label}</span>
+                  <span className="text-sm text-green-600 dark:text-green-400">${Number(t.price).toFixed(2)}</span>
+                </button>
+              ));
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWeightPickerProduct(null)}>Cancel</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

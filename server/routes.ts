@@ -3541,6 +3541,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ].map(o => ({ label: o.label, price: o.val != null ? parseFloat(o.val) : NaN }))
          .filter(o => !isNaN(o.price) && o.price > 0);
         if (opts.length === 0) return { price: 0, sellingMethod: "weight", weightLabel: "", selectedSize };
+        // If a specific weight tier was pinned (preferredSize holds the label like "⅛ oz"), honor it
+        if (preferredSize) {
+          const pinned = opts.find(o => o.label === preferredSize);
+          if (pinned) return { price: pinned.price, sellingMethod: "weight", weightLabel: pinned.label, selectedSize };
+        }
         // Pick the highest-value tier that fits within slotBudget; fall back to cheapest if none fit
         const affordable = opts.filter(o => o.price <= slotBudget);
         const best = affordable.length > 0
