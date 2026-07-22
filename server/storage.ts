@@ -196,6 +196,7 @@ export interface IStorage {
   getPasswordResetToken(token: string): Promise<{ userId: string; expiresAt: Date } | undefined>;
   deletePasswordResetToken(token: string): Promise<void>;
   cleanupExpiredPasswordResetTokens(): Promise<void>;
+  cleanupVerificationFiles(): Promise<void>;
 
   // City purchase limits
   getCityPurchaseLimits(): Promise<any[]>;
@@ -3450,9 +3451,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserStatus(id: string, status: string): Promise<User> {
+    const setData: Record<string, any> = { status, updatedAt: new Date() };
+    if (status === 'active') {
+      setData.verifiedAt = new Date();
+    }
     const [user] = await db
       .update(users)
-      .set({ status, updatedAt: new Date() })
+      .set(setData)
       .where(eq(users.id, id))
       .returning();
 
@@ -3509,12 +3514,49 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserIdVerification(id: string, status: string): Promise<User> {
+    const setData: Record<string, any> = { idVerificationStatus: status, updatedAt: new Date() };
+    if (status === 'verified') {
+      setData.verifiedAt = new Date();
+    }
     const [updated] = await db
       .update(users)
-      .set({ idVerificationStatus: status, updatedAt: new Date() })
+      .set(setData)
       .where(eq(users.id, id))
       .returning();
     return updated;
+  }
+
+  async cleanupVerificationFiles(): Promise<void> {
+    const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000);
+    const staleUsers = await db
+      .select()
+      .from(users)
+      .where(
+        sql`verified_at IS NOT NULL AND verified_at < ${cutoff} AND (id_image_url IS NOT NULL OR verification_photo_url IS NOT NULL)`
+      );
+
+    if (staleUsers.length === 0) return;
+
+    const { ObjectStorageService } = await import("./objectStorage");
+    const objectStorage = new ObjectStorageService();
+
+    for (const user of staleUsers) {
+      try {
+        if (user.idImageUrl) {
+          await objectStorage.deleteObjectEntity(user.idImageUrl);
+        }
+        if (user.verificationPhotoUrl) {
+          await objectStorage.deleteObjectEntity(user.verificationPhotoUrl);
+        }
+        await db
+          .update(users)
+          .set({ idImageUrl: null, verificationPhotoUrl: null, updatedAt: new Date() })
+          .where(eq(users.id, user.id));
+        console.log(`Deleted verification files for user ${user.id}`);
+      } catch (err) {
+        console.error(`Error cleaning up verification files for user ${user.id}:`, err);
+      }
+    }
   }
 
   async getUsersPendingVerification(): Promise<User[]> {

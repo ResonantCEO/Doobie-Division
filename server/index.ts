@@ -178,6 +178,15 @@ app.use((req, res, next) => {
   // A single warmup query serializes startup and prevents the null-map crash.
   await warmupDatabase();
 
+  // Add verified_at column to users table if not already present
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP`);
+    console.log("✓ Verified users.verified_at column exists");
+  } catch (error: any) {
+    console.warn("⚠ Could not verify users.verified_at column:", error?.message);
+  }
+
   // Ensure image_urls column exists (migration)
   try {
     const { sql } = await import("./db");
@@ -397,6 +406,18 @@ app.use((req, res, next) => {
       console.error("Error cleaning up old closed tickets:", error);
     }
   }, 3600000); // 1 hour
+
+  // Delete verification files (ID photo + verification photo) for users verified >72 hours ago
+  const runVerificationFileCleanup = async () => {
+    try {
+      const { storage } = await import("./storage");
+      await storage.cleanupVerificationFiles();
+    } catch (error) {
+      console.error("Error cleaning up verification files:", error);
+    }
+  };
+  runVerificationFileCleanup(); // run once on startup to catch any missed deletions
+  setInterval(runVerificationFileCleanup, 3600000); // then every hour
 
   // Start the server
   server.listen(port, "0.0.0.0", () => {
