@@ -2495,8 +2495,7 @@ export default function AdminPage() {
                   {(() => {
                     const term = specificSearch.toLowerCase();
                     const eligible = allProducts.filter(p =>
-                      p.price &&
-                      (!term || p.name.toLowerCase().includes(term) || (allCategories.find(c => c.id === p.categoryId)?.name || "").toLowerCase().includes(term))
+                      !term || p.name.toLowerCase().includes(term) || (allCategories.find(c => c.id === p.categoryId)?.name || "").toLowerCase().includes(term)
                     ).sort((a, b) => a.name.localeCompare(b.name));
                     if (eligible.length === 0) return <p className="px-3 py-2 text-sm text-gray-400">No products found</p>;
                     return eligible.map(p => {
@@ -2505,6 +2504,14 @@ export default function AdminPage() {
                         ? p.sizes.reduce((s, sz) => s + (sz.quantity ?? 0), 0)
                         : (p.stock ?? 0);
                       const hasFlavors = p.sizes && p.sizes.length > 0;
+                      const isWeightBased = p.sellingMethod === "weight";
+                      const displayPrice = p.price
+                        ? `$${Number(p.price).toFixed(2)}`
+                        : p.pricePerEighth
+                        ? `$${Number(p.pricePerEighth).toFixed(2)}/⅛oz`
+                        : p.pricePerGram
+                        ? `$${Number(p.pricePerGram).toFixed(2)}/g`
+                        : isWeightBased ? "weight-based" : "no price";
                       return (
                         <button
                           key={p.id}
@@ -2521,7 +2528,7 @@ export default function AdminPage() {
                           }}
                         >
                           <span className="truncate font-medium">{p.name}{cat ? <span className="text-gray-400 font-normal"> · {cat.name}</span> : null}</span>
-                          <span className="shrink-0 text-gray-500 text-xs">${Number(p.price).toFixed(2)} · {hasFlavors ? `${p.sizes!.length} flavors` : `${totalStock} in stock`}</span>
+                          <span className="shrink-0 text-gray-500 text-xs">{displayPrice} · {hasFlavors ? `${p.sizes!.length} flavors` : `${totalStock} in stock`}</span>
                         </button>
                       );
                     });
@@ -2639,6 +2646,14 @@ export default function AdminPage() {
                     if (eligible.length === 0) return <p className="px-3 py-2 text-sm text-gray-400">No products found</p>;
                     return eligible.map(p => {
                       const cat = allCategories.find(c => c.id === p.categoryId);
+                      const isWeightBased = p.sellingMethod === "weight";
+                      const displayPrice = p.price
+                        ? `$${Number(p.price).toFixed(2)}`
+                        : (p as any).pricePerEighth
+                        ? `$${Number((p as any).pricePerEighth).toFixed(2)}/⅛oz`
+                        : (p as any).pricePerGram
+                        ? `$${Number((p as any).pricePerGram).toFixed(2)}/g`
+                        : isWeightBased ? "weight-based" : "";
                       return (
                         <button
                           key={p.id}
@@ -2653,7 +2668,7 @@ export default function AdminPage() {
                           }}
                         >
                           <span className="truncate font-medium">{p.name}{cat ? <span className="text-gray-400 font-normal"> · {cat.name}</span> : null}</span>
-                          {p.price && <span className="shrink-0 text-gray-500 text-xs">${Number(p.price).toFixed(2)}</span>}
+                          {displayPrice && <span className="shrink-0 text-gray-500 text-xs">{displayPrice}</span>}
                         </button>
                       );
                     });
