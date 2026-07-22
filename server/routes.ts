@@ -701,6 +701,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper: scan all grab-bag products and disable any whose component items are out of stock.
+  // Also re-enables bags (sets stock back to 1) when all components are back in stock.
+  async function syncGrabBagAvailability(): Promise<void> {
+    try {
+      const { products: productsTable } = await import("@shared/schema");
+      const allBagProducts = await db
+        .select()
+        .from(productsTable)
+        .where(like(productsTable.sku, "GRAB-BAG-%"));
+
+      for (const bag of allBagProducts) {
+        if ((bag.sku ?? "").startsWith("GRAB-BAG-DISCOUNT")) continue;
+        if (!bag.adminNotes) continue;
+        let items: Array<{ productId?: number | null }> = [];
+        try {
+          const parsed = JSON.parse(bag.adminNotes as string);
+          if (parsed.items && Array.isArray(parsed.items)) items = parsed.items;
+        } catch { continue; }
+
+        let anyOutOfStock = false;
+        for (const item of items) {
+          if (!item.productId) continue;
+          const component = await storage.getProduct(item.productId);
+          if (!component || !component.isActive) { anyOutOfStock = true; break; }
+          // For size-based products check that at least one size has quantity
+          if (component.sizes && component.sizes.length > 0) {
+            const hasStock = component.sizes.some((s: any) => (s.quantity ?? 0) > 0);
+            if (!hasStock) { anyOutOfStock = true; break; }
+          } else if ((component.stock ?? 0) <= 0) {
+            anyOutOfStock = true;
+            break;
+          }
+        }
+
+        const currentStock = bag.stock ?? 0;
+        if (anyOutOfStock && currentStock > 0) {
+          await db.execute(sql`UPDATE products SET stock = 0, is_active = false, updated_at = NOW() WHERE id = ${bag.id}`);
+          console.log(`[syncGrabBagAvailability] Disabled bag product #${bag.id} (${bag.name}) — component out of stock`);
+        } else if (!anyOutOfStock && (!bag.isActive || currentStock === 0)) {
+          await db.execute(sql`UPDATE products SET stock = 1, is_active = true, updated_at = NOW() WHERE id = ${bag.id}`);
+          console.log(`[syncGrabBagAvailability] Re-enabled bag product #${bag.id} (${bag.name}) — all components back in stock`);
+        }
+      }
+
+      try {
+        const { invalidateCache } = await import("./cache");
+        invalidateCache.products();
+      } catch { /* best-effort */ }
+    } catch (err) {
+      console.warn("[syncGrabBagAvailability] Error:", err);
+    }
+  }
+
   // Stock adjustment route
   app.post('/api/products/:id/adjust-stock', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
@@ -720,6 +773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.adjustStock(productId, quantity, req.currentUser.id, reason, sizeName || undefined);
+      syncGrabBagAvailability().catch(() => {});
       res.status(200).json({ message: "Stock adjusted successfully" });
     } catch (error) {
       console.error("Stock adjustment error:", error);
@@ -754,6 +808,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      syncGrabBagAvailability().catch(() => {});
       res.status(200).json({ results });
     } catch (error) {
       res.status(500).json({ message: "Failed to process bulk adjustments" });
@@ -1019,6 +1074,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
 
+        // For grab bag products, also verify each component item has stock
+        if ((product.sku ?? "").startsWith("GRAB-BAG-") && product.adminNotes) {
+          try {
+            const bagMeta = JSON.parse(product.adminNotes as string);
+            if (bagMeta.items && Array.isArray(bagMeta.items)) {
+              for (const bagItem of bagMeta.items) {
+                if (!bagItem.productId) continue;
+                const comp = await storage.getProduct(bagItem.productId);
+                if (!comp || !comp.isActive) {
+                  stockErrors.push(`Grab bag "${product.name}" is unavailable — item "${bagItem.name}" is no longer available.`);
+                  break;
+                }
+                const compOutOfStock = comp.sizes && comp.sizes.length > 0
+                  ? !comp.sizes.some((s: any) => (s.quantity ?? 0) > 0)
+                  : (comp.stock ?? 0) <= 0;
+                if (compOutOfStock) {
+                  stockErrors.push(`Grab bag "${product.name}" is unavailable — item "${bagItem.name}" is out of stock.`);
+                  break;
+                }
+              }
+            }
+          } catch { /* ignore parse errors */ }
+          if (stockErrors.length > 0) continue;
+        }
+
         enrichedItems.push({
           ...item,
           productSku: product.sku
@@ -1122,6 +1202,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.warn("[createOrder] Failed to deduct grab bag product stock:", err);
         }
       }
+
+      // Sync grab bag availability — disables any bag products whose component items are now out of stock
+      syncGrabBagAvailability().catch(() => {});
 
       // Invalidate the products cache so updated stock counts are reflected immediately
       try {
