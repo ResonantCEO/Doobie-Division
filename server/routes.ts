@@ -600,33 +600,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[POST /api/products] Parsed productData:', JSON.stringify(productData, null, 2));
       const product = await storage.createProduct(productData);
 
-      // Auto-create a Daily Deals ad if product has BOGO or quantity pricing and no active ads exist yet
-      try {
-        const hasBogo = (product as any).bogoEnabled === true;
-        const hasQuantityPricing = Array.isArray((product as any).quantityPricing) && (product as any).quantityPricing.length > 0;
-        if (hasBogo || hasQuantityPricing) {
-          const existingAds = await storage.getActivePromotionalAds();
-          if (existingAds.length === 0) {
-            const subtitle = hasBogo
-              ? "Buy one, get one free on select items!"
-              : "Buy more and save — tiered pricing available!";
-            await storage.createPromotionalAd({
-              title: "Daily Deals",
-              subtitle,
-              buttonText: "Shop Deals",
-              buttonLink: "",
-              backgroundImageUrl: (product as any).imageUrl || null,
-              backgroundColor: hasBogo ? "#3b1054" : "#14532d",
-              textColor: "white",
-              isActive: true,
-              sortOrder: 0,
-            });
-          }
-        }
-      } catch (e) {
-        console.error('[POST /api/products] Failed to auto-create deals ad:', e);
-      }
-
       res.status(201).json(product);
     } catch (error) {
       console.error('[POST /api/products] Product creation error:', error);
@@ -684,36 +657,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[PUT /api/products/:id] Parsed productData:', JSON.stringify(productData, null, 2));
       const product = await storage.updateProduct(id, productData);
       console.log('[PUT /api/products/:id] Update returned product id:', product?.id);
-
-      // Auto-create a Daily Deals ad if product has BOGO or quantity pricing and no active ads exist yet
-      try {
-        if (product) {
-          const hasBogo = (product as any).bogoEnabled === true;
-          const hasQuantityPricing = Array.isArray((product as any).quantityPricing) && (product as any).quantityPricing.length > 0;
-          if (hasBogo || hasQuantityPricing) {
-            const existingAds = await storage.getActivePromotionalAds();
-            if (existingAds.length === 0) {
-              const dealType = hasBogo ? "BOGO" : "Quantity";
-              const subtitle = hasBogo
-                ? "Buy one, get one free on select items!"
-                : `Buy more and save — tiered pricing available!`;
-              await storage.createPromotionalAd({
-                title: "Daily Deals",
-                subtitle,
-                buttonText: "Shop Deals",
-                buttonLink: "",
-                backgroundImageUrl: (product as any).imageUrl || null,
-                backgroundColor: hasBogo ? "#3b1054" : "#14532d",
-                textColor: "white",
-                isActive: true,
-                sortOrder: 0,
-              });
-            }
-          }
-        }
-      } catch (e) {
-        console.error('[PUT /api/products/:id] Failed to auto-create deals ad:', e);
-      }
 
       res.json(product);
     } catch (error: any) {
