@@ -119,6 +119,10 @@ export default function AdminPage() {
 
   // Grab Bags state
   const [discountsSubTab, setDiscountsSubTab] = useState("promo-codes");
+  const [specificSearch, setSpecificSearch] = useState("");
+  const [showSpecificList, setShowSpecificList] = useState(false);
+  const [blacklistSearch, setBlacklistSearch] = useState("");
+  const [showBlacklistList, setShowBlacklistList] = useState(false);
   const [showGrabBagModal, setShowGrabBagModal] = useState(false);
   const [editingGrabBag, setEditingGrabBag] = useState<GrabBag | null>(null);
   const [grabBagToDelete, setGrabBagToDelete] = useState<GrabBag | null>(null);
@@ -2478,55 +2482,52 @@ export default function AdminPage() {
                 Always Include — Specific Products
               </Label>
               <p className="text-xs text-gray-400">These products are always added to every generated bag.</p>
-              <Select
-                onValueChange={(val) => {
-                  const id = parseInt(val);
-                  const prod = allProducts.find(p => p.id === id);
-                  if (!prod) return;
-                  if (prod.sizes && prod.sizes.length > 0) {
-                    setFlavorPickerProduct(prod);
-                  } else {
-                    setGrabBagForm(f => ({ ...f, specificProductIds: [...f.specificProductIds, { id }] }));
-                  }
-                }}
-                value=""
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Add a specific product…" />
-                </SelectTrigger>
-                <SelectContent>
+              <Input
+                placeholder="Search products to add…"
+                value={specificSearch}
+                onChange={e => { setSpecificSearch(e.target.value); setShowSpecificList(true); }}
+                onFocus={() => setShowSpecificList(true)}
+                onBlur={() => setTimeout(() => setShowSpecificList(false), 150)}
+                autoComplete="off"
+              />
+              {showSpecificList && (
+                <div className="w-full border dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 max-h-48 overflow-y-auto">
                   {(() => {
-                    const eligible = allProducts.filter(p => p.price);
-                    const catMap = new Map<number | null, typeof eligible>();
-                    for (const p of eligible) {
-                      const cid = p.categoryId ?? null;
-                      if (!catMap.has(cid)) catMap.set(cid, []);
-                      catMap.get(cid)!.push(p);
-                    }
-                    const groups = Array.from(catMap.entries()).map(([cid, prods]) => ({
-                      label: cid ? (allCategories.find(c => c.id === cid)?.name ?? `Category #${cid}`) : "Uncategorized",
-                      prods: [...prods].sort((a, b) => a.name.localeCompare(b.name)),
-                    })).sort((a, b) => a.label.localeCompare(b.label));
-                    return groups.map(g => (
-                      <SelectGroup key={g.label}>
-                        <SelectLabel>{g.label}</SelectLabel>
-                        {g.prods.map(p => {
-                          const totalStock = p.sizes && p.sizes.length > 0
-                            ? p.sizes.reduce((s, sz) => s + (sz.quantity ?? 0), 0)
-                            : (p.stock ?? 0);
-                          const hasFlavors = p.sizes && p.sizes.length > 0;
-                          return (
-                            <SelectItem key={p.id} value={p.id.toString()} style={{ paddingLeft: '2.5rem' }}>
-                              {p.name} — ${Number(p.price).toFixed(2)}
-                              {hasFlavors ? ` · ${p.sizes!.length} flavors` : ` · ${totalStock} in stock`}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectGroup>
-                    ));
+                    const term = specificSearch.toLowerCase();
+                    const eligible = allProducts.filter(p =>
+                      p.price &&
+                      (!term || p.name.toLowerCase().includes(term) || (allCategories.find(c => c.id === p.categoryId)?.name || "").toLowerCase().includes(term))
+                    ).sort((a, b) => a.name.localeCompare(b.name));
+                    if (eligible.length === 0) return <p className="px-3 py-2 text-sm text-gray-400">No products found</p>;
+                    return eligible.map(p => {
+                      const cat = allCategories.find(c => c.id === p.categoryId);
+                      const totalStock = p.sizes && p.sizes.length > 0
+                        ? p.sizes.reduce((s, sz) => s + (sz.quantity ?? 0), 0)
+                        : (p.stock ?? 0);
+                      const hasFlavors = p.sizes && p.sizes.length > 0;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-between gap-2 border-b last:border-b-0 dark:border-gray-700"
+                          onMouseDown={() => {
+                            if (hasFlavors) {
+                              setFlavorPickerProduct(p);
+                            } else {
+                              setGrabBagForm(f => ({ ...f, specificProductIds: [...f.specificProductIds, { id: p.id }] }));
+                            }
+                            setSpecificSearch("");
+                            setShowSpecificList(false);
+                          }}
+                        >
+                          <span className="truncate font-medium">{p.name}{cat ? <span className="text-gray-400 font-normal"> · {cat.name}</span> : null}</span>
+                          <span className="shrink-0 text-gray-500 text-xs">${Number(p.price).toFixed(2)} · {hasFlavors ? `${p.sizes!.length} flavors` : `${totalStock} in stock`}</span>
+                        </button>
+                      );
+                    });
                   })()}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
               {grabBagForm.specificProductIds.length > 0 && (
                 <div className="space-y-1 mt-2">
                   {grabBagForm.specificProductIds.map((entry, idx) => {
@@ -2619,44 +2620,46 @@ export default function AdminPage() {
                 Never Include — Blacklisted Products
               </Label>
               <p className="text-xs text-gray-400">These products will never be randomly picked from category selections for this bag.</p>
-              <Select
-                onValueChange={(val) => {
-                  const id = parseInt(val);
-                  if (!grabBagForm.blacklistedProductIds.includes(id)) {
-                    setGrabBagForm(f => ({ ...f, blacklistedProductIds: [...f.blacklistedProductIds, id] }));
-                  }
-                }}
-                value=""
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Add a product to exclude…" />
-                </SelectTrigger>
-                <SelectContent>
+              <Input
+                placeholder="Search products to exclude…"
+                value={blacklistSearch}
+                onChange={e => { setBlacklistSearch(e.target.value); setShowBlacklistList(true); }}
+                onFocus={() => setShowBlacklistList(true)}
+                onBlur={() => setTimeout(() => setShowBlacklistList(false), 150)}
+                autoComplete="off"
+              />
+              {showBlacklistList && (
+                <div className="w-full border dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 max-h-48 overflow-y-auto">
                   {(() => {
-                    const eligible = allProducts.filter(p => !grabBagForm.blacklistedProductIds.includes(p.id) && p.price);
-                    const catMap = new Map<number | null, typeof eligible>();
-                    for (const p of eligible) {
-                      const cid = p.categoryId ?? null;
-                      if (!catMap.has(cid)) catMap.set(cid, []);
-                      catMap.get(cid)!.push(p);
-                    }
-                    const groups = Array.from(catMap.entries()).map(([cid, prods]) => ({
-                      label: cid ? (allCategories.find(c => c.id === cid)?.name ?? `Category #${cid}`) : "Uncategorized",
-                      prods: [...prods].sort((a, b) => a.name.localeCompare(b.name)),
-                    })).sort((a, b) => a.label.localeCompare(b.label));
-                    return groups.map(g => (
-                      <SelectGroup key={g.label}>
-                        <SelectLabel>{g.label}</SelectLabel>
-                        {g.prods.map(p => (
-                          <SelectItem key={p.id} value={p.id.toString()} style={{ paddingLeft: '2.5rem' }}>
-                            {p.name} — ${Number(p.price).toFixed(2)}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    ));
+                    const term = blacklistSearch.toLowerCase();
+                    const eligible = allProducts.filter(p =>
+                      !grabBagForm.blacklistedProductIds.includes(p.id) &&
+                      (!term || p.name.toLowerCase().includes(term) || (allCategories.find(c => c.id === p.categoryId)?.name || "").toLowerCase().includes(term))
+                    ).sort((a, b) => a.name.localeCompare(b.name));
+                    if (eligible.length === 0) return <p className="px-3 py-2 text-sm text-gray-400">No products found</p>;
+                    return eligible.map(p => {
+                      const cat = allCategories.find(c => c.id === p.categoryId);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-between gap-2 border-b last:border-b-0 dark:border-gray-700"
+                          onMouseDown={() => {
+                            if (!grabBagForm.blacklistedProductIds.includes(p.id)) {
+                              setGrabBagForm(f => ({ ...f, blacklistedProductIds: [...f.blacklistedProductIds, p.id] }));
+                            }
+                            setBlacklistSearch("");
+                            setShowBlacklistList(false);
+                          }}
+                        >
+                          <span className="truncate font-medium">{p.name}{cat ? <span className="text-gray-400 font-normal"> · {cat.name}</span> : null}</span>
+                          {p.price && <span className="shrink-0 text-gray-500 text-xs">${Number(p.price).toFixed(2)}</span>}
+                        </button>
+                      );
+                    });
                   })()}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
               {grabBagForm.blacklistedProductIds.length > 0 && (
                 <div className="space-y-1 mt-2">
                   {grabBagForm.blacklistedProductIds.map(pid => {
