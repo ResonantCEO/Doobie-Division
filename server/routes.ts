@@ -3512,18 +3512,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return bestCombo;
     }
 
-    // 1. Always include specific products
+    // Pre-parse specific items and category selections so we can compute a fair per-slot budget
+    // BEFORE adding mandatory items (prevents a single mandatory item from consuming the full budget).
     let specificItems: { id: number; size?: string }[] = [];
     try {
       const parsed = bag.specificProductIds ? JSON.parse(bag.specificProductIds) : [];
-      // Support both legacy number[] format and new { id, size? }[] format
       specificItems = parsed.map((item: any) => typeof item === 'number' ? { id: item } : item);
     } catch { /* ignore */ }
+
+    let categorySelections: Array<{ categoryId: number; count: number }> = [];
+    try { categorySelections = bag.categorySelections ? JSON.parse(bag.categorySelections) : []; } catch { /* ignore */ }
+
+    // Fair per-slot budget based on ALL slots (specific + category) so mandatory items without a
+    // pinned size pick an affordable weight tier instead of always defaulting to the most expensive.
+    const totalSlots = specificItems.length + categorySelections.reduce((s, c) => s + c.count, 0);
+    const slotBudget = totalSlots > 0 ? targetTotal / totalSlots : targetTotal;
+
+    // 1. Always include specific products
     for (const item of specificItems) {
       try {
         const p = await storage.getProduct(item.id);
         if (p) {
-          const { price, sellingMethod, weightLabel, selectedSize } = resolveProduct(p, Infinity, item.size);
+          // Use slotBudget when no size is pinned so weight-based products don't eat the whole budget.
+          const effectiveBudget = item.size ? Infinity : slotBudget;
+          const { price, sellingMethod, weightLabel, selectedSize } = resolveProduct(p, effectiveBudget, item.size);
           if (price > 0) {
             selectedProducts.push({ id: p.id, name: p.name, price, sku: p.sku, sellingMethod, weightLabel, selectedSize, imageUrl: p.imageUrl, imageUrls: p.imageUrls });
             runningTotal += price;
@@ -3540,15 +3552,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let blacklistedIds: number[] = [];
     try { blacklistedIds = bag.blacklistedProductIds ? JSON.parse(bag.blacklistedProductIds) : []; } catch { /* ignore */ }
 
-    let categorySelections: Array<{ categoryId: number; count: number }> = [];
-    try { categorySelections = bag.categorySelections ? JSON.parse(bag.categorySelections) : []; } catch { /* ignore */ }
-
     // Compute how much of the target remains after specific products
     const remainingTarget = Math.max(0, targetTotal - runningTotal);
 
-    // Fair per-slot budget: divide evenly across all requested slots so every category gets a share
-    const totalSlots = categorySelections.reduce((s, c) => s + c.count, 0);
-    const slotBudget = totalSlots > 0 ? remainingTarget / totalSlots : remainingTarget;
+    // Category slot budget based on what's left after mandatory items
+    const catTotalSlots = categorySelections.reduce((s, c) => s + c.count, 0);
+    const catSlotBudget = catTotalSlots > 0 ? remainingTarget / catTotalSlots : remainingTarget;
 
     // Fetch all category pools, resolving weight tiers against the per-slot budget for variety
     type PoolEntry = { sel: { categoryId: number; count: number }; pool: Array<{ id: number; name: string; price: number; sku: string; sellingMethod: string; weightLabel: string; selectedSize?: string; imageUrl?: string | null; imageUrls?: string | null }> };
@@ -3558,7 +3567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const allInCat = await storage.getProducts({ categoryIds: [sel.categoryId], isActive: true });
         const pool = allInCat
           .filter(p => !selectedProducts.find(s => s.id === p.id) && !blacklistedIds.includes(p.id))
-          .map(p => { const r = resolveProduct(p, slotBudget); return { id: p.id, name: p.name, price: r.price, sku: p.sku, sellingMethod: r.sellingMethod, weightLabel: r.weightLabel, selectedSize: r.selectedSize, imageUrl: p.imageUrl, imageUrls: p.imageUrls }; })
+          .map(p => { const r = resolveProduct(p, catSlotBudget); return { id: p.id, name: p.name, price: r.price, sku: p.sku, sellingMethod: r.sellingMethod, weightLabel: r.weightLabel, selectedSize: r.selectedSize, imageUrl: p.imageUrl, imageUrls: p.imageUrls }; })
           .filter(p => p.price > 0);
         if (pool.length === 0) {
           warnings.push(`"${catLabel(sel.categoryId)}" has no eligible products.`);
@@ -3570,9 +3579,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
-    // Each category gets its proportional budget share (slotBudget × count) — no starvation
+    // Each category gets its proportional budget share (catSlotBudget × count) — no starvation
     for (const { sel, pool } of poolEntries) {
-      const categoryBudget = slotBudget * sel.count;
+      const categoryBudget = catSlotBudget * sel.count;
       const picked = pickBestUnder(pool, sel.count, categoryBudget);
       const pickedTotal = picked.reduce((s, p) => s + p.price, 0);
       for (const p of picked) {
