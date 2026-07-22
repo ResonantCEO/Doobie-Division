@@ -1311,6 +1311,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const order = await storage.updateOrderStatus(id, status);
 
+      // Re-sync grab bag availability after any status change that could restore stock (e.g. cancellation)
+      syncGrabBagAvailability().catch(() => {});
+
       // Create notification for the customer about status change
       if (existingOrder.customerId) {
         try {
@@ -1778,6 +1781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.removeOrderItem(orderId, itemId, req.currentUser.id);
+      syncGrabBagAvailability().catch(() => {});
       const updatedOrder = await storage.getOrder(orderId);
       res.status(200).json(updatedOrder);
     } catch (error: any) {
@@ -1802,6 +1806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.addOrderItem(orderId, productId, quantity, req.currentUser.id, unitPrice != null ? Number(unitPrice) : undefined, unitLabel);
+      syncGrabBagAvailability().catch(() => {});
       const updatedOrder = await storage.getOrder(orderId);
       res.status(200).json(updatedOrder);
     } catch (error: any) {
@@ -1867,6 +1872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (newProduct.stock < quantity) return res.status(400).json({ message: `Insufficient stock. Available: ${newProduct.stock}` });
 
       await storage.substituteOrderItem(orderId, oldItemId, newProductId, quantity, req.currentUser.id);
+      syncGrabBagAvailability().catch(() => {});
 
       res.status(200).json({ message: "Item substituted successfully" });
     } catch (error: any) {
