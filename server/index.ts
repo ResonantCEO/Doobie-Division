@@ -347,6 +347,14 @@ app.use((req, res, next) => {
     console.warn("⚠ Could not set analytics profit-correction sentinel:", error?.message);
   }
 
+  // One-time cleanup: remove auto-generated "Daily Deals" promotional ads
+  try {
+    await sql.query(`DELETE FROM promotional_ads WHERE title = 'Daily Deals'`);
+    console.log("✓ Cleaned up auto-generated Daily Deals ads");
+  } catch (error: any) {
+    console.warn("⚠ Could not clean up Daily Deals ads:", error?.message);
+  }
+
   // Add health check endpoint
   app.get("/api/health", async (req, res) => {
     const dbConnected = await checkDatabaseConnection();
