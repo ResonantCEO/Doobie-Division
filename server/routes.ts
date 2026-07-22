@@ -657,6 +657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[PUT /api/products/:id] Parsed productData:', JSON.stringify(productData, null, 2));
       const product = await storage.updateProduct(id, productData);
       console.log('[PUT /api/products/:id] Update returned product id:', product?.id);
+      syncGrabBagAvailability().catch(() => {});
 
       res.json(product);
     } catch (error: any) {
