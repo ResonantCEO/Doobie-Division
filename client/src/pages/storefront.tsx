@@ -609,6 +609,7 @@ export default function StorefrontPage() {
                   key="deals"
                   className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
                 >
+                  {/* Rotating product background images */}
                   {allDiscountedProducts.map((product: Product, imgIdx: number) => (
                     <div
                       key={product.id}
@@ -622,6 +623,7 @@ export default function StorefrontPage() {
                       <div className="absolute inset-0 bg-black/50" />
                     </div>
                   ))}
+                  {/* Content */}
                   <div className="relative z-10 py-16 px-8">
                     <div className="max-w-2xl">
                       <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-lg">Today's Amazing Deals!</h2>
@@ -643,6 +645,7 @@ export default function StorefrontPage() {
                 </div>
               );
             } else {
+              // Promotional ad slide
               const { ad } = slide;
               return (
                 <div
