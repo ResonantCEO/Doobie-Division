@@ -3503,8 +3503,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/admin/grab-bags/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
     try {
-      const updated = await storage.updateGrabBag(parseInt(req.params.id), req.body);
+      const bagId = parseInt(req.params.id);
+      const updated = await storage.updateGrabBag(bagId, req.body);
       if (!updated) return res.status(404).json({ message: "Not found" });
+
+      // Sync hideItems to all generated products for this bag template
+      const newHideItems = req.body.hideItems ?? false;
+      const skuPrefix = `GRAB-BAG-${bagId}-`;
+      const { products: productsTable } = await import("@shared/schema");
+      const generatedProducts = await db.select().from(productsTable).where(like(productsTable.sku, `${skuPrefix}%`));
+      for (const gp of generatedProducts) {
+        if ((gp.sku ?? "").startsWith("GRAB-BAG-DISCOUNT")) continue;
+        try {
+          const existing = JSON.parse((gp.adminNotes as string) || "{}");
+          existing.hideItems = newHideItems;
+          await rawPool.query(`UPDATE products SET admin_notes = $1 WHERE id = $2`, [JSON.stringify(existing), gp.id]);
+        } catch { /* skip malformed */ }
+      }
+      if (generatedProducts.length > 0) {
+        try { const { invalidateCache } = await import("./cache"); invalidateCache.products(); } catch { /* best-effort */ }
+      }
+
       res.json(updated);
     } catch (e) {
       res.status(500).json({ message: "Failed to update grab bag" });

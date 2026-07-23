@@ -4486,10 +4486,12 @@ export class DatabaseStorage implements IStorage {
       sellingPrice: data.sellingPrice,
       maxTotalItemPrice: data.maxTotalItemPrice,
       isActive: data.isActive !== false,
+      hideItems: data.hideItems === true,
     };
     if (data.description) toInsert.description = data.description;
     if (data.specificProductIds != null) toInsert.specificProductIds = data.specificProductIds;
     if (data.categorySelections != null) toInsert.categorySelections = data.categorySelections;
+    if (data.blacklistedProductIds != null) toInsert.blacklistedProductIds = data.blacklistedProductIds;
     const results = await retryQuery(() => db.insert(grabBags).values(toInsert).returning());
     return results[0];
   }
@@ -4504,7 +4506,9 @@ export class DatabaseStorage implements IStorage {
     if (data.maxTotalItemPrice !== undefined) toUpdate.maxTotalItemPrice = data.maxTotalItemPrice;
     if (data.specificProductIds !== undefined) toUpdate.specificProductIds = data.specificProductIds;
     if (data.categorySelections !== undefined) toUpdate.categorySelections = data.categorySelections;
+    if (data.blacklistedProductIds !== undefined) toUpdate.blacklistedProductIds = data.blacklistedProductIds;
     if (data.isActive !== undefined) toUpdate.isActive = data.isActive;
+    if (data.hideItems !== undefined) toUpdate.hideItems = data.hideItems;
     const results = await retryQuery(() => db.update(grabBags).set(toUpdate).where(eq(grabBags.id, id)).returning());
     return results[0];
   }
