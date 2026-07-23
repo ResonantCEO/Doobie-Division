@@ -221,7 +221,6 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
 
   const renderPhysicalDisplay = (product: Product & { sizes?: ProductSize[] }) => {
     const hasSizes = product.sizes && product.sizes.length > 0;
-    const physicalTotal = product.physicalInventory || 0;
     
     if (hasSizes && product.sizes) {
       const physicalPerSize = product.sizes.map(size => ({
@@ -229,19 +228,21 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
         physical: size.physicalQuantity || 0,
         stock: size.quantity || 0
       }));
+      const physicalTotal = physicalPerSize.reduce((sum, s) => sum + s.physical, 0);
+      const stockTotal = physicalPerSize.reduce((sum, s) => sum + s.stock, 0);
       
       return (
         <div className="flex flex-col space-y-1 min-w-[120px]">
           <div className={`text-xs font-medium mb-1 ${
             physicalTotal === 0 ? "text-red-600" : 
-            physicalTotal !== product.stock ? "text-orange-600" : 
+            physicalTotal !== stockTotal ? "text-orange-600" : 
             "text-gray-600 dark:text-gray-400"
           }`}>
             Total: {displayStock(product, physicalTotal)}
           </div>
-          {physicalTotal !== product.stock && (
+          {physicalTotal !== stockTotal && (
             <div className="text-xs text-orange-600 mb-1">
-              Variance: {displayStock(product, physicalTotal - product.stock)}
+              Variance: {displayStock(product, physicalTotal - stockTotal)}
             </div>
           )}
           <div className="space-y-0.5 border-t border-gray-200 dark:border-gray-700 pt-1">
