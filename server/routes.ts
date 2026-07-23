@@ -3432,6 +3432,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Board Posts - admin edit
+  app.patch("/api/board-posts/:id", isAuthenticated, requireRole(["admin"]), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { text, imageUrl, productIds } = req.body;
+      const productIdsJson = Array.isArray(productIds) && productIds.length > 0
+        ? JSON.stringify(productIds)
+        : productIds === null ? null : undefined;
+      const post = await storage.updateBoardPost(id, {
+        ...(text !== undefined ? { text: text ?? null } : {}),
+        ...(imageUrl !== undefined ? { imageUrl: imageUrl ?? null } : {}),
+        ...(productIdsJson !== undefined ? { productIds: productIdsJson } : {}),
+      });
+      res.json(post);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update post" });
+    }
+  });
+
   // Board Posts - admin delete
   app.delete("/api/board-posts/:id", isAuthenticated, requireRole(["admin"]), async (req, res) => {
     try {

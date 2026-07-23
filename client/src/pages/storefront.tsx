@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ProductCard from "@/components/product-card";
-import { Search, ChevronLeft, ChevronRight, Megaphone, ImagePlus, Trash2, X, ShoppingBag, Check } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Megaphone, ImagePlus, Trash2, X, ShoppingBag, Check, Pencil } from "lucide-react";
 import type { Product, Category, PromotionalAd, BoardPost } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -105,6 +105,9 @@ export default function StorefrontPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [postSelectedProductIds, setPostSelectedProductIds] = useState<number[]>([]);
   const [postProductSearch, setPostProductSearch] = useState("");
+  const [editingPost, setEditingPost] = useState<BoardPost | null>(null);
+  // When editing, keep the existing image URL (so user can keep it without re-uploading)
+  const [editingExistingImageUrl, setEditingExistingImageUrl] = useState<string | null>(null);
 
   // Ad product filter — set when user taps a board post with linked products
   const [adProductFilter, setAdProductFilter] = useState<number[] | null>(null);
@@ -184,15 +187,38 @@ export default function StorefrontPage() {
     reader.readAsDataURL(file);
   };
 
-  // Submit new board post
+  const resetPostModal = () => {
+    setPostText("");
+    setPostImageFile(null);
+    setPostImagePreview(null);
+    setPostSelectedProductIds([]);
+    setPostProductSearch("");
+    setEditingPost(null);
+    setEditingExistingImageUrl(null);
+  };
+
+  const openEditModal = (post: BoardPost) => {
+    setEditingPost(post);
+    setPostText(post.text ?? "");
+    setEditingExistingImageUrl(post.imageUrl ?? null);
+    setPostImageFile(null);
+    setPostImagePreview(null);
+    const ids: number[] = post.productIds ? (() => { try { return JSON.parse(post.productIds); } catch { return []; } })() : [];
+    setPostSelectedProductIds(ids);
+    setPostProductSearch("");
+    setAdvertiseOpen(true);
+  };
+
+  // Submit new board post or save edit
   const handlePostSubmit = async () => {
-    if (!postText.trim() && !postImageFile) {
+    const isEditing = !!editingPost;
+    if (!postText.trim() && !postImageFile && !editingExistingImageUrl) {
       toast({ title: "Add text or an image first", variant: "destructive" });
       return;
     }
     setUploading(true);
     try {
-      let imageUrl: string | null = null;
+      let imageUrl: string | null = editingExistingImageUrl;
       if (postImageFile) {
         const formData = new FormData();
         formData.append('image', postImageFile);
@@ -201,24 +227,36 @@ export default function StorefrontPage() {
         const uploadData = await uploadRes.json();
         imageUrl = uploadData.imageUrl;
       }
-      const res = await fetch('/api/board-posts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: postText.trim() || null,
-          imageUrl,
-          productIds: postSelectedProductIds.length > 0 ? postSelectedProductIds : undefined,
-        }),
-      });
-      if (!res.ok) throw new Error('Failed to create post');
+
+      if (isEditing) {
+        const res = await fetch(`/api/board-posts/${editingPost.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: postText.trim() || null,
+            imageUrl,
+            productIds: postSelectedProductIds.length > 0 ? postSelectedProductIds : null,
+          }),
+        });
+        if (!res.ok) throw new Error('Failed to update post');
+        toast({ title: "Post updated!" });
+      } else {
+        const res = await fetch('/api/board-posts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: postText.trim() || null,
+            imageUrl,
+            productIds: postSelectedProductIds.length > 0 ? postSelectedProductIds : undefined,
+          }),
+        });
+        if (!res.ok) throw new Error('Failed to create post');
+        toast({ title: "Post published!" });
+      }
+
       queryClient.invalidateQueries({ queryKey: ["/api/board-posts"] });
-      toast({ title: "Post published!" });
       setAdvertiseOpen(false);
-      setPostText("");
-      setPostImageFile(null);
-      setPostImagePreview(null);
-      setPostSelectedProductIds([]);
-      setPostProductSearch("");
+      resetPostModal();
     } catch (err: any) {
       toast({ title: err.message || "Something went wrong", variant: "destructive" });
     } finally {
@@ -536,13 +574,22 @@ export default function StorefrontPage() {
                 } : undefined}
               >
                 {isAdmin && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteBoardPostMutation.mutate(post.id); }}
-                    className="absolute top-2 right-2 z-10 text-muted-foreground hover:text-destructive transition-colors"
-                    title="Remove post"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openEditModal(post); }}
+                      className="bg-black/50 rounded-full p-1.5 text-white hover:bg-primary/80 transition-colors"
+                      title="Edit post"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteBoardPostMutation.mutate(post.id); }}
+                      className="bg-black/50 rounded-full p-1.5 text-white hover:bg-destructive/80 transition-colors"
+                      title="Remove post"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 )}
                 {post.imageUrl && (
                   <img
@@ -584,19 +631,13 @@ export default function StorefrontPage() {
       {/* Advertise Dialog */}
       <Dialog open={advertiseOpen} onOpenChange={(open) => {
         setAdvertiseOpen(open);
-        if (!open) {
-          setPostText("");
-          setPostImageFile(null);
-          setPostImagePreview(null);
-          setPostSelectedProductIds([]);
-          setPostProductSearch("");
-        }
+        if (!open) resetPostModal();
       }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Megaphone className="w-5 h-5 text-primary" />
-              Create a Post / Advertisement
+              {editingPost ? "Edit Advertisement" : "Create a Post / Advertisement"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
@@ -619,6 +660,26 @@ export default function StorefrontPage() {
                   >
                     <X className="w-4 h-4" />
                   </button>
+                </div>
+              ) : editingExistingImageUrl ? (
+                <div className="relative">
+                  <img src={editingExistingImageUrl} alt="Current image" className="rounded-lg max-h-48 w-full object-cover" />
+                  <div className="absolute inset-0 flex items-end gap-2 p-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1 text-xs bg-black/60 text-white px-2 py-1 rounded hover:bg-black/80"
+                    >
+                      <ImagePlus className="w-3 h-3" /> Replace
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingExistingImageUrl(null)}
+                      className="flex items-center gap-1 text-xs bg-black/60 text-white px-2 py-1 rounded hover:bg-red-600/80"
+                    >
+                      <X className="w-3 h-3" /> Remove
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <button
@@ -696,8 +757,8 @@ export default function StorefrontPage() {
               <Button variant="outline" onClick={() => setAdvertiseOpen(false)} disabled={uploading}>
                 Cancel
               </Button>
-              <Button onClick={handlePostSubmit} disabled={uploading || (!postText.trim() && !postImageFile)}>
-                {uploading ? "Publishing..." : "Publish"}
+              <Button onClick={handlePostSubmit} disabled={uploading || (!postText.trim() && !postImageFile && !editingExistingImageUrl)}>
+                {uploading ? (editingPost ? "Saving..." : "Publishing...") : (editingPost ? "Save Changes" : "Publish")}
               </Button>
             </div>
           </div>

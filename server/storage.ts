@@ -4461,6 +4461,17 @@ export class DatabaseStorage implements IStorage {
     return results[0];
   }
 
+  async updateBoardPost(id: number, data: { text?: string | null; imageUrl?: string | null; productIds?: string | null }): Promise<BoardPost> {
+    const results = await retryQuery(() =>
+      db.update(boardPosts).set({
+        ...(data.text !== undefined ? { text: data.text } : {}),
+        ...(data.imageUrl !== undefined ? { imageUrl: data.imageUrl } : {}),
+        ...(data.productIds !== undefined ? { productIds: data.productIds } : {}),
+      }).where(eq(boardPosts.id, id)).returning()
+    );
+    return results[0];
+  }
+
   async deleteBoardPost(id: number): Promise<void> {
     await retryQuery(() => db.delete(boardPosts).where(eq(boardPosts.id, id)));
   }
