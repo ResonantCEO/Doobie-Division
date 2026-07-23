@@ -14,6 +14,7 @@ import { orders, products, orderItems, users, supportTickets, notifications } fr
 import { eq, sql, desc, and, gte, lt, inArray, like } from "drizzle-orm";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
+import sharp from "sharp";
 
 // WebSocket connection store
 const wsConnections = new Set<WebSocket>();
@@ -259,11 +260,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'No image file provided' });
       }
 
+      const compressedBuffer = await sharp(req.file.buffer)
+        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toBuffer();
+
       const objectStorageService = new ObjectStorageService();
       const privateDir = objectStorageService.getPrivateObjectDir();
       const uniqueId = uuidv4();
-      const extension = path.extname(req.file.originalname) || '.jpg';
-      const objectName = `product-images/${uniqueId}${extension}`;
+      const objectName = `product-images/${uniqueId}.webp`;
       const fullPath = `${privateDir}/${objectName}`;
 
       const parts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
@@ -273,13 +278,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bucket = objectStorageClient.bucket(bucketName);
       const file = bucket.file(objectKey);
 
-      await file.save(req.file.buffer, {
+      await file.save(compressedBuffer, {
         metadata: {
-          contentType: req.file.mimetype,
+          contentType: 'image/webp',
         },
       });
 
-      const imageUrl = `/api/product-images/${uniqueId}${extension}`;
+      const imageUrl = `/api/product-images/${uniqueId}.webp`;
       res.json({ imageUrl });
     } catch (error) {
       console.error('Product image upload error:', error);
@@ -308,8 +313,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [metadata] = await file.getMetadata();
       res.set({
-        'Content-Type': metadata.contentType || 'image/jpeg',
-        'Cache-Control': 'public, max-age=86400',
+        'Content-Type': metadata.contentType || 'image/webp',
+        'Cache-Control': 'public, max-age=604800',
       });
 
       const stream = file.createReadStream();
@@ -3440,19 +3445,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.file) {
         return res.status(400).json({ message: "No image file provided" });
       }
+
+      const compressedBuffer = await sharp(req.file.buffer)
+        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toBuffer();
+
       const objectStorageService = new ObjectStorageService();
       const privateDir = objectStorageService.getPrivateObjectDir();
       const uniqueId = uuidv4();
-      const extension = path.extname(req.file.originalname) || ".jpg";
-      const objectName = `board-images/${uniqueId}${extension}`;
+      const objectName = `board-images/${uniqueId}.webp`;
       const fullPath = `${privateDir}/${objectName}`;
       const parts = fullPath.startsWith("/") ? fullPath.slice(1).split("/") : fullPath.split("/");
       const bucketName = parts[0];
       const objectKey = parts.slice(1).join("/");
       const bucket = objectStorageClient.bucket(bucketName);
       const file = bucket.file(objectKey);
-      await file.save(req.file.buffer, { metadata: { contentType: req.file.mimetype } });
-      const imageUrl = `/api/board-images/${uniqueId}${extension}`;
+      await file.save(compressedBuffer, { metadata: { contentType: 'image/webp' } });
+      const imageUrl = `/api/board-images/${uniqueId}.webp`;
       res.json({ imageUrl });
     } catch (error) {
       res.status(500).json({ message: "Failed to upload image" });
@@ -3473,8 +3483,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [exists] = await file.exists();
       if (!exists) return res.status(404).json({ message: "Image not found" });
       const [metadata] = await file.getMetadata();
-      res.setHeader("Content-Type", (metadata as any).contentType || "image/jpeg");
-      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.setHeader("Content-Type", (metadata as any).contentType || "image/webp");
+      res.setHeader("Cache-Control", "public, max-age=604800");
       file.createReadStream().pipe(res);
     } catch (error) {
       res.status(500).json({ message: "Failed to serve image" });
