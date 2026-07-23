@@ -174,10 +174,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       objectStorageService.downloadObject(objectFile, res);
     } catch (error) {
-      console.error("Error checking object access:", error);
       if (error instanceof ObjectNotFoundError) {
         return res.sendStatus(404);
       }
+      console.error("Error checking object access:", error);
       return res.sendStatus(500);
     }
   });
