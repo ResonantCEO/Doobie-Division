@@ -265,6 +265,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
         </div>
       );
     } else {
+      const physicalTotal = product.physicalInventory ?? 0;
       return (
         <div className="flex flex-col">
           <span className="font-medium text-gray-900 dark:text-white">{displayStock(product, physicalTotal)}</span>
