@@ -93,6 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    await db.execute(sql`ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS product_ids TEXT`);
   } catch (e: any) {
     console.warn('[startup] Could not ensure board_posts table:', e?.message);
   }
@@ -3417,11 +3418,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/board-posts", isAuthenticated, requireRole(["admin"]), async (req: any, res) => {
     try {
       const userId = req.userId || req.user?.claims?.sub || req.user?.id;
-      const { text, imageUrl } = req.body;
+      const { text, imageUrl, productIds } = req.body;
       if (!text && !imageUrl) {
         return res.status(400).json({ message: "Post must have text or an image" });
       }
-      const post = await storage.createBoardPost({ text: text ?? null, imageUrl: imageUrl ?? null, createdBy: userId });
+      const productIdsJson = Array.isArray(productIds) && productIds.length > 0
+        ? JSON.stringify(productIds)
+        : null;
+      const post = await storage.createBoardPost({ text: text ?? null, imageUrl: imageUrl ?? null, productIds: productIdsJson, createdBy: userId });
       res.status(201).json(post);
     } catch (error) {
       res.status(500).json({ message: "Failed to create board post" });

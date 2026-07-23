@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ProductCard from "@/components/product-card";
-import { Search, ChevronLeft, ChevronRight, Megaphone, ImagePlus, Trash2, X } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Megaphone, ImagePlus, Trash2, X, ShoppingBag, Check } from "lucide-react";
 import type { Product, Category, PromotionalAd, BoardPost } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -103,34 +103,42 @@ export default function StorefrontPage() {
   const [postImagePreview, setPostImagePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [postSelectedProductIds, setPostSelectedProductIds] = useState<number[]>([]);
+  const [postProductSearch, setPostProductSearch] = useState("");
 
-  // Fetch all deal products for hero section (independent of filters)
-  // Includes: discounted products, BOGO products, quantity-priced products
-  const { data: allDiscountedProducts = [] } = useQuery({
-    queryKey: ["/api/products", "discounted"],
+  // Ad product filter — set when user taps a board post with linked products
+  const [adProductFilter, setAdProductFilter] = useState<number[] | null>(null);
+
+  // Fetch ALL products (unfiltered) for hero section and modal product selector
+  const { data: allProductsRaw = [] } = useQuery<Product[]>({
+    queryKey: ["/api/products", "all-raw"],
     queryFn: async () => {
       const response = await fetch('/api/products');
       if (!response.ok) throw new Error('Failed to fetch products');
-      const products = await response.json();
-      return products.filter((product: Product) => {
-        if (product.stock <= 0) return false;
-        const discount = product.discountPercentage;
-        const hasDiscountPct = discount && discount !== "0" && discount !== 0 &&
-          !isNaN(typeof discount === 'number' ? discount : parseFloat(String(discount))) &&
-          (typeof discount === 'number' ? discount : parseFloat(String(discount))) > 0;
-        const discountAmt = (product as any).discountAmount;
-        const hasDiscountAmt = discountAmt && parseFloat(String(discountAmt)) > 0;
-        const hasDiscount = hasDiscountPct || hasDiscountAmt;
-        const hasBogo = product.bogoEnabled === true;
-        const hasQuantityPricing = Array.isArray((product as any).quantityPricing) && (product as any).quantityPricing.length > 0;
-        const isGrabBag = (product as any).sku?.startsWith("GRAB-BAG-");
-        return hasDiscount || hasBogo || hasQuantityPricing || isGrabBag;
-      });
+      return response.json();
     },
     staleTime: 60000,
     gcTime: 300000,
     refetchOnMount: true,
   });
+
+  // Filter to deal products for hero section
+  const allDiscountedProducts = useMemo(() => {
+    return allProductsRaw.filter((product: Product) => {
+      if (product.stock <= 0) return false;
+      const discount = product.discountPercentage;
+      const hasDiscountPct = discount && discount !== "0" && discount !== 0 &&
+        !isNaN(typeof discount === 'number' ? discount : parseFloat(String(discount))) &&
+        (typeof discount === 'number' ? discount : parseFloat(String(discount))) > 0;
+      const discountAmt = (product as any).discountAmount;
+      const hasDiscountAmt = discountAmt && parseFloat(String(discountAmt)) > 0;
+      const hasDiscount = hasDiscountPct || hasDiscountAmt;
+      const hasBogo = product.bogoEnabled === true;
+      const hasQuantityPricing = Array.isArray((product as any).quantityPricing) && (product as any).quantityPricing.length > 0;
+      const isGrabBag = (product as any).sku?.startsWith("GRAB-BAG-");
+      return hasDiscount || hasBogo || hasQuantityPricing || isGrabBag;
+    });
+  }, [allProductsRaw]);
 
   // Fetch active promotional ads
   const { data: activeAds = [] } = useQuery<PromotionalAd[]>({
@@ -196,7 +204,11 @@ export default function StorefrontPage() {
       const res = await fetch('/api/board-posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: postText.trim() || null, imageUrl }),
+        body: JSON.stringify({
+          text: postText.trim() || null,
+          imageUrl,
+          productIds: postSelectedProductIds.length > 0 ? postSelectedProductIds : undefined,
+        }),
       });
       if (!res.ok) throw new Error('Failed to create post');
       queryClient.invalidateQueries({ queryKey: ["/api/board-posts"] });
@@ -205,6 +217,8 @@ export default function StorefrontPage() {
       setPostText("");
       setPostImageFile(null);
       setPostImagePreview(null);
+      setPostSelectedProductIds([]);
+      setPostProductSearch("");
     } catch (err: any) {
       toast({ title: err.message || "Something went wrong", variant: "destructive" });
     } finally {
@@ -350,6 +364,7 @@ export default function StorefrontPage() {
   const products = useMemo(() => {
     return allProducts.filter((product: Product & { category: Category | null }) => {
       const hasStock = product.stock > 0;
+      if (adProductFilter) return hasStock && adProductFilter.includes(product.id);
       if (!showDealsOnly) return hasStock;
       const hasDiscountPct = product.discountPercentage && parseFloat(String(product.discountPercentage)) > 0;
       const hasDiscountAmt = (product as any).discountAmount && parseFloat(String((product as any).discountAmount)) > 0;
@@ -359,7 +374,7 @@ export default function StorefrontPage() {
       const isGrabBag = (product as any).sku?.startsWith("GRAB-BAG-");
       return hasStock && (hasDiscount || hasBogo || hasQuantityPricing || isGrabBag);
     });
-  }, [allProducts, showDealsOnly]);
+  }, [allProducts, showDealsOnly, adProductFilter]);
 
   // Build a set of category IDs that have products (directly or in descendants)
   // This is used to hide empty categories
@@ -501,32 +516,68 @@ export default function StorefrontPage() {
       {/* Message Board - board posts shown above daily deals */}
       {boardPosts.length > 0 && (
         <div className="space-y-3 mb-4">
-          {boardPosts.map((post) => (
-            <div
-              key={post.id}
-              className="relative rounded-xl border border-border bg-card p-4 shadow-sm"
-            >
-              {isAdmin && (
-                <button
-                  onClick={() => deleteBoardPostMutation.mutate(post.id)}
-                  className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors"
-                  title="Remove post"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-              {post.imageUrl && (
-                <img
-                  src={post.imageUrl}
-                  alt="Board post"
-                  className="rounded-lg max-h-72 w-full object-cover mb-3"
-                />
-              )}
-              {post.text && (
-                <p className="text-sm text-foreground whitespace-pre-wrap">{post.text}</p>
-              )}
-            </div>
-          ))}
+          {boardPosts.map((post) => {
+            const linkedIds: number[] = post.productIds ? (() => { try { return JSON.parse(post.productIds); } catch { return []; } })() : [];
+            const hasLinkedProducts = linkedIds.length > 0;
+            const isActive = adProductFilter !== null && linkedIds.length > 0 && linkedIds.every(id => adProductFilter.includes(id));
+            return (
+              <div
+                key={post.id}
+                className={`relative rounded-xl border bg-card shadow-sm overflow-hidden ${hasLinkedProducts ? 'cursor-pointer hover:border-primary transition-colors' : ''} ${isActive ? 'border-primary ring-1 ring-primary' : 'border-border'}`}
+                onClick={hasLinkedProducts ? () => {
+                  if (isActive) {
+                    setAdProductFilter(null);
+                  } else {
+                    setAdProductFilter(linkedIds);
+                    setTimeout(() => {
+                      document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 100);
+                  }
+                } : undefined}
+              >
+                {isAdmin && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteBoardPostMutation.mutate(post.id); }}
+                    className="absolute top-2 right-2 z-10 text-muted-foreground hover:text-destructive transition-colors"
+                    title="Remove post"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                {post.imageUrl && (
+                  <img
+                    src={post.imageUrl}
+                    alt="Board post"
+                    className="w-full max-h-72 object-cover"
+                  />
+                )}
+                <div className={post.imageUrl ? 'p-4' : 'p-4'}>
+                  {post.text && (
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{post.text}</p>
+                  )}
+                  {hasLinkedProducts && (
+                    <div className={`flex items-center gap-1.5 mt-2 text-xs font-medium ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                      {isActive ? 'Showing linked products — tap to clear' : `Tap to shop ${linkedIds.length === 1 ? 'this product' : `${linkedIds.length} products`}`}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Ad product filter banner */}
+      {adProductFilter && (
+        <div className="flex items-center justify-between bg-primary/10 border border-primary/30 rounded-lg px-4 py-2 mb-4">
+          <span className="text-sm text-primary font-medium flex items-center gap-2">
+            <ShoppingBag className="w-4 h-4" />
+            Showing products from advertisement
+          </span>
+          <button onClick={() => setAdProductFilter(null)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+            <X className="w-3 h-3" /> Clear
+          </button>
         </div>
       )}
 
@@ -537,6 +588,8 @@ export default function StorefrontPage() {
           setPostText("");
           setPostImageFile(null);
           setPostImagePreview(null);
+          setPostSelectedProductIds([]);
+          setPostProductSearch("");
         }
       }}>
         <DialogContent className="max-w-lg">
@@ -584,6 +637,59 @@ export default function StorefrontPage() {
                 className="hidden"
                 onChange={handleImageSelect}
               />
+            </div>
+
+            {/* Link products */}
+            <div>
+              <p className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                <ShoppingBag className="w-4 h-4 text-muted-foreground" />
+                Link products <span className="text-muted-foreground font-normal">(optional — tap ad to jump to them)</span>
+              </p>
+              {postSelectedProductIds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {postSelectedProductIds.map(id => {
+                    const p = allProductsRaw.find(p => p.id === id);
+                    return p ? (
+                      <span key={id} className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">
+                        {p.name}
+                        <button onClick={() => setPostSelectedProductIds(prev => prev.filter(pid => pid !== id))}>
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              )}
+              <Input
+                placeholder="Search products..."
+                value={postProductSearch}
+                onChange={(e) => setPostProductSearch(e.target.value)}
+                className="mb-2"
+              />
+              <div className="max-h-40 overflow-y-auto rounded-md border border-border divide-y divide-border">
+                {allProductsRaw
+                  .filter(p => p.stock > 0 && p.name.toLowerCase().includes(postProductSearch.toLowerCase()))
+                  .slice(0, 30)
+                  .map(p => {
+                    const selected = postSelectedProductIds.includes(p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setPostSelectedProductIds(prev =>
+                          selected ? prev.filter(id => id !== p.id) : [...prev, p.id]
+                        )}
+                        className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-muted transition-colors ${selected ? 'bg-primary/5' : ''}`}
+                      >
+                        <span className={selected ? 'text-primary font-medium' : ''}>{p.name}</span>
+                        {selected && <Check className="w-4 h-4 text-primary flex-shrink-0" />}
+                      </button>
+                    );
+                  })}
+                {allProductsRaw.filter(p => p.stock > 0 && p.name.toLowerCase().includes(postProductSearch.toLowerCase())).length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">No products found</p>
+                )}
+              </div>
             </div>
 
             <div className="flex gap-2 justify-end">
@@ -826,6 +932,7 @@ export default function StorefrontPage() {
       </div>
 
       {/* Products by Category */}
+      <div id="product-grid" />
       {products.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground text-lg">No products found</p>

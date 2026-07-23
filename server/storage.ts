@@ -4448,11 +4448,12 @@ export class DatabaseStorage implements IStorage {
     return retryQuery(() => db.select().from(boardPosts).orderBy(desc(boardPosts.createdAt)));
   }
 
-  async createBoardPost(data: { text?: string | null; imageUrl?: string | null; createdBy: string }): Promise<BoardPost> {
+  async createBoardPost(data: { text?: string | null; imageUrl?: string | null; productIds?: string | null; createdBy: string }): Promise<BoardPost> {
     const results = await retryQuery(() =>
       db.insert(boardPosts).values({
         text: data.text ?? null,
         imageUrl: data.imageUrl ?? null,
+        productIds: data.productIds ?? null,
         createdBy: data.createdBy,
         isActive: true,
       }).returning()

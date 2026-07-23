@@ -289,6 +289,7 @@ export const boardPosts = pgTable("board_posts", {
   id: serial("id").primaryKey(),
   text: text("text"),
   imageUrl: text("image_url"),
+  productIds: text("product_ids"), // JSON array of product IDs
   createdBy: varchar("created_by").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -300,6 +301,7 @@ export const insertBoardPostSchema = createInsertSchema(boardPosts).omit({
 }).extend({
   text: z.string().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
+  productIds: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
 });
 
