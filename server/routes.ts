@@ -753,7 +753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (newStock !== currentStock || !!bag.isActive !== newActive) {
           await rawPool.query(
-            `UPDATE products SET stock = $1, physical_inventory = $1, is_active = $2, updated_at = NOW() WHERE id = $3`,
+            `UPDATE products SET stock = $1, physical_inventory = GREATEST(physical_inventory, $1), is_active = $2, updated_at = NOW() WHERE id = $3`,
             [newStock, newActive, bag.id]
           );
           console.log(`[syncGrabBagAvailability] Bag #${bag.id} (${bag.name}): stock ${currentStock} → ${newStock}, active: ${newActive}`);

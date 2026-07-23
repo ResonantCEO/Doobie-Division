@@ -1184,7 +1184,12 @@ export class DatabaseStorage implements IStorage {
     delete updateData.enableSizes;
 
     if (dataWithoutSizes.stock !== undefined) {
-      updateData.physicalInventory = dataWithoutSizes.stock;
+      const [currentProduct] = await db.select().from(products).where(eq(products.id, id));
+      const currentStock = currentProduct?.stock ?? 0;
+      const currentPhysical = currentProduct?.physicalInventory ?? 0;
+      const stockDelta = (dataWithoutSizes.stock as number) - currentStock;
+      const newPhysical = Math.max(currentPhysical + stockDelta, dataWithoutSizes.stock as number);
+      updateData.physicalInventory = newPhysical;
     }
 
     const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'discountAmount', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
@@ -1582,13 +1587,15 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Insufficient stock for this size");
       }
 
+      const newSizePhysicalQty = Math.max((sizeRow.physicalQuantity ?? sizeRow.quantity) + quantity, newSizeQty);
       await db.update(productSizes)
-        .set({ quantity: newSizeQty, physicalQuantity: newSizeQty, updatedAt: new Date() })
+        .set({ quantity: newSizeQty, physicalQuantity: newSizePhysicalQty, updatedAt: new Date() })
         .where(and(eq(productSizes.productId, productId), eq(productSizes.size, sizeName)));
 
       const newTotalStock = product.stock + quantity;
+      const newPhysicalInventory = Math.max((product.physicalInventory ?? product.stock) + quantity, newTotalStock);
       await db.update(products)
-        .set({ stock: newTotalStock, physicalInventory: newTotalStock, updatedAt: new Date() })
+        .set({ stock: newTotalStock, physicalInventory: newPhysicalInventory, updatedAt: new Date() })
         .where(eq(products.id, productId));
 
       await db.insert(inventoryLogs).values({
@@ -1619,10 +1626,11 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Insufficient stock");
       }
 
+      const newPhysical = Math.max((product.physicalInventory ?? product.stock) + quantity, newStock);
       await db.update(products)
         .set({
           stock: newStock,
-          physicalInventory: newStock,
+          physicalInventory: newPhysical,
           updatedAt: new Date()
         })
         .where(eq(products.id, productId));
