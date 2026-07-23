@@ -1,12 +1,11 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import OrderTable, { type OrderTab } from "@/components/order-table";
 import { useOrderNotifications } from "@/hooks/useOrderNotifications";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { ShoppingBag, Clock, Truck, CheckCircle, Download, RefreshCw, UserCheck, MapPin, Route } from "lucide-react";
+import { Download, RefreshCw, UserCheck, MapPin, Route } from "lucide-react";
 import type { Order } from "@shared/schema";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -69,14 +68,6 @@ export default function OrdersPage() {
     queryFn: () => apiRequest("GET", "/api/users/staff"),
     enabled: user?.role === 'admin' || user?.role === 'manager',
   });
-
-  // Derive stats directly from live orders (not analytics snapshot)
-  const stats = useMemo(() => ({
-    total: orders.length,
-    pending: orders.filter(o => o.status === "pending" && !o.archived).length,
-    processing: orders.filter(o => o.status === "processing" && !o.archived).length,
-    shipped: orders.filter(o => (o.status === "shipped" || o.status === "delivered") && !o.archived).length,
-  }), [orders]);
 
   // Derive unique cities from all orders
   const uniqueCities = useMemo(() => {
@@ -274,51 +265,6 @@ export default function OrdersPage() {
             </Button>
           </div>
         </div>
-      </div>
-
-      {/* Order Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <Card>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center">
-              <div className="p-2 sm:p-3 rounded-full bg-blue-100 dark:bg-blue-900/20 text-primary">
-                <ShoppingBag className="h-5 w-5 sm:h-6 sm:w-6" />
-              </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Total Orders</p>
-                <p className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">{stats.total}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center">
-              <div className="p-2 sm:p-3 rounded-full bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400">
-                <Clock className="h-5 w-5 sm:h-6 sm:w-6" />
-              </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Pending</p>
-                <p className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">{stats.pending}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center">
-              <div className="p-2 sm:p-3 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
-                <Truck className="h-5 w-5 sm:h-6 sm:w-6" />
-              </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Shipped</p>
-                <p className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">{stats.shipped}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Orders Table */}
