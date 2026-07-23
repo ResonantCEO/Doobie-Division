@@ -63,13 +63,6 @@ export default function OrdersPage() {
     gcTime: 0,
   });
 
-  // Fetch order status breakdown
-  const { data: statusBreakdown = [] } = useQuery<{ status: string; count: number }[]>({
-    queryKey: ["/api/analytics/order-status-breakdown"],
-    staleTime: 0,
-    gcTime: 0,
-  });
-
   // Fetch staff users if the current user is an admin or manager
   const { data: staffUsers = [], isLoading: staffLoading } = useQuery({
     queryKey: ["/api/users/staff"],
@@ -77,26 +70,13 @@ export default function OrdersPage() {
     enabled: user?.role === 'admin' || user?.role === 'manager',
   });
 
-
-  const getStatusStats = () => {
-    const stats = {
-      total: 0,
-      pending: 0,
-      processing: 0,
-      shipped: 0,
-    };
-
-    statusBreakdown.forEach((item) => {
-      stats.total += item.count;
-      if (item.status === "pending") stats.pending = item.count;
-      else if (item.status === "processing") stats.processing = item.count;
-      else if (item.status === "shipped" || item.status === "delivered") stats.shipped += item.count;
-    });
-
-    return stats;
-  };
-
-  const stats = getStatusStats();
+  // Derive stats directly from live orders (not analytics snapshot)
+  const stats = useMemo(() => ({
+    total: orders.length,
+    pending: orders.filter(o => o.status === "pending" && !o.archived).length,
+    processing: orders.filter(o => o.status === "processing" && !o.archived).length,
+    shipped: orders.filter(o => (o.status === "shipped" || o.status === "delivered") && !o.archived).length,
+  }), [orders]);
 
   // Derive unique cities from all orders
   const uniqueCities = useMemo(() => {
