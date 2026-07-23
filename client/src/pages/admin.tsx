@@ -1153,12 +1153,12 @@ export default function AdminPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="support">Support Tickets</TabsTrigger>
-          <TabsTrigger value="logs">Logs</TabsTrigger>
-          <TabsTrigger value="purchase-limits">Purchase Limits</TabsTrigger>
-          <TabsTrigger value="access">Access</TabsTrigger>
-          <TabsTrigger value="discounts">Discounts</TabsTrigger>
+        <TabsList className="flex w-full overflow-x-auto h-auto flex-nowrap">
+          <TabsTrigger value="support" className="flex-shrink-0 text-xs sm:text-sm">Support Tickets</TabsTrigger>
+          <TabsTrigger value="logs" className="flex-shrink-0 text-xs sm:text-sm">Logs</TabsTrigger>
+          <TabsTrigger value="purchase-limits" className="flex-shrink-0 text-xs sm:text-sm">Purchase Limits</TabsTrigger>
+          <TabsTrigger value="access" className="flex-shrink-0 text-xs sm:text-sm">Access</TabsTrigger>
+          <TabsTrigger value="discounts" className="flex-shrink-0 text-xs sm:text-sm">Discounts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="logs">
