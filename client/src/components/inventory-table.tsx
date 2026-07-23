@@ -238,11 +238,11 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
             physicalTotal !== stockTotal ? "text-orange-600" : 
             "text-gray-600 dark:text-gray-400"
           }`}>
-            Total: {displayStock(product, physicalTotal)}
+            Total: {physicalTotal} packs
           </div>
           {physicalTotal !== stockTotal && (
             <div className="text-xs text-orange-600 mb-1">
-              Variance: {displayStock(product, physicalTotal - stockTotal)}
+              Variance: {physicalTotal - stockTotal > 0 ? "+" : ""}{physicalTotal - stockTotal} packs
             </div>
           )}
           <div className="space-y-0.5 border-t border-gray-200 dark:border-gray-700 pt-1">
@@ -256,7 +256,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                     sizeVariance !== 0 ? "text-orange-600" : 
                     "text-gray-900 dark:text-white"
                   }`}>
-                    {item.physical}
+                    {item.physical} packs
                   </span>
                 </div>
               );
