@@ -44,7 +44,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   const { theme, toggleTheme } = useTheme();
   const { state: cartState } = useCart();
   const { toast } = useToast();
-  const location = useLocation();
+  const [pathname, navigate] = useLocation();
   const [notificationTab, setNotificationTab] = useState("all");
 
   // Reset notification tab if customer is on users tab
@@ -629,12 +629,13 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
             <NavigationMenuList className="-mb-px overflow-x-auto scrollbar-hide">
               {visibleTabs.map((tab) => (
                 <NavigationMenuItem key={tab.id}>
-                  <Link href={tab.path}>
-                    <NavigationMenuLink
-                      className={`block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground ${
-                        currentTab === tab.id ? 'bg-accent text-accent-foreground' : ''
-                      }`}
-                    >
+                  <NavigationMenuLink
+                    asChild
+                    className={`block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground ${
+                      currentTab === tab.id ? 'bg-accent text-accent-foreground' : ''
+                    }`}
+                  >
+                    <Link href={tab.path}>
                       <div className="text-sm font-medium leading-none">
                         {/* Mobile: Show shortened labels */}
                         <span className="block sm:hidden text-xs">
@@ -648,34 +649,36 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                         {/* Desktop: Show full labels */}
                         <span className="hidden sm:block">{tab.label}</span>
                       </div>
-                    </NavigationMenuLink>
-                  </Link>
+                    </Link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
               ))}
               {/* Add My Orders and Support links for customers */}
               {user.role === 'customer' && (
                 <>
                   <NavigationMenuItem>
-                    <Link href="/customer-orders">
-                      <NavigationMenuLink
-                        className={`block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground ${
-                          location.pathname === '/customer-orders' ? 'bg-accent text-accent-foreground' : ''
-                        }`}
-                      >
+                    <NavigationMenuLink
+                      asChild
+                      className={`block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground ${
+                        pathname === '/customer-orders' ? 'bg-accent text-accent-foreground' : ''
+                      }`}
+                    >
+                      <Link href="/customer-orders">
                         <div className="text-sm font-medium leading-none">My Orders</div>
-                      </NavigationMenuLink>
-                    </Link>
+                      </Link>
+                    </NavigationMenuLink>
                   </NavigationMenuItem>
                   <NavigationMenuItem>
-                    <Link href="/support">
-                      <NavigationMenuLink
-                        className={`block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground ${
-                          location.pathname === '/support' ? 'bg-accent text-accent-foreground' : ''
-                        }`}
-                      >
+                    <NavigationMenuLink
+                      asChild
+                      className={`block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground ${
+                        pathname === '/support' ? 'bg-accent text-accent-foreground' : ''
+                      }`}
+                    >
+                      <Link href="/support">
                         <div className="text-sm font-medium leading-none">Support</div>
-                      </NavigationMenuLink>
-                    </Link>
+                      </Link>
+                    </NavigationMenuLink>
                   </NavigationMenuItem>
                 </>
               )}
