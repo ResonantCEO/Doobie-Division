@@ -372,6 +372,7 @@ export default function StorefrontPage() {
     };
     setNavigationHistory(prev => [...prev, currentState]);
 
+    setAdProductFilter(null);
     if (categoryId) {
       if (categories.length === 0) return;
 
@@ -914,6 +915,7 @@ export default function StorefrontPage() {
                 setCurrentParentCategory(null);
                 setSelectedCategory(null);
                 setShowDealsOnly(false);
+                setAdProductFilter(null);
               }}
             >
               All Products
