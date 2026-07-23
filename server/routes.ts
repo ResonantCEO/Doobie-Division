@@ -3507,8 +3507,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.updateGrabBag(bagId, req.body);
       if (!updated) return res.status(404).json({ message: "Not found" });
 
+      // Explicitly persist hideItems via raw SQL (Drizzle boolean in .set() can silently drop)
+      if (req.body.hideItems !== undefined) {
+        await rawPool.query(`UPDATE grab_bags SET hide_items = $1 WHERE id = $2`, [req.body.hideItems === true, bagId]);
+      }
+
       // Sync hideItems to all generated products for this bag template
-      const newHideItems = req.body.hideItems ?? false;
+      const newHideItems = req.body.hideItems === true;
       const skuPrefix = `GRAB-BAG-${bagId}-`;
       const { products: productsTable } = await import("@shared/schema");
       const generatedProducts = await db.select().from(productsTable).where(like(productsTable.sku, `${skuPrefix}%`));
