@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -299,6 +299,15 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
     [orders, routingIds]
   );
 
+  useEffect(() => {
+    const orderIds = new Set(orders.map((o) => o.id));
+    const cleaned = routingIds.filter((id) => orderIds.has(id));
+    if (cleaned.length !== routingIds.length) {
+      setRoutingIds(cleaned);
+      saveToStorage(ROUTING_STORAGE_KEY, cleaned);
+    }
+  }, [orders]);
+
   const routedOrderIds = useMemo(
     () => new Set(routedExports.flatMap((r) => r.orders.map((o) => o.id))),
     [routedExports]
@@ -373,8 +382,8 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                 </TabsTrigger>
                 <TabsTrigger value="routing" className="flex-1 sm:flex-initial">
                   Routing
-                  {routingIds.length > 0 && (
-                    <Badge className="ml-2 bg-amber-500 text-white">{routingIds.length}</Badge>
+                  {routingOrders.length > 0 && (
+                    <Badge className="ml-2 bg-amber-500 text-white">{routingOrders.length}</Badge>
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="routed" className="flex-1 sm:flex-initial">
