@@ -2521,7 +2521,7 @@ export default function AdminPage() {
               className="w-48 h-48 object-cover rounded-xl shadow-md"
             />
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              This feature is still being built. You can preview bags all you want, but publishing to the storefront is locked for now.
+              Naw... Not yet... This feature is still being built.
             </p>
           </div>
           <DialogFooter className="justify-center">
