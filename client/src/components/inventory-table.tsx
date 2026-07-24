@@ -227,7 +227,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
         size: size.size,
         physical: size.physicalQuantity || 0,
         stock: size.quantity || 0
-      }));
+      })).sort((a, b) => a.size.localeCompare(b.size));
       const physicalTotal = physicalPerSize.reduce((sum, s) => sum + s.physical, 0);
       const stockTotal = physicalPerSize.reduce((sum, s) => sum + s.stock, 0);
       
