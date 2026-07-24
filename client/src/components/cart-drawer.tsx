@@ -424,11 +424,14 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         return Number(product.pricePerGram) || 0;
       };
 
-      // Cross-product weight tier: sum all weight-based item grams
-      const totalCartWeightGrams = state.items
-        .filter(i => !i.isFree && i.product.sellingMethod === 'weight' && i.customPrice === undefined)
-        .reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
-      const cartWeightTier: WeightTier = getWeightTier(totalCartWeightGrams);
+      // Cross-product weight tier (only when global weight pricing is enabled)
+      let cartWeightTier: WeightTier = 'gram';
+      if (state.globalWeightPricing) {
+        const totalCartWeightGrams = state.items
+          .filter(i => !i.isFree && i.product.sellingMethod === 'weight' && i.customPrice === undefined)
+          .reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
+        cartWeightTier = getWeightTier(totalCartWeightGrams);
+      }
 
       // Compute total quantity per product for non-weight tier pricing
       const productQtyMap = new Map<number, number>();

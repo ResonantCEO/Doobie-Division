@@ -224,6 +224,21 @@ export default function AdminPage() {
     onError: () => toast({ title: "Error", description: "Failed to update setting.", variant: "destructive" }),
   });
 
+  // Global Weight Pricing toggle
+  const { data: globalWeightPricingSetting, isLoading: isLoadingWeightPricing } = useQuery<{ key: string; value: string | null }>({
+    queryKey: ["/api/settings/global_weight_pricing_enabled"],
+  });
+  const globalWeightPricingEnabled = globalWeightPricingSetting?.value !== "false";
+  const toggleWeightPricingMutation = useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiRequest("PUT", "/api/admin/settings/global_weight_pricing_enabled", { value: String(enabled) }),
+    onSuccess: (_data, enabled) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/global_weight_pricing_enabled"] });
+      toast({ title: "Setting saved", description: `Global Weight Pricing has been ${enabled ? "enabled" : "disabled"}.` });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to update setting.", variant: "destructive" }),
+  });
+
   const { data: accessPasswords = [], isLoading: isLoadingPasswords } = useQuery<AccessPassword[]>({
     queryKey: ["/api/admin/access-passwords"],
     queryFn: async () => {
@@ -2015,6 +2030,42 @@ export default function AdminPage() {
 
         {/* Discounts Tab — Promo Codes */}
         <TabsContent value="discounts">
+              {/* Global Weight Pricing Toggle */}
+              <Card className="mb-4">
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Package className="h-5 w-5 text-primary" />
+                        <h3 className="font-semibold text-base">Global Weight Pricing</h3>
+                        {isLoadingWeightPricing ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-500 animate-pulse">Loading…</span>
+                        ) : globalWeightPricingEnabled ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-green-500 inline-block" />
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600">
+                            <span className="h-1.5 w-1.5 rounded-full bg-gray-400 inline-block" />
+                            Inactive
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        When active, the total weight of all weight-based items in a cart is combined to qualify for better price tiers. For example, ½ oz of Item A + ½ oz of Item B = 1 oz total, so both items are priced at the 1 oz rate using their own per-oz price points. Existing orders are not affected.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={globalWeightPricingEnabled}
+                      disabled={isLoadingWeightPricing || toggleWeightPricingMutation.isPending}
+                      onCheckedChange={(checked) => toggleWeightPricingMutation.mutate(checked)}
+                      className="mt-1 shrink-0"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">

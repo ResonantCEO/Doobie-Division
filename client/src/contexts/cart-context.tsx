@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { Product, Category } from "@shared/schema";
 
 interface QuantityTier {
@@ -19,6 +20,7 @@ interface CartState {
   items: CartItem[];
   total: number;
   itemCount: number;
+  globalWeightPricing: boolean;
 }
 
 type CartAction =
@@ -28,12 +30,14 @@ type CartAction =
   | { type: 'REMOVE_ITEM'; payload: { id: number; size?: string; isFree?: boolean } }
   | { type: 'UPDATE_QUANTITY'; payload: { id: number; quantity: number; size?: string; isFree?: boolean } }
   | { type: 'CLEAR_CART' }
-  | { type: 'LOAD_CART'; payload: CartItem[] };
+  | { type: 'LOAD_CART'; payload: CartItem[] }
+  | { type: 'SET_WEIGHT_PRICING'; payload: boolean };
 
 const initialState: CartState = {
   items: [],
   total: 0,
   itemCount: 0,
+  globalWeightPricing: true,
 };
 
 function getWeightOptionPrice(product: Product & { category: Category | null }, size?: string): number {
@@ -124,14 +128,17 @@ function getApplicableTierPrice(product: Product & { category: Category | null; 
   return basePrice;
 }
 
-function computeTotal(items: CartItem[]): number {
+function computeTotal(items: CartItem[], globalWeightPricing: boolean): number {
   const paidItems = items.filter(i => !i.isFree);
 
-  // Cross-product weight tier: sum all weight-based item grams to find the best tier
-  const totalWeightGrams = paidItems
-    .filter(i => i.product.sellingMethod === 'weight' && i.customPrice === undefined)
-    .reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
-  const weightTier = getWeightTier(totalWeightGrams);
+  // Cross-product weight tier (only when global weight pricing is enabled)
+  let weightTier: WeightTier = 'gram';
+  if (globalWeightPricing) {
+    const totalWeightGrams = paidItems
+      .filter(i => i.product.sellingMethod === 'weight' && i.customPrice === undefined)
+      .reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
+    weightTier = getWeightTier(totalWeightGrams);
+  }
 
   // For non-weight items: quantity-based tier pricing per product
   const productQtyMap = new Map<number, number>();
@@ -146,7 +153,8 @@ function computeTotal(items: CartItem[]): number {
       return sum + item.customPrice * item.quantity;
     }
     if (item.product.sellingMethod === 'weight') {
-      const unitPrice = applyProductDiscount(item.product, getWeightItemEffectivePrice(item.product, item.size, weightTier));
+      const tier = globalWeightPricing ? weightTier : getWeightTier(sizeToGrams(item.size) * item.quantity);
+      const unitPrice = applyProductDiscount(item.product, getWeightItemEffectivePrice(item.product, item.size, tier));
       return sum + unitPrice * item.quantity;
     }
     const totalQty = productQtyMap.get(item.product.id) || item.quantity;
@@ -161,6 +169,11 @@ function makeItemKey(id: number, size?: string, isFree?: boolean): string {
 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
+    case 'SET_WEIGHT_PRICING': {
+      const total = computeTotal(state.items, action.payload);
+      return { ...state, globalWeightPricing: action.payload, total };
+    }
+
     case 'ADD_ITEM': {
       const itemKey = makeItemKey(action.payload.product.id, action.payload.size, false);
 
@@ -186,9 +199,9 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         }];
       }
 
-      const total = computeTotal(newItems);
+      const total = computeTotal(newItems, state.globalWeightPricing);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
-      return { items: newItems, total, itemCount };
+      return { ...state, items: newItems, total, itemCount };
     }
 
     case 'ADD_FREE_ITEM': {
@@ -216,9 +229,9 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         }];
       }
 
-      const total = computeTotal(newItems);
+      const total = computeTotal(newItems, state.globalWeightPricing);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
-      return { items: newItems, total, itemCount };
+      return { ...state, items: newItems, total, itemCount };
     }
 
     case 'ADD_DISCOUNTED_ITEM': {
@@ -244,9 +257,9 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         }];
       }
 
-      const total = computeTotal(newItems);
+      const total = computeTotal(newItems, state.globalWeightPricing);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
-      return { items: newItems, total, itemCount };
+      return { ...state, items: newItems, total, itemCount };
     }
 
     case 'REMOVE_ITEM': {
@@ -256,7 +269,6 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         return makeItemKey(item.product.id, item.size, item.isFree) !== itemKey;
       });
 
-      // If a paid item was removed, also remove the paired free (BOGO) item
       if (!action.payload.isFree) {
         const freeKey = makeItemKey(action.payload.id, action.payload.size, true);
         newItems = newItems.filter(item =>
@@ -264,9 +276,9 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         );
       }
 
-      const total = computeTotal(newItems);
+      const total = computeTotal(newItems, state.globalWeightPricing);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
-      return { items: newItems, total, itemCount };
+      return { ...state, items: newItems, total, itemCount };
     }
 
     case 'UPDATE_QUANTITY': {
@@ -278,18 +290,18 @@ function cartReducer(state: CartState, action: CartAction): CartState {
           : item;
       }).filter(item => item.quantity > 0);
 
-      const total = computeTotal(newItems);
+      const total = computeTotal(newItems, state.globalWeightPricing);
       const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
-      return { items: newItems, total, itemCount };
+      return { ...state, items: newItems, total, itemCount };
     }
 
     case 'CLEAR_CART':
-      return initialState;
+      return { ...initialState, globalWeightPricing: state.globalWeightPricing };
 
     case 'LOAD_CART': {
-      const total = computeTotal(action.payload);
+      const total = computeTotal(action.payload, state.globalWeightPricing);
       const itemCount = action.payload.reduce((sum, item) => sum + item.quantity, 0);
-      return { items: action.payload, total, itemCount };
+      return { ...state, items: action.payload, total, itemCount };
     }
 
     default:
@@ -312,6 +324,16 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, initialState);
+
+  // Fetch global weight pricing setting
+  const { data: weightPricingSetting } = useQuery<{ key: string; value: string | null }>({
+    queryKey: ["/api/settings/global_weight_pricing_enabled"],
+  });
+
+  useEffect(() => {
+    const enabled = weightPricingSetting?.value !== "false";
+    dispatch({ type: 'SET_WEIGHT_PRICING', payload: enabled });
+  }, [weightPricingSetting]);
 
   useEffect(() => {
     const savedCart = localStorage.getItem('cart');
@@ -391,10 +413,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!item) return 0;
 
     if (item.product.sellingMethod === 'weight' && item.customPrice === undefined) {
-      const totalGrams = paidItems
-        .filter(i => i.product.sellingMethod === 'weight' && i.customPrice === undefined)
-        .reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
-      const tier = getWeightTier(totalGrams);
+      let tier: WeightTier;
+      if (state.globalWeightPricing) {
+        const totalGrams = paidItems
+          .filter(i => i.product.sellingMethod === 'weight' && i.customPrice === undefined)
+          .reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
+        tier = getWeightTier(totalGrams);
+      } else {
+        tier = getWeightTier(sizeToGrams(size) * item.quantity);
+      }
       return applyProductDiscount(item.product, getWeightItemEffectivePrice(item.product, size, tier));
     }
 
