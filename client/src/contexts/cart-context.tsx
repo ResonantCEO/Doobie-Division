@@ -56,6 +56,45 @@ function getWeightOptionPrice(product: Product & { category: Category | null }, 
   return Number(product.pricePerGram) || 0;
 }
 
+export type WeightTier = 'oz' | 'half' | 'quarter' | 'eighth' | 'gram';
+
+export function sizeToGrams(size?: string): number {
+  if (!size) return 1;
+  const norm = size.toLowerCase().trim();
+  if (norm.includes('1 oz') || norm === 'ounce') return 28;
+  if (norm.includes('1/2') || norm.includes('½')) return 14;
+  if (norm.includes('1/4') || norm.includes('¼')) return 7;
+  if (norm.includes('1/8') || norm.includes('⅛')) return 3.5;
+  return 1;
+}
+
+export function getWeightTier(totalGrams: number): WeightTier {
+  if (totalGrams >= 28) return 'oz';
+  if (totalGrams >= 14) return 'half';
+  if (totalGrams >= 7) return 'quarter';
+  if (totalGrams >= 3.5) return 'eighth';
+  return 'gram';
+}
+
+function pricePerGramForTier(product: any, tier: WeightTier): number {
+  switch (tier) {
+    case 'oz': return (Number(product.pricePerOunce) || 0) / 28;
+    case 'half': return (Number(product.pricePerHalf) || 0) / 14;
+    case 'quarter': return (Number(product.pricePerQuarter) || 0) / 7;
+    case 'eighth': return (Number(product.pricePerEighth) || 0) / 3.5;
+    case 'gram': return Number(product.pricePerGram) || 0;
+  }
+}
+
+export function getWeightItemEffectivePrice(product: any, size: string | undefined, tier: WeightTier): number {
+  const grams = sizeToGrams(size);
+  const pgAtTier = pricePerGramForTier(product, tier);
+  if (pgAtTier === 0) {
+    return getWeightOptionPrice(product as any, size);
+  }
+  return pgAtTier * grams;
+}
+
 function applyProductDiscount(product: any, price: number): number {
   const discPct = parseFloat(product.discountPercentage || "0");
   if (discPct > 0) return price * (1 - discPct / 100);
@@ -86,15 +125,29 @@ function getApplicableTierPrice(product: Product & { category: Category | null; 
 }
 
 function computeTotal(items: CartItem[]): number {
-  // Free items (isFree=true) don't contribute to total; discounted items use customPrice
   const paidItems = items.filter(i => !i.isFree);
+
+  // Cross-product weight tier: sum all weight-based item grams to find the best tier
+  const totalWeightGrams = paidItems
+    .filter(i => i.product.sellingMethod === 'weight' && i.customPrice === undefined)
+    .reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
+  const weightTier = getWeightTier(totalWeightGrams);
+
+  // For non-weight items: quantity-based tier pricing per product
   const productQtyMap = new Map<number, number>();
   for (const item of paidItems) {
-    productQtyMap.set(item.product.id, (productQtyMap.get(item.product.id) || 0) + item.quantity);
+    if (item.product.sellingMethod !== 'weight') {
+      productQtyMap.set(item.product.id, (productQtyMap.get(item.product.id) || 0) + item.quantity);
+    }
   }
+
   return paidItems.reduce((sum, item) => {
     if (item.customPrice !== undefined) {
       return sum + item.customPrice * item.quantity;
+    }
+    if (item.product.sellingMethod === 'weight') {
+      const unitPrice = applyProductDiscount(item.product, getWeightItemEffectivePrice(item.product, item.size, weightTier));
+      return sum + unitPrice * item.quantity;
     }
     const totalQty = productQtyMap.get(item.product.id) || item.quantity;
     return sum + getApplicableTierPrice(item.product, item.size, totalQty) * item.quantity;
@@ -333,14 +386,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const getEffectivePrice = (productId: number, size?: string): number => {
+    const paidItems = state.items.filter(i => !i.isFree);
+    const item = paidItems.find(i => i.product.id === productId && i.size === size);
+    if (!item) return 0;
+
+    if (item.product.sellingMethod === 'weight' && item.customPrice === undefined) {
+      const totalGrams = paidItems
+        .filter(i => i.product.sellingMethod === 'weight' && i.customPrice === undefined)
+        .reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
+      const tier = getWeightTier(totalGrams);
+      return applyProductDiscount(item.product, getWeightItemEffectivePrice(item.product, size, tier));
+    }
+
+    if (item.customPrice !== undefined) return item.customPrice;
+
     const productQtyMap = new Map<number, number>();
-    for (const item of state.items) {
-      if (!item.isFree) {
-        productQtyMap.set(item.product.id, (productQtyMap.get(item.product.id) || 0) + item.quantity);
+    for (const i of paidItems) {
+      if (i.product.sellingMethod !== 'weight') {
+        productQtyMap.set(i.product.id, (productQtyMap.get(i.product.id) || 0) + i.quantity);
       }
     }
-    const item = state.items.find(i => i.product.id === productId && i.size === size && !i.isFree);
-    if (!item) return 0;
     const totalQty = productQtyMap.get(productId) || 0;
     return getApplicableTierPrice(item.product, size, totalQty);
   };

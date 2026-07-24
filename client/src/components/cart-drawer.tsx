@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useCart } from "@/contexts/cart-context";
+import { useCart, sizeToGrams, getWeightTier, getWeightItemEffectivePrice, type WeightTier } from "@/contexts/cart-context";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ShoppingCart, Minus, Plus, Trash2, CreditCard, Tag, Gift, Upload, X, ImageIcon } from "lucide-react";
@@ -77,7 +77,7 @@ function getEffectiveUnitPrice(product: any, size?: string): number {
 }
 
 export default function CartDrawer({ children }: CartDrawerProps) {
-  const { state, removeItem, updateQuantity, clearCart } = useCart();
+  const { state, removeItem, updateQuantity, clearCart, getEffectivePrice } = useCart();
   const { toast } = useToast();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -424,10 +424,18 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         return Number(product.pricePerGram) || 0;
       };
 
-      // Compute total quantity per product for tier pricing
+      // Cross-product weight tier: sum all weight-based item grams
+      const totalCartWeightGrams = state.items
+        .filter(i => !i.isFree && i.product.sellingMethod === 'weight' && i.customPrice === undefined)
+        .reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
+      const cartWeightTier: WeightTier = getWeightTier(totalCartWeightGrams);
+
+      // Compute total quantity per product for non-weight tier pricing
       const productQtyMap = new Map<number, number>();
       for (const item of state.items) {
-        productQtyMap.set(item.product.id, (productQtyMap.get(item.product.id) || 0) + item.quantity);
+        if (item.product.sellingMethod !== 'weight') {
+          productQtyMap.set(item.product.id, (productQtyMap.get(item.product.id) || 0) + item.quantity);
+        }
       }
 
       const applyTierPrice = (product: any, basePrice: number): number => {
@@ -452,13 +460,18 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             size: item.size,
           };
         }
-        const rawBase = item.product.sellingMethod === "weight"
-          ? getWeightPrice(item.product, item.size)
-          : Number(item.product.price) || 0;
-        const discountedBase = item.customPrice !== undefined
-          ? item.customPrice
-          : applyProductDiscount(item.product, rawBase);
-        const itemPrice = applyTierPrice(item.product, discountedBase);
+        let itemPrice: number;
+        if (item.product.sellingMethod === "weight" && item.customPrice === undefined) {
+          itemPrice = applyProductDiscount(item.product, getWeightItemEffectivePrice(item.product, item.size, cartWeightTier));
+        } else {
+          const rawBase = item.product.sellingMethod === "weight"
+            ? getWeightPrice(item.product, item.size)
+            : Number(item.product.price) || 0;
+          const discountedBase = item.customPrice !== undefined
+            ? item.customPrice
+            : applyProductDiscount(item.product, rawBase);
+          itemPrice = applyTierPrice(item.product, discountedBase);
+        }
 
         const productName = item.size 
           ? `${item.product.name} (Size: ${item.size})`
@@ -644,18 +657,9 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                       <div className="mt-1">
                         {item.isFree ? (
                           <p className="font-semibold text-green-600 dark:text-green-400">FREE</p>
-                        ) : item.product.sellingMethod === "weight" ? (
-                          <div className="space-y-1">
-                            {item.product.pricePerGram && (
-                              <div className="font-semibold text-primary">${item.product.pricePerGram}/g</div>
-                            )}
-                            {item.product.pricePerOunce && (
-                              <div className="text-sm text-gray-600">${item.product.pricePerOunce}/oz</div>
-                            )}
-                          </div>
                         ) : (
                           <p className="font-semibold text-primary">
-                            ${getEffectiveUnitPrice(item.product).toFixed(2)}
+                            ${getEffectivePrice(item.product.id, item.size).toFixed(2)}
                           </p>
                         )}
                       </div>
@@ -712,7 +716,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         {item.isFree ? (
                           <span className="text-green-600 dark:text-green-400">Subtotal: FREE</span>
                         ) : (
-                          <>Subtotal: ${(getEffectiveUnitPrice(item.product, item.size) * item.quantity).toFixed(2)}</>
+                          <>Subtotal: ${(getEffectivePrice(item.product.id, item.size) * item.quantity).toFixed(2)}</>
                         )}
                       </p>
                     </div>
@@ -727,6 +731,38 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           {state.items.length > 0 && (
             <div className="border-t pt-4 mt-4">
               <div className="space-y-2 mb-4">
+                {/* Combined weight tier pricing notice */}
+                {(() => {
+                  const weightItems = state.items.filter(i => !i.isFree && i.product.sellingMethod === 'weight' && i.customPrice === undefined);
+                  if (weightItems.length < 2) return null;
+                  const totalGrams = weightItems.reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
+                  const tier = getWeightTier(totalGrams);
+                  const tierLabels: Record<string, string> = { oz: '1 oz', half: '½ oz', quarter: '¼ oz', eighth: '⅛ oz', gram: 'per gram' };
+                  const baseGrams = weightItems.reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
+                  if (tier === 'gram' && baseGrams < 3.5) return null;
+                  const ownTierTotal = weightItems.reduce((sum, i) => {
+                    const norm = (i.size || '').toLowerCase().trim();
+                    let p = 0;
+                    if (norm.includes('1 oz') || norm === 'ounce') p = Number((i.product as any).pricePerOunce) || 0;
+                    else if (norm.includes('1/2') || norm.includes('½')) p = Number((i.product as any).pricePerHalf) || 0;
+                    else if (norm.includes('1/4') || norm.includes('¼')) p = Number((i.product as any).pricePerQuarter) || 0;
+                    else if (norm.includes('1/8') || norm.includes('⅛')) p = Number((i.product as any).pricePerEighth) || 0;
+                    else p = Number(i.product.pricePerGram) || 0;
+                    return sum + p * i.quantity;
+                  }, 0);
+                  const combinedTotal = weightItems.reduce((sum, i) => sum + getEffectivePrice(i.product.id, i.size) * i.quantity, 0);
+                  const savings = Math.round((ownTierTotal - combinedTotal) * 100) / 100;
+                  if (savings <= 0) return null;
+                  return (
+                    <div className="flex justify-between text-sm text-blue-600 dark:text-blue-400">
+                      <span className="flex items-center gap-1">
+                        <Tag className="h-3 w-3" />
+                        Combined weight ({tierLabels[tier]} rate)
+                      </span>
+                      <span>-${savings.toFixed(2)}</span>
+                    </div>
+                  );
+                })()}
                 <div className="flex justify-between text-sm">
                   <span>Items ({state.itemCount})</span>
                   <span>${state.total.toFixed(2)}</span>
