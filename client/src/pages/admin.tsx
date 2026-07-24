@@ -1174,6 +1174,7 @@ export default function AdminPage() {
           <TabsTrigger value="purchase-limits" className="flex-shrink-0 text-xs sm:text-sm">Purchase Limits</TabsTrigger>
           <TabsTrigger value="access" className="flex-shrink-0 text-xs sm:text-sm">Access</TabsTrigger>
           <TabsTrigger value="discounts" className="flex-shrink-0 text-xs sm:text-sm">Discounts</TabsTrigger>
+          <TabsTrigger value="bags" className="flex-shrink-0 text-xs sm:text-sm">Bags</TabsTrigger>
         </TabsList>
 
         <TabsContent value="logs">
