@@ -99,16 +99,20 @@ export function getWeightItemEffectivePrice(product: any, size: string | undefin
   return pgAtTier * grams;
 }
 
-// Greedy oz-bucket pricing: fills 28g buckets largest-first.
-// Items that fill a complete bucket get oz pricing; items in the remainder bucket
-// get tier pricing based on the combined grams of that remainder.
-// Returns a map of itemKey -> total price for ALL units of that item.
+// Returns true if a product should use quantity pricing tiers instead of weight-tier pricing
+function usesQuantityPricing(product: any): boolean {
+  if (product.bogoEnabled === true) return false;
+  const tiers = product.quantityPricing;
+  return Array.isArray(tiers) && tiers.length > 0;
+}
+
 export function greedyOzBucketPricing(
   paidItems: Array<{ product: any; size?: string; quantity: number; isFree?: boolean; customPrice?: number }>,
   makeKey: (productId: number, size?: string) => string
 ): Map<string, number> {
   const weightItems = paidItems.filter(
     i => !i.isFree && i.product.sellingMethod === 'weight' && i.customPrice === undefined
+      && !usesQuantityPricing(i.product)
   );
 
   // Expand into individual units (one entry per unit, not per line)
@@ -224,10 +228,10 @@ function computeTotal(items: CartItem[], globalWeightPricing: boolean): number {
     ? greedyOzBucketPricing(paidItems, (id, size) => makeItemKey(id, size, false))
     : null;
 
-  // For non-weight items: quantity-based tier pricing per product
+  // For non-weight items AND weight items that use quantity pricing: quantity-based tier pricing per product
   const productQtyMap = new Map<number, number>();
   for (const item of paidItems) {
-    if (item.product.sellingMethod !== 'weight') {
+    if (item.product.sellingMethod !== 'weight' || usesQuantityPricing(item.product)) {
       productQtyMap.set(item.product.id, (productQtyMap.get(item.product.id) || 0) + item.quantity);
     }
   }
@@ -236,7 +240,7 @@ function computeTotal(items: CartItem[], globalWeightPricing: boolean): number {
     if (item.customPrice !== undefined) {
       return sum + item.customPrice * item.quantity;
     }
-    if (item.product.sellingMethod === 'weight') {
+    if (item.product.sellingMethod === 'weight' && !usesQuantityPricing(item.product)) {
       if (weightSubtotals) {
         // Bucket-priced: subtotal already covers all units
         const key = makeItemKey(item.product.id, item.size, false);
@@ -497,7 +501,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const item = paidItems.find(i => i.product.id === productId && i.size === size);
     if (!item) return 0;
 
-    if (item.product.sellingMethod === 'weight' && item.customPrice === undefined) {
+    if (item.product.sellingMethod === 'weight' && !usesQuantityPricing(item.product) && item.customPrice === undefined) {
       if (state.globalWeightPricing) {
         // Bucket pricing: subtotal covers all units; divide to get avg unit price for display
         const subtotals = greedyOzBucketPricing(paidItems, (id, sz) => makeItemKey(id, sz, false));
@@ -514,7 +518,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     const productQtyMap = new Map<number, number>();
     for (const i of paidItems) {
-      if (i.product.sellingMethod !== 'weight') {
+      if (i.product.sellingMethod !== 'weight' || usesQuantityPricing(i.product)) {
         productQtyMap.set(i.product.id, (productQtyMap.get(i.product.id) || 0) + i.quantity);
       }
     }
