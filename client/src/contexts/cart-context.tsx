@@ -99,6 +99,87 @@ export function getWeightItemEffectivePrice(product: any, size: string | undefin
   return pgAtTier * grams;
 }
 
+// Greedy oz-bucket pricing: fills 28g buckets largest-first.
+// Items that fill a complete bucket get oz pricing; items in the remainder bucket
+// get tier pricing based on the combined grams of that remainder.
+// Returns a map of itemKey -> total price for ALL units of that item.
+export function greedyOzBucketPricing(
+  paidItems: Array<{ product: any; size?: string; quantity: number; isFree?: boolean; customPrice?: number }>,
+  makeKey: (productId: number, size?: string) => string
+): Map<string, number> {
+  const weightItems = paidItems.filter(
+    i => !i.isFree && i.product.sellingMethod === 'weight' && i.customPrice === undefined
+  );
+
+  // Expand into individual units (one entry per unit, not per line)
+  type Unit = { product: any; size?: string; itemKey: string; grams: number };
+  const units: Unit[] = [];
+  for (const item of weightItems) {
+    const key = makeKey(item.product.id, item.size);
+    const grams = sizeToGrams(item.size);
+    for (let q = 0; q < item.quantity; q++) {
+      units.push({ product: item.product, size: item.size, itemKey: key, grams });
+    }
+  }
+
+  // Sort largest grams first so big items fill oz buckets before small ones
+  units.sort((a, b) => b.grams - a.grams);
+
+  // Pack into 28g buckets
+  const OZ_GRAMS = 28;
+  type Bucket = Unit[];
+  const buckets: Bucket[] = [];
+  let currentBucket: Bucket = [];
+  let currentGrams = 0;
+
+  for (const unit of units) {
+    if (currentGrams + unit.grams <= OZ_GRAMS) {
+      currentBucket.push(unit);
+      currentGrams += unit.grams;
+      if (currentGrams >= OZ_GRAMS) {
+        buckets.push(currentBucket);
+        currentBucket = [];
+        currentGrams = 0;
+      }
+    } else {
+      // Unit doesn't fit: close current bucket, start a new one
+      if (currentBucket.length > 0) {
+        buckets.push(currentBucket);
+      }
+      currentBucket = [unit];
+      currentGrams = unit.grams;
+      if (currentGrams >= OZ_GRAMS) {
+        buckets.push(currentBucket);
+        currentBucket = [];
+        currentGrams = 0;
+      }
+    }
+  }
+  if (currentBucket.length > 0) {
+    buckets.push(currentBucket);
+  }
+
+  // Price each bucket: tier is determined by combined grams in that bucket
+  const subtotals = new Map<string, number>();
+  for (const item of weightItems) {
+    subtotals.set(makeKey(item.product.id, item.size), 0);
+  }
+
+  for (const bucket of buckets) {
+    const bucketGrams = bucket.reduce((s, u) => s + u.grams, 0);
+    const tier = getWeightTier(bucketGrams);
+    for (const unit of bucket) {
+      const unitPrice = applyProductDiscount(
+        unit.product,
+        getWeightItemEffectivePrice(unit.product, unit.size, tier)
+      );
+      subtotals.set(unit.itemKey, (subtotals.get(unit.itemKey) || 0) + unitPrice);
+    }
+  }
+
+  return subtotals;
+}
+
 function applyProductDiscount(product: any, price: number): number {
   const discPct = parseFloat(product.discountPercentage || "0");
   if (discPct > 0) return price * (1 - discPct / 100);
@@ -131,14 +212,10 @@ function getApplicableTierPrice(product: Product & { category: Category | null; 
 function computeTotal(items: CartItem[], globalWeightPricing: boolean): number {
   const paidItems = items.filter(i => !i.isFree);
 
-  // Cross-product weight tier (only when global weight pricing is enabled)
-  let weightTier: WeightTier = 'gram';
-  if (globalWeightPricing) {
-    const totalWeightGrams = paidItems
-      .filter(i => i.product.sellingMethod === 'weight' && i.customPrice === undefined)
-      .reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
-    weightTier = getWeightTier(totalWeightGrams);
-  }
+  // Oz-bucket subtotals for weight items when global weight pricing is on
+  const weightSubtotals: Map<string, number> | null = globalWeightPricing
+    ? greedyOzBucketPricing(paidItems, (id, size) => makeItemKey(id, size, false))
+    : null;
 
   // For non-weight items: quantity-based tier pricing per product
   const productQtyMap = new Map<number, number>();
@@ -153,7 +230,13 @@ function computeTotal(items: CartItem[], globalWeightPricing: boolean): number {
       return sum + item.customPrice * item.quantity;
     }
     if (item.product.sellingMethod === 'weight') {
-      const tier = globalWeightPricing ? weightTier : getWeightTier(sizeToGrams(item.size) * item.quantity);
+      if (weightSubtotals) {
+        // Bucket-priced: subtotal already covers all units
+        const key = makeItemKey(item.product.id, item.size, false);
+        return sum + (weightSubtotals.get(key) || 0);
+      }
+      // GWP off: each item priced at its own size's tier
+      const tier = getWeightTier(sizeToGrams(item.size));
       const unitPrice = applyProductDiscount(item.product, getWeightItemEffectivePrice(item.product, item.size, tier));
       return sum + unitPrice * item.quantity;
     }
@@ -413,15 +496,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!item) return 0;
 
     if (item.product.sellingMethod === 'weight' && item.customPrice === undefined) {
-      let tier: WeightTier;
       if (state.globalWeightPricing) {
-        const totalGrams = paidItems
-          .filter(i => i.product.sellingMethod === 'weight' && i.customPrice === undefined)
-          .reduce((sum, i) => sum + sizeToGrams(i.size) * i.quantity, 0);
-        tier = getWeightTier(totalGrams);
-      } else {
-        tier = getWeightTier(sizeToGrams(size) * item.quantity);
+        // Bucket pricing: subtotal covers all units; divide to get avg unit price for display
+        const subtotals = greedyOzBucketPricing(paidItems, (id, sz) => makeItemKey(id, sz, false));
+        const key = makeItemKey(productId, size, false);
+        const subtotal = subtotals.get(key) || 0;
+        return item.quantity > 0 ? subtotal / item.quantity : 0;
       }
+      // GWP off: each item at its own size's tier
+      const tier = getWeightTier(sizeToGrams(size));
       return applyProductDiscount(item.product, getWeightItemEffectivePrice(item.product, size, tier));
     }
 
