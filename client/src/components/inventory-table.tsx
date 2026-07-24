@@ -180,45 +180,65 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
   const renderStockAndPhysical = (product: Product & { sizes?: ProductSize[] }, onAdjust: () => void) => {
     const hasSizes = product.sizes && product.sizes.length > 0;
 
-    if (hasSizes && product.sizes) {
-      const sorted = [...product.sizes].sort((a, b) => a.size.localeCompare(b.size));
-      const stockTotal = sorted.reduce((s, x) => s + (x.quantity || 0), 0);
-      const physTotal = sorted.reduce((s, x) => s + (x.physicalQuantity || 0), 0);
-      const varianceDiff = physTotal - stockTotal;
+    const stockVal = hasSizes && product.sizes
+      ? product.sizes.reduce((s, x) => s + (x.quantity || 0), 0)
+      : product.stock;
+    const physVal = hasSizes && product.sizes
+      ? product.sizes.reduce((s, x) => s + (x.physicalQuantity || 0), 0)
+      : (product.physicalInventory ?? 0);
+    const varianceDiff = physVal - stockVal;
+    const sorted = hasSizes && product.sizes
+      ? [...product.sizes].sort((a, b) => a.size.localeCompare(b.size))
+      : [];
 
-      return (
-        <div className="text-xs min-w-[220px]">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 mb-1 pb-1 border-b border-gray-200 dark:border-gray-700">
+    return (
+      <div className="text-xs min-w-[200px]">
+        <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 mb-1 pb-1 border-b border-gray-200 dark:border-gray-700 items-center">
+          <div className="flex items-center gap-1">
             <span className={`font-medium ${
-              stockTotal === 0 ? "text-red-600" :
-              stockTotal <= product.minStockThreshold ? "text-orange-600" :
+              stockVal === 0 ? "text-red-600" :
+              stockVal <= product.minStockThreshold ? "text-orange-600" :
               "text-gray-500 dark:text-gray-400"
             }`}>Total</span>
-            <span className={`font-semibold text-right ${
-              stockTotal === 0 ? "text-red-600" :
-              stockTotal <= product.minStockThreshold ? "text-orange-600" :
-              "text-gray-900 dark:text-white"
-            }`}>{stockTotal}</span>
-            <span className={`font-semibold text-right ${
-              physTotal === 0 ? "text-red-600" :
-              varianceDiff !== 0 ? "text-orange-500" :
-              "text-gray-900 dark:text-white"
-            }`}>
-              {physTotal}{varianceDiff !== 0 && <span className="ml-0.5 text-[10px]">({varianceDiff > 0 ? "+" : ""}{varianceDiff})</span>}
-            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onAdjust}
+              className="h-4 w-4 p-0 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white"
+              title="Adjust stock"
+            >
+              <Edit className="h-3 w-3" />
+            </Button>
           </div>
+          <span className={`font-semibold justify-self-end ${
+            stockVal === 0 ? "text-red-600" :
+            stockVal <= product.minStockThreshold ? "text-orange-600" :
+            "text-gray-900 dark:text-white"
+          }`}>{hasSizes ? stockVal : displayStock(product, stockVal)}</span>
+          <span className={`font-semibold justify-self-end ${
+            physVal === 0 ? "text-red-600" :
+            varianceDiff !== 0 ? "text-orange-500" :
+            "text-gray-900 dark:text-white"
+          }`}>
+            {hasSizes ? physVal : displayStock(product, physVal)}
+            {varianceDiff !== 0 && (
+              <span className="ml-0.5 text-[10px]">({varianceDiff > 0 ? "+" : ""}{varianceDiff})</span>
+            )}
+          </span>
+        </div>
+        {sorted.length > 0 && (
           <div className="space-y-0.5">
             {sorted.map((size) => {
               const sv = (size.physicalQuantity || 0) - (size.quantity || 0);
               return (
-                <div key={size.id} className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-baseline">
+                <div key={size.id} className="grid grid-cols-[1fr_auto_auto] gap-x-4 items-baseline">
                   <span className="text-gray-700 dark:text-gray-300 font-medium">{size.size}:</span>
-                  <span className={`font-semibold text-right ${
+                  <span className={`font-semibold justify-self-end ${
                     size.quantity === 0 ? "text-red-600" :
                     size.quantity <= product.minStockThreshold ? "text-orange-600" :
                     "text-gray-900 dark:text-white"
                   }`}>{size.quantity}</span>
-                  <span className={`font-semibold text-right ${
+                  <span className={`font-semibold justify-self-end ${
                     (size.physicalQuantity || 0) === 0 ? "text-red-600" :
                     sv !== 0 ? "text-orange-500" :
                     "text-gray-900 dark:text-white"
@@ -227,67 +247,9 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
               );
             })}
           </div>
-          <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
-            <span className="w-16 text-right">stock</span>
-            <span className="w-10 text-right">physical</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onAdjust}
-              className="h-5 w-5 p-0 text-gray-600 dark:text-white hover:text-gray-900 dark:hover:text-white ml-auto"
-              title="Adjust stock"
-            >
-              <Edit className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
-      );
-    } else {
-      const physicalTotal = product.physicalInventory ?? 0;
-      const varianceDiff = physicalTotal - product.stock;
-      return (
-        <div className="flex flex-col gap-0.5 text-sm">
-          <div className="flex items-center gap-3">
-            <span className="text-gray-500 dark:text-gray-400 text-xs w-16">stock</span>
-            <span className={`font-medium ${
-              product.stock === 0 ? "text-red-600" :
-              product.stock <= product.minStockThreshold ? "text-orange-600" :
-              "text-gray-900 dark:text-white"
-            }`}>{displayStock(product, product.stock)}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-gray-500 dark:text-gray-400 text-xs w-16">physical</span>
-            <span className={`font-medium ${
-              physicalTotal === 0 ? "text-red-600" :
-              varianceDiff !== 0 ? "text-orange-500" :
-              "text-gray-900 dark:text-white"
-            }`}>
-              {displayStock(product, physicalTotal)}
-              {varianceDiff !== 0 && <span className="ml-1 text-xs">({varianceDiff > 0 ? "+" : ""}{displayStock(product, varianceDiff)})</span>}
-            </span>
-          </div>
-          <div className="w-16 h-1 bg-gray-200 rounded-full mt-1">
-            <div
-              className={`h-1 rounded-full transition-all ${
-                product.stock === 0 ? "bg-red-500" :
-                product.stock <= product.minStockThreshold ? "bg-orange-500" :
-                "bg-green-500"
-              }`}
-              style={{ width: `${Math.min((product.stock / (product.minStockThreshold * 2)) * 100, 100)}%` }}
-            />
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onAdjust}
-            className="h-6 w-6 p-0 text-gray-600 dark:text-white hover:text-gray-900 dark:hover:text-white mt-1"
-            title="Adjust stock"
-          >
-            <Edit className="h-3 w-3" />
-          </Button>
-        </div>
-      );
-    }
+        )}
+      </div>
+    );
   };
 
   const getProductStatus = (product: Product): string => {
