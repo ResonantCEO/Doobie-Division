@@ -194,12 +194,17 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
     return (
       <div className="text-xs min-w-[200px]">
         <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 mb-1 pb-1 border-b border-gray-200 dark:border-gray-700 items-center">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-wrap">
             <span className={`font-medium ${
               stockVal === 0 ? "text-red-600" :
               stockVal <= product.minStockThreshold ? "text-orange-600" :
               "text-gray-500 dark:text-gray-400"
             }`}>Total</span>
+            {varianceDiff !== 0 && (
+              <span className="text-orange-500 text-[10px] font-medium">
+                ({varianceDiff > 0 ? "+" : ""}{varianceDiff})
+              </span>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -219,12 +224,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
             physVal === 0 ? "text-red-600" :
             varianceDiff !== 0 ? "text-orange-500" :
             "text-gray-900 dark:text-white"
-          }`}>
-            {hasSizes ? physVal : displayStock(product, physVal)}
-            {varianceDiff !== 0 && (
-              <span className="ml-0.5 text-[10px]">({varianceDiff > 0 ? "+" : ""}{varianceDiff})</span>
-            )}
-          </span>
+          }`}>{hasSizes ? physVal : displayStock(product, physVal)}</span>
         </div>
         {sorted.length > 0 && (
           <div className="space-y-0.5">
