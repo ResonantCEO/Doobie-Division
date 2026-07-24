@@ -2053,11 +2053,17 @@ export default function AdminPage() {
                         <strong>Example:</strong> Cart has 1 oz of Item A ($120/oz), ½ oz of Item B ($30/half, $50/oz), and ½ oz of Item C ($30/half, $50/oz). B and C are cheaper so they combine first — their 28g fills one bucket at the oz rate ($25 each). Item A fills its own bucket at its oz rate ($120). Total: $170. Without this toggle, each item would be priced at its own size's rate with no combining benefit.
                       </p>
                     </div>
-                    <Switch
-                      checked={false}
-                      disabled={true}
-                      className="mt-1 shrink-0 opacity-40 cursor-not-allowed"
-                    />
+                    <div
+                      className="mt-1 shrink-0 cursor-pointer"
+                      onClick={() => setShowLockedBagPopup(true)}
+                      title="Feature locked — coming soon"
+                    >
+                      <Switch
+                        checked={false}
+                        disabled={true}
+                        className="opacity-40 pointer-events-none"
+                      />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
