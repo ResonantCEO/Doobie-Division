@@ -1355,7 +1355,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                               <div className="space-y-2">
                                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Options</p>
                                 <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-                                  {ap.sizes.map((size: any) => {
+                                  {[...ap.sizes].sort((a: any, b: any) => a.size.localeCompare(b.size)).map((size: any) => {
                                     const isOutOfStock = size.quantity <= 0;
                                     const currentQty = addItemSizeQuantities[size.size] || 0;
                                     return (

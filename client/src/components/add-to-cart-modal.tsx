@@ -438,7 +438,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
               </span>
             </div>
             <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-              {product.sizes!.map((size) => {
+              {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map((size) => {
                 const isOutOfStock = size.quantity <= 0;
                 const currentFree = freeQuantities[size.size] || 0;
                 return (
@@ -676,7 +676,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
           <div className="space-y-3">
             <Label>Options</Label>
             <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-              {product.sizes!.map((size) => {
+              {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map((size) => {
                 const isOutOfStock = size.quantity <= 0;
                 return (
                   <div key={size.id} className={`flex items-center justify-between ${isOutOfStock ? 'opacity-50' : ''}`}>

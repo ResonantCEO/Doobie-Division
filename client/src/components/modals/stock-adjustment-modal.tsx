@@ -143,7 +143,7 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
             {hasSizes ? (
               <div className="text-sm text-muted-foreground">
                 <p className="font-medium mb-1">Total Stock: {product.sellingMethod === "weight" ? formatWeight(product.stock) : `${product.stock} units`}</p>
-                {product.sizes!.map(s => (
+                {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map(s => (
                   <p key={s.id} className="ml-2">{s.size}: {s.quantity}</p>
                 ))}
               </div>
@@ -161,7 +161,7 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All (Total Stock)</SelectItem>
-                  {product.sizes!.map(s => (
+                  {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map(s => (
                     <SelectItem key={s.id} value={s.size}>
                       {s.size} (Current: {s.quantity})
                     </SelectItem>

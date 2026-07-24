@@ -2872,7 +2872,7 @@ export default function AdminPage() {
             </p>
           </DialogHeader>
           <div className="space-y-2 max-h-80 overflow-y-auto py-1">
-            {flavorPickerProduct?.sizes?.map(sz => (
+            {[...(flavorPickerProduct?.sizes ?? [])].sort((a, b) => a.size.localeCompare(b.size)).map(sz => (
               <button
                 key={sz.size}
                 type="button"

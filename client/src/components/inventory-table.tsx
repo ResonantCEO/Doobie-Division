@@ -191,7 +191,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
             Total: {displayStock(product, product.stock)}
           </div>
           <div className="space-y-0.5 border-t border-gray-200 dark:border-gray-700 pt-1">
-            {product.sizes!.map((size) => (
+            {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map((size) => (
               <div key={size.id} className="flex items-center justify-between text-xs">
                 <span className="text-gray-700 dark:text-gray-300 font-medium">{size.size}:</span>
                 <span className={`font-semibold ${
@@ -584,7 +584,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                     {hasSizes ? (
                       <div className="space-y-0.5 mt-0.5">
                         <div className="text-white font-medium">{product.stock} total</div>
-                        {product.sizes!.map((size) => (
+                        {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map((size) => (
                           <div key={size.id} className="text-white pl-1">
                             {size.size}: {size.quantity}
                           </div>
@@ -601,7 +601,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                         <div className={`font-medium ${hasVariance ? "text-red-500" : "text-white"}`}>
                           {product.physicalInventory || 0} total
                         </div>
-                        {product.sizes!.map((size) => {
+                        {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map((size) => {
                           const sizeVariance = (size.physicalQuantity || 0) - size.quantity;
                           return (
                             <div key={size.id} className={sizeVariance !== 0 ? "text-red-500" : "text-white"}>
