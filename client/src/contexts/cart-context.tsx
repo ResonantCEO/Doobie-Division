@@ -122,8 +122,15 @@ export function greedyOzBucketPricing(
     }
   }
 
-  // Sort largest grams first so big items fill oz buckets before small ones
-  units.sort((a, b) => b.grams - a.grams);
+  // Primary: largest grams first (big items fill buckets before small ones)
+  // Secondary: cheapest own-tier price first within same gram size, so low-value
+  //   items combine into oz buckets while expensive items stay at their own tier
+  units.sort((a, b) => {
+    if (b.grams !== a.grams) return b.grams - a.grams;
+    const ownTierA = getWeightItemEffectivePrice(a.product, a.size, getWeightTier(a.grams));
+    const ownTierB = getWeightItemEffectivePrice(b.product, b.size, getWeightTier(b.grams));
+    return ownTierA - ownTierB;
+  });
 
   // Pack into 28g buckets
   const OZ_GRAMS = 28;
