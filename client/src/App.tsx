@@ -21,7 +21,7 @@ import SupportPage from "@/pages/support";
 import AccessGate from "@/components/AccessGate";
 import InactivityWarning from "@/components/InactivityWarning";
 import { useInactivityTimer } from "@/hooks/useInactivityTimer";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 function Router() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -103,6 +103,17 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    const preventScrollOnNumberInputs = (e: WheelEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" && (target as HTMLInputElement).type === "number") {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("wheel", preventScrollOnNumberInputs, { passive: false });
+    return () => document.removeEventListener("wheel", preventScrollOnNumberInputs);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
