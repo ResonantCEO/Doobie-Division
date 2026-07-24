@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift } from "lucide-react";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift, Lock } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount, PromoCode, GrabBag, Category, ProductSize } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -2038,19 +2038,10 @@ export default function AdminPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <Package className="h-5 w-5 text-primary" />
                         <h3 className="font-semibold text-base">Global Weight Pricing</h3>
-                        {isLoadingWeightPricing ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-500 animate-pulse">Loading…</span>
-                        ) : globalWeightPricingEnabled ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700">
-                            <span className="h-1.5 w-1.5 rounded-full bg-green-500 inline-block" />
-                            Active
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600">
-                            <span className="h-1.5 w-1.5 rounded-full bg-gray-400 inline-block" />
-                            Inactive
-                          </span>
-                        )}
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700">
+                          <Lock className="h-3 w-3" />
+                          Locked — Inactive
+                        </span>
                       </div>
                       <p className="text-sm text-muted-foreground">
                         When active, the total weight of all weight-based items in a cart is combined to qualify for better price tiers. For example, ½ oz of Item A + ½ oz of Item B = 1 oz total, so both items are priced at the 1 oz rate using their own per-oz price points. Existing orders are not affected.
@@ -2061,10 +2052,9 @@ export default function AdminPage() {
                       </p>
                     </div>
                     <Switch
-                      checked={globalWeightPricingEnabled}
-                      disabled={isLoadingWeightPricing || toggleWeightPricingMutation.isPending}
-                      onCheckedChange={(checked) => toggleWeightPricingMutation.mutate(checked)}
-                      className="mt-1 shrink-0"
+                      checked={false}
+                      disabled={true}
+                      className="mt-1 shrink-0 opacity-40 cursor-not-allowed"
                     />
                   </div>
                 </CardContent>
