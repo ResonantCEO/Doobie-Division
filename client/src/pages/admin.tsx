@@ -2054,6 +2054,10 @@ export default function AdminPage() {
                       </div>
                       <p className="text-sm text-muted-foreground">
                         When active, the total weight of all weight-based items in a cart is combined to qualify for better price tiers. For example, ½ oz of Item A + ½ oz of Item B = 1 oz total, so both items are priced at the 1 oz rate using their own per-oz price points. Existing orders are not affected.
+                        <br /><br />
+                        <strong>How oz buckets work:</strong> The system fills buckets of exactly 1 oz (28g) at a time. Items are sorted cheapest-first within the same weight, so lower-priced items combine into the oz bucket first — leaving higher-priced items at their own tier. Once a bucket hits 28g it locks in at oz pricing and a new bucket starts from zero. Any leftover weight that doesn't complete a full oz bucket is priced at whatever tier that remaining weight qualifies for (e.g. a 14g remainder = ½ oz rate, a 7g remainder = ¼ oz rate).
+                        <br /><br />
+                        <strong>Example:</strong> Cart has 1 oz of Item A ($120/oz), ½ oz of Item B ($30/half, $50/oz), and ½ oz of Item C ($30/half, $50/oz). B and C are cheaper so they combine first — their 28g fills one bucket at the oz rate ($25 each). Item A fills its own bucket at its oz rate ($120). Total: $170. Without this toggle, each item would be priced at its own size's rate with no combining benefit.
                       </p>
                     </div>
                     <Switch
