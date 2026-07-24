@@ -1226,6 +1226,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                         placeholder="0"
                         value={stockLbs}
                         onChange={(e) => setStockLbs(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
                         className="pr-8"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">lb</span>
@@ -1237,6 +1238,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                         placeholder="0"
                         value={stockOz}
                         onChange={(e) => setStockOz(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
                         className="pr-8"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">oz</span>
@@ -1249,6 +1251,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                         placeholder="0"
                         value={stockG}
                         onChange={(e) => setStockG(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
                         className="pr-6"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">g</span>
@@ -1284,6 +1287,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                       placeholder="0"
                       value={minStockLbs}
                       onChange={(e) => setMinStockLbs(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="pr-8"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">lb</span>
@@ -1295,6 +1299,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                       placeholder="0"
                       value={minStockOz}
                       onChange={(e) => setMinStockOz(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="pr-8"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">oz</span>
@@ -1307,6 +1312,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                       placeholder="0"
                       value={minStockG}
                       onChange={(e) => setMinStockG(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="pr-6"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">g</span>
