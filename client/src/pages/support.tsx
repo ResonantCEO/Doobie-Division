@@ -144,7 +144,8 @@ function TicketConversation({
   };
 
   const isClosed = item.ticket.status === "closed";
-  const canReply = !isClosed;
+  const isPasswordReset = item.ticket.subject?.includes("Password Reset Request");
+  const canReply = !isClosed && !isPasswordReset;
 
   const allMessages = [
     {

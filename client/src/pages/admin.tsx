@@ -1686,7 +1686,7 @@ export default function AdminPage() {
                               })}
 
                               {/* Inline reply box */}
-                              {!isClosed && (
+                              {!isClosed && !item.ticket.subject?.includes('Password Reset Request') && (
                                 <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-700">
                                   {/* Pending images preview */}
                                   {pendingImgs.length > 0 && (
@@ -3504,7 +3504,7 @@ export default function AdminPage() {
           </div>
 
           {/* Reply area */}
-          {selectedTicket?.ticket.status !== 'closed' && (
+          {selectedTicket?.ticket.status !== 'closed' && !selectedTicket?.ticket.subject?.includes('Password Reset Request') && (
             <div className="shrink-0 border-t border-border pt-3 space-y-2">
               {adminPendingImages.length > 0 && (
                 <div className="flex flex-wrap gap-2">

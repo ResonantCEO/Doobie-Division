@@ -467,6 +467,9 @@ Please manually send this reset URL to the user via their preferred communicatio
         { ipAddress: req.ip, userAgent: req.get('User-Agent') }
       );
 
+      // Close and clear the password reset support ticket now that it's resolved
+      await storage.closePasswordResetTicket(user.id);
+
       res.json({ message: "Password reset successful" });
     } catch (error) {
       console.error("Reset password error:", error);

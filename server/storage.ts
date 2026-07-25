@@ -190,6 +190,7 @@ export interface IStorage {
   archiveSupportTicket(id: number): Promise<any>;
   unarchiveSupportTicket(id: number): Promise<any>;
   clearAllSupportTickets(): Promise<void>;
+  closePasswordResetTicket(userId: string): Promise<void>;
   cleanupOldClosedTickets(): Promise<void>;
 
   // Password reset operations
@@ -3852,6 +3853,22 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(supportTickets.archived, false),
           eq(supportTickets.status, 'closed')
+        )
+      );
+  }
+
+  async closePasswordResetTicket(userId: string): Promise<void> {
+    // Find any open password reset tickets for this user and close + soft-delete them
+    const now = new Date();
+    await db
+      .update(supportTickets)
+      .set({ status: 'closed', closedAt: now, adminCleared: true, updatedAt: now })
+      .where(
+        and(
+          eq(supportTickets.userId, userId),
+          eq(supportTickets.archived, false),
+          eq(supportTickets.adminCleared, false),
+          like(supportTickets.subject, 'Password Reset Request%')
         )
       );
   }
