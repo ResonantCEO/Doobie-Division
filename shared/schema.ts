@@ -214,6 +214,7 @@ export const supportTickets = pgTable("support_tickets", {
   status: varchar("status").notNull().default('open'),
   assignedTo: varchar("assigned_to").references(() => users.id),
   archived: boolean("archived").notNull().default(false),
+  adminCleared: boolean("admin_cleared").notNull().default(false),
   closedAt: timestamp("closed_at"),
   weeklyTicketNumber: integer("weekly_ticket_number"),
   imageUrls: text("image_urls"), // JSON array of image URLs attached to initial message

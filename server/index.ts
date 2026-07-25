@@ -187,6 +187,15 @@ app.use((req, res, next) => {
     console.warn("⚠ Could not verify users.verified_at column:", error?.message);
   }
 
+  // Add admin_cleared column to support_tickets
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS admin_cleared BOOLEAN NOT NULL DEFAULT false`);
+    console.log("✓ Verified support_tickets.admin_cleared column exists");
+  } catch (error: any) {
+    console.warn("⚠ Could not verify support_tickets.admin_cleared column:", error?.message);
+  }
+
   // Ensure image_urls column exists (migration)
   try {
     const { sql } = await import("./db");

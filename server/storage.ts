@@ -3633,6 +3633,9 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(supportTickets.priority, filters.priority));
     }
 
+    // Admin view never shows admin-cleared tickets
+    conditions.push(eq(supportTickets.adminCleared, false));
+
     const tickets = await retryQuery(() => db
       .select({
         ticket: supportTickets,
@@ -3645,7 +3648,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(supportTickets)
       .leftJoin(users, eq(supportTickets.userId, users.id))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(supportTickets.createdAt)));
 
     // Process each ticket to add responses and assigned user
@@ -3757,6 +3760,12 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(supportTickets.userId, userId),
+          // Hide tickets that have been admin-cleared AND are past the 24 h window
+          or(
+            eq(supportTickets.adminCleared, false),
+            gt(supportTickets.closedAt, twentyFourHoursAgo)
+          ),
+          // Also hide tickets that have simply been closed for > 24 h (existing rule)
           or(
             ne(supportTickets.status, 'closed'),
             gt(supportTickets.closedAt, twentyFourHoursAgo)
@@ -3833,57 +3842,48 @@ export class DatabaseStorage implements IStorage {
   }
 
   async clearAllSupportTickets(): Promise<void> {
-    // Hard-delete all closed, non-archived tickets (admin explicitly requested this)
-    const ticketsToDelete = await db
-      .select({ id: supportTickets.id })
-      .from(supportTickets)
+    // Soft-delete: mark closed, non-archived tickets as admin_cleared.
+    // Admin view hides them immediately; customers keep seeing them for
+    // 24 h after closing, then cleanupOldClosedTickets() hard-deletes them.
+    await db
+      .update(supportTickets)
+      .set({ adminCleared: true })
       .where(
         and(
           eq(supportTickets.archived, false),
           eq(supportTickets.status, 'closed')
         )
       );
-
-    for (const ticket of ticketsToDelete) {
-      await db.delete(supportTicketResponses).where(eq(supportTicketResponses.ticketId, ticket.id));
-    }
-
-    if (ticketsToDelete.length > 0) {
-      await db.delete(supportTickets).where(
-        and(
-          eq(supportTickets.archived, false),
-          eq(supportTickets.status, 'closed')
-        )
-      );
-    }
   }
 
   async cleanupOldClosedTickets(): Promise<void> {
-    // Delete closed, non-archived tickets whose closedAt is more than 24 hours ago
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const oldClosedTickets = await db
+    // Hard-delete any ticket that is either:
+    //  a) admin-cleared (soft-deleted) and closed more than 24 h ago, OR
+    //  b) naturally closed more than 24 h ago (existing behaviour)
+    const oldTickets = await db
       .select({ id: supportTickets.id })
       .from(supportTickets)
       .where(
         and(
-          eq(supportTickets.status, 'closed'),
           eq(supportTickets.archived, false),
+          eq(supportTickets.status, 'closed'),
           lt(supportTickets.closedAt, twentyFourHoursAgo)
         )
       );
 
-    for (const ticket of oldClosedTickets) {
+    for (const ticket of oldTickets) {
       await db.delete(supportTicketResponses).where(eq(supportTicketResponses.ticketId, ticket.id));
     }
 
-    if (oldClosedTickets.length > 0) {
+    if (oldTickets.length > 0) {
       await db
         .delete(supportTickets)
         .where(
           and(
-            eq(supportTickets.status, 'closed'),
             eq(supportTickets.archived, false),
+            eq(supportTickets.status, 'closed'),
             lt(supportTickets.closedAt, twentyFourHoursAgo)
           )
         );
