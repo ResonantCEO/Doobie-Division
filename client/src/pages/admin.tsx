@@ -872,7 +872,8 @@ export default function AdminPage() {
       });
       if (!response.ok) throw new Error('Failed to fetch support tickets');
       return response.json();
-    }
+    },
+    refetchInterval: 15000,
   });
 
 
