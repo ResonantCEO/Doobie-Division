@@ -818,9 +818,9 @@ export default function StorefrontPage() {
                   {/* Content */}
                   <div className="relative z-10 py-16 px-8">
                     <div className="max-w-2xl">
-                      <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-lg">Today's Amazing Deals!</h2>
+                      <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-lg">Daily Deals!</h2>
                       <p className="text-xl mb-6 text-white/90 drop-shadow-md">
-                        Check out our special discounts on selected products every day!
+                        Click here to see our hand selected special discounts for today!
                       </p>
                     </div>
                   </div>
