@@ -214,6 +214,7 @@ export const supportTickets = pgTable("support_tickets", {
   status: varchar("status").notNull().default('open'),
   assignedTo: varchar("assigned_to").references(() => users.id),
   archived: boolean("archived").notNull().default(false),
+  closedAt: timestamp("closed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

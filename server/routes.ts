@@ -2760,9 +2760,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imageUrls: imageUrls ? JSON.stringify(imageUrls) : undefined,
       });
 
-      // Notify the customer if they have a userId linked
+      // Auto-advance status from 'open' to 'in_progress' on first staff reply
       try {
         const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+        if (ticket?.status === 'open') {
+          await storage.updateSupportTicketStatus(id, 'in_progress');
+        }
+        // Notify the customer if they have a userId linked
         if (ticket?.userId) {
           await storage.createNotification({
             userId: ticket.userId,
@@ -2773,7 +2777,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       } catch (notifyErr) {
-        console.error("Failed to notify customer of support reply:", notifyErr);
+        console.error("Failed to update ticket status or notify customer:", notifyErr);
       }
 
       res.status(201).json(ticketResponse);

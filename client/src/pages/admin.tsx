@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift, Lock, ImagePlus, X, Loader2 } from "lucide-react";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift, Lock, ImagePlus, X, Loader2, ChevronDown, ChevronUp, Paperclip } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount, PromoCode, GrabBag, Category, ProductSize } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -82,6 +82,11 @@ export default function AdminPage() {
   const adminFileInputRef = useRef<HTMLInputElement>(null);
   const adminChatBottomRef = useRef<HTMLDivElement>(null);
   const [inlineReplies, setInlineReplies] = useState<Record<number, string>>({});
+  const [inlineImages, setInlineImages] = useState<Record<number, string[]>>({});
+  const [inlineUploadingImage, setInlineUploadingImage] = useState<number | null>(null);
+  const [expandedTickets, setExpandedTickets] = useState<Set<number>>(new Set());
+  const inlineFileInputRef = useRef<HTMLInputElement>(null);
+  const [inlineFileTargetTicket, setInlineFileTargetTicket] = useState<number | null>(null);
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showAddLimitModal, setShowAddLimitModal] = useState(false);
@@ -1102,6 +1107,36 @@ export default function AdminPage() {
     }
   };
 
+  const handleInlineImageUpload = async (ticketId: number, file: File) => {
+    setInlineUploadingImage(ticketId);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/support/ticket-images", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { imageUrl } = await res.json();
+      setInlineImages((prev) => ({ ...prev, [ticketId]: [...(prev[ticketId] || []), imageUrl] }));
+    } catch {
+      toast({ title: "Failed to upload image", variant: "destructive" });
+    } finally {
+      setInlineUploadingImage(null);
+      if (inlineFileInputRef.current) inlineFileInputRef.current.value = "";
+    }
+  };
+
+  const getTicketDisplayStatus = (item: any): { label: string; className: string } => {
+    const status = item.ticket.status;
+    if (status === 'closed') return { label: 'Resolved', className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' };
+    if (status === 'close_requested') return { label: 'Close Requested', className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' };
+    const hasStaffReply = item.responses?.some((r: any) => r.type === 'staff');
+    if (hasStaffReply || status === 'in_progress') return { label: 'Processing', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' };
+    return { label: 'Pending', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' };
+  };
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -1467,37 +1502,85 @@ export default function AdminPage() {
                 </div>
               ) : (
                 <>
-                  {/* Ticket Cards (shared mobile + desktop) */}
-                  <div className="space-y-4">
+                  {/* Hidden shared file input for inline image uploads */}
+                  <input
+                    ref={inlineFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file && inlineFileTargetTicket !== null) {
+                        handleInlineImageUpload(inlineFileTargetTicket, file);
+                      }
+                    }}
+                  />
+
+                  {/* Ticket Cards */}
+                  <div className="space-y-2">
                     {supportTickets.map((item) => {
                       const customerName = item.ticket.customerName || (item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Anonymous');
                       const replyText = inlineReplies[item.ticket.id] || '';
+                      const pendingImgs = inlineImages[item.ticket.id] || [];
+                      const isExpanded = expandedTickets.has(item.ticket.id);
+                      const displayStatus = getTicketDisplayStatus(item);
+                      const responseCount = (item.responses?.length || 0);
+                      const isClosed = item.ticket.status === 'closed';
+
+                      const toggleExpand = () => {
+                        setExpandedTickets((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(item.ticket.id)) next.delete(item.ticket.id);
+                          else next.add(item.ticket.id);
+                          return next;
+                        });
+                      };
+
+                      const sendReply = () => {
+                        if (!replyText.trim() && pendingImgs.length === 0) return;
+                        sendTicketResponseMutation.mutate(
+                          {
+                            ticketId: item.ticket.id,
+                            response: replyText.trim() || "(image attached)",
+                            type: 'staff',
+                            imageUrls: pendingImgs.length > 0 ? pendingImgs : undefined,
+                          },
+                          {
+                            onSuccess: () => {
+                              setInlineReplies((prev) => ({ ...prev, [item.ticket.id]: '' }));
+                              setInlineImages((prev) => ({ ...prev, [item.ticket.id]: [] }));
+                            },
+                          }
+                        );
+                      };
+
                       return (
                         <div key={item.ticket.id} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                          {/* Card Header */}
-                          <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-800/50">
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-semibold text-gray-900 dark:text-white">{customerName}</span>
-                                <Badge className={getStatusColor(item.ticket.status)}>
-                                  {item.ticket.status === 'in_progress' ? 'In Progress' : item.ticket.status === 'close_requested' ? 'Close Requested' : item.ticket.status.charAt(0).toUpperCase() + item.ticket.status.slice(1)}
-                                </Badge>
-                              </div>
-                              {(item.ticket as any).customerTelegram ? (
-                                <div className="text-sm text-blue-500 dark:text-blue-400 mt-0.5">@{(item.ticket as any).customerTelegram}</div>
-                              ) : (
-                                <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                                  {item.ticket.customerEmail || item.user?.email || ''}
-                                  {item.ticket.customerPhone ? ` · ${item.ticket.customerPhone}` : ''}
+                          {/* Collapsed Header — always visible, click to expand */}
+                          <button
+                            type="button"
+                            onClick={toggleExpand}
+                            className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-semibold text-gray-900 dark:text-white">{customerName}</span>
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${displayStatus.className}`}>
+                                    {displayStatus.label}
+                                  </span>
+                                  {responseCount > 0 && (
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">{responseCount} message{responseCount !== 1 ? 's' : ''}</span>
+                                  )}
                                 </div>
-                              )}
-                              <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
-                                {item.ticket.subject ? ` · ${item.ticket.subject}` : ''}
+                                <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                                  {item.ticket.subject || 'No subject'} · {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
+                                </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                              {item.ticket.status !== 'closed' && (
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-3" onClick={(e) => e.stopPropagation()}>
+                              {!isClosed && (
                                 <Button variant="outline" size="sm" onClick={() => handleCloseTicket(item)} className="text-xs">
                                   Close
                                 </Button>
@@ -1512,86 +1595,115 @@ export default function AdminPage() {
                                 </Button>
                               )}
                             </div>
-                          </div>
+                          </button>
 
-                          {/* Message Thread */}
-                          <div className="p-4 space-y-3">
-                            {/* Original message */}
-                            {item.ticket.message && (
-                              <div>
-                                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
-                                  {customerName} · {format(new Date(item.ticket.createdAt!), 'MMM d, h:mm a')}
+                          {/* Expanded Content */}
+                          {isExpanded && (
+                            <div className="p-4 space-y-3 border-t border-gray-100 dark:border-gray-700">
+                              {/* Contact info */}
+                              {((item.ticket as any).customerTelegram || item.ticket.customerEmail || item.user?.email || item.ticket.customerPhone) && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {(item.ticket as any).customerTelegram
+                                    ? <span className="text-blue-500">@{(item.ticket as any).customerTelegram}</span>
+                                    : <>{item.ticket.customerEmail || item.user?.email || ''}{item.ticket.customerPhone ? ` · ${item.ticket.customerPhone}` : ''}</>
+                                  }
                                 </div>
-                                <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
-                                  {item.ticket.message}
-                                </div>
-                              </div>
-                            )}
+                              )}
 
-                            {/* Responses */}
-                            {item.responses?.map((response) => {
-                              const isStaff = response.type === 'staff';
-                              const senderName = isStaff
-                                ? (response.createdBy ? `${response.createdBy.firstName} ${response.createdBy.lastName}` : 'Staff')
-                                : customerName;
-                              return (
-                                <div key={response.id} className={isStaff ? 'pl-6' : ''}>
+                              {/* Original message */}
+                              {item.ticket.message && (
+                                <div>
                                   <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
-                                    {senderName} · {format(new Date(response.createdAt), 'MMM d, h:mm a')}
+                                    {customerName} · {format(new Date(item.ticket.createdAt!), 'MMM d, h:mm a')}
                                   </div>
-                                  <div className={`rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words ${
-                                    isStaff
-                                      ? 'bg-blue-50 dark:bg-blue-900/25 text-blue-900 dark:text-blue-100'
-                                      : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                                  }`}>
-                                    {response.message}
+                                  <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
+                                    {item.ticket.message}
                                   </div>
-                                  {response.imageUrls && response.imageUrls.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mt-1">
-                                      {response.imageUrls.map((url, i) => (
-                                        <img key={i} src={url} alt="attachment" className="h-20 w-20 object-cover rounded border cursor-pointer" onClick={() => window.open(url, '_blank')} />
+                                </div>
+                              )}
+
+                              {/* Responses */}
+                              {item.responses?.map((response: any) => {
+                                const isStaff = response.type === 'staff';
+                                const senderName = isStaff
+                                  ? (response.createdBy ? `${response.createdBy.firstName} ${response.createdBy.lastName}` : 'Staff')
+                                  : customerName;
+                                const imgs: string[] = (() => { try { return response.imageUrls ? JSON.parse(response.imageUrls) : []; } catch { return []; } })();
+                                return (
+                                  <div key={response.id} className={isStaff ? 'pl-6' : ''}>
+                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                                      {senderName} · {format(new Date(response.createdAt), 'MMM d, h:mm a')}
+                                    </div>
+                                    <div className={`rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words ${isStaff ? 'bg-blue-50 dark:bg-blue-900/25 text-blue-900 dark:text-blue-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'}`}>
+                                      {response.message}
+                                    </div>
+                                    {imgs.length > 0 && (
+                                      <div className="flex flex-wrap gap-2 mt-1">
+                                        {imgs.map((url: string, i: number) => (
+                                          <img key={i} src={url} alt="attachment" className="h-20 w-20 object-cover rounded border cursor-pointer" onClick={() => window.open(url, '_blank')} />
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              {/* Inline reply box */}
+                              {!isClosed && (
+                                <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                  {/* Pending images preview */}
+                                  {pendingImgs.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {pendingImgs.map((url, i) => (
+                                        <div key={i} className="relative">
+                                          <img src={url} alt="pending" className="h-16 w-16 object-cover rounded border" />
+                                          <button
+                                            type="button"
+                                            onClick={() => setInlineImages((prev) => ({ ...prev, [item.ticket.id]: prev[item.ticket.id].filter((_, idx) => idx !== i) }))}
+                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs"
+                                          >×</button>
+                                        </div>
                                       ))}
                                     </div>
                                   )}
+                                  <div className="flex gap-2 items-end">
+                                    <Textarea
+                                      placeholder="Type a reply… (Ctrl+Enter to send)"
+                                      value={replyText}
+                                      onChange={(e) => setInlineReplies((prev) => ({ ...prev, [item.ticket.id]: e.target.value }))}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (replyText.trim() || pendingImgs.length > 0)) sendReply();
+                                      }}
+                                      rows={2}
+                                      className="flex-1 text-sm resize-none"
+                                    />
+                                    <div className="flex flex-col gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                        disabled={inlineUploadingImage === item.ticket.id}
+                                        onClick={() => {
+                                          setInlineFileTargetTicket(item.ticket.id);
+                                          setTimeout(() => inlineFileInputRef.current?.click(), 0);
+                                        }}
+                                        title="Attach photo"
+                                      >
+                                        {inlineUploadingImage === item.ticket.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        disabled={(!replyText.trim() && pendingImgs.length === 0) || sendTicketResponseMutation.isPending}
+                                        onClick={sendReply}
+                                      >
+                                        {sendTicketResponseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                                      </Button>
+                                    </div>
+                                  </div>
                                 </div>
-                              );
-                            })}
-
-                            {/* Inline reply box */}
-                            {item.ticket.status !== 'closed' && (
-                              <div className="flex gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-                                <Textarea
-                                  placeholder="Type a reply… (Ctrl+Enter to send)"
-                                  value={replyText}
-                                  onChange={(e) => setInlineReplies((prev) => ({ ...prev, [item.ticket.id]: e.target.value }))}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && replyText.trim()) {
-                                      sendTicketResponseMutation.mutate(
-                                        { ticketId: item.ticket.id, response: replyText.trim(), type: 'staff' },
-                                        { onSuccess: () => setInlineReplies((prev) => ({ ...prev, [item.ticket.id]: '' })) }
-                                      );
-                                    }
-                                  }}
-                                  rows={2}
-                                  className="flex-1 text-sm resize-none"
-                                />
-                                <Button
-                                  size="sm"
-                                  className="self-end"
-                                  disabled={!replyText.trim() || sendTicketResponseMutation.isPending}
-                                  onClick={() => {
-                                    if (!replyText.trim()) return;
-                                    sendTicketResponseMutation.mutate(
-                                      { ticketId: item.ticket.id, response: replyText.trim(), type: 'staff' },
-                                      { onSuccess: () => setInlineReplies((prev) => ({ ...prev, [item.ticket.id]: '' })) }
-                                    );
-                                  }}
-                                >
-                                  {sendTicketResponseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                                </Button>
-                              </div>
-                            )}
-                          </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

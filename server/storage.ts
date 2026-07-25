@@ -3696,9 +3696,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSupportTicketStatus(id: number, status: string) {
+    const extra: any = { status, updatedAt: new Date() };
+    if (status === 'closed') extra.closedAt = new Date();
     const [ticket] = await db
       .update(supportTickets)
-      .set({ status, updatedAt: new Date() })
+      .set(extra)
       .where(eq(supportTickets.id, id))
       .returning();
     return ticket;
@@ -3734,10 +3736,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCustomerTickets(userId: string) {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const tickets = await retryQuery(() => db
       .select({ ticket: supportTickets })
       .from(supportTickets)
-      .where(eq(supportTickets.userId, userId))
+      .where(
+        and(
+          eq(supportTickets.userId, userId),
+          or(
+            ne(supportTickets.status, 'closed'),
+            gt(supportTickets.closedAt, twentyFourHoursAgo)
+          )
+        )
+      )
       .orderBy(desc(supportTickets.createdAt)));
 
     const processedTickets = [];
@@ -3808,14 +3819,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async clearAllSupportTickets(): Promise<void> {
-    // Only delete closed, non-archived tickets
+    // Only hard-delete closed, non-archived tickets whose 24h customer-visibility window has expired
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const ticketsToDelete = await db
       .select({ id: supportTickets.id })
       .from(supportTickets)
       .where(
         and(
           eq(supportTickets.archived, false),
-          eq(supportTickets.status, 'closed')
+          eq(supportTickets.status, 'closed'),
+          lt(supportTickets.closedAt, twentyFourHoursAgo)
         )
       );
 
@@ -3827,18 +3840,17 @@ export class DatabaseStorage implements IStorage {
       await db.delete(supportTickets).where(
         and(
           eq(supportTickets.archived, false),
-          eq(supportTickets.status, 'closed')
+          eq(supportTickets.status, 'closed'),
+          lt(supportTickets.closedAt, twentyFourHoursAgo)
         )
       );
     }
   }
 
   async cleanupOldClosedTickets(): Promise<void> {
-    // Delete closed, non-archived tickets that were closed more than 24 hours ago
-    const twentyFourHoursAgo = new Date();
-    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+    // Delete closed, non-archived tickets whose closedAt is more than 24 hours ago
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    // First, get all closed non-archived tickets older than 24 hours
     const oldClosedTickets = await db
       .select({ id: supportTickets.id })
       .from(supportTickets)
@@ -3846,16 +3858,14 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(supportTickets.status, 'closed'),
           eq(supportTickets.archived, false),
-          lt(supportTickets.updatedAt, twentyFourHoursAgo)
+          lt(supportTickets.closedAt, twentyFourHoursAgo)
         )
       );
 
-    // Delete responses for these tickets first (foreign key constraint)
     for (const ticket of oldClosedTickets) {
       await db.delete(supportTicketResponses).where(eq(supportTicketResponses.ticketId, ticket.id));
     }
 
-    // Then delete the tickets
     if (oldClosedTickets.length > 0) {
       await db
         .delete(supportTickets)
@@ -3863,7 +3873,7 @@ export class DatabaseStorage implements IStorage {
           and(
             eq(supportTickets.status, 'closed'),
             eq(supportTickets.archived, false),
-            lt(supportTickets.updatedAt, twentyFourHoursAgo)
+            lt(supportTickets.closedAt, twentyFourHoursAgo)
           )
         );
     }
