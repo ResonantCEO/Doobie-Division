@@ -50,7 +50,7 @@ function SortableProductItem({ product }: { product: Product & { category: Categ
       >
         <GripVertical className="h-4 w-4" />
       </div>
-      <div className="product-card-mobile-grid">
+      <div className="product-card-mobile-grid sm:product-card-container">
         <ProductCard product={product} />
       </div>
     </div>
@@ -83,7 +83,7 @@ function CategoryReorderGrid({
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={products.map((p) => p.id)} strategy={rectSortingStrategy}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {products.map((product) => (
             <SortableProductItem key={product.id} product={product} />
           ))}
