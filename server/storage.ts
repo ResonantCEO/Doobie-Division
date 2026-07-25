@@ -3578,8 +3578,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSupportTicket(data: any) {
+    // Calculate the start of the current ISO week (Monday 00:00:00 UTC)
+    const now = new Date();
+    const dayOfWeek = now.getUTCDay(); // 0=Sun, 1=Mon, ...
+    const daysToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+    const weekStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysToMonday));
+
+    // Count tickets created this week to derive the next weekly number
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(supportTickets)
+      .where(gte(supportTickets.createdAt, weekStart));
+
+    const weeklyTicketNumber = (count || 0) + 1;
+
     const [ticket] = await retryQuery(() =>
-      db.insert(supportTickets).values(data).returning()
+      db.insert(supportTickets).values({ ...data, weeklyTicketNumber }).returning()
     );
 
     try {

@@ -1526,6 +1526,17 @@ export default function AdminPage() {
                       const displayStatus = getTicketDisplayStatus(item);
                       const responseCount = (item.responses?.length || 0);
                       const isClosed = item.ticket.status === 'closed';
+                      const ticketNum = (item.ticket as any).weeklyTicketNumber
+                        ? `#${String((item.ticket as any).weeklyTicketNumber).padStart(4, '0')}`
+                        : `#${String(item.ticket.id).padStart(4, '0')}`;
+                      // Unique staff who replied
+                      const staffRepliers: string[] = [];
+                      (item.responses || []).forEach((r: any) => {
+                        if (r.type === 'staff' && r.createdBy) {
+                          const name = `${r.createdBy.firstName} ${r.createdBy.lastName}`.trim();
+                          if (name && !staffRepliers.includes(name)) staffRepliers.push(name);
+                        }
+                      });
 
                       const toggleExpand = () => {
                         setExpandedTickets((prev) => {
@@ -1565,18 +1576,29 @@ export default function AdminPage() {
                             <div className="flex items-center gap-3 min-w-0">
                               {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />}
                               <div className="min-w-0">
+                                {/* Row 1: ticket number + name + status */}
                                 <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-mono font-bold text-gray-400 dark:text-gray-500">{ticketNum}</span>
                                   <span className="font-semibold text-gray-900 dark:text-white">{customerName}</span>
                                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${displayStatus.className}`}>
                                     {displayStatus.label}
                                   </span>
-                                  {responseCount > 0 && (
-                                    <span className="text-xs text-gray-400 dark:text-gray-500">{responseCount} message{responseCount !== 1 ? 's' : ''}</span>
-                                  )}
                                 </div>
+                                {/* Row 2: subject + date */}
                                 <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
                                   {item.ticket.subject || 'No subject'} · {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
                                 </div>
+                                {/* Row 3: staff who replied */}
+                                {staffRepliers.length > 0 && (
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">Replied by:</span>
+                                    {staffRepliers.map((name, i) => (
+                                      <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-xs text-blue-700 dark:text-blue-300 font-medium">
+                                        {name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0 ml-3" onClick={(e) => e.stopPropagation()}>

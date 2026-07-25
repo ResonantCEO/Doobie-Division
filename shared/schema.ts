@@ -215,6 +215,7 @@ export const supportTickets = pgTable("support_tickets", {
   assignedTo: varchar("assigned_to").references(() => users.id),
   archived: boolean("archived").notNull().default(false),
   closedAt: timestamp("closed_at"),
+  weeklyTicketNumber: integer("weekly_ticket_number"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
