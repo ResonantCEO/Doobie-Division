@@ -2581,6 +2581,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Upload image for support ticket — public version (no auth required, used by landing-page form)
+  app.post('/api/support/ticket-images/public', upload.single('image'), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: 'No image file provided' });
+      const compressedBuffer = await sharp(req.file.buffer)
+        .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const uniqueId = uuidv4();
+      const objectName = `support-images/${uniqueId}.webp`;
+      const fullPath = `${privateDir}/${objectName}`;
+      const parts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join('/');
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectKey);
+      await file.save(compressedBuffer, { metadata: { contentType: 'image/webp' } });
+      res.json({ imageUrl: `/api/support-images/${uniqueId}.webp` });
+    } catch (error) {
+      console.error('Support ticket image upload error:', error);
+      res.status(500).json({ message: 'Failed to upload image' });
+    }
+  });
+
   // Upload image for support ticket (any authenticated user)
   app.post('/api/support/ticket-images', isAuthenticated, upload.single('image'), async (req: any, res) => {
     try {

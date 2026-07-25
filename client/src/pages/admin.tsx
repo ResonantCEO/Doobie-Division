@@ -1641,6 +1641,15 @@ export default function AdminPage() {
                                   <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
                                     {item.ticket.message}
                                   </div>
+                                  {(() => { try { const imgs: string[] = (item.ticket as any).imageUrls ? JSON.parse((item.ticket as any).imageUrls) : []; return imgs.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                      {imgs.map((url: string, i: number) => (
+                                        <a key={i} href={url} target="_blank" rel="noreferrer">
+                                          <img src={url} alt="attachment" className="w-20 h-20 object-cover rounded border border-gray-200 dark:border-gray-700 hover:opacity-80 transition-opacity" />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  ) : null; } catch { return null; } })()}
                                 </div>
                               )}
 

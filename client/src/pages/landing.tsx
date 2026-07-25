@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ShoppingBag, Users, BarChart3, Package, Star, Shield, Clock, Smartphone, Truck, ArrowRight, CheckCircle, Zap, Heart, Sparkles, MessageCircle, Send } from "lucide-react";
+import { ShoppingBag, Users, BarChart3, Package, Star, Shield, Clock, Smartphone, Truck, ArrowRight, CheckCircle, Zap, Heart, Sparkles, MessageCircle, Send, ImagePlus, X, Loader2 } from "lucide-react";
 import { AuthForms } from "@/components/auth-forms";
 import { useToast } from "@/hooks/use-toast";
 export default function Landing() {
@@ -14,6 +14,9 @@ export default function Landing() {
     customerName: "",
     message: "",
   });
+  const [pendingPhotos, setPendingPhotos] = useState<{ file: File; preview: string }[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const handleLogin = () => {
@@ -24,11 +27,34 @@ export default function Landing() {
     e.preventDefault();
 
     try {
+      // Upload any pending photos first (public endpoint, no auth required)
+      let imageUrls: string[] = [];
+      if (pendingPhotos.length > 0) {
+        setUploadingPhotos(true);
+        try {
+          for (const { file } of pendingPhotos) {
+            const fd = new FormData();
+            fd.append("image", file);
+            const res = await fetch("/api/support/ticket-images/public", {
+              method: "POST",
+              body: fd,
+            });
+            if (res.ok) {
+              const { imageUrl } = await res.json();
+              imageUrls.push(imageUrl);
+            }
+          }
+        } finally {
+          setUploadingPhotos(false);
+        }
+      }
+
       const ticketData = {
         subject: "General Inquiry",
         message: supportForm.message,
         priority: "normal",
         customerName: supportForm.customerName,
+        imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
         userId: null
       };
 
@@ -47,6 +73,7 @@ export default function Landing() {
           description: "We'll get back to you within 24 hours.",
         });
         setSupportForm({ customerName: "", message: "" });
+        setPendingPhotos([]);
         setShowSupportDialog(false);
       } else {
         throw new Error("Failed to submit support ticket");
@@ -460,6 +487,54 @@ export default function Landing() {
                 className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
                 data-testid="textarea-support-details"
               />
+            </div>
+            {/* Photo upload */}
+            <div>
+              <label className="text-sm font-medium text-white mb-2 block">Attach Photos (optional)</label>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  files.forEach((file) => {
+                    const preview = URL.createObjectURL(file);
+                    setPendingPhotos((prev) => [...prev, { file, preview }]);
+                  });
+                  if (photoInputRef.current) photoInputRef.current.value = "";
+                }}
+              />
+              {pendingPhotos.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {pendingPhotos.map((p, i) => (
+                    <div key={i} className="relative w-16 h-16 rounded overflow-hidden border border-slate-600">
+                      <img src={p.preview} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setPendingPhotos((prev) => {
+                          URL.revokeObjectURL(prev[i].preview);
+                          return prev.filter((_, idx) => idx !== i);
+                        })}
+                        className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 hover:bg-black/80"
+                      >
+                        <X className="h-3 w-3 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => photoInputRef.current?.click()}
+                className="gap-2 border-slate-600 text-slate-300 hover:bg-slate-800"
+              >
+                <ImagePlus className="h-4 w-4" />
+                Add Photos
+              </Button>
             </div>
             <div className="flex gap-3 pt-2">
               <Button

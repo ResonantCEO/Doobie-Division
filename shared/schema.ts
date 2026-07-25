@@ -216,6 +216,7 @@ export const supportTickets = pgTable("support_tickets", {
   archived: boolean("archived").notNull().default(false),
   closedAt: timestamp("closed_at"),
   weeklyTicketNumber: integer("weekly_ticket_number"),
+  imageUrls: text("image_urls"), // JSON array of image URLs attached to initial message
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

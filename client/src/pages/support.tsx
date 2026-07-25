@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -152,7 +152,7 @@ function TicketConversation({
       message: item.ticket.message,
       createdAt: item.ticket.createdAt,
       isInitial: true,
-      imageUrls: null as string | null,
+      imageUrls: (item.ticket as any).imageUrls as string | null,
     },
     ...item.responses.map((r) => ({
       id: r.id,
@@ -319,6 +319,25 @@ export default function SupportPage() {
     customerName: "",
     message: "",
   });
+  const [pendingPhotos, setPendingPhotos] = useState<{ file: File; preview: string }[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach((file) => {
+      const preview = URL.createObjectURL(file);
+      setPendingPhotos((prev) => [...prev, { file, preview }]);
+    });
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  }, []);
+
+  const removePhoto = useCallback((index: number) => {
+    setPendingPhotos((prev) => {
+      URL.revokeObjectURL(prev[index].preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  }, []);
 
   const { data: myTickets = [], isLoading: ticketsLoading } = useQuery<TicketWithResponses[]>({
     queryKey: ["/api/support/my-tickets"],
@@ -339,11 +358,35 @@ export default function SupportPage() {
   const handleSubmitContact = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Upload any pending photos first
+      let imageUrls: string[] = [];
+      if (pendingPhotos.length > 0) {
+        setUploadingPhotos(true);
+        try {
+          for (const { file } of pendingPhotos) {
+            const fd = new FormData();
+            fd.append("image", file);
+            const res = await fetch("/api/support/ticket-images", {
+              method: "POST",
+              credentials: "include",
+              body: fd,
+            });
+            if (res.ok) {
+              const { imageUrl } = await res.json();
+              imageUrls.push(imageUrl);
+            }
+          }
+        } finally {
+          setUploadingPhotos(false);
+        }
+      }
+
       const ticketData: Record<string, string | null> = {
         subject: "Support Request",
         message: contactForm.message,
         priority: "normal",
         customerName: contactForm.customerName,
+        imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
       };
       if (user?.id) ticketData.userId = user.id;
 
@@ -358,6 +401,7 @@ export default function SupportPage() {
         const ticket = await response.json();
         toast({ title: "Support ticket created", description: "You can now continue the conversation below." });
         setContactForm({ customerName: "", message: "" });
+        setPendingPhotos([]);
         setShowNewForm(false);
         await queryClient.invalidateQueries({ queryKey: ["/api/support/my-tickets"] });
         setSelectedTicketId(ticket.id);
@@ -425,9 +469,50 @@ export default function SupportPage() {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full">
-                    <Send className="h-4 w-4 mr-2" />
-                    Submit Support Ticket
+                  {/* Photo upload */}
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Attach Photos (optional)</label>
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={handlePhotoSelect}
+                    />
+                    {pendingPhotos.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {pendingPhotos.map((p, i) => (
+                          <div key={i} className="relative w-16 h-16 rounded overflow-hidden border border-border">
+                            <img src={p.preview} alt="" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removePhoto(i)}
+                              className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 hover:bg-black/80"
+                            >
+                              <X className="h-3 w-3 text-white" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => photoInputRef.current?.click()}
+                      className="gap-2"
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                      Add Photos
+                    </Button>
+                  </div>
+                  <Button type="submit" disabled={uploadingPhotos} className="w-full">
+                    {uploadingPhotos ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading photos...</>
+                    ) : (
+                      <><Send className="h-4 w-4 mr-2" />Submit Support Ticket</>
+                    )}
                   </Button>
                 </form>
               </CardContent>
