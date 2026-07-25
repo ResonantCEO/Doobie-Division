@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift, Lock } from "lucide-react";
+import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift, Lock, ImagePlus, X, Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { InventoryLog, Product, User, SupportTicket, CityPurchaseLimit, AccessPassword, Discount, PromoCode, GrabBag, Category, ProductSize } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -33,6 +33,7 @@ interface SupportTicketResponse {
   id: number;
   message: string;
   type: string;
+  imageUrls: string | null;
   createdAt: Date | string;
   createdBy: {
     id: string;
@@ -76,6 +77,10 @@ export default function AdminPage() {
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [ticketResponse, setTicketResponse] = useState("");
   const [responseType, setResponseType] = useState("customer_response");
+  const [adminPendingImages, setAdminPendingImages] = useState<string[]>([]);
+  const [adminUploadingImage, setAdminUploadingImage] = useState(false);
+  const adminFileInputRef = useRef<HTMLInputElement>(null);
+  const adminChatBottomRef = useRef<HTMLDivElement>(null);
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showAddLimitModal, setShowAddLimitModal] = useState(false);
@@ -889,12 +894,12 @@ export default function AdminPage() {
 
 
   const sendTicketResponseMutation = useMutation({
-    mutationFn: async ({ ticketId, response, type }: { ticketId: number; response: string; type: string }) => {
+    mutationFn: async ({ ticketId, response, type, imageUrls }: { ticketId: number; response: string; type: string; imageUrls?: string[] }) => {
       const res = await fetch(`/api/support/tickets/${ticketId}/respond`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ response, type }),
+        body: JSON.stringify({ response, type, imageUrls }),
       });
       if (!res.ok) throw new Error('Failed to send response');
       return res.json();
@@ -902,8 +907,8 @@ export default function AdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
       toast({ title: "Response sent successfully" });
-      setShowTicketModal(false);
       setTicketResponse("");
+      setAdminPendingImages([]);
     },
     onError: () => {
       toast({ title: "Failed to send response", variant: "destructive" });
@@ -1037,6 +1042,7 @@ export default function AdminPage() {
     switch (status) {
       case 'open': return 'bg-green-100 text-green-800';
       case 'in_progress': return 'bg-yellow-100 text-yellow-800';
+      case 'close_requested': return 'bg-orange-100 text-orange-800';
       case 'resolved': return 'bg-blue-100 text-blue-800';
       case 'closed': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -1058,15 +1064,40 @@ export default function AdminPage() {
     setShowTicketModal(false);
     setSelectedTicket(null);
     setTicketResponse("");
+    setAdminPendingImages([]);
   };
 
   const handleSendResponse = () => {
-    if (selectedTicket && ticketResponse) {
+    if (selectedTicket && (ticketResponse.trim() || adminPendingImages.length > 0)) {
       sendTicketResponseMutation.mutate({
         ticketId: selectedTicket.ticket.id,
-        response: ticketResponse,
-        type: responseType,
+        response: ticketResponse.trim() || "(image attached)",
+        type: "staff",
+        imageUrls: adminPendingImages.length > 0 ? adminPendingImages : undefined,
       });
+    }
+  };
+
+  const handleAdminImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAdminUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/support/ticket-images", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { imageUrl } = await res.json();
+      setAdminPendingImages((prev) => [...prev, imageUrl]);
+    } catch {
+      toast({ title: "Failed to upload image", variant: "destructive" });
+    } finally {
+      setAdminUploadingImage(false);
+      if (adminFileInputRef.current) adminFileInputRef.current.value = "";
     }
   };
 
@@ -1462,7 +1493,7 @@ export default function AdminPage() {
                             )}
                           </div>
                           <Badge className={getStatusColor(item.ticket.status)}>
-                            {item.ticket.status === 'in_progress' ? 'In Progress' : item.ticket.status === 'closed' ? 'Closed' : item.ticket.status.charAt(0).toUpperCase() + item.ticket.status.slice(1)}
+                            {item.ticket.status === 'in_progress' ? 'In Progress' : item.ticket.status === 'close_requested' ? 'Close Requested' : item.ticket.status === 'closed' ? 'Closed' : item.ticket.status.charAt(0).toUpperCase() + item.ticket.status.slice(1)}
                           </Badge>
                         </div>
                         {item.ticket.message && (
@@ -1544,11 +1575,9 @@ export default function AdminPage() {
                             <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                               Created: {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
                             </div>
-                            {item.ticket.status === 'closed' && (
-                              <Badge className={getStatusColor(item.ticket.status)}>
-                                Closed
-                              </Badge>
-                            )}
+                            <Badge className={getStatusColor(item.ticket.status)}>
+                              {item.ticket.status === 'in_progress' ? 'In Progress' : item.ticket.status === 'close_requested' ? 'Close Requested' : item.ticket.status.charAt(0).toUpperCase() + item.ticket.status.slice(1)}
+                            </Badge>
                           </div>
                           <div className="flex items-center gap-3">
                             {item.ticket.status !== 'closed' && (
@@ -3302,58 +3331,168 @@ export default function AdminPage() {
       </Dialog>
 
 
-      {/* Ticket Review Modal */}
+      {/* Ticket Conversation Modal */}
       <Dialog open={showTicketModal} onOpenChange={handleCloseTicketModal}>
-        <DialogContent className="sm:max-w-[700px]">
-          <DialogHeader>
-            <DialogTitle>Ticket #{selectedTicket?.ticket.id} - {selectedTicket?.ticket.subject}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="flex items-center gap-2">
-              <UserIcon className="h-5 w-5 text-gray-400" />
-              <span className="font-semibold">Customer:</span>
-              <span>{selectedTicket?.ticket.customerName || (selectedTicket?.user ? `${selectedTicket.user.firstName} ${selectedTicket.user.lastName}` : 'Anonymous')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-gray-400" />
-              <span className="font-semibold">Created:</span>
-              <span>{selectedTicket?.ticket.createdAt ? format(new Date(selectedTicket.ticket.createdAt), 'MMM dd, yyyy HH:mm') : 'N/A'}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-gray-400" />
-              <span className="font-semibold">Priority:</span>
-              <Badge className={getPriorityColor(selectedTicket?.ticket.priority || 'normal')}>
-                {selectedTicket?.ticket.priority.charAt(0).toUpperCase() + selectedTicket?.ticket.priority.slice(1)}
-              </Badge>
-            </div>
-            <div className="space-y-2">
+        <DialogContent className="sm:max-w-[720px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="flex items-center gap-3 flex-wrap">
+              <span>Ticket #{selectedTicket?.ticket.id}</span>
+              {selectedTicket && (
+                <Badge className={getStatusColor(selectedTicket.ticket.status)}>
+                  {selectedTicket.ticket.status === 'in_progress' ? 'In Progress' : selectedTicket.ticket.status === 'close_requested' ? 'Close Requested' : selectedTicket.ticket.status.charAt(0).toUpperCase() + selectedTicket.ticket.status.slice(1)}
+                </Badge>
+              )}
+            </DialogTitle>
+            <div className="text-sm text-muted-foreground space-y-1 mt-1">
               <div className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5 text-gray-400" />
-                <span className="font-semibold">Message:</span>
+                <UserIcon className="h-4 w-4" />
+                <span className="font-medium">{selectedTicket?.ticket.customerName || (selectedTicket?.user ? `${selectedTicket.user.firstName} ${selectedTicket.user.lastName}` : 'Anonymous')}</span>
+                {selectedTicket?.ticket.customerEmail && <span className="text-muted-foreground">· {selectedTicket.ticket.customerEmail}</span>}
+                {(selectedTicket?.ticket as any)?.customerTelegram && <span className="text-blue-500">· @{(selectedTicket?.ticket as any)?.customerTelegram}</span>}
               </div>
-              <p className="text-base text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words">
-                {selectedTicket?.ticket.message}
-              </p>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{selectedTicket?.ticket.subject}</span>
+                <span>·</span>
+                <Badge className={getPriorityColor(selectedTicket?.ticket.priority || 'normal')}>
+                  {(selectedTicket?.ticket.priority || 'normal').charAt(0).toUpperCase() + (selectedTicket?.ticket.priority || 'normal').slice(1)}
+                </Badge>
+                <span>·</span>
+                <span>{selectedTicket?.ticket.createdAt ? format(new Date(selectedTicket.ticket.createdAt), 'MMM d, yyyy') : ''}</span>
+              </div>
             </div>
-            <hr />
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Your Response</label>
+          </DialogHeader>
+
+          {/* Conversation thread */}
+          <div className="flex-1 overflow-y-auto py-3 space-y-3 min-h-[220px] max-h-[380px]">
+            {/* Original message */}
+            {selectedTicket && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
+                  <p className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">
+                    {selectedTicket.ticket.customerName || 'Customer'}
+                  </p>
+                  <p className="text-sm whitespace-pre-wrap break-words">{selectedTicket.ticket.message}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {selectedTicket.ticket.createdAt ? format(new Date(selectedTicket.ticket.createdAt), 'MMM d, h:mm a') : ''}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Responses */}
+            {selectedTicket?.responses?.map((r: SupportTicketResponse) => {
+              const isStaff = r.type === 'staff' || r.type === 'customer_response';
+              const isCustomer = r.type === 'customer';
+              const images: string[] = r.imageUrls ? (() => { try { return JSON.parse(r.imageUrls); } catch { return []; } })() : [];
+              return (
+                <div key={r.id} className={`flex ${isStaff ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 space-y-2 ${
+                    isStaff
+                      ? 'bg-green-600 text-white rounded-tr-sm'
+                      : isCustomer
+                      ? 'bg-muted rounded-tl-sm'
+                      : 'bg-muted italic text-muted-foreground rounded-tl-sm text-sm'
+                  }`}>
+                    {isStaff && (
+                      <p className="text-xs font-semibold text-green-100 mb-1">
+                        Support: {r.createdBy ? `${r.createdBy.firstName || ''} ${r.createdBy.lastName || ''}`.trim() || 'Staff' : 'Staff'}
+                      </p>
+                    )}
+                    {isCustomer && (
+                      <p className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">
+                        {selectedTicket.ticket.customerName || 'Customer'}
+                      </p>
+                    )}
+                    <p className="text-sm whitespace-pre-wrap break-words">{r.message}</p>
+                    {images.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {images.map((url: string, i: number) => (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                            <img src={url} alt="attachment" className="max-h-36 rounded-lg border border-white/20 object-cover cursor-pointer hover:opacity-90" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    <p className={`text-xs mt-1 ${isStaff ? 'text-green-100' : 'text-muted-foreground'}`}>
+                      {r.createdAt ? format(new Date(r.createdAt), 'MMM d, h:mm a') : ''}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={adminChatBottomRef} />
+          </div>
+
+          {/* Reply area */}
+          {selectedTicket?.ticket.status !== 'closed' && (
+            <div className="shrink-0 border-t border-border pt-3 space-y-2">
+              {adminPendingImages.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {adminPendingImages.map((url, i) => (
+                    <div key={i} className="relative">
+                      <img src={url} alt="pending" className="h-14 w-14 object-cover rounded-lg border" />
+                      <button
+                        onClick={() => setAdminPendingImages((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <Textarea
-                placeholder="Write your response to the customer..."
+                placeholder="Type your reply to the customer..."
                 value={ticketResponse}
                 onChange={(e) => setTicketResponse(e.target.value)}
-                className="min-h-[100px]"
+                className="min-h-[80px] resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (ticketResponse.trim() || adminPendingImages.length > 0)) {
+                    handleSendResponse();
+                  }
+                }}
               />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex gap-2">
+                  <input ref={adminFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAdminImageUpload} />
+                  <Button type="button" variant="outline" size="sm" onClick={() => adminFileInputRef.current?.click()} disabled={adminUploadingImage}>
+                    {adminUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                    <span className="ml-1">Photo</span>
+                  </Button>
+                  {selectedTicket?.ticket.status !== 'closed' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCloseTicket(selectedTicket)}
+                      disabled={closeTicketMutation.isPending}
+                      className="text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    >
+                      Close Ticket
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleCloseTicketModal}>Cancel</Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSendResponse}
+                    disabled={(!ticketResponse.trim() && adminPendingImages.length === 0) || sendTicketResponseMutation.isPending}
+                  >
+                    {sendTicketResponseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
+                    Send
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Ctrl+Enter to send</p>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseTicketModal}>
-              Cancel
-            </Button>
-            <Button onClick={handleSendResponse} disabled={!ticketResponse || sendTicketResponseMutation.isPending}>
-              {sendTicketResponseMutation.isPending ? 'Sending...' : 'Send Response'}
-            </Button>
-          </DialogFooter>
+          )}
+          {selectedTicket?.ticket.status === 'closed' && (
+            <div className="shrink-0 border-t border-border pt-3 text-center text-sm text-muted-foreground">
+              This ticket is closed.
+              <Button variant="outline" size="sm" className="ml-3" onClick={handleCloseTicketModal}>Close</Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

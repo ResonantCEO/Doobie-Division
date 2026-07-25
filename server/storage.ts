@@ -182,6 +182,7 @@ export interface IStorage {
   // Support ticket operations
   createSupportTicket(data: any): Promise<any>;
   getSupportTickets(filters?: any): Promise<any[]>;
+  getCustomerTickets(userId: string): Promise<any[]>;
   updateSupportTicketStatus(id: number, status: string): Promise<any>;
   assignSupportTicket(id: number, assignedTo: string | null): Promise<any>;
   addSupportTicketResponse(ticketId: number, responseData: any): Promise<any>;
@@ -3732,10 +3733,42 @@ export class DatabaseStorage implements IStorage {
     return ticket;
   }
 
+  async getCustomerTickets(userId: string) {
+    const tickets = await retryQuery(() => db
+      .select({ ticket: supportTickets })
+      .from(supportTickets)
+      .where(eq(supportTickets.userId, userId))
+      .orderBy(desc(supportTickets.createdAt)));
+
+    const processedTickets = [];
+    for (const t of tickets) {
+      const responses = await retryQuery(() => db
+        .select({
+          id: supportTicketResponses.id,
+          message: supportTicketResponses.message,
+          type: supportTicketResponses.type,
+          imageUrls: supportTicketResponses.imageUrls,
+          createdAt: supportTicketResponses.createdAt,
+          createdBy: {
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+          }
+        })
+        .from(supportTicketResponses)
+        .leftJoin(users, eq(supportTicketResponses.createdBy, users.id))
+        .where(eq(supportTicketResponses.ticketId, t.ticket.id))
+        .orderBy(asc(supportTicketResponses.createdAt)));
+      processedTickets.push({ ...t, responses });
+    }
+    return processedTickets;
+  }
+
   async addSupportTicketResponse(ticketId: number, responseData: {
     message: string;
     type: string;
     createdBy: string;
+    imageUrls?: string;
   }) {
     const [response] = await db
       .insert(supportTicketResponses)
@@ -3744,6 +3777,7 @@ export class DatabaseStorage implements IStorage {
         message: responseData.message,
         type: responseData.type,
         createdBy: responseData.createdBy,
+        imageUrls: responseData.imageUrls,
       })
       .returning();
 

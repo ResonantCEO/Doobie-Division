@@ -2570,6 +2570,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer: get their own tickets
+  app.get('/api/support/my-tickets', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.currentUser.id;
+      const tickets = await storage.getCustomerTickets(userId);
+      res.json(tickets);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch your tickets" });
+    }
+  });
+
+  // Upload image for support ticket (any authenticated user)
+  app.post('/api/support/ticket-images', isAuthenticated, upload.single('image'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No image file provided' });
+      }
+
+      const compressedBuffer = await sharp(req.file.buffer)
+        .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
+
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const uniqueId = uuidv4();
+      const objectName = `support-images/${uniqueId}.webp`;
+      const fullPath = `${privateDir}/${objectName}`;
+
+      const parts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join('/');
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectKey);
+      await file.save(compressedBuffer, { metadata: { contentType: 'image/webp' } });
+
+      res.json({ imageUrl: `/api/support-images/${uniqueId}.webp` });
+    } catch (error) {
+      console.error('Support ticket image upload error:', error);
+      res.status(500).json({ message: 'Failed to upload image' });
+    }
+  });
+
+  // Serve support ticket images
+  app.get('/api/support-images/:filename', isAuthenticated, async (req: any, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const fullPath = `${privateDir}/support-images/${req.params.filename}`;
+
+      const parts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join('/');
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectKey);
+      const [exists] = await file.exists();
+      if (!exists) return res.status(404).json({ message: 'Image not found' });
+
+      const [metadata] = await file.getMetadata();
+      res.set({
+        'Content-Type': metadata.contentType || 'image/webp',
+        'Cache-Control': 'private, max-age=3600',
+      });
+      file.createReadStream().pipe(res);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to serve image' });
+    }
+  });
+
+  // Customer: reply to their own ticket
+  app.post('/api/support/tickets/:id/customer-reply', isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { message, imageUrls } = req.body;
+      const userId = req.currentUser.id;
+
+      if (!message || !message.trim()) {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      // Verify this ticket belongs to the customer
+      const tickets = await storage.getCustomerTickets(userId);
+      const ticket = tickets.find(t => t.ticket.id === id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+      if (ticket.ticket.status === 'closed') {
+        return res.status(400).json({ message: "Cannot reply to a closed ticket" });
+      }
+
+      const response = await storage.addSupportTicketResponse(id, {
+        message: message.trim(),
+        type: 'customer',
+        createdBy: userId,
+        imageUrls: imageUrls ? JSON.stringify(imageUrls) : undefined,
+      });
+
+      res.status(201).json(response);
+    } catch (error) {
+      console.error("Customer reply error:", error);
+      res.status(500).json({ message: "Failed to send reply" });
+    }
+  });
+
+  // Customer: request ticket closure
+  app.put('/api/support/tickets/:id/request-close', isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = req.currentUser.id;
+
+      const tickets = await storage.getCustomerTickets(userId);
+      const ticket = tickets.find(t => t.ticket.id === id);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+
+      const updated = await storage.updateSupportTicketStatus(id, 'close_requested');
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to request ticket closure" });
+    }
+  });
+
   app.get('/api/support/tickets', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
       const { status, priority } = req.query;
@@ -2624,7 +2747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/support/tickets/:id/respond', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { response, type } = req.body;
+      const { response, type, imageUrls } = req.body;
 
       if (!response || !type) {
         return res.status(400).json({ message: "Response and type are required" });
@@ -2633,8 +2756,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ticketResponse = await storage.addSupportTicketResponse(id, {
         message: response,
         type,
-        createdBy: req.currentUser.id
+        createdBy: req.currentUser.id,
+        imageUrls: imageUrls ? JSON.stringify(imageUrls) : undefined,
       });
+
+      // Notify the customer if they have a userId linked
+      try {
+        const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+        if (ticket?.userId) {
+          await storage.createNotification({
+            userId: ticket.userId,
+            type: 'support_reply',
+            title: 'Support Team Replied',
+            message: `Your support ticket #${id} received a new reply from our team.`,
+            data: { ticketId: id },
+          });
+        }
+      } catch (notifyErr) {
+        console.error("Failed to notify customer of support reply:", notifyErr);
+      }
 
       res.status(201).json(ticketResponse);
     } catch (error) {

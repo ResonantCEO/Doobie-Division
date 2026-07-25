@@ -223,6 +223,7 @@ export const supportTicketResponses = pgTable("support_ticket_responses", {
   ticketId: integer("ticket_id").references(() => supportTickets.id),
   message: text("message").notNull(),
   type: varchar("type").notNull(), // 'customer', 'staff', 'system'
+  imageUrls: text("image_urls"), // JSON array of image URLs
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").default(sql`now()`),
 });
