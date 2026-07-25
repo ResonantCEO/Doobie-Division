@@ -41,6 +41,11 @@ export function useWebSocket() {
             queryClient.invalidateQueries({ queryKey: ['/api/support/tickets'] });
             break;
 
+          case 'ticket_reply':
+            queryClient.invalidateQueries({ queryKey: ['/api/support/tickets'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/support/my-tickets'] });
+            break;
+
           default:
 
         }

@@ -2698,6 +2698,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imageUrls: imageUrls ? JSON.stringify(imageUrls) : undefined,
       });
 
+      broadcastToClients({ type: 'ticket_reply', ticketId: id });
+
       res.status(201).json(response);
     } catch (error) {
       console.error("Customer reply error:", error);
@@ -2808,6 +2810,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (notifyErr) {
         console.error("Failed to update ticket status or notify customer:", notifyErr);
       }
+
+      broadcastToClients({ type: 'ticket_reply', ticketId: id });
 
       res.status(201).json(ticketResponse);
     } catch (error) {
