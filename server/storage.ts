@@ -3833,16 +3833,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async clearAllSupportTickets(): Promise<void> {
-    // Only hard-delete closed, non-archived tickets whose 24h customer-visibility window has expired
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Hard-delete all closed, non-archived tickets (admin explicitly requested this)
     const ticketsToDelete = await db
       .select({ id: supportTickets.id })
       .from(supportTickets)
       .where(
         and(
           eq(supportTickets.archived, false),
-          eq(supportTickets.status, 'closed'),
-          lt(supportTickets.closedAt, twentyFourHoursAgo)
+          eq(supportTickets.status, 'closed')
         )
       );
 
@@ -3854,8 +3852,7 @@ export class DatabaseStorage implements IStorage {
       await db.delete(supportTickets).where(
         and(
           eq(supportTickets.archived, false),
-          eq(supportTickets.status, 'closed'),
-          lt(supportTickets.closedAt, twentyFourHoursAgo)
+          eq(supportTickets.status, 'closed')
         )
       );
     }
