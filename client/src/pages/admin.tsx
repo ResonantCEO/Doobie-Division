@@ -81,6 +81,7 @@ export default function AdminPage() {
   const [adminUploadingImage, setAdminUploadingImage] = useState(false);
   const adminFileInputRef = useRef<HTMLInputElement>(null);
   const adminChatBottomRef = useRef<HTMLDivElement>(null);
+  const [inlineReplies, setInlineReplies] = useState<Record<number, string>>({});
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showAddLimitModal, setShowAddLimitModal] = useState(false);
@@ -1466,219 +1467,134 @@ export default function AdminPage() {
                 </div>
               ) : (
                 <>
-                  {/* Mobile Card View */}
-                  <div className="md:hidden space-y-3">
-                    {supportTickets.map((item) => (
-                      <div key={item.ticket.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <div className="font-medium text-gray-900 dark:text-white">
-                              {item.ticket.customerName || (item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Anonymous')}
-                            </div>
-                            {(item.ticket as any).customerTelegram ? (
-                              <div className="text-sm text-blue-500 dark:text-blue-400">
-                                @{(item.ticket as any).customerTelegram}
+                  {/* Ticket Cards (shared mobile + desktop) */}
+                  <div className="space-y-4">
+                    {supportTickets.map((item) => {
+                      const customerName = item.ticket.customerName || (item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Anonymous');
+                      const replyText = inlineReplies[item.ticket.id] || '';
+                      return (
+                        <div key={item.ticket.id} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                          {/* Card Header */}
+                          <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-800/50">
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-gray-900 dark:text-white">{customerName}</span>
+                                <Badge className={getStatusColor(item.ticket.status)}>
+                                  {item.ticket.status === 'in_progress' ? 'In Progress' : item.ticket.status === 'close_requested' ? 'Close Requested' : item.ticket.status.charAt(0).toUpperCase() + item.ticket.status.slice(1)}
+                                </Badge>
                               </div>
-                            ) : (
-                              <>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                  {item.ticket.customerEmail || item.user?.email || 'No email'}
+                              {(item.ticket as any).customerTelegram ? (
+                                <div className="text-sm text-blue-500 dark:text-blue-400 mt-0.5">@{(item.ticket as any).customerTelegram}</div>
+                              ) : (
+                                <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                                  {item.ticket.customerEmail || item.user?.email || ''}
+                                  {item.ticket.customerPhone ? ` · ${item.ticket.customerPhone}` : ''}
                                 </div>
-                                {item.ticket.customerPhone && (
-                                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                                    {item.ticket.customerPhone}
-                                  </div>
-                                )}
-                              </>
-                            )}
+                              )}
+                              <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                                {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
+                                {item.ticket.subject ? ` · ${item.ticket.subject}` : ''}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                              {item.ticket.status !== 'closed' && (
+                                <Button variant="outline" size="sm" onClick={() => handleCloseTicket(item)} className="text-xs">
+                                  Close
+                                </Button>
+                              )}
+                              {!item.ticket.archived ? (
+                                <Button variant="outline" size="sm" onClick={() => archiveTicketMutation.mutate(item.ticket.id)} disabled={archiveTicketMutation.isPending} className="text-xs text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20">
+                                  <Archive className="h-3 w-3 sm:mr-1" /><span className="hidden sm:inline">Archive</span>
+                                </Button>
+                              ) : (
+                                <Button variant="outline" size="sm" onClick={() => unarchiveTicketMutation.mutate(item.ticket.id)} disabled={unarchiveTicketMutation.isPending} className="text-xs">
+                                  <Archive className="h-3 w-3 sm:mr-1" /><span className="hidden sm:inline">Unarchive</span>
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                          <Badge className={getStatusColor(item.ticket.status)}>
-                            {item.ticket.status === 'in_progress' ? 'In Progress' : item.ticket.status === 'close_requested' ? 'Close Requested' : item.ticket.status === 'closed' ? 'Closed' : item.ticket.status.charAt(0).toUpperCase() + item.ticket.status.slice(1)}
-                          </Badge>
-                        </div>
-                        {item.ticket.message && (
-                          <div className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">{item.ticket.message}</div>
-                        )}
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                          <Button
-                            size="sm"
-                            onClick={() => handleTicketView(item)}
-                            className="text-xs"
-                          >
-                            <MessageCircle className="h-3 w-3 mr-1" />
-                            {item.ticket.status !== 'closed' ? 'Reply' : 'View'}
-                          </Button>
-                          {item.ticket.status !== 'closed' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleCloseTicket(item)}
-                              className="text-xs"
-                            >
-                              Close
-                            </Button>
-                          )}
-                          {!item.ticket.archived && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => archiveTicketMutation.mutate(item.ticket.id)}
-                              disabled={archiveTicketMutation.isPending}
-                              className="text-xs text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                            >
-                              <Archive className="h-3 w-3 mr-1" />
-                              Archive
-                            </Button>
-                          )}
-                          {item.ticket.archived && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => unarchiveTicketMutation.mutate(item.ticket.id)}
-                              disabled={unarchiveTicketMutation.isPending}
-                              className="text-xs text-gray-600 border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                            >
-                              <Archive className="h-3 w-3 mr-1" />
-                              Unarchive
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
 
-                  {/* Desktop Card View */}
-                  <div className="hidden md:block space-y-4">
-                    {supportTickets.map((item) => (
-                      <div key={item.ticket.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 space-y-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <UserIcon className="h-5 w-5 text-gray-400" />
+                          {/* Message Thread */}
+                          <div className="p-4 space-y-3">
+                            {/* Original message */}
+                            {item.ticket.message && (
                               <div>
-                                <div className="font-medium text-gray-900 dark:text-white text-lg">
-                                  {item.ticket.customerName || (item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Anonymous')}
+                                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                                  {customerName} · {format(new Date(item.ticket.createdAt!), 'MMM d, h:mm a')}
                                 </div>
-                                {(item.ticket as any).customerTelegram ? (
-                                  <div className="text-sm text-blue-500 dark:text-blue-400">
-                                    @{(item.ticket as any).customerTelegram}
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                                      {item.ticket.customerEmail || item.user?.email || 'No email'}
-                                    </div>
-                                    {item.ticket.customerPhone && (
-                                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                                        {item.ticket.customerPhone}
-                                      </div>
-                                    )}
-                                  </>
-                                )}
+                                <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
+                                  {item.ticket.message}
+                                </div>
                               </div>
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                              Created: {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
-                            </div>
-                            <Badge className={getStatusColor(item.ticket.status)}>
-                              {item.ticket.status === 'in_progress' ? 'In Progress' : item.ticket.status === 'close_requested' ? 'Close Requested' : item.ticket.status.charAt(0).toUpperCase() + item.ticket.status.slice(1)}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <Button
-                              size="sm"
-                              onClick={() => handleTicketView(item)}
-                            >
-                              <MessageCircle className="h-4 w-4 mr-1" />
-                              {item.ticket.status !== 'closed' ? 'Reply' : 'View'}
-                            </Button>
+                            )}
+
+                            {/* Responses */}
+                            {item.responses?.map((response) => {
+                              const isStaff = response.type === 'staff';
+                              const senderName = isStaff
+                                ? (response.createdBy ? `${response.createdBy.firstName} ${response.createdBy.lastName}` : 'Staff')
+                                : customerName;
+                              return (
+                                <div key={response.id} className={isStaff ? 'pl-6' : ''}>
+                                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                                    {senderName} · {format(new Date(response.createdAt), 'MMM d, h:mm a')}
+                                  </div>
+                                  <div className={`rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words ${
+                                    isStaff
+                                      ? 'bg-blue-50 dark:bg-blue-900/25 text-blue-900 dark:text-blue-100'
+                                      : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                                  }`}>
+                                    {response.message}
+                                  </div>
+                                  {response.imageUrls && response.imageUrls.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                      {response.imageUrls.map((url, i) => (
+                                        <img key={i} src={url} alt="attachment" className="h-20 w-20 object-cover rounded border cursor-pointer" onClick={() => window.open(url, '_blank')} />
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {/* Inline reply box */}
                             {item.ticket.status !== 'closed' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleCloseTicket(item)}
-                                className="text-xs"
-                              >
-                                Close
-                              </Button>
-                            )}
-                            {!item.ticket.archived && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => archiveTicketMutation.mutate(item.ticket.id)}
-                                disabled={archiveTicketMutation.isPending}
-                                className="text-xs text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                              >
-                                <Archive className="h-3 w-3 mr-1" />
-                                Archive
-                              </Button>
-                            )}
-                            {item.ticket.archived && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => unarchiveTicketMutation.mutate(item.ticket.id)}
-                                disabled={unarchiveTicketMutation.isPending}
-                                className="text-xs text-gray-600 border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                              >
-                                <Archive className="h-3 w-3 mr-1" />
-                                Unarchive
-                              </Button>
+                              <div className="flex gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                <Textarea
+                                  placeholder="Type a reply… (Ctrl+Enter to send)"
+                                  value={replyText}
+                                  onChange={(e) => setInlineReplies((prev) => ({ ...prev, [item.ticket.id]: e.target.value }))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && replyText.trim()) {
+                                      sendTicketResponseMutation.mutate(
+                                        { ticketId: item.ticket.id, response: replyText.trim(), type: 'staff' },
+                                        { onSuccess: () => setInlineReplies((prev) => ({ ...prev, [item.ticket.id]: '' })) }
+                                      );
+                                    }
+                                  }}
+                                  rows={2}
+                                  className="flex-1 text-sm resize-none"
+                                />
+                                <Button
+                                  size="sm"
+                                  className="self-end"
+                                  disabled={!replyText.trim() || sendTicketResponseMutation.isPending}
+                                  onClick={() => {
+                                    if (!replyText.trim()) return;
+                                    sendTicketResponseMutation.mutate(
+                                      { ticketId: item.ticket.id, response: replyText.trim(), type: 'staff' },
+                                      { onSuccess: () => setInlineReplies((prev) => ({ ...prev, [item.ticket.id]: '' })) }
+                                    );
+                                  }}
+                                >
+                                  {sendTicketResponseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                                </Button>
+                              </div>
                             )}
                           </div>
                         </div>
-                        
-                        {/* Ticket Message */}
-                        {item.ticket.message && (
-                          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-2">
-                            <div className="flex items-center gap-2">
-                              <MessageCircle className="h-4 w-4 text-gray-400" />
-                              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Original Message:</span>
-                            </div>
-                            <p className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words">
-                              {item.ticket.message}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Ticket Responses */}
-                        {item.responses && item.responses.length > 0 && (
-                          <div className="space-y-3">
-                            <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                              Responses ({item.responses.length}):
-                            </div>
-                            <div className="space-y-2">
-                              {item.responses.map((response) => (
-                                <div key={response.id} className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
-                                        {response.type === 'staff' ? 'Staff' : response.type === 'customer' ? 'Customer' : 'System'}
-                                      </span>
-                                      {response.createdBy && (
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                          by {response.createdBy.firstName} {response.createdBy.lastName}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                                      {format(new Date(response.createdAt), 'MMM dd, yyyy HH:mm')}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
-                                    {response.message}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}
