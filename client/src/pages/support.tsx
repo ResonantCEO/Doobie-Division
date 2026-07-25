@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Navigation from "@/components/navigation";
 import {
@@ -312,6 +313,7 @@ function TicketConversation({
 export default function SupportPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  useWebSocket();
   const queryClient = useQueryClient();
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -342,7 +344,7 @@ export default function SupportPage() {
   const { data: myTickets = [], isLoading: ticketsLoading } = useQuery<TicketWithResponses[]>({
     queryKey: ["/api/support/my-tickets"],
     enabled: !!user,
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 
   const selectedTicket = myTickets.find((t) => t.ticket.id === selectedTicketId) ?? null;
