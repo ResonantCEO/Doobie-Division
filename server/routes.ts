@@ -571,6 +571,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reorder products (admin only) - Must come BEFORE /api/products/:id to avoid route conflict
+  app.patch('/api/products/reorder', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const { orders } = req.body;
+      if (!Array.isArray(orders)) {
+        return res.status(400).json({ message: "orders must be an array" });
+      }
+      await storage.updateProductSortOrders(orders);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error reordering products:', error);
+      res.status(500).json({ message: "Failed to reorder products" });
+    }
+  });
+
   // Low stock products - Must come BEFORE /api/products/:id to avoid route conflict
   app.get('/api/products/low-stock', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     try {

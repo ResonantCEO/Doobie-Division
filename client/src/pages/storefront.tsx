@@ -8,12 +8,90 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ProductCard from "@/components/product-card";
-import { Search, ChevronLeft, ChevronRight, Megaphone, ImagePlus, Trash2, X, ShoppingBag, Check, Pencil } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Megaphone, ImagePlus, Trash2, X, ShoppingBag, Check, Pencil, GripVertical, ArrowUpDown, Save } from "lucide-react";
 import type { Product, Category, PromotionalAd, BoardPost } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
+
+function SortableProductItem({ product }: { product: Product & { category: Category | null } }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: product.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="relative">
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute top-2 left-2 z-30 bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 cursor-grab active:cursor-grabbing shadow-lg touch-none"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical className="h-4 w-4" />
+      </div>
+      <div className="product-card-mobile-grid">
+        <ProductCard product={product} />
+      </div>
+    </div>
+  );
+}
+
+function CategoryReorderGrid({
+  categoryKey,
+  products,
+  onReorder,
+}: {
+  categoryKey: string;
+  products: (Product & { category: Category | null })[];
+  onReorder: (categoryKey: string, newProducts: (Product & { category: Category | null })[]) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = products.findIndex((p) => p.id === active.id);
+    const newIndex = products.findIndex((p) => p.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    onReorder(categoryKey, arrayMove(products, oldIndex, newIndex));
+  };
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={products.map((p) => p.id)} strategy={rectSortingStrategy}>
+        <div className="grid grid-cols-2 gap-3">
+          {products.map((product) => (
+            <SortableProductItem key={product.id} product={product} />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
 
 function ScrollableProductRow({ products, onCategoryFilter }: { products: (Product & { category: Category | null })[], onCategoryFilter?: (id: number) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -123,6 +201,43 @@ export default function StorefrontPage() {
 
   // Ad product filter — set when user taps a board post with linked products
   const [adProductFilter, setAdProductFilter] = useState<number[] | null>(null);
+
+  // Reorder mode (admin only)
+  const [isReorderMode, setIsReorderMode] = useState(false);
+  const [localProductGroups, setLocalProductGroups] = useState<Map<string, (Product & { category: Category | null })[]>>(new Map());
+
+  const reorderMutation = useMutation({
+    mutationFn: async (orders: { id: number; sortOrder: number }[]) => {
+      await apiRequest("PATCH", "/api/products/reorder", { orders });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      setIsReorderMode(false);
+      setLocalProductGroups(new Map());
+      toast({ title: "Product order saved!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save order", variant: "destructive" });
+    },
+  });
+
+  const handleSaveReorder = () => {
+    const orders: { id: number; sortOrder: number }[] = [];
+    localProductGroups.forEach((groupProducts) => {
+      groupProducts.forEach((product, index) => {
+        orders.push({ id: product.id, sortOrder: index });
+      });
+    });
+    reorderMutation.mutate(orders);
+  };
+
+  const handleReorder = (categoryKey: string, newProducts: (Product & { category: Category | null })[]) => {
+    setLocalProductGroups(prev => new Map(prev).set(categoryKey, newProducts));
+  };
+
+  const getGroupProducts = (categoryKey: string, defaultProducts: (Product & { category: Category | null })[]) => {
+    return localProductGroups.get(categoryKey) ?? defaultProducts;
+  };
 
   // Fetch ALL products (unfiltered) for hero section and modal product selector
   const { data: allProductsRaw = [] } = useQuery<Product[]>({
@@ -1006,6 +1121,43 @@ export default function StorefrontPage() {
 
       {/* Products by Category */}
       <div id="product-grid" />
+      {isAdmin && products.length > 0 && (
+        <div className="flex items-center gap-3 mb-4 px-1">
+          {!isReorderMode ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setIsReorderMode(true); setLocalProductGroups(new Map()); }}
+              className="flex items-center gap-2 border-purple-400 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+            >
+              <ArrowUpDown className="h-4 w-4" />
+              Reorder Products
+            </Button>
+          ) : (
+            <>
+              <Button
+                size="sm"
+                onClick={handleSaveReorder}
+                disabled={reorderMutation.isPending}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Save className="h-4 w-4" />
+                {reorderMutation.isPending ? "Saving…" : "Save Order"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setIsReorderMode(false); setLocalProductGroups(new Map()); }}
+                className="flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+              <span className="text-sm text-muted-foreground">Drag the <GripVertical className="inline h-3 w-3" /> handle to reorder products</span>
+            </>
+          )}
+        </div>
+      )}
       {products.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground text-lg">No products found</p>
@@ -1049,7 +1201,15 @@ export default function StorefrontPage() {
                         {parentCategory?.name || "All Products"}
                       </h3>
                     </div>
-                    <ScrollableProductRow products={parentDirectProducts} />
+                    {isReorderMode ? (
+                      <CategoryReorderGrid
+                        categoryKey={`parent-direct-${currentParentCategory}`}
+                        products={getGroupProducts(`parent-direct-${currentParentCategory}`, parentDirectProducts)}
+                        onReorder={handleReorder}
+                      />
+                    ) : (
+                      <ScrollableProductRow products={parentDirectProducts} />
+                    )}
                   </div>
                 );
               }
@@ -1108,7 +1268,15 @@ export default function StorefrontPage() {
                         </h3>
                       </div>
 
-                      <ScrollableProductRow products={subcategoryProducts} />
+                      {isReorderMode ? (
+                        <CategoryReorderGrid
+                          categoryKey={`subcat-${subcategory.id}`}
+                          products={getGroupProducts(`subcat-${subcategory.id}`, subcategoryProducts)}
+                          onReorder={handleReorder}
+                        />
+                      ) : (
+                        <ScrollableProductRow products={subcategoryProducts} />
+                      )}
                     </div>
                   );
                 });
@@ -1191,7 +1359,15 @@ export default function StorefrontPage() {
                     </h3>
                   </div>
 
-                  <ScrollableProductRow products={categoryProducts} />
+                  {isReorderMode ? (
+                    <CategoryReorderGrid
+                      categoryKey={`root-${parentCategoryId ?? 'uncategorized'}`}
+                      products={getGroupProducts(`root-${parentCategoryId ?? 'uncategorized'}`, categoryProducts)}
+                      onReorder={handleReorder}
+                    />
+                  ) : (
+                    <ScrollableProductRow products={categoryProducts} />
+                  )}
                 </div>
               );
             }).filter(Boolean);

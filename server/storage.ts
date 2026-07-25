@@ -95,6 +95,7 @@ export interface IStorage {
   getProduct(id: number): Promise<(Product & { category: Category | null; sizes?: ProductSize[] }) | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
+  updateProductSortOrders(orders: { id: number; sortOrder: number }[]): Promise<void>;
   deleteProduct(id: number): Promise<void>;
   adjustStock(productId: number, quantity: number, userId: string, reason: string, sizeName?: string): Promise<void>;
   getLowStockProducts(): Promise<Product[]>;
@@ -581,6 +582,7 @@ export class DatabaseStorage implements IStorage {
         purchasePricePerOunce: products.purchasePricePerOunce,
         adminNotes: products.adminNotes,
         isActive: products.isActive,
+        sortOrder: products.sortOrder,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
         category: {
@@ -669,7 +671,7 @@ export class DatabaseStorage implements IStorage {
       finalQuery = finalQuery.where(and(...conditions));
     }
 
-    const productsList = await finalQuery.orderBy(desc(products.createdAt));
+    const productsList = await finalQuery.orderBy(asc(products.sortOrder), desc(products.createdAt));
 
     // If no products, return empty array with proper type
     if (productsList.length === 0) {
@@ -1491,6 +1493,12 @@ export class DatabaseStorage implements IStorage {
     }
 
     return product;
+  }
+
+  async updateProductSortOrders(orders: { id: number; sortOrder: number }[]): Promise<void> {
+    for (const { id, sortOrder } of orders) {
+      await db.update(products).set({ sortOrder }).where(eq(products.id, id));
+    }
   }
 
   async deleteProduct(id: number): Promise<void> {

@@ -107,6 +107,7 @@ export const products = pgTable("products", {
   purchasePricePerOunce: decimal("purchase_price_per_ounce", { precision: 10, scale: 2 }), // admin only - cost per ounce
   adminNotes: text("admin_notes"), // admin only - internal company notes
   isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
