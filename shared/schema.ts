@@ -616,10 +616,11 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 
 export const insertSupportTicketSchema = createInsertSchema(supportTickets).extend({
   customerName: z.string().min(1, "Customer name is required"),
-  customerEmail: z.string().email("Valid email is required"),
+  customerEmail: z.string().email().optional().nullable(),
   customerPhone: z.string().optional().nullable(),
   customerTelegram: z.string().optional().nullable(),
   userId: z.string().nullable().optional(),
+  imageUrls: z.string().optional().nullable(),
 });
 
 export const insertSupportTicketResponseSchema = createInsertSchema(supportTicketResponses).omit({
