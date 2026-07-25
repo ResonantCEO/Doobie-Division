@@ -1503,6 +1503,14 @@ export default function AdminPage() {
                           {format(new Date(item.ticket.createdAt!), 'MMM dd, yyyy HH:mm')}
                         </div>
                         <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                          <Button
+                            size="sm"
+                            onClick={() => handleTicketView(item)}
+                            className="text-xs"
+                          >
+                            <MessageCircle className="h-3 w-3 mr-1" />
+                            {item.ticket.status !== 'closed' ? 'Reply' : 'View'}
+                          </Button>
                           {item.ticket.status !== 'closed' && (
                             <Button
                               variant="outline"
@@ -1580,6 +1588,13 @@ export default function AdminPage() {
                             </Badge>
                           </div>
                           <div className="flex items-center gap-3">
+                            <Button
+                              size="sm"
+                              onClick={() => handleTicketView(item)}
+                            >
+                              <MessageCircle className="h-4 w-4 mr-1" />
+                              {item.ticket.status !== 'closed' ? 'Reply' : 'View'}
+                            </Button>
                             {item.ticket.status !== 'closed' && (
                               <Button
                                 variant="outline"
