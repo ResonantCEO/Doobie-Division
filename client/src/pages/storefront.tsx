@@ -45,35 +45,47 @@ function ScrollableProductRow({ products, onCategoryFilter }: { products: (Produ
   };
 
   return (
-    <div className="relative group">
-      {canScrollLeft && (
-        <button
-          onClick={() => scroll('left')}
-          className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 shadow-lg transition-opacity opacity-0 group-hover:opacity-100"
-          aria-label="Scroll left"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-      )}
-      <div ref={scrollRef} className="flex space-x-8 overflow-x-auto pb-4 scrollbar-hide">
-        <div className="flex space-x-8" style={{ minWidth: 'max-content' }}>
-          {products.map((product, index) => (
-            <div key={product.id} className={`flex-shrink-0 w-64 sm:w-72 my-6 ${index === 0 ? 'ml-6' : ''}`}>
-              <ProductCard product={product} />
-            </div>
-          ))}
-        </div>
+    <>
+      {/* Mobile: 2-column grid, vertical scroll only */}
+      <div className="grid grid-cols-2 gap-3 sm:hidden">
+        {products.map((product) => (
+          <div key={product.id} className="product-card-mobile-grid">
+            <ProductCard product={product} />
+          </div>
+        ))}
       </div>
-      {canScrollRight && (
-        <button
-          onClick={() => scroll('right')}
-          className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 shadow-lg transition-opacity opacity-0 group-hover:opacity-100"
-          aria-label="Scroll right"
-        >
-          <ChevronRight className="w-6 h-6" />
-        </button>
-      )}
-    </div>
+
+      {/* Desktop: horizontal scroll carousel */}
+      <div className="hidden sm:block relative group">
+        {canScrollLeft && (
+          <button
+            onClick={() => scroll('left')}
+            className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 shadow-lg transition-opacity opacity-0 group-hover:opacity-100"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        )}
+        <div ref={scrollRef} className="flex space-x-8 overflow-x-auto pb-4 scrollbar-hide">
+          <div className="flex space-x-8" style={{ minWidth: 'max-content' }}>
+            {products.map((product, index) => (
+              <div key={product.id} className={`flex-shrink-0 w-64 sm:w-72 my-6 ${index === 0 ? 'ml-6' : ''}`}>
+                <ProductCard product={product} />
+              </div>
+            ))}
+          </div>
+        </div>
+        {canScrollRight && (
+          <button
+            onClick={() => scroll('right')}
+            className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 shadow-lg transition-opacity opacity-0 group-hover:opacity-100"
+            aria-label="Scroll right"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 

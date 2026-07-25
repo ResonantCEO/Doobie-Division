@@ -550,22 +550,29 @@
   /* Mobile-optimized product cards */
   @media (max-width: 640px) {
     .product-card-container {
-      height: 440px !important;
-      min-height: 440px !important;
-      max-height: 440px !important;
+      height: 340px !important;
+      min-height: 340px !important;
+      max-height: 340px !important;
     }
 
     .product-card-inner {
-      height: 440px !important;
-      min-height: 440px !important;
-      max-height: 440px !important;
+      height: 340px !important;
+      min-height: 340px !important;
+      max-height: 340px !important;
     }
 
     .product-card-face {
-      height: 440px !important;
-      min-height: 440px !important;
-      max-height: 440px !important;
+      height: 340px !important;
+      min-height: 340px !important;
+      max-height: 340px !important;
     }
+  }
+
+  /* Mobile 2-col grid card wrapper */
+  .product-card-mobile-grid {
+    height: 340px;
+    min-height: 340px;
+    max-height: 340px;
   }
 
   @media (min-width: 641px) and (max-width: 768px) {
