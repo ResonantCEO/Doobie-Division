@@ -75,7 +75,7 @@ export default function AdminPage() {
   const [productFilter, setProductFilter] = useState("");
   const [ticketStatusFilter, setTicketStatusFilter] = useState("all");
   const [ticketPriorityFilter, setTicketPriorityFilter] = useState("all");
-  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [ticketResponse, setTicketResponse] = useState("");
   const [responseType, setResponseType] = useState("customer_response");
@@ -875,9 +875,13 @@ export default function AdminPage() {
       if (!response.ok) throw new Error('Failed to fetch support tickets');
       return response.json();
     },
+    refetchInterval: 5000,
   });
 
-
+  const selectedTicket = useMemo(
+    () => supportTickets.find((t: any) => t.ticket.id === selectedTicketId) ?? null,
+    [supportTickets, selectedTicketId]
+  );
 
   const updateTicketStatusMutation = useMutation({
     mutationFn: async ({ ticketId, status }: { ticketId: number; status: string }) => {
@@ -1064,13 +1068,13 @@ export default function AdminPage() {
 
 
   const handleTicketView = (ticket: SupportTicketWithDetails) => {
-    setSelectedTicket(ticket);
+    setSelectedTicketId(ticket.ticket.id);
     setShowTicketModal(true);
   };
 
   const handleCloseTicketModal = () => {
     setShowTicketModal(false);
-    setSelectedTicket(null);
+    setSelectedTicketId(null);
     setTicketResponse("");
     setAdminPendingImages([]);
   };
