@@ -12,11 +12,7 @@ export default function Landing() {
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [supportForm, setSupportForm] = useState({
     customerName: "",
-    customerEmail: "",
-    customerPhone: "",
-    customerTelegram: "",
     message: "",
-    contactMethod: "telegram" as "phone" | "telegram"
   });
   const { toast } = useToast();
 
@@ -33,9 +29,6 @@ export default function Landing() {
         message: supportForm.message,
         priority: "normal",
         customerName: supportForm.customerName,
-        customerEmail: supportForm.customerEmail,
-        customerPhone: supportForm.contactMethod === "phone" ? supportForm.customerPhone : null,
-        customerTelegram: supportForm.contactMethod === "telegram" ? supportForm.customerTelegram : null,
         userId: null
       };
 
@@ -53,12 +46,7 @@ export default function Landing() {
           title: "Support ticket submitted successfully",
           description: "We'll get back to you within 24 hours.",
         });
-        setSupportForm({ 
-          customerName: "", 
-          customerEmail: "", 
-          customerPhone: "", 
-          message: ""
-        });
+        setSupportForm({ customerName: "", message: "" });
         setShowSupportDialog(false);
       } else {
         throw new Error("Failed to submit support ticket");
@@ -459,62 +447,6 @@ export default function Landing() {
                 required
                 className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
                 data-testid="input-support-name"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-white mb-2 block">Contact Method *</label>
-              <div className="flex rounded-lg overflow-hidden border border-slate-600 mb-3">
-                <button
-                  type="button"
-                  onClick={() => setSupportForm(prev => ({ ...prev, contactMethod: "telegram" }))}
-                  className={`flex-1 py-2 text-sm font-medium transition-colors ${supportForm.contactMethod === "telegram" ? "bg-green-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
-                >
-                  ✈️ Telegram
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSupportForm(prev => ({ ...prev, contactMethod: "phone" }))}
-                  className={`flex-1 py-2 text-sm font-medium transition-colors ${supportForm.contactMethod === "phone" ? "bg-green-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
-                >
-                  📞 Phone Number
-                </button>
-              </div>
-              {supportForm.contactMethod === "telegram" ? (
-                <Input
-                  value={supportForm.customerTelegram}
-                  onChange={(e) => setSupportForm(prev => ({ ...prev, customerTelegram: e.target.value }))}
-                  placeholder="@yourusername"
-                  required
-                  className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
-                  data-testid="input-support-telegram"
-                />
-              ) : (
-                <>
-                  <Input
-                    value={supportForm.customerPhone}
-                    onChange={(e) => setSupportForm(prev => ({ ...prev, customerPhone: e.target.value }))}
-                    placeholder="Your phone number"
-                    type="tel"
-                    required
-                    className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
-                    data-testid="input-support-phone"
-                  />
-                  <p className="text-xs text-yellow-400 mt-2 flex items-center gap-1">
-                    ⚠️ Phone number is a less secure form of communication. We recommend using Telegram for better privacy.
-                  </p>
-                </>
-              )}
-            </div>
-            <div>
-              <label className="text-sm font-medium text-white mb-2 block">Email Address *</label>
-              <Input
-                value={supportForm.customerEmail}
-                onChange={(e) => setSupportForm(prev => ({ ...prev, customerEmail: e.target.value }))}
-                placeholder="Your email address"
-                type="email"
-                required
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
-                data-testid="input-support-email"
               />
             </div>
             <div>

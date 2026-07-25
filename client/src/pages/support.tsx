@@ -317,11 +317,7 @@ export default function SupportPage() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [contactForm, setContactForm] = useState({
     customerName: "",
-    customerEmail: "",
-    customerPhone: "",
-    customerTelegram: "",
     message: "",
-    contactMethod: "telegram" as "phone" | "telegram",
   });
 
   const { data: myTickets = [], isLoading: ticketsLoading } = useQuery<TicketWithResponses[]>({
@@ -348,9 +344,6 @@ export default function SupportPage() {
         message: contactForm.message,
         priority: "normal",
         customerName: contactForm.customerName,
-        customerEmail: contactForm.customerEmail,
-        customerPhone: contactForm.contactMethod === "phone" ? contactForm.customerPhone : null,
-        customerTelegram: contactForm.contactMethod === "telegram" ? contactForm.customerTelegram : null,
       };
       if (user?.id) ticketData.userId = user.id;
 
@@ -364,14 +357,7 @@ export default function SupportPage() {
       if (response.ok) {
         const ticket = await response.json();
         toast({ title: "Support ticket created", description: "You can now continue the conversation below." });
-        setContactForm({
-          customerName: "",
-          customerEmail: "",
-          customerPhone: "",
-          customerTelegram: "",
-          message: "",
-          contactMethod: "telegram",
-        });
+        setContactForm({ customerName: "", message: "" });
         setShowNewForm(false);
         await queryClient.invalidateQueries({ queryKey: ["/api/support/my-tickets"] });
         setSelectedTicketId(ticket.id);
@@ -426,54 +412,6 @@ export default function SupportPage() {
                       value={contactForm.customerName}
                       onChange={(e) => setContactForm((p) => ({ ...p, customerName: e.target.value }))}
                       placeholder="Your full name"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Contact Method *</label>
-                    <div className="flex rounded-lg overflow-hidden border border-input mb-3">
-                      <button
-                        type="button"
-                        onClick={() => setContactForm((p) => ({ ...p, contactMethod: "telegram" }))}
-                        className={`flex-1 py-2 text-sm font-medium transition-colors ${contactForm.contactMethod === "telegram" ? "bg-green-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-                      >
-                        ✈️ Telegram
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setContactForm((p) => ({ ...p, contactMethod: "phone" }))}
-                        className={`flex-1 py-2 text-sm font-medium transition-colors ${contactForm.contactMethod === "phone" ? "bg-green-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-                      >
-                        📞 Phone Number
-                      </button>
-                    </div>
-                    {contactForm.contactMethod === "telegram" ? (
-                      <Input
-                        value={contactForm.customerTelegram}
-                        onChange={(e) => setContactForm((p) => ({ ...p, customerTelegram: e.target.value }))}
-                        placeholder="@yourusername"
-                        required
-                      />
-                    ) : (
-                      <>
-                        <p className="text-xs text-yellow-500 mb-2">⚠️ Phone number is less secure. We recommend Telegram for better privacy.</p>
-                        <Input
-                          value={contactForm.customerPhone}
-                          onChange={(e) => setContactForm((p) => ({ ...p, customerPhone: e.target.value }))}
-                          placeholder="Your phone number"
-                          type="tel"
-                          required
-                        />
-                      </>
-                    )}
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Email Address *</label>
-                    <Input
-                      value={contactForm.customerEmail}
-                      onChange={(e) => setContactForm((p) => ({ ...p, customerEmail: e.target.value }))}
-                      placeholder="Your email address"
-                      type="email"
                       required
                     />
                   </div>
