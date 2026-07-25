@@ -189,7 +189,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       >
         {/* Front of card */}
         <Card className="product-card-face product-card-front absolute inset-0 w-full h-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col rounded-2xl overflow-hidden">
-          <div className="w-full h-1/2 overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl relative group">
+          <div className="w-full h-[42%] overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl relative group">
             {productImages.map((src, idx) => (
               <img
                 key={src}
@@ -425,7 +425,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             backfaceVisibility: isFlipped ? "visible" : "hidden",
           }}
         >
-          <div className="w-full h-1/2 overflow-hidden relative bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl group">
+          <div className="w-full h-[42%] overflow-hidden relative bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl group">
             {productImages.map((src, idx) => (
               <img
                 key={src}
