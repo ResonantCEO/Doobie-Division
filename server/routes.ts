@@ -2560,6 +2560,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const insertData = userId ? { ...rest, userId } : rest;
       const ticket = await storage.createSupportTicket(insertData);
 
+      // Push real-time notification to all admin/manager clients
+      broadcastToClients({ type: 'new_support_ticket', ticketId: ticket.id });
+
       res.status(201).json(ticket);
     } catch (error) {
       if (error instanceof z.ZodError) {

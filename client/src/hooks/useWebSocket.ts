@@ -36,7 +36,11 @@ export function useWebSocket() {
             queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
             queryClient.invalidateQueries({ queryKey: ['/api/analytics/order-status-breakdown'] });
             break;
-            
+
+          case 'new_support_ticket':
+            queryClient.invalidateQueries({ queryKey: ['/api/support/tickets'] });
+            break;
+
           default:
 
         }

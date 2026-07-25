@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { MessageCircle, User as UserIcon, Clock, AlertTriangle, Eye, Send, ArrowUpDown, ArrowUp, ArrowDown, Trash2, MapPin, Plus, DollarSign, Pencil, TruckIcon, Archive, Trash, KeyRound, Calendar, Eye as EyeIcon, EyeOff, Tag, Percent, Package, ShoppingBag, Gift, Lock, ImagePlus, X, Loader2, ChevronDown, ChevronUp, Paperclip } from "lucide-react";
@@ -66,6 +67,7 @@ type SortDirection = 'asc' | 'desc';
 export default function AdminPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  useWebSocket();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("support");
   const [dateFilter, setDateFilter] = useState("7"); // days
@@ -873,7 +875,6 @@ export default function AdminPage() {
       if (!response.ok) throw new Error('Failed to fetch support tickets');
       return response.json();
     },
-    refetchInterval: 15000,
   });
 
 
