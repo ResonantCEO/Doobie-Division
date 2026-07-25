@@ -796,6 +796,9 @@ export default function StorefrontPage() {
                     setCurrentParentCategory(null);
                     setSelectedCategory(null);
                     setShowDealsOnly(true);
+                    setTimeout(() => {
+                      document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 50);
                   }}
                 >
                   {/* Rotating product background images */}
