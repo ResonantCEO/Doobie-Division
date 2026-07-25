@@ -776,7 +776,15 @@ export default function StorefrontPage() {
               return (
                 <div
                   key="deals"
-                  className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                  className={`absolute inset-0 transition-opacity duration-1000 cursor-pointer ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                  onClick={() => {
+                    const currentState = { parentCategory: currentParentCategory, selectedCategory, showDealsOnly };
+                    setNavigationHistory(prev => [...prev, currentState]);
+                    setSearchQuery("");
+                    setCurrentParentCategory(null);
+                    setSelectedCategory(null);
+                    setShowDealsOnly(true);
+                  }}
                 >
                   {/* Rotating product background images */}
                   {allDiscountedProducts.map((product: Product, imgIdx: number) => (
@@ -799,19 +807,6 @@ export default function StorefrontPage() {
                       <p className="text-xl mb-6 text-white/90 drop-shadow-md">
                         Check out our special discounts on selected products every day!
                       </p>
-                      <Button
-                        className="bg-white text-primary hover:bg-white/90 drop-shadow-md"
-                        onClick={() => {
-                          const currentState = { parentCategory: currentParentCategory, selectedCategory, showDealsOnly };
-                          setNavigationHistory(prev => [...prev, currentState]);
-                          setSearchQuery("");
-                          setCurrentParentCategory(null);
-                          setSelectedCategory(null);
-                          setShowDealsOnly(true);
-                        }}
-                      >
-                        Shop Now
-                      </Button>
                     </div>
                   </div>
                 </div>
