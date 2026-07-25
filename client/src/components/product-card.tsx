@@ -485,7 +485,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             </div>
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               <div
-                className="bg-gray-50 dark:bg-gray-800 p-2 sm:p-3 rounded-lg overflow-y-scroll max-h-28 sm:max-h-32"
+                className="bg-gray-50 dark:bg-gray-800 p-2 sm:p-3 rounded-lg overflow-y-auto flex-1"
                 style={{
                   touchAction: "pan-y",
                   WebkitOverflowScrolling: "touch",
