@@ -426,9 +426,15 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
       <div className="md:hidden">
         <div className="divide-y divide-gray-200 dark:divide-gray-700">
           {sortedProducts.map((product) => {
-            const hasVariance = (product.physicalInventory ?? product.stock) !== product.stock;
-            const variance = (product.physicalInventory || 0) - product.stock;
             const hasSizes = product.sizes && product.sizes.length > 0;
+            const stockTotal = hasSizes
+              ? product.sizes!.reduce((s, x) => s + (x.quantity || 0), 0)
+              : product.stock;
+            const physTotal = hasSizes
+              ? product.sizes!.reduce((s, x) => s + (x.physicalQuantity || 0), 0)
+              : (product.physicalInventory ?? 0);
+            const hasVariance = physTotal !== stockTotal;
+            const variance = physTotal - stockTotal;
 
             return (
               <div
@@ -556,7 +562,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                     <span className="font-medium text-white">Stock</span>
                     {hasSizes ? (
                       <div className="space-y-0.5 mt-0.5">
-                        <div className="text-white font-medium">{product.stock} total</div>
+                        <div className="text-white font-medium">{stockTotal} total</div>
                         {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map((size) => (
                           <div key={size.id} className="text-white pl-1">
                             {size.size}: {size.quantity}
@@ -564,7 +570,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                         ))}
                       </div>
                     ) : (
-                      <div className="text-white font-medium mt-0.5">{displayStock(product, product.stock)}</div>
+                      <div className="text-white font-medium mt-0.5">{displayStock(product, stockTotal)}</div>
                     )}
                   </div>
                   <div className="space-y-0.5 text-right">
@@ -572,7 +578,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                     {hasSizes ? (
                       <div className="space-y-0.5 mt-0.5">
                         <div className={`font-medium ${hasVariance ? "text-red-500" : "text-white"}`}>
-                          {product.physicalInventory || 0} total
+                          {physTotal} total
                         </div>
                         {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map((size) => {
                           const sizeVariance = (size.physicalQuantity || 0) - size.quantity;
