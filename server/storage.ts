@@ -1188,12 +1188,8 @@ export class DatabaseStorage implements IStorage {
     delete updateData.enableSizes;
 
     if (dataWithoutSizes.stock !== undefined) {
-      const [currentProduct] = await db.select().from(products).where(eq(products.id, id));
-      const currentStock = currentProduct?.stock ?? 0;
-      const currentPhysical = currentProduct?.physicalInventory ?? 0;
-      const stockDelta = (dataWithoutSizes.stock as number) - currentStock;
-      const newPhysical = Math.max(currentPhysical + stockDelta, dataWithoutSizes.stock as number);
-      updateData.physicalInventory = newPhysical;
+      // When stock is explicitly set via edit product, sync physical inventory to match exactly.
+      updateData.physicalInventory = dataWithoutSizes.stock as number;
     }
 
     const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'discountAmount', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
