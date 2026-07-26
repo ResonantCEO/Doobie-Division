@@ -564,7 +564,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                         ))}
                       </div>
                     ) : (
-                      <div className="text-white font-medium mt-0.5">{product.stock} units</div>
+                      <div className="text-white font-medium mt-0.5">{displayStock(product, product.stock)}</div>
                     )}
                   </div>
                   <div className="space-y-0.5 text-right">
@@ -585,7 +585,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                       </div>
                     ) : (
                       <div className={`font-medium mt-0.5 ${hasVariance ? "text-red-500" : "text-white"}`}>
-                        {product.physicalInventory || 0} units
+                        {displayStock(product, product.physicalInventory || 0)}
                       </div>
                     )}
                   </div>
@@ -593,7 +593,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                 {hasVariance && (
                   <div className="mt-1.5 flex items-center gap-1 text-xs text-red-500 font-medium">
                     <TrendingDown className="h-3 w-3 shrink-0" />
-                    <span>Variance: {variance > 0 ? "+" : ""}{variance} units</span>
+                    <span>Variance: {variance > 0 ? "+" : ""}{product.sellingMethod === "weight" ? formatWeight(Math.abs(variance)) : `${Math.abs(variance)} units`}</span>
                   </div>
                 )}
               </div>
