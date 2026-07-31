@@ -756,6 +756,27 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
     },
   });
 
+  const archiveOrderMutation = useMutation({
+    mutationFn: async (orderId: number) => {
+      await apiRequest("PUT", `/api/orders/${orderId}/archive`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Archived", description: "Order moved to Archived." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to archive order", variant: "destructive" });
+    },
+  });
+
+  const handleStatusOrArchive = (orderId: number, value: string) => {
+    if (value === "archived") {
+      archiveOrderMutation.mutate(orderId);
+    } else {
+      handleStatusUpdate(orderId, value);
+    }
+  };
+
   const assignOrderMutation = useMutation({
     mutationFn: async ({ orderId, assignedUserId }: { orderId: number; assignedUserId: string }) => {
       await apiRequest("PUT", `/api/orders/${orderId}/assign`, { assignedUserId });
@@ -970,17 +991,28 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
                     ) : (
                       <Select
                         value={order.status}
-                        onValueChange={(status) => handleStatusUpdate(order.id, status)}
+                        onValueChange={(value) => handleStatusOrArchive(order.id, value)}
                       >
                         <SelectTrigger className="flex-1 h-8 bg-gray-700 dark:bg-gray-700 text-white dark:text-gray-100 border-gray-600 dark:border-gray-600 hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="processing">Processing</SelectItem>
-                          <SelectItem value="packed">Packed</SelectItem>
-                          <SelectItem value="shipped">Shipped</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          {activeTab === "shipped" ? (
+                            <>
+                              <SelectItem value="pending">New Order</SelectItem>
+                              <SelectItem value="packed">Packed</SelectItem>
+                              <SelectItem value="shipped">Shipped</SelectItem>
+                              <SelectItem value="archived">Archived</SelectItem>
+                            </>
+                          ) : (
+                            <>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="processing">Processing</SelectItem>
+                              <SelectItem value="packed">Packed</SelectItem>
+                              <SelectItem value="shipped">Shipped</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
                     )}
@@ -1167,17 +1199,28 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
                         ) : (
                           <Select
                             value={order.status}
-                            onValueChange={(status) => handleStatusUpdate(order.id, status)}
+                            onValueChange={(value) => handleStatusOrArchive(order.id, value)}
                           >
                             <SelectTrigger className="w-32 h-8 bg-gray-700 text-white border-gray-600 hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="processing">Processing</SelectItem>
-                              <SelectItem value="packed">Packed</SelectItem>
-                              <SelectItem value="shipped">Shipped</SelectItem>
-                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                              {activeTab === "shipped" ? (
+                                <>
+                                  <SelectItem value="pending">New Order</SelectItem>
+                                  <SelectItem value="packed">Packed</SelectItem>
+                                  <SelectItem value="shipped">Shipped</SelectItem>
+                                  <SelectItem value="archived">Archived</SelectItem>
+                                </>
+                              ) : (
+                                <>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="processing">Processing</SelectItem>
+                                  <SelectItem value="packed">Packed</SelectItem>
+                                  <SelectItem value="shipped">Shipped</SelectItem>
+                                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                                </>
+                              )}
                             </SelectContent>
                           </Select>
                         )}

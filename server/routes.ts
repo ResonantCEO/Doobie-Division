@@ -1594,6 +1594,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Archive all shipped orders
+  // Archive a single order (sets archived = true)
+  app.put('/api/orders/:id/archive', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { sql: pool } = await import("./db");
+      await pool.query(`UPDATE orders SET archived = true, updated_at = NOW() WHERE id = $1`, [id]);
+      res.json({ message: "Order archived successfully" });
+    } catch (error) {
+      console.error('Failed to archive order:', error);
+      res.status(500).json({ message: "Failed to archive order" });
+    }
+  });
+
   app.post('/api/orders/archive-all-shipped', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
       const { sql: pool } = await import("./db");
