@@ -1397,7 +1397,7 @@ export default function StorefrontPage() {
                 <p className="text-sm font-medium">Pick your categories <span className="text-muted-foreground font-normal">(select all you'd like)</span></p>
                 <p className="text-xs text-muted-foreground">We'll pick 1 item from each category you select, up to the target retail value.</p>
                 <div className="space-y-2 mt-2">
-                  {categories.filter(c => c.isActive !== false).map((cat) => {
+                  {categories.filter(c => c.isActive !== false && !c.name.toLowerCase().includes('grab bag')).map((cat) => {
                     const catId = cat.id;
                     const isSelected = cgBagSelectedCatIds.includes(catId);
                     return (
