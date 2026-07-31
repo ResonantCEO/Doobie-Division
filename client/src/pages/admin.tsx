@@ -156,7 +156,6 @@ export default function AdminPage() {
     maxTotalItemPrice: "",
     specificProductIds: [] as { id: number; size?: string }[],
     categorySelections: [] as { categoryId: number; count: number }[],
-    allowedCategoryIds: [] as number[],
     blacklistedProductIds: [] as number[],
     hideItems: false,
     isActive: true,
@@ -164,7 +163,7 @@ export default function AdminPage() {
 
   const resetGrabBagForm = () => setGrabBagForm({
     name: "", description: "", type: "standard", sellingPrice: "", maxTotalItemPrice: "",
-    specificProductIds: [], categorySelections: [], allowedCategoryIds: [], blacklistedProductIds: [], hideItems: false, isActive: true,
+    specificProductIds: [], categorySelections: [], blacklistedProductIds: [], hideItems: false, isActive: true,
   });
 
   const openEditGrabBag = (g: GrabBag) => {
@@ -184,7 +183,6 @@ export default function AdminPage() {
         } catch { return []; }
       })(),
       categorySelections: g.categorySelections ? JSON.parse(g.categorySelections) : [],
-      allowedCategoryIds: (g as any).allowedCategoryIds ? (() => { try { return JSON.parse((g as any).allowedCategoryIds); } catch { return []; } })() : [],
       blacklistedProductIds: g.blacklistedProductIds ? JSON.parse(g.blacklistedProductIds) : [],
       hideItems: bagType === 'customer_generated' ? true : (g.hideItems ?? false),
       isActive: g.isActive,
@@ -620,7 +618,6 @@ export default function AdminPage() {
         maxTotalItemPrice: data.maxTotalItemPrice,
         specificProductIds: !isCg && data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
         categorySelections: !isCg && data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
-        allowedCategoryIds: isCg && data.allowedCategoryIds.length > 0 ? JSON.stringify(data.allowedCategoryIds) : null,
         blacklistedProductIds: data.blacklistedProductIds.length > 0 ? JSON.stringify(data.blacklistedProductIds) : null,
         hideItems: isCg ? true : data.hideItems,
         isActive: data.isActive,
@@ -648,7 +645,6 @@ export default function AdminPage() {
         maxTotalItemPrice: data.maxTotalItemPrice,
         specificProductIds: !isCg && data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
         categorySelections: !isCg && data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
-        allowedCategoryIds: isCg && data.allowedCategoryIds.length > 0 ? JSON.stringify(data.allowedCategoryIds) : null,
         blacklistedProductIds: data.blacklistedProductIds.length > 0 ? JSON.stringify(data.blacklistedProductIds) : null,
         hideItems: isCg ? true : data.hideItems,
         isActive: data.isActive,
@@ -2427,10 +2423,9 @@ export default function AdminPage() {
                                   {(bag as any).type !== 'customer_generated' && catSels.length > 0 && (
                                     <span>{catSels.reduce((s, c) => s + c.count, 0)} random from {catSels.length} categor{catSels.length !== 1 ? 'ies' : 'y'}</span>
                                   )}
-                                  {(bag as any).type === 'customer_generated' && (() => {
-                                    const allowedIds: number[] = (bag as any).allowedCategoryIds ? (() => { try { return JSON.parse((bag as any).allowedCategoryIds); } catch { return []; } })() : [];
-                                    return allowedIds.length > 0 ? <span>Customer picks from {allowedIds.length} categor{allowedIds.length !== 1 ? 'ies' : 'y'}</span> : null;
-                                  })()}
+                                  {(bag as any).type === 'customer_generated' && (
+                                    <span>Customer picks from all categories</span>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -2891,47 +2886,6 @@ export default function AdminPage() {
               )}
             </div>}
 
-            {/* Allowed Categories — Customer Generated bags only */}
-            {grabBagForm.type === 'customer_generated' && <div className="space-y-2">
-              <Label className="flex items-center gap-1">
-                <ShoppingBag className="h-4 w-4" />
-                Allowed Categories
-              </Label>
-              <p className="text-xs text-gray-400">Customers can pick from these categories when building their bag. The system picks 1 item per selected category within the target retail value.</p>
-              <Select
-                onValueChange={(val) => {
-                  const catId = parseInt(val);
-                  if (!grabBagForm.allowedCategoryIds.includes(catId)) {
-                    setGrabBagForm(f => ({ ...f, allowedCategoryIds: [...f.allowedCategoryIds, catId] }));
-                  }
-                }}
-                value=""
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Add a category…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allCategories.filter(c => c.isActive && !grabBagForm.allowedCategoryIds.includes(c.id)).sort((a, b) => a.name.localeCompare(b.name)).map(c => (
-                    <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {grabBagForm.allowedCategoryIds.length > 0 && (
-                <div className="space-y-1 mt-2">
-                  {grabBagForm.allowedCategoryIds.map(catId => {
-                    const cat = allCategories.find(c => c.id === catId);
-                    return (
-                      <div key={catId} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
-                        <span>{cat?.name || `Category #${catId}`}</span>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setGrabBagForm(f => ({ ...f, allowedCategoryIds: f.allowedCategoryIds.filter(id => id !== catId) }))}>
-                          <Trash2 className="h-3.5 w-3.5 text-gray-400" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>}
 
             {/* Blacklisted Products */}
             <div className="space-y-2">
@@ -3036,9 +2990,6 @@ export default function AdminPage() {
                 if (!grabBagForm.name.trim()) return toast({ title: "Name is required", variant: "destructive" });
                 if (!grabBagForm.sellingPrice) return toast({ title: "Selling price is required", variant: "destructive" });
                 if (!grabBagForm.maxTotalItemPrice) return toast({ title: "Target retail value is required", variant: "destructive" });
-                if (grabBagForm.type === 'customer_generated' && grabBagForm.allowedCategoryIds.length === 0) {
-                  return toast({ title: "Add at least one allowed category", variant: "destructive" });
-                }
                 if (editingGrabBag) {
                   updateGrabBagMutation.mutate({ id: editingGrabBag.id, data: grabBagForm });
                 } else {

@@ -143,7 +143,7 @@ export default function StorefrontPage() {
 
   // Customer Generated bag modal state
   const { addCgBag } = useCart();
-  interface CgTemplate { id: number; name: string; description?: string | null; sellingPrice: string; maxTotalItemPrice: string; allowedCategoryIds: number[] }
+  interface CgTemplate { id: number; name: string; description?: string | null; sellingPrice: string; maxTotalItemPrice: string; }
   const [cgBagModalOpen, setCgBagModalOpen] = useState(false);
   const [cgBagModalTemplate, setCgBagModalTemplate] = useState<CgTemplate | null>(null);
   const [cgBagSelectedCatIds, setCgBagSelectedCatIds] = useState<number[]>([]);
@@ -1364,7 +1364,7 @@ export default function StorefrontPage() {
                   <span className="text-xs text-muted-foreground">Target up to ${Number(template.maxTotalItemPrice).toFixed(2)}</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {template.allowedCategoryIds.length} categor{template.allowedCategoryIds.length !== 1 ? 'ies' : 'y'} to choose from
+                  Pick from any category
                 </div>
                 <div className="mt-1 w-full text-sm font-medium text-center text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 rounded-lg py-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                   Choose Categories →
@@ -1397,8 +1397,8 @@ export default function StorefrontPage() {
                 <p className="text-sm font-medium">Pick your categories <span className="text-muted-foreground font-normal">(select all you'd like)</span></p>
                 <p className="text-xs text-muted-foreground">We'll pick 1 item from each category you select, up to the target retail value.</p>
                 <div className="space-y-2 mt-2">
-                  {cgBagModalTemplate.allowedCategoryIds.map((catId) => {
-                    const cat = categories.find(c => c.id === catId);
+                  {categories.filter(c => c.isActive !== false).map((cat) => {
+                    const catId = cat.id;
                     const isSelected = cgBagSelectedCatIds.includes(catId);
                     return (
                       <button
