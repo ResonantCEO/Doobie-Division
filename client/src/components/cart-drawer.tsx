@@ -222,7 +222,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   };
 
   const handleCheckout = async () => {
-    if (state.items.length === 0) {
+    if (state.items.length === 0 && state.cgBagItems.length === 0) {
       toast({
         title: "Cart is empty",
         description: "Add some items to your cart before checking out.",
@@ -751,7 +751,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           </div>
 
           {/* Cart Summary and Actions */}
-          {state.items.length > 0 && (
+          {(state.items.length > 0 || state.cgBagItems.length > 0) && (
             <div className="border-t pt-4 mt-4">
               <div className="space-y-2 mb-4">
                 {/* Combined weight tier pricing notice */}
