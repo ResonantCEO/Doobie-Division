@@ -1681,22 +1681,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Order cannot be fulfilled in its current status" });
       }
 
-      // Get the product and verify physical inventory
+      // Get the product
       const product = await storage.getProduct(productId);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
-      }
-
-      // Check physicalInventory since fulfillment reduces physical inventory, not stock
-      // physicalInventory is the actual warehouse count available for fulfillment
-      const availablePhysicalInventory = (product.physicalInventory !== null && product.physicalInventory !== undefined) 
-        ? product.physicalInventory 
-        : 0;
-      
-      if (availablePhysicalInventory < quantity) {
-        return res.status(400).json({ 
-          message: `Insufficient stock available. Physical inventory: ${availablePhysicalInventory}, requested: ${quantity}` 
-        });
       }
 
       // Verify the specific order item exists (match by item ID when provided)
@@ -1713,6 +1701,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (quantity > orderItem.quantity) {
         return res.status(400).json({ message: `Order only requires ${orderItem.quantity} units` });
+      }
+
+      // Check physicalInventory since fulfillment reduces physical inventory, not stock.
+      // For weight products physicalInventory is stored in grams; convert the ordered
+      // quantity (in weight-option units, e.g. oz) to grams before comparing.
+      const availablePhysicalInventory = (product.physicalInventory !== null && product.physicalInventory !== undefined)
+        ? product.physicalInventory
+        : 0;
+
+      const weightOptionGrams: Array<[string, number]> = [
+        ['1/8', 3.5], ['⅛', 3.5],
+        ['1/4', 7],   ['¼', 7],
+        ['1/2', 14],  ['½', 14],
+        ['1oz', 28],  ['ounce', 28],
+        ['gram', 1],  ['grams', 1],
+      ];
+      let gramEquivalent = 1;
+      if (product.sellingMethod === 'weight') {
+        const sizeLabel = ((orderItem as any).size || '').toLowerCase().trim();
+        for (const [key, val] of weightOptionGrams) {
+          if (sizeLabel.includes(key)) { gramEquivalent = val; break; }
+        }
+      }
+      const requestedGrams = quantity * gramEquivalent;
+
+      if (availablePhysicalInventory < requestedGrams) {
+        return res.status(400).json({
+          message: `Insufficient physical inventory. Available: ${availablePhysicalInventory}${product.sellingMethod === 'weight' ? 'g' : ' units'}, requested: ${requestedGrams}${product.sellingMethod === 'weight' ? 'g' : ' units'}`
+        });
       }
 
       // Fulfill the item (reduce physical inventory and mark as fulfilled)

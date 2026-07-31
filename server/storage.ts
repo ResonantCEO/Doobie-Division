@@ -2152,8 +2152,9 @@ export class DatabaseStorage implements IStorage {
       .set({ fulfilled: true })
       .where(fulfillFilter);
 
-    // Update per-size physical quantity if applicable
-    const sizeName = this.extractSizeFromProductName(orderItem.productName);
+    // Update per-size physical quantity if applicable.
+    // Prefer the dedicated size column on the order item; fall back to parsing the product name.
+    const sizeName = (orderItem as any).size || this.extractSizeFromProductName(orderItem.productName);
     if (sizeName) {
       await db.execute(
         sql`UPDATE product_sizes SET physical_quantity = physical_quantity - ${physicalDeltaInt}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
@@ -2236,7 +2237,8 @@ export class DatabaseStorage implements IStorage {
       .where(unfulfillItemFilter);
 
     if (unfulfillItem) {
-      const sizeName = this.extractSizeFromProductName(unfulfillItem.productName);
+      // Prefer the dedicated size column; fall back to parsing the product name.
+      const sizeName = (unfulfillItem as any).size || this.extractSizeFromProductName(unfulfillItem.productName);
       if (sizeName) {
         await db.execute(
           sql`UPDATE product_sizes SET physical_quantity = physical_quantity + ${physicalDeltaInt}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
