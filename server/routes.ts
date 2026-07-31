@@ -1262,7 +1262,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          // Build a synthetic bag using the selected category IDs (1 item per category)
+          // Build a synthetic bag using the selected category IDs (1 item per category).
+          // Use sellingPrice as the maxTotalItemPrice so pickGrabBagItems targets items
+          // worth up to that amount; multiply by 1.5 so the budget per category isn't so
+          // tight that reasonable items get filtered out.
+          const cgSellingPrice = parseFloat(String(template.sellingPrice)) || 0;
           const syntheticBag = {
             ...template,
             specificProductIds: null,
@@ -1270,6 +1274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               cgBagReq.selectedCategoryIds.map((catId: number) => ({ categoryId: catId, count: 1 }))
             ),
             hideItems: true,
+            maxTotalItemPrice: String(cgSellingPrice * 1.5 || 999),
           };
 
           const { selectedProducts, warnings: bagWarnings, error: bagError } = await pickGrabBagItems(syntheticBag);
@@ -1295,12 +1300,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
 
-          if (Math.abs(discount) > 0.001) {
+          if (discount < -0.001) {
+            // Items retail value exceeds selling price — true customer savings
             finalItems.push({
               productId: null,
               productName: `🎁 Grab Bag Discount — ${template.name}`,
               productSku: "GRAB-BAG-DISCOUNT",
-              productPrice: discount.toFixed(2),
+              productPrice: discount.toFixed(2), // negative number
+              quantity: 1,
+              subtotal: discount.toFixed(2),
+              fulfilled: true,
+              removed: false,
+            });
+          } else if (discount > 0.001) {
+            // Items retail value less than selling price — balance line to reconcile order total
+            finalItems.push({
+              productId: null,
+              productName: `🎁 Custom Bag Balance — ${template.name}`,
+              productSku: "GRAB-BAG-DISCOUNT",
+              productPrice: discount.toFixed(2), // positive number
               quantity: 1,
               subtotal: discount.toFixed(2),
               fulfilled: true,
