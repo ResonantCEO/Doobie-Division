@@ -2149,30 +2149,17 @@ export default function AdminPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <Package className="h-5 w-5 text-primary" />
                         <h3 className="font-semibold text-base">Global Weight Pricing</h3>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700">
-                          <Lock className="h-3 w-3" />
-                          Locked — Inactive
-                        </span>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        When active, the total weight of all weight-based items in a cart is combined to qualify for better price tiers. For example, ½ oz of Item A + ½ oz of Item B = 1 oz total, so both items are priced at the 1 oz rate using their own per-oz price points. Existing orders are not affected.
-                        <br /><br />
-                        <strong>How oz buckets work:</strong> The system fills buckets of exactly 1 oz (28g) at a time. Items are sorted cheapest-first within the same weight, so lower-priced items combine into the oz bucket first — leaving higher-priced items at their own tier. Once a bucket hits 28g it locks in at oz pricing and a new bucket starts from zero. Any leftover weight that doesn't complete a full oz bucket is priced at whatever tier that remaining weight qualifies for (e.g. a 14g remainder = ½ oz rate, a 7g remainder = ¼ oz rate).
-                        <br /><br />
-                        <strong>Example:</strong> Cart has 1 oz of Item A ($120/oz), ½ oz of Item B ($30/half, $50/oz), and ½ oz of Item C ($30/half, $50/oz). B and C are cheaper so they combine first — their 28g fills one bucket at the oz rate ($25 each). Item A fills its own bucket at its oz rate ($120). Total: $170. Without this toggle, each item would be priced at its own size's rate with no combining benefit.
+                        When active, the total weight of all weight-based items in a cart is combined so customers qualify for better price tiers across mixed products.
                       </p>
                     </div>
-                    <div
-                      className="mt-1 shrink-0 cursor-pointer"
-                      onClick={() => setShowLockedBagPopup(true)}
-                      title="Feature locked — coming soon"
-                    >
-                      <Switch
-                        checked={false}
-                        disabled={true}
-                        className="opacity-40 pointer-events-none"
-                      />
-                    </div>
+                    <Switch
+                      checked={globalWeightPricingEnabled}
+                      onCheckedChange={(enabled) => toggleGlobalWeightPricingMutation.mutate(enabled)}
+                      disabled={isLoadingWeightPricing || toggleGlobalWeightPricingMutation.isPending}
+                      className="mt-1 shrink-0"
+                    />
                   </div>
                 </CardContent>
               </Card>
