@@ -574,6 +574,17 @@ export default function StorefrontPage() {
     return hasProducts;
   }, [products, categories]);
 
+  // Categories that have at least one in-stock product (used for CG bag picker)
+  const categoriesWithStock = useMemo(() => {
+    const ids = new Set<number>();
+    for (const p of allProductsRaw) {
+      if ((p.stock ?? 0) > 0 || ((p as any).physicalInventory ?? 0) > 0) {
+        if ((p as any).categoryId) ids.add((p as any).categoryId);
+      }
+    }
+    return ids;
+  }, [allProductsRaw]);
+
   // Helper function to check if a category has products (including descendants)
   const categoryHasProducts = useCallback((categoryId: number): boolean => {
     return categoriesWithProducts.has(categoryId);
@@ -1403,7 +1414,7 @@ export default function StorefrontPage() {
                 <p className="text-sm font-medium">Pick your categories <span className="text-muted-foreground font-normal">(select all you'd like)</span></p>
                 <p className="text-xs text-muted-foreground">We'll pick 1 item from each category you select, up to the target retail value.</p>
                 <div className="space-y-2 mt-2">
-                  {categories.filter(c => c.isActive !== false && !c.name.toLowerCase().includes('grab bag')).map((cat) => {
+                  {categories.filter(c => c.isActive !== false && !c.name.toLowerCase().includes('grab bag') && categoriesWithStock.has(c.id)).map((cat) => {
                     const catId = cat.id;
                     const isSelected = cgBagSelectedCatIds.includes(catId);
                     return (

@@ -607,6 +607,17 @@ export default function AdminPage() {
     return flatten(categoriesResponse);
   }, [categoriesResponse]);
 
+  // Categories that have at least one active, in-stock product
+  const categoriesWithStock = useMemo(() => {
+    const ids = new Set<number>();
+    for (const p of allProducts) {
+      if ((p.stock ?? 0) > 0 || ((p as any).physicalInventory ?? 0) > 0) {
+        if (p.categoryId) ids.add(p.categoryId);
+      }
+    }
+    return ids;
+  }, [allProducts]);
+
   const createGrabBagMutation = useMutation({
     mutationFn: async (data: typeof grabBagForm) => {
       const isCg = data.type === 'customer_generated';
@@ -2846,7 +2857,7 @@ export default function AdminPage() {
                     <SelectValue placeholder="Add a category…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {allCategories.filter(c => c.isActive && !grabBagForm.categorySelections.find(s => s.categoryId === c.id)).sort((a, b) => a.name.localeCompare(b.name)).map(c => (
+                    {allCategories.filter(c => c.isActive && categoriesWithStock.has(c.id) && !c.name.toLowerCase().includes('grab bag') && !grabBagForm.categorySelections.find(s => s.categoryId === c.id)).sort((a, b) => a.name.localeCompare(b.name)).map(c => (
                       <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
                     ))}
                   </SelectContent>
