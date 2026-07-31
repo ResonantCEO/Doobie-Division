@@ -1375,16 +1375,22 @@ export default function StorefrontPage() {
         </div>
       )}
 
-      {/* CG Bag Category Picker Modal */}
-      {cgBagModalTemplate && (
-        <Dialog open={cgBagModalOpen} onOpenChange={(open) => { setCgBagModalOpen(open); if (!open) { setCgBagModalTemplate(null); setCgBagSelectedCatIds([]); } }}>
-          <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Gift className="h-5 w-5 text-blue-500" />
-                {cgBagModalTemplate.name}
-              </DialogTitle>
-            </DialogHeader>
+      {/* CG Bag Category Picker Modal — always mounted so Radix overlay is never torn mid-animation */}
+      <Dialog open={cgBagModalOpen && !!cgBagModalTemplate} onOpenChange={(open) => {
+        setCgBagModalOpen(open);
+        if (!open) {
+          // Delay clearing template until after close animation finishes
+          setTimeout(() => { setCgBagModalTemplate(null); setCgBagSelectedCatIds([]); }, 300);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gift className="h-5 w-5 text-blue-500" />
+              {cgBagModalTemplate?.name ?? ''}
+            </DialogTitle>
+          </DialogHeader>
+          {cgBagModalTemplate && (
             <div className="space-y-4 py-2">
               {cgBagModalTemplate.description && (
                 <p className="text-sm text-muted-foreground">{cgBagModalTemplate.description}</p>
@@ -1409,7 +1415,7 @@ export default function StorefrontPage() {
                         )}
                         className={`w-full flex items-center justify-between p-3 rounded-lg border-2 text-left transition-all ${isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'}`}
                       >
-                        <span className="text-sm font-medium">{cat?.name || `Category #${catId}`}</span>
+                        <span className="text-sm font-medium">{cat.name}</span>
                         {isSelected && <Check className="h-4 w-4 text-blue-500 shrink-0" />}
                       </button>
                     );
@@ -1433,18 +1439,17 @@ export default function StorefrontPage() {
                   };
                   addCgBag(cartItem);
                   setCgBagModalOpen(false);
-                  setCgBagModalTemplate(null);
-                  setCgBagSelectedCatIds([]);
                   toast({ title: "Added to cart!", description: `${cgBagModalTemplate.name} — ${selectedCategoryNames.join(', ')}` });
+                  setTimeout(() => { setCgBagModalTemplate(null); setCgBagSelectedCatIds([]); }, 300);
                 }}
                 className="w-full py-2.5 rounded-lg font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {cgBagSelectedCatIds.length === 0 ? 'Select at least one category' : `Add to Cart — $${Number(cgBagModalTemplate.sellingPrice).toFixed(2)}`}
               </button>
             </div>
-          </DialogContent>
-        </Dialog>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
 
       </div>
     </div>

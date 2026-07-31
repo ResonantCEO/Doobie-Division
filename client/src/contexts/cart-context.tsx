@@ -330,7 +330,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       }
 
       const total = computeTotal(newItems, state.globalWeightPricing);
-      const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
+      const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0) + state.cgBagItems.length;
       return { ...state, items: newItems, total, itemCount };
     }
 
@@ -360,7 +360,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       }
 
       const total = computeTotal(newItems, state.globalWeightPricing);
-      const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
+      const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0) + state.cgBagItems.length;
       return { ...state, items: newItems, total, itemCount };
     }
 
@@ -388,7 +388,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       }
 
       const total = computeTotal(newItems, state.globalWeightPricing);
-      const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
+      const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0) + state.cgBagItems.length;
       return { ...state, items: newItems, total, itemCount };
     }
 
@@ -407,7 +407,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       }
 
       const total = computeTotal(newItems, state.globalWeightPricing);
-      const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
+      const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0) + state.cgBagItems.length;
       return { ...state, items: newItems, total, itemCount };
     }
 
@@ -421,7 +421,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       }).filter(item => item.quantity > 0);
 
       const total = computeTotal(newItems, state.globalWeightPricing);
-      const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0);
+      const itemCount = newItems.reduce((sum, item) => sum + item.quantity, 0) + state.cgBagItems.length;
       return { ...state, items: newItems, total, itemCount };
     }
 
