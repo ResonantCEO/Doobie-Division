@@ -556,52 +556,49 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
 
                 </div>
 
-                {/* Stock vs Physical — always shown */}
-                <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 flex items-start justify-between gap-4 text-xs">
-                  <div className="space-y-0.5">
-                    <span className="font-medium text-white">Stock</span>
-                    {hasSizes ? (
-                      <div className="space-y-0.5 mt-0.5">
-                        <div className="text-white font-medium">{stockTotal} total</div>
-                        {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map((size) => (
-                          <div key={size.id} className="text-white pl-1">
-                            {size.size}: {size.quantity}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-white font-medium mt-0.5">{displayStock(product, stockTotal)}</div>
-                    )}
+                {/* Stock / Physical — mini table matching desktop layout */}
+                <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 text-xs">
+                  {/* Table header */}
+                  <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 mb-1">
+                    <span className="font-semibold text-gray-400 uppercase tracking-wide text-[10px]">Stock / Physical</span>
+                    <span className="font-semibold text-gray-400 uppercase tracking-wide text-[10px] text-right">Stock</span>
+                    <span className="font-semibold text-gray-400 uppercase tracking-wide text-[10px] text-right">Physical</span>
                   </div>
-                  <div className="space-y-0.5 text-right">
-                    <span className="font-medium text-white">Physical</span>
-                    {hasSizes ? (
-                      <div className="space-y-0.5 mt-0.5">
-                        <div className={`font-medium ${hasVariance ? "text-red-500" : "text-white"}`}>
-                          {physTotal} total
-                        </div>
-                        {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map((size) => {
-                          const sizeVariance = (size.physicalQuantity || 0) - size.quantity;
-                          return (
-                            <div key={size.id} className={sizeVariance !== 0 ? "text-red-500" : "text-white"}>
-                              {size.size}: {size.physicalQuantity || 0}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className={`font-medium mt-0.5 ${hasVariance ? "text-red-500" : "text-white"}`}>
-                        {displayStock(product, product.physicalInventory || 0)}
-                      </div>
-                    )}
+
+                  {/* Totals row */}
+                  <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 py-0.5">
+                    <span className="font-semibold text-white flex items-center gap-1">
+                      Total
+                      {hasVariance && (
+                        <span className="text-orange-500 font-medium">
+                          ({variance > 0 ? "+" : ""}{product.sellingMethod === "weight" ? formatWeight(Math.abs(variance)) : Math.abs(variance)})
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-semibold text-white text-right tabular-nums">
+                      {displayStock(product, stockTotal)}
+                    </span>
+                    <span className={`font-semibold text-right tabular-nums ${hasVariance ? "text-orange-500" : "text-white"}`}>
+                      {displayStock(product, physTotal)}
+                    </span>
                   </div>
+
+                  {/* Per-size rows */}
+                  {hasSizes && [...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map((size) => {
+                    const sizeVariance = (size.physicalQuantity || 0) - size.quantity;
+                    return (
+                      <div key={size.id} className="grid grid-cols-[1fr_auto_auto] gap-x-4 py-0.5">
+                        <span className={`${sizeVariance !== 0 ? "text-orange-500" : "text-gray-300"}`}>
+                          {size.size}:
+                        </span>
+                        <span className="text-gray-300 text-right tabular-nums">{size.quantity}</span>
+                        <span className={`text-right tabular-nums ${sizeVariance !== 0 ? "text-orange-500" : "text-gray-300"}`}>
+                          {size.physicalQuantity || 0}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-                {hasVariance && (
-                  <div className="mt-1.5 flex items-center gap-1 text-xs text-red-500 font-medium">
-                    <TrendingDown className="h-3 w-3 shrink-0" />
-                    <span>Variance: {variance > 0 ? "+" : ""}{product.sellingMethod === "weight" ? formatWeight(Math.abs(variance)) : `${Math.abs(variance)} units`}</span>
-                  </div>
-                )}
               </div>
             );
           })}
