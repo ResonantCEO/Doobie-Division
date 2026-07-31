@@ -151,25 +151,29 @@ export default function AdminPage() {
   const [grabBagForm, setGrabBagForm] = useState({
     name: "",
     description: "",
+    type: "standard" as "standard" | "customer_generated",
     sellingPrice: "",
     maxTotalItemPrice: "",
     specificProductIds: [] as { id: number; size?: string }[],
     categorySelections: [] as { categoryId: number; count: number }[],
+    allowedCategoryIds: [] as number[],
     blacklistedProductIds: [] as number[],
     hideItems: false,
     isActive: true,
   });
 
   const resetGrabBagForm = () => setGrabBagForm({
-    name: "", description: "", sellingPrice: "", maxTotalItemPrice: "",
-    specificProductIds: [], categorySelections: [], blacklistedProductIds: [], hideItems: false, isActive: true,
+    name: "", description: "", type: "standard", sellingPrice: "", maxTotalItemPrice: "",
+    specificProductIds: [], categorySelections: [], allowedCategoryIds: [], blacklistedProductIds: [], hideItems: false, isActive: true,
   });
 
   const openEditGrabBag = (g: GrabBag) => {
     setEditingGrabBag(g);
+    const bagType = ((g as any).type === 'customer_generated' ? 'customer_generated' : 'standard') as "standard" | "customer_generated";
     setGrabBagForm({
       name: g.name,
       description: g.description || "",
+      type: bagType,
       sellingPrice: g.sellingPrice?.toString() || "",
       maxTotalItemPrice: g.maxTotalItemPrice?.toString() || "",
       specificProductIds: (() => {
@@ -180,8 +184,9 @@ export default function AdminPage() {
         } catch { return []; }
       })(),
       categorySelections: g.categorySelections ? JSON.parse(g.categorySelections) : [],
+      allowedCategoryIds: (g as any).allowedCategoryIds ? (() => { try { return JSON.parse((g as any).allowedCategoryIds); } catch { return []; } })() : [],
       blacklistedProductIds: g.blacklistedProductIds ? JSON.parse(g.blacklistedProductIds) : [],
-      hideItems: g.hideItems ?? false,
+      hideItems: bagType === 'customer_generated' ? true : (g.hideItems ?? false),
       isActive: g.isActive,
     });
     setShowGrabBagModal(true);
@@ -606,15 +611,18 @@ export default function AdminPage() {
 
   const createGrabBagMutation = useMutation({
     mutationFn: async (data: typeof grabBagForm) => {
+      const isCg = data.type === 'customer_generated';
       const res = await apiRequest("POST", "/api/admin/grab-bags", {
         name: data.name,
         description: data.description || null,
+        type: data.type,
         sellingPrice: data.sellingPrice,
         maxTotalItemPrice: data.maxTotalItemPrice,
-        specificProductIds: data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
-        categorySelections: data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
+        specificProductIds: !isCg && data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
+        categorySelections: !isCg && data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
+        allowedCategoryIds: isCg && data.allowedCategoryIds.length > 0 ? JSON.stringify(data.allowedCategoryIds) : null,
         blacklistedProductIds: data.blacklistedProductIds.length > 0 ? JSON.stringify(data.blacklistedProductIds) : null,
-        hideItems: data.hideItems,
+        hideItems: isCg ? true : data.hideItems,
         isActive: data.isActive,
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
@@ -631,15 +639,18 @@ export default function AdminPage() {
 
   const updateGrabBagMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: typeof grabBagForm }) => {
+      const isCg = data.type === 'customer_generated';
       const res = await apiRequest("PUT", `/api/admin/grab-bags/${id}`, {
         name: data.name,
         description: data.description || null,
+        type: data.type,
         sellingPrice: data.sellingPrice,
         maxTotalItemPrice: data.maxTotalItemPrice,
-        specificProductIds: data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
-        categorySelections: data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
+        specificProductIds: !isCg && data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
+        categorySelections: !isCg && data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
+        allowedCategoryIds: isCg && data.allowedCategoryIds.length > 0 ? JSON.stringify(data.allowedCategoryIds) : null,
         blacklistedProductIds: data.blacklistedProductIds.length > 0 ? JSON.stringify(data.blacklistedProductIds) : null,
-        hideItems: data.hideItems,
+        hideItems: isCg ? true : data.hideItems,
         isActive: data.isActive,
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
@@ -2401,31 +2412,41 @@ export default function AdminPage() {
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-semibold text-sm">{bag.name}</span>
                                   <Badge variant={bag.isActive ? "default" : "secondary"} className="text-xs">{bag.isActive ? 'Active' : 'Inactive'}</Badge>
+                                  {(bag as any).type === 'customer_generated'
+                                    ? <Badge variant="outline" className="text-xs text-blue-600 border-blue-400 dark:text-blue-400">Customer Generated</Badge>
+                                    : <Badge variant="outline" className="text-xs text-purple-600 border-purple-400 dark:text-purple-400">Standard</Badge>
+                                  }
                                   <Badge variant="outline" className="text-xs text-green-700 border-green-400 dark:text-green-400">Sells for ${Number(bag.sellingPrice).toFixed(2)}</Badge>
                                   <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">Target value ${Number(bag.maxTotalItemPrice).toFixed(2)}</Badge>
                                 </div>
                                 {bag.description && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 truncate">{bag.description}</p>}
                                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
-                                  {specificIds.length > 0 && (
+                                  {(bag as any).type !== 'customer_generated' && specificIds.length > 0 && (
                                     <span>{specificIds.length} specific item{specificIds.length !== 1 ? 's' : ''}</span>
                                   )}
-                                  {catSels.length > 0 && (
+                                  {(bag as any).type !== 'customer_generated' && catSels.length > 0 && (
                                     <span>{catSels.reduce((s, c) => s + c.count, 0)} random from {catSels.length} categor{catSels.length !== 1 ? 'ies' : 'y'}</span>
                                   )}
+                                  {(bag as any).type === 'customer_generated' && (() => {
+                                    const allowedIds: number[] = (bag as any).allowedCategoryIds ? (() => { try { return JSON.parse((bag as any).allowedCategoryIds); } catch { return []; } })() : [];
+                                    return allowedIds.length > 0 ? <span>Customer picks from {allowedIds.length} categor{allowedIds.length !== 1 ? 'ies' : 'y'}</span> : null;
+                                  })()}
                                 </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0 ml-3">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-purple-600 border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                                onClick={() => generateGrabBagMutation.mutate(bag.id)}
-                                disabled={generateGrabBagMutation.isPending}
-                              >
-                                <Gift className="h-4 w-4 mr-1" />
-                                Generate
-                              </Button>
+                              {(bag as any).type !== 'customer_generated' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-purple-600 border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                                  onClick={() => generateGrabBagMutation.mutate(bag.id)}
+                                  disabled={generateGrabBagMutation.isPending}
+                                >
+                                  <Gift className="h-4 w-4 mr-1" />
+                                  Generate
+                                </Button>
+                              )}
                               <Switch checked={bag.isActive} onCheckedChange={(checked) => toggleGrabBagMutation.mutate({ id: bag.id, isActive: checked })} />
                               <Button variant="ghost" size="sm" onClick={() => openEditGrabBag(bag)}><Pencil className="h-4 w-4" /></Button>
                               <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { setGrabBagToDelete(bag); setDeleteGrabBagConfirmOpen(true); }}>
@@ -2652,6 +2673,29 @@ export default function AdminPage() {
                 rows={2}
               />
             </div>
+            {/* Bag Type */}
+            <div className="space-y-2">
+              <Label>Bag Type *</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGrabBagForm(f => ({ ...f, type: 'standard' }))}
+                  className={`p-3 rounded-lg border-2 text-left transition-all ${grabBagForm.type === 'standard' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-purple-300'}`}
+                >
+                  <div className="font-medium text-sm">Standard</div>
+                  <div className="text-xs text-gray-400 mt-0.5">Admin generates bags; customers buy the ready-made product</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGrabBagForm(f => ({ ...f, type: 'customer_generated', hideItems: true }))}
+                  className={`p-3 rounded-lg border-2 text-left transition-all ${grabBagForm.type === 'customer_generated' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-purple-300'}`}
+                >
+                  <div className="font-medium text-sm">Customer Generated</div>
+                  <div className="text-xs text-gray-400 mt-0.5">Customer picks categories at checkout; bag assembled per order</div>
+                </button>
+              </div>
+            </div>
+
             {/* Pricing */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -2687,8 +2731,8 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Specific Products */}
-            <div className="space-y-2">
+            {/* Specific Products — Standard bags only */}
+            {grabBagForm.type === 'standard' && <div className="space-y-2">
               <Label className="flex items-center gap-1">
                 <Package className="h-4 w-4" />
                 Always Include — Specific Products
@@ -2784,10 +2828,10 @@ export default function AdminPage() {
                   })}
                 </div>
               )}
-            </div>
+            </div>}
 
-            {/* Category Random Picks */}
-            <div className="space-y-2">
+            {/* Category Random Picks — Standard bags only */}
+            {grabBagForm.type === 'standard' && <div className="space-y-2">
               <Label className="flex items-center gap-1">
                 <ShoppingBag className="h-4 w-4" />
                 Random Category Picks
@@ -2845,7 +2889,49 @@ export default function AdminPage() {
                   })}
                 </div>
               )}
-            </div>
+            </div>}
+
+            {/* Allowed Categories — Customer Generated bags only */}
+            {grabBagForm.type === 'customer_generated' && <div className="space-y-2">
+              <Label className="flex items-center gap-1">
+                <ShoppingBag className="h-4 w-4" />
+                Allowed Categories
+              </Label>
+              <p className="text-xs text-gray-400">Customers can pick from these categories when building their bag. The system picks 1 item per selected category within the target retail value.</p>
+              <Select
+                onValueChange={(val) => {
+                  const catId = parseInt(val);
+                  if (!grabBagForm.allowedCategoryIds.includes(catId)) {
+                    setGrabBagForm(f => ({ ...f, allowedCategoryIds: [...f.allowedCategoryIds, catId] }));
+                  }
+                }}
+                value=""
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Add a category…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allCategories.filter(c => c.isActive && !grabBagForm.allowedCategoryIds.includes(c.id)).sort((a, b) => a.name.localeCompare(b.name)).map(c => (
+                    <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {grabBagForm.allowedCategoryIds.length > 0 && (
+                <div className="space-y-1 mt-2">
+                  {grabBagForm.allowedCategoryIds.map(catId => {
+                    const cat = allCategories.find(c => c.id === catId);
+                    return (
+                      <div key={catId} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
+                        <span>{cat?.name || `Category #${catId}`}</span>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setGrabBagForm(f => ({ ...f, allowedCategoryIds: f.allowedCategoryIds.filter(id => id !== catId) }))}>
+                          <Trash2 className="h-3.5 w-3.5 text-gray-400" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>}
 
             {/* Blacklisted Products */}
             <div className="space-y-2">
@@ -2925,10 +3011,16 @@ export default function AdminPage() {
               <div className="space-y-0.5">
                 <Label className="text-sm font-medium">Hide bag contents from customers</Label>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  When on, customers won't see the item list on the storefront, add-to-cart screen, or shopping cart. Staff can always see the full contents on fulfillment screens.
+                  {grabBagForm.type === 'customer_generated'
+                    ? "Always on for Customer Generated bags — contents are assembled per order and never shown."
+                    : "When on, customers won't see the item list on the storefront, add-to-cart screen, or shopping cart. Staff can always see the full contents on fulfillment screens."}
                 </p>
               </div>
-              <Switch checked={grabBagForm.hideItems} onCheckedChange={v => setGrabBagForm(f => ({ ...f, hideItems: v }))} />
+              <Switch
+                checked={grabBagForm.type === 'customer_generated' ? true : grabBagForm.hideItems}
+                disabled={grabBagForm.type === 'customer_generated'}
+                onCheckedChange={v => grabBagForm.type !== 'customer_generated' && setGrabBagForm(f => ({ ...f, hideItems: v }))}
+              />
             </div>
 
             {/* Active toggle */}
@@ -2944,6 +3036,9 @@ export default function AdminPage() {
                 if (!grabBagForm.name.trim()) return toast({ title: "Name is required", variant: "destructive" });
                 if (!grabBagForm.sellingPrice) return toast({ title: "Selling price is required", variant: "destructive" });
                 if (!grabBagForm.maxTotalItemPrice) return toast({ title: "Target retail value is required", variant: "destructive" });
+                if (grabBagForm.type === 'customer_generated' && grabBagForm.allowedCategoryIds.length === 0) {
+                  return toast({ title: "Add at least one allowed category", variant: "destructive" });
+                }
                 if (editingGrabBag) {
                   updateGrabBagMutation.mutate({ id: editingGrabBag.id, data: grabBagForm });
                 } else {

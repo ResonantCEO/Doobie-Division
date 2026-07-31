@@ -984,9 +984,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public endpoint: list active Customer Generated bag templates for the storefront
+  app.get('/api/grab-bags/customer-generated', async (_req, res) => {
+    try {
+      const all = await storage.getGrabBags();
+      const cg = all
+        .filter(b => (b as any).type === 'customer_generated' && b.isActive)
+        .map(b => ({
+          id: b.id,
+          name: b.name,
+          description: b.description,
+          sellingPrice: b.sellingPrice,
+          maxTotalItemPrice: b.maxTotalItemPrice,
+          allowedCategoryIds: b.allowedCategoryIds ? (() => { try { return JSON.parse(b.allowedCategoryIds as string); } catch { return []; } })() : [],
+        }));
+      res.json(cg);
+    } catch (e) {
+      res.status(500).json({ message: "Failed to fetch customer-generated grab bags" });
+    }
+  });
+
   app.post('/api/orders', async (req, res) => {
     try {
-      const { order, items } = req.body;
+      const { order, items, cgBags: cgBagsInput = [] } = req.body;
 
       const orderData = insertOrderSchema.parse(order);
 
@@ -1225,6 +1245,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         finalItems.push(item);
+      }
+
+      // Expand Customer-Generated bag items (from cgBags in the request body)
+      const cgBagsInput_typed = cgBagsInput as Array<{ templateId: number; selectedCategoryIds: number[] }>;
+      for (const cgBagReq of cgBagsInput_typed) {
+        try {
+          const template = await storage.getGrabBag(cgBagReq.templateId);
+          if (!template || !(template as any).isActive || (template as any).type !== 'customer_generated') {
+            stockErrors.push(`Customer-generated bag template not found or inactive.`);
+            continue;
+          }
+
+          if (!cgBagReq.selectedCategoryIds || cgBagReq.selectedCategoryIds.length === 0) {
+            stockErrors.push(`No categories selected for bag "${template.name}".`);
+            continue;
+          }
+
+          // Build a synthetic bag using the selected category IDs (1 item per category)
+          const syntheticBag = {
+            ...template,
+            specificProductIds: null,
+            categorySelections: JSON.stringify(
+              cgBagReq.selectedCategoryIds.map((catId: number) => ({ categoryId: catId, count: 1 }))
+            ),
+            hideItems: true,
+          };
+
+          const { selectedProducts, warnings: bagWarnings, error: bagError } = await pickGrabBagItems(syntheticBag);
+          if (bagError || selectedProducts.length === 0) {
+            stockErrors.push(`Could not assemble bag "${template.name}": ${bagError || 'No products could be found for the selected categories.'}`);
+            continue;
+          }
+
+          const sellingPrice = parseFloat(String(template.sellingPrice));
+          const retailTotal = selectedProducts.reduce((s, p) => s + p.price, 0);
+          const discount = sellingPrice - retailTotal;
+
+          for (const p of selectedProducts) {
+            finalItems.push({
+              productId: p.id,
+              productName: p.name,
+              productSku: p.sku ?? undefined,
+              productPrice: p.price.toFixed(2),
+              quantity: 1,
+              subtotal: p.price.toFixed(2),
+              fulfilled: false,
+              removed: false,
+            });
+          }
+
+          if (Math.abs(discount) > 0.001) {
+            finalItems.push({
+              productId: null,
+              productName: `🎁 Grab Bag Discount — ${template.name}`,
+              productSku: "GRAB-BAG-DISCOUNT",
+              productPrice: discount.toFixed(2),
+              quantity: 1,
+              subtotal: discount.toFixed(2),
+              fulfilled: true,
+              removed: false,
+            });
+          }
+
+          // Deduct stock for each picked component
+          for (const p of selectedProducts) {
+            try {
+              await db.execute(sql`UPDATE products SET stock = GREATEST(0, stock - 1), updated_at = NOW() WHERE id = ${p.id}`);
+            } catch (err) {
+              console.warn("[createOrder] Failed to deduct CG bag component stock:", err);
+            }
+          }
+        } catch (cgErr) {
+          console.error("[createOrder] CG bag expansion error:", cgErr);
+          stockErrors.push(`Failed to process customer-generated bag.`);
+        }
+      }
+
+      // Re-check stock errors after CG bag expansion
+      if (stockErrors.length > 0) {
+        return res.status(400).json({
+          message: "Order cannot be processed due to stock issues",
+          errors: stockErrors
+        });
       }
 
       const itemsData = finalItems.map((item: any) => insertOrderItemSchema.parse(item));

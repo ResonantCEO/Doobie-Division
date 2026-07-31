@@ -77,7 +77,9 @@ function getEffectiveUnitPrice(product: any, size?: string): number {
 }
 
 export default function CartDrawer({ children }: CartDrawerProps) {
-  const { state, removeItem, updateQuantity, clearCart, getEffectivePrice } = useCart();
+  const { state, removeItem, updateQuantity, clearCart, getEffectivePrice, removeCgBag } = useCart();
+  // Combined total includes both product items and customer-generated bag items
+  const combinedTotal = state.total + state.cgBagTotal;
   const { toast } = useToast();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -295,7 +297,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     if (!promoInput.trim()) return;
     setIsValidatingPromo(true);
     try {
-      const effectiveTotal = state.total - (discountResult?.totalSavings || 0);
+      const effectiveTotal = combinedTotal - (discountResult?.totalSavings || 0);
       const res = await fetch('/api/promo-codes/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -328,7 +330,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     try {
       // Check purchase limit for city (skipped if promo code bypasses minimum)
       if (city.trim() && !appliedPromo?.bypassPurchaseMinimum) {
-        const adjustedTotalForLimit = Math.max(0, state.total - (discountResult?.totalSavings || 0));
+        const adjustedTotalForLimit = Math.max(0, combinedTotal - (discountResult?.totalSavings || 0));
         const limitCheck = await fetch('/api/check-purchase-limit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -378,7 +380,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
       // Prepare order data (apply promo discount if any)
       const promoSavings = appliedPromo?.discountAmount || 0;
-      const finalTotal = Math.max(0, state.total - (discountResult?.totalSavings || 0) - promoSavings);
+      const finalTotal = Math.max(0, combinedTotal - (discountResult?.totalSavings || 0) - promoSavings);
       const orderData: any = {
         orderNumber,
         customerId: user?.id,
@@ -393,7 +395,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           ? [isAfter5pm ? "[Next Day 1st Run]" : `[${runPreference} Run]`, shippingForm.notes].filter(Boolean).join(" — ")
           : shippingForm.notes || null,
       };
-      orderData.originalTotal = state.total.toFixed(2);
+      orderData.originalTotal = combinedTotal.toFixed(2);
       if (appliedPromo) {
         orderData.promoCodeId = appliedPromo.promoId;
         orderData.promoCode = appliedPromo.code;
@@ -491,6 +493,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         body: JSON.stringify({
           order: orderData,
           items: orderItems,
+          cgBags: state.cgBagItems.map(b => ({
+            templateId: b.templateId,
+            selectedCategoryIds: b.selectedCategoryIds,
+          })),
         }),
       });
 
@@ -582,7 +588,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             )}
           </SheetTitle>
           <SheetDescription>
-            {state.items.length === 0
+            {state.items.length === 0 && state.cgBagItems.length === 0
               ? "Your cart is empty. Start shopping to add items!"
               : "Review your items and proceed to checkout"
             }
@@ -592,7 +598,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         <div className="flex flex-col h-full">
           {/* Cart Items */}
           <div className="flex-1 overflow-y-auto py-4">
-            {state.items.length === 0 ? (
+            {state.items.length === 0 && state.cgBagItems.length === 0 ? (
               <div className="text-center py-12">
                 <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">Your cart is empty</p>
@@ -606,6 +612,28 @@ export default function CartDrawer({ children }: CartDrawerProps) {
               </div>
             ) : (
               <div className="space-y-4">
+                {/* Customer Generated bag items */}
+                {state.cgBagItems.map((bag) => (
+                  <div key={bag.cartId} className="flex items-start gap-4 p-4 border rounded-lg border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10">
+                    <div className="w-16 h-16 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                      <Gift className="h-7 w-7 text-blue-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-1">
+                        <h4 className="font-medium text-sm">{bag.templateName}</h4>
+                        <span className="shrink-0 text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-medium">Custom Bag</span>
+                      </div>
+                      {bag.categoryNames.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-0.5">From: {bag.categoryNames.join(', ')}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground italic mt-0.5">Contents assembled when order is placed</p>
+                      <p className="font-semibold text-primary mt-1">${bag.sellingPrice.toFixed(2)}</p>
+                    </div>
+                    <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeCgBag(bag.cartId)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
                 {state.items.map((item, index) => {
                   const itemKey = item.size ? `${item.product.id}-${item.size}-${index}` : `${item.product.id}-${index}`;
                   return (
@@ -758,7 +786,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 })()}
                 <div className="flex justify-between text-sm">
                   <span>Items ({state.itemCount})</span>
-                  <span>${state.total.toFixed(2)}</span>
+                  <span>${combinedTotal.toFixed(2)}</span>
                 </div>
                 {/* BOGO product-level savings */}
                 {bogoSavings > 0 && (
@@ -803,7 +831,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   const autoSavings = discountResult?.totalSavings || 0;
                   const promoSavings = appliedPromo?.discountAmount || 0;
                   const totalSavings = autoSavings + promoSavings;
-                  const finalTotal = Math.max(0, state.total - totalSavings);
+                  const finalTotal = Math.max(0, combinedTotal - totalSavings);
                   return (
                     <>
                       <div className="flex justify-between font-semibold">
@@ -811,10 +839,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         <span>
                           {totalSavings > 0 ? (
                             <span className="flex items-center gap-2">
-                              <span className="line-through text-gray-400 text-sm font-normal">${state.total.toFixed(2)}</span>
+                              <span className="line-through text-gray-400 text-sm font-normal">${combinedTotal.toFixed(2)}</span>
                               <span className="text-green-600 dark:text-green-400">${finalTotal.toFixed(2)}</span>
                             </span>
-                          ) : `$${state.total.toFixed(2)}`}
+                          ) : `$${combinedTotal.toFixed(2)}`}
                         </span>
                       </div>
                       {totalSavings > 0 && (
@@ -885,9 +913,17 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   );
                 })}
                 <Separator className="my-2" />
+                {/* CG bag items in order summary */}
+                {state.cgBagItems.map((bag) => (
+                  <div key={bag.cartId} className="flex justify-between text-sm">
+                    <span className="flex items-center gap-1"><Gift className="h-3 w-3 text-blue-500" /> {bag.templateName} <span className="text-muted-foreground">(Custom Bag)</span></span>
+                    <span>${bag.sellingPrice.toFixed(2)}</span>
+                  </div>
+                ))}
+                <Separator className="my-2" />
                 <div className="flex justify-between font-medium">
                   <span>Subtotal</span>
-                  <span>${state.total.toFixed(2)}</span>
+                  <span>${combinedTotal.toFixed(2)}</span>
                 </div>
                 {bogoSavings > 0 && (
                   <div className="flex justify-between text-sm text-purple-600 dark:text-purple-400">
@@ -910,7 +946,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 <div className="flex justify-between font-semibold text-base mt-1">
                   <span>Total</span>
                   <span className="text-green-600 dark:text-green-400">
-                    ${Math.max(0, state.total - (discountResult?.totalSavings || 0) - (appliedPromo?.discountAmount || 0)).toFixed(2)}
+                    ${Math.max(0, combinedTotal - (discountResult?.totalSavings || 0) - (appliedPromo?.discountAmount || 0)).toFixed(2)}
                   </span>
                 </div>
               </div>

@@ -16,9 +16,20 @@ interface CartItem {
   customPrice?: number;
 }
 
+export interface CgBagCartItem {
+  cartId: string; // unique id for this entry, e.g. `cg-${templateId}-${timestamp}`
+  templateId: number;
+  templateName: string;
+  sellingPrice: number;
+  selectedCategoryIds: number[];
+  categoryNames: string[];
+}
+
 interface CartState {
   items: CartItem[];
+  cgBagItems: CgBagCartItem[];
   total: number;
+  cgBagTotal: number;
   itemCount: number;
   globalWeightPricing: boolean;
 }
@@ -31,11 +42,16 @@ type CartAction =
   | { type: 'UPDATE_QUANTITY'; payload: { id: number; quantity: number; size?: string; isFree?: boolean } }
   | { type: 'CLEAR_CART' }
   | { type: 'LOAD_CART'; payload: CartItem[] }
-  | { type: 'SET_WEIGHT_PRICING'; payload: boolean };
+  | { type: 'LOAD_CG_BAGS'; payload: CgBagCartItem[] }
+  | { type: 'SET_WEIGHT_PRICING'; payload: boolean }
+  | { type: 'ADD_CG_BAG'; payload: CgBagCartItem }
+  | { type: 'REMOVE_CG_BAG'; payload: { cartId: string } };
 
 const initialState: CartState = {
   items: [],
+  cgBagItems: [],
   total: 0,
+  cgBagTotal: 0,
   itemCount: 0,
   globalWeightPricing: true,
 };
@@ -268,6 +284,26 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       return { ...state, globalWeightPricing: action.payload, total };
     }
 
+    case 'ADD_CG_BAG': {
+      const newCgBagItems = [...state.cgBagItems, action.payload];
+      const cgBagTotal = newCgBagItems.reduce((s, b) => s + b.sellingPrice, 0);
+      const itemCount = state.items.reduce((sum, i) => sum + i.quantity, 0) + newCgBagItems.length;
+      return { ...state, cgBagItems: newCgBagItems, cgBagTotal, itemCount };
+    }
+
+    case 'REMOVE_CG_BAG': {
+      const newCgBagItems = state.cgBagItems.filter(b => b.cartId !== action.payload.cartId);
+      const cgBagTotal = newCgBagItems.reduce((s, b) => s + b.sellingPrice, 0);
+      const itemCount = state.items.reduce((sum, i) => sum + i.quantity, 0) + newCgBagItems.length;
+      return { ...state, cgBagItems: newCgBagItems, cgBagTotal, itemCount };
+    }
+
+    case 'LOAD_CG_BAGS': {
+      const cgBagTotal = action.payload.reduce((s, b) => s + b.sellingPrice, 0);
+      const itemCount = state.items.reduce((sum, i) => sum + i.quantity, 0) + action.payload.length;
+      return { ...state, cgBagItems: action.payload, cgBagTotal, itemCount };
+    }
+
     case 'ADD_ITEM': {
       const itemKey = makeItemKey(action.payload.product.id, action.payload.size, false);
 
@@ -394,8 +430,9 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
     case 'LOAD_CART': {
       const total = computeTotal(action.payload, state.globalWeightPricing);
-      const itemCount = action.payload.reduce((sum, item) => sum + item.quantity, 0);
-      return { ...state, items: action.payload, total, itemCount };
+      const cgBagTotal = state.cgBagItems.reduce((s, b) => s + b.sellingPrice, 0);
+      const itemCount = action.payload.reduce((sum, item) => sum + item.quantity, 0) + state.cgBagItems.length;
+      return { ...state, items: action.payload, total, cgBagTotal, itemCount };
     }
 
     default:
@@ -412,6 +449,8 @@ interface CartContextType {
   updateQuantity: (productId: number, quantity: number, size?: string, isFree?: boolean) => void;
   clearCart: () => void;
   getEffectivePrice: (productId: number, size?: string) => number;
+  addCgBag: (bag: CgBagCartItem) => void;
+  removeCgBag: (cartId: string) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -466,11 +505,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         console.error('Error loading cart from localStorage:', error);
       }
     }
+    // Restore CG bag items from localStorage
+    const savedCgBags = localStorage.getItem('cgBagCart');
+    if (savedCgBags) {
+      try {
+        const cgBagItems: CgBagCartItem[] = JSON.parse(savedCgBags);
+        dispatch({ type: 'LOAD_CG_BAGS', payload: cgBagItems });
+      } catch { /* ignore */ }
+    }
   }, []);
 
   useEffect(() => {
     localStorage.setItem('cart', JSON.stringify(state.items));
   }, [state.items]);
+
+  useEffect(() => {
+    localStorage.setItem('cgBagCart', JSON.stringify(state.cgBagItems));
+  }, [state.cgBagItems]);
 
   const addItem = (product: Product & { category: Category | null; quantityPricing?: QuantityTier[] }, size?: string) => {
     dispatch({ type: 'ADD_ITEM', payload: { product, size } });
@@ -494,6 +545,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = () => {
     dispatch({ type: 'CLEAR_CART' });
+    localStorage.removeItem('cgBagCart');
+  };
+
+  const addCgBag = (bag: CgBagCartItem) => {
+    dispatch({ type: 'ADD_CG_BAG', payload: bag });
+  };
+
+  const removeCgBag = (cartId: string) => {
+    dispatch({ type: 'REMOVE_CG_BAG', payload: { cartId } });
   };
 
   const getEffectivePrice = (productId: number, size?: string): number => {
@@ -527,7 +587,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <CartContext.Provider value={{ state, addItem, addFreeItem, addDiscountedItem, removeItem, updateQuantity, clearCart, getEffectivePrice }}>
+    <CartContext.Provider value={{ state, addItem, addFreeItem, addDiscountedItem, removeItem, updateQuantity, clearCart, getEffectivePrice, addCgBag, removeCgBag }}>
       {children}
     </CartContext.Provider>
   );

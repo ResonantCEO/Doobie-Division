@@ -8,7 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ProductCard from "@/components/product-card";
-import { Search, ChevronLeft, ChevronRight, Megaphone, ImagePlus, Trash2, X, ShoppingBag, Check, Pencil, GripVertical, ArrowUpDown, Save } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Megaphone, ImagePlus, Trash2, X, ShoppingBag, Check, Pencil, GripVertical, ArrowUpDown, Save, Gift } from "lucide-react";
+import { useCart, type CgBagCartItem } from "@/contexts/cart-context";
 import type { Product, Category, PromotionalAd, BoardPost } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -139,6 +140,23 @@ export default function StorefrontPage() {
 
   // Ad product filter — set when user taps a board post with linked products
   const [adProductFilter, setAdProductFilter] = useState<number[] | null>(null);
+
+  // Customer Generated bag modal state
+  const { addCgBag } = useCart();
+  interface CgTemplate { id: number; name: string; description?: string | null; sellingPrice: string; maxTotalItemPrice: string; allowedCategoryIds: number[] }
+  const [cgBagModalOpen, setCgBagModalOpen] = useState(false);
+  const [cgBagModalTemplate, setCgBagModalTemplate] = useState<CgTemplate | null>(null);
+  const [cgBagSelectedCatIds, setCgBagSelectedCatIds] = useState<number[]>([]);
+
+  const { data: cgTemplates = [] } = useQuery<CgTemplate[]>({
+    queryKey: ["/api/grab-bags/customer-generated"],
+    queryFn: async () => {
+      const res = await fetch('/api/grab-bags/customer-generated');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60000,
+  });
 
   // Reorder mode (admin only)
   const [isReorderMode, setIsReorderMode] = useState(false);
@@ -1312,6 +1330,122 @@ export default function StorefrontPage() {
           })()}
         </div>
       )}
+
+      {/* Build Your Bag — Customer Generated templates */}
+      {cgTemplates.length > 0 && (
+        <div className="space-y-4 mt-2">
+          <div className="flex items-center gap-2">
+            <Gift className="h-6 w-6 text-blue-500" />
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Build Your Bag</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">Pick your categories and we'll put together a mystery bag just for you.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {cgTemplates.map((template) => (
+              <div
+                key={template.id}
+                className="rounded-xl border bg-card shadow-sm p-5 flex flex-col gap-3 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+                onClick={() => {
+                  setCgBagModalTemplate(template);
+                  setCgBagSelectedCatIds([]);
+                  setCgBagModalOpen(true);
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                    <Gift className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-base">{template.name}</h4>
+                    {template.description && <p className="text-xs text-muted-foreground mt-0.5">{template.description}</p>}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-lg font-bold text-blue-600 dark:text-blue-400">${Number(template.sellingPrice).toFixed(2)}</span>
+                  <span className="text-xs text-muted-foreground">Target up to ${Number(template.maxTotalItemPrice).toFixed(2)}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {template.allowedCategoryIds.length} categor{template.allowedCategoryIds.length !== 1 ? 'ies' : 'y'} to choose from
+                </div>
+                <div className="mt-1 w-full text-sm font-medium text-center text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 rounded-lg py-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                  Choose Categories →
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* CG Bag Category Picker Modal */}
+      {cgBagModalTemplate && (
+        <Dialog open={cgBagModalOpen} onOpenChange={(open) => { setCgBagModalOpen(open); if (!open) { setCgBagModalTemplate(null); setCgBagSelectedCatIds([]); } }}>
+          <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Gift className="h-5 w-5 text-blue-500" />
+                {cgBagModalTemplate.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              {cgBagModalTemplate.description && (
+                <p className="text-sm text-muted-foreground">{cgBagModalTemplate.description}</p>
+              )}
+              <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <span className="text-sm font-medium">Bag price</span>
+                <span className="text-lg font-bold text-blue-600 dark:text-blue-400">${Number(cgBagModalTemplate.sellingPrice).toFixed(2)}</span>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Pick your categories <span className="text-muted-foreground font-normal">(select all you'd like)</span></p>
+                <p className="text-xs text-muted-foreground">We'll pick 1 item from each category you select, up to the target retail value.</p>
+                <div className="space-y-2 mt-2">
+                  {cgBagModalTemplate.allowedCategoryIds.map((catId) => {
+                    const cat = categories.find(c => c.id === catId);
+                    const isSelected = cgBagSelectedCatIds.includes(catId);
+                    return (
+                      <button
+                        key={catId}
+                        type="button"
+                        onClick={() => setCgBagSelectedCatIds(prev =>
+                          prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]
+                        )}
+                        className={`w-full flex items-center justify-between p-3 rounded-lg border-2 text-left transition-all ${isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'}`}
+                      >
+                        <span className="text-sm font-medium">{cat?.name || `Category #${catId}`}</span>
+                        {isSelected && <Check className="h-4 w-4 text-blue-500 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <button
+                disabled={cgBagSelectedCatIds.length === 0}
+                onClick={() => {
+                  if (!cgBagModalTemplate || cgBagSelectedCatIds.length === 0) return;
+                  const selectedCategoryNames = cgBagSelectedCatIds
+                    .map(id => categories.find(c => c.id === id)?.name || `Category #${id}`)
+                    .filter(Boolean) as string[];
+                  const cartItem: CgBagCartItem = {
+                    cartId: `cg-${cgBagModalTemplate.id}-${Date.now()}`,
+                    templateId: cgBagModalTemplate.id,
+                    templateName: cgBagModalTemplate.name,
+                    sellingPrice: Number(cgBagModalTemplate.sellingPrice),
+                    selectedCategoryIds: cgBagSelectedCatIds,
+                    categoryNames: selectedCategoryNames,
+                  };
+                  addCgBag(cartItem);
+                  setCgBagModalOpen(false);
+                  setCgBagModalTemplate(null);
+                  setCgBagSelectedCatIds([]);
+                  toast({ title: "Added to cart!", description: `${cgBagModalTemplate.name} — ${selectedCategoryNames.join(', ')}` });
+                }}
+                className="w-full py-2.5 rounded-lg font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {cgBagSelectedCatIds.length === 0 ? 'Select at least one category' : `Add to Cart — $${Number(cgBagModalTemplate.sellingPrice).toFixed(2)}`}
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       </div>
     </div>
   );

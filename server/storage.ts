@@ -4580,16 +4580,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createGrabBag(data: any): Promise<GrabBag> {
+    const isCg = data.type === 'customer_generated';
     const toInsert: any = {
       name: data.name,
+      type: isCg ? 'customer_generated' : 'standard',
       sellingPrice: data.sellingPrice,
       maxTotalItemPrice: data.maxTotalItemPrice,
       isActive: data.isActive !== false,
-      hideItems: data.hideItems === true,
+      // CG bags always hide items
+      hideItems: isCg ? true : (data.hideItems === true),
     };
     if (data.description) toInsert.description = data.description;
     if (data.specificProductIds != null) toInsert.specificProductIds = data.specificProductIds;
     if (data.categorySelections != null) toInsert.categorySelections = data.categorySelections;
+    if (data.allowedCategoryIds != null) toInsert.allowedCategoryIds = data.allowedCategoryIds;
     if (data.blacklistedProductIds != null) toInsert.blacklistedProductIds = data.blacklistedProductIds;
     const results = await retryQuery(() => db.insert(grabBags).values(toInsert).returning());
     return results[0];
@@ -4598,16 +4602,20 @@ export class DatabaseStorage implements IStorage {
   async updateGrabBag(id: number, data: any): Promise<GrabBag | undefined> {
     const existing = await retryQuery(() => db.select().from(grabBags).where(eq(grabBags.id, id)));
     if (!existing[0]) return undefined;
+    const isCg = (data.type ?? existing[0].type) === 'customer_generated';
     const toUpdate: any = { updatedAt: new Date() };
     if (data.name !== undefined) toUpdate.name = data.name;
     if (data.description !== undefined) toUpdate.description = data.description;
+    if (data.type !== undefined) toUpdate.type = data.type;
     if (data.sellingPrice !== undefined) toUpdate.sellingPrice = data.sellingPrice;
     if (data.maxTotalItemPrice !== undefined) toUpdate.maxTotalItemPrice = data.maxTotalItemPrice;
     if (data.specificProductIds !== undefined) toUpdate.specificProductIds = data.specificProductIds;
     if (data.categorySelections !== undefined) toUpdate.categorySelections = data.categorySelections;
+    if (data.allowedCategoryIds !== undefined) toUpdate.allowedCategoryIds = data.allowedCategoryIds;
     if (data.blacklistedProductIds !== undefined) toUpdate.blacklistedProductIds = data.blacklistedProductIds;
     if (data.isActive !== undefined) toUpdate.isActive = data.isActive;
-    if (data.hideItems !== undefined) toUpdate.hideItems = data.hideItems;
+    // CG bags always hide items regardless of what was sent
+    if (data.hideItems !== undefined) toUpdate.hideItems = isCg ? true : data.hideItems;
     const results = await retryQuery(() => db.update(grabBags).set(toUpdate).where(eq(grabBags.id, id)).returning());
     return results[0];
   }

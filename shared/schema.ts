@@ -780,10 +780,12 @@ export const grabBags = pgTable("grab_bags", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
   description: text("description"),
+  type: varchar("type").notNull().default("standard"), // 'standard' | 'customer_generated'
   sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }).notNull(),
   maxTotalItemPrice: decimal("max_total_item_price", { precision: 10, scale: 2 }).notNull(),
   specificProductIds: text("specific_product_ids"), // JSON array of product IDs always included
   categorySelections: text("category_selections"), // JSON array of { categoryId, count }
+  allowedCategoryIds: text("allowed_category_ids"), // JSON array of category IDs customers can choose from (CG bags)
   blacklistedProductIds: text("blacklisted_product_ids"), // JSON array of product IDs never picked from category selections
   hideItems: boolean("hide_items").notNull().default(false), // hide item list from customers
   isActive: boolean("is_active").notNull().default(true),
