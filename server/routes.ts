@@ -1262,36 +1262,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          // Build a synthetic bag using the selected category IDs (1 item per category).
-          // Use sellingPrice as the maxTotalItemPrice so pickGrabBagItems targets items
-          // worth up to that amount; multiply by 1.5 so the budget per category isn't so
-          // tight that reasonable items get filtered out.
+          // Custom CG bag picker: pick 1 item per selected category with NO per-item
+          // price ceiling.  pickGrabBagItems divides the budget across slots which
+          // makes per-slot ceilings too tight, causing perfectly good items to be
+          // filtered out.  Instead we pick directly: random eligible product per cat.
           const cgSellingPrice = parseFloat(String(template.sellingPrice)) || 0;
-          const syntheticBag = {
-            ...template,
-            specificProductIds: null,
-            categorySelections: JSON.stringify(
-              cgBagReq.selectedCategoryIds.map((catId: number) => ({ categoryId: catId, count: 1 }))
-            ),
-            hideItems: true,
-            maxTotalItemPrice: String(cgSellingPrice * 1.5 || 999),
-          };
 
-          const { selectedProducts, warnings: bagWarnings, error: bagError } = await pickGrabBagItems(syntheticBag);
-          if (bagError || selectedProducts.length === 0) {
-            stockErrors.push(`Could not assemble bag "${template.name}": ${bagError || 'No products could be found for the selected categories.'}`);
+          type CgPickedItem = { id: number; name: string; price: number; sku: string };
+          const cgPicked: CgPickedItem[] = [];
+          const cgPickedIds = new Set<number>();
+
+          for (const catId of cgBagReq.selectedCategoryIds) {
+            try {
+              const catProducts = await storage.getProducts({ categoryIds: [catId], isActive: true });
+              const eligible = catProducts.filter(p => {
+                if (cgPickedIds.has(p.id)) return false;
+                if ((p.sku ?? '').startsWith('GRAB-BAG-')) return false;
+                const hasStock = ((p.stock ?? 0) > 0) || ((p.physicalInventory ?? 0) > 0);
+                const price = parseFloat(String(p.price ?? '')) || 0;
+                return hasStock && price > 0;
+              });
+              if (eligible.length === 0) continue;
+              // Pick a random eligible product
+              const pick = eligible[Math.floor(Math.random() * eligible.length)];
+              cgPicked.push({ id: pick.id, name: pick.name, price: parseFloat(String(pick.price)), sku: pick.sku ?? '' });
+              cgPickedIds.add(pick.id);
+            } catch (catErr) {
+              console.warn(`[createOrder] CG bag category ${catId} fetch error:`, catErr);
+            }
+          }
+
+          if (cgPicked.length === 0) {
+            stockErrors.push(`Could not assemble bag "${template.name}": no products with stock found in the selected categories.`);
             continue;
           }
 
-          const sellingPrice = parseFloat(String(template.sellingPrice));
-          const retailTotal = selectedProducts.reduce((s, p) => s + p.price, 0);
-          const discount = sellingPrice - retailTotal;
+          const retailTotal = cgPicked.reduce((s, p) => s + p.price, 0);
+          // discount is negative when items retail > selling price (customer savings)
+          const discount = cgSellingPrice - retailTotal;
 
-          for (const p of selectedProducts) {
+          for (const p of cgPicked) {
             finalItems.push({
               productId: p.id,
               productName: p.name,
-              productSku: p.sku ?? undefined,
+              productSku: p.sku || undefined,
               productPrice: p.price.toFixed(2),
               quantity: 1,
               subtotal: p.price.toFixed(2),
@@ -1300,25 +1314,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
 
+          // Discount line: only add when the retail value differs from selling price
           if (discount < -0.001) {
-            // Items retail value exceeds selling price — true customer savings
+            // Items retail exceeds selling price — customer savings (negative line)
             finalItems.push({
               productId: null,
               productName: `🎁 Grab Bag Discount — ${template.name}`,
               productSku: "GRAB-BAG-DISCOUNT",
-              productPrice: discount.toFixed(2), // negative number
+              productPrice: discount.toFixed(2), // negative
               quantity: 1,
               subtotal: discount.toFixed(2),
               fulfilled: true,
               removed: false,
             });
           } else if (discount > 0.001) {
-            // Items retail value less than selling price — balance line to reconcile order total
+            // Fewer items than selling price (stock shortage) — balance line
             finalItems.push({
               productId: null,
               productName: `🎁 Custom Bag Balance — ${template.name}`,
               productSku: "GRAB-BAG-DISCOUNT",
-              productPrice: discount.toFixed(2), // positive number
+              productPrice: discount.toFixed(2), // positive
               quantity: 1,
               subtotal: discount.toFixed(2),
               fulfilled: true,
@@ -1327,7 +1342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Deduct stock for each picked component
-          for (const p of selectedProducts) {
+          for (const p of cgPicked) {
             try {
               await db.execute(sql`UPDATE products SET stock = GREATEST(0, stock - 1), updated_at = NOW() WHERE id = ${p.id}`);
             } catch (err) {
