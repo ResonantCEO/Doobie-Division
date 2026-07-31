@@ -2156,8 +2156,8 @@ export default function AdminPage() {
                     </div>
                     <Switch
                       checked={globalWeightPricingEnabled}
-                      onCheckedChange={(enabled) => toggleGlobalWeightPricingMutation.mutate(enabled)}
-                      disabled={isLoadingWeightPricing || toggleGlobalWeightPricingMutation.isPending}
+                      onCheckedChange={(enabled) => toggleWeightPricingMutation.mutate(enabled)}
+                      disabled={isLoadingWeightPricing || toggleWeightPricingMutation.isPending}
                       className="mt-1 shrink-0"
                     />
                   </div>
