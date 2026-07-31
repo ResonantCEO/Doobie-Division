@@ -559,14 +559,14 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                 {/* Stock / Physical — mini table matching desktop layout */}
                 <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 text-xs">
                   {/* Table header */}
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 mb-1">
+                  <div className="grid grid-cols-[1fr_72px_72px] mb-1">
                     <span className="font-semibold text-gray-400 uppercase tracking-wide text-[10px]">Stock / Physical</span>
                     <span className="font-semibold text-gray-400 uppercase tracking-wide text-[10px] text-right">Stock</span>
                     <span className="font-semibold text-gray-400 uppercase tracking-wide text-[10px] text-right">Physical</span>
                   </div>
 
                   {/* Totals row */}
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 py-0.5">
+                  <div className="grid grid-cols-[1fr_72px_72px] py-0.5">
                     <span className="font-semibold text-white flex items-center gap-1">
                       Total
                       {hasVariance && (
@@ -587,7 +587,7 @@ export default function InventoryTable({ products, user, selectedProducts, onSel
                   {hasSizes && [...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map((size) => {
                     const sizeVariance = (size.physicalQuantity || 0) - size.quantity;
                     return (
-                      <div key={size.id} className="grid grid-cols-[1fr_auto_auto] gap-x-4 py-0.5">
+                      <div key={size.id} className="grid grid-cols-[1fr_72px_72px] py-0.5">
                         <span className={`${sizeVariance !== 0 ? "text-orange-500" : "text-gray-300"}`}>
                           {size.size}:
                         </span>
