@@ -990,14 +990,14 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
                       />
                     ) : (
                       <Select
-                        value={order.status}
+                        value={activeTab === "archived" ? "archived" : order.status}
                         onValueChange={(value) => handleStatusOrArchive(order.id, value)}
                       >
                         <SelectTrigger className="flex-1 h-8 bg-gray-700 dark:bg-gray-700 text-white dark:text-gray-100 border-gray-600 dark:border-gray-600 hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {activeTab === "shipped" ? (
+                          {(activeTab === "shipped" || activeTab === "archived") ? (
                             <>
                               <SelectItem value="pending">New Order</SelectItem>
                               <SelectItem value="packed">Packed</SelectItem>
@@ -1198,14 +1198,14 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
                           />
                         ) : (
                           <Select
-                            value={order.status}
+                            value={activeTab === "archived" ? "archived" : order.status}
                             onValueChange={(value) => handleStatusOrArchive(order.id, value)}
                           >
                             <SelectTrigger className="w-32 h-8 bg-gray-700 text-white border-gray-600 hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {activeTab === "shipped" ? (
+                              {(activeTab === "shipped" || activeTab === "archived") ? (
                                 <>
                                   <SelectItem value="pending">New Order</SelectItem>
                                   <SelectItem value="packed">Packed</SelectItem>

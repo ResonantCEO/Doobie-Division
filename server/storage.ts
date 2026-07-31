@@ -2011,6 +2011,7 @@ export class DatabaseStorage implements IStorage {
           .update(orders)
           .set({
             status,
+            archived: false,
             updatedAt: new Date()
           })
           .where(eq(orders.id, orderId))
