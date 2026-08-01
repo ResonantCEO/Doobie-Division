@@ -769,15 +769,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const newStock = anyUnavailable ? 0 : (isFinite(minStock) ? minStock : 0);
-        const newActive = newStock > 0;
         const currentStock = bag.stock ?? 0;
 
-        if (newStock !== currentStock || !!bag.isActive !== newActive) {
+        if (newStock !== currentStock) {
           await rawPool.query(
-            `UPDATE products SET stock = $1, physical_inventory = GREATEST(physical_inventory, $1), is_active = $2, updated_at = NOW() WHERE id = $3`,
-            [newStock, newActive, bag.id]
+            `UPDATE products SET stock = $1, physical_inventory = GREATEST(physical_inventory, $1), updated_at = NOW() WHERE id = $2`,
+            [newStock, bag.id]
           );
-          console.log(`[syncGrabBagAvailability] Bag #${bag.id} (${bag.name}): stock ${currentStock} → ${newStock}, active: ${newActive}`);
+          console.log(`[syncGrabBagAvailability] Bag #${bag.id} (${bag.name}): stock ${currentStock} → ${newStock}`);
         }
       }
 
