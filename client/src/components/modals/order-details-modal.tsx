@@ -1540,13 +1540,16 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                         <div className="flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className={`font-medium text-sm ${isRemoved ? "line-through text-red-500 dark:text-red-400" : "text-gray-900 dark:text-gray-100"}`}>
-                              {item.productName || item.product_name || "Unknown Product"}
+                              {(() => {
+                                const name = item.productName || item.product_name || "Unknown Product";
+                                const size = item.size || (item as any).size;
+                                const formatted = name.replace("(Size:", "(Option:");
+                                if (size && !name.includes("(Size:") && !name.includes("(Option:")) {
+                                  return `${formatted} (Option: ${size})`;
+                                }
+                                return formatted;
+                              })()}
                             </h4>
-                            {(item.size || (item as any).size) && (
-                              <Badge className="text-xs py-0 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-300 dark:border-blue-700 font-medium">
-                                {item.size || (item as any).size}
-                              </Badge>
-                            )}
                             {isRemoved && (
                               <Badge variant="destructive" className="text-xs py-0">
                                 <Trash2 className="h-2.5 w-2.5 mr-1" />Removed

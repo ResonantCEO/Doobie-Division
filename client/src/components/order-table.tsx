@@ -241,10 +241,10 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                     />
                   )}
                   <div>
-                    <span className={`font-medium ${fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>{formatOrderItemName(item.productName)}</span>
-                    {(item as any).size && (
-                      <span className="ml-2 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">{(item as any).size}</span>
-                    )}
+                    <span className={`font-medium ${fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
+                      {formatOrderItemName(item.productName)}
+                      {(item as any).size && !(item.productName || '').includes('(Size:') && !(item.productName || '').includes('(Option:') && ` (Option: ${(item as any).size})`}
+                    </span>
                     {item.productSku && (
                       <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">SKU: {item.productSku}</span>
                     )}
@@ -464,9 +464,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
           <div className="flex-1 min-w-0">
             <div className={`font-medium text-sm ${fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
               {formatOrderItemName(item.productName)}
-              {(item as any).size && (
-                <span className="ml-2 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">{(item as any).size}</span>
-              )}
+              {(item as any).size && !(item.productName || '').includes('(Size:') && !(item.productName || '').includes('(Option:') && ` (Option: ${(item as any).size})`}
               {fulfilled && <span className="ml-1 text-xs">(Fulfilled)</span>}
             </div>
             {item.productSku && (
