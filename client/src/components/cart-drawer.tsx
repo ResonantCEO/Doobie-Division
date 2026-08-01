@@ -238,35 +238,55 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       const stockValidation = await Promise.all(
         state.items.map(async (item) => {
           const response = await fetch(`/api/products/${item.product.id}`);
-          if (!response.ok) throw new Error('Failed to check stock');
+
+          // Product no longer exists — stale cart item
+          if (response.status === 404) {
+            return { item, product: null, hasStock: false, notFound: true };
+          }
+
+          if (!response.ok) throw new Error(`Failed to check stock for ${item.product.name}`);
           const product = await response.json();
           
+          // Grab bag products: treat as available if product.isActive is true and stock > 0
+          const isGrabBag = (product.sku ?? '').startsWith('GRAB-BAG-');
+
           // Check stock per size if item has a size
           let hasStock = false;
           if (item.size && product.sizes && product.sizes.length > 0) {
             const sizeData = product.sizes.find((s: any) => s.size === item.size);
             hasStock = sizeData ? sizeData.quantity >= item.quantity : false;
+          } else if (isGrabBag) {
+            hasStock = product.isActive === true && (product.stock ?? 0) >= item.quantity;
           } else {
-            hasStock = product.stock >= item.quantity;
+            hasStock = (product.stock ?? 0) >= item.quantity;
           }
           
-          return {
-            item,
-            product,
-            hasStock
-          };
+          return { item, product, hasStock, notFound: false };
         })
       );
 
-      const outOfStockItems = stockValidation.filter(v => !v.hasStock);
+      // Handle stale (deleted) products — remove them and inform the user
+      const notFoundItems = stockValidation.filter(v => v.notFound);
+      if (notFoundItems.length > 0) {
+        notFoundItems.forEach(v => removeItem(v.item.product.id, v.item.size, v.item.isFree));
+        toast({
+          title: "Cart updated",
+          description: `${notFoundItems.map(v => v.item.product.name).join(', ')} ${notFoundItems.length === 1 ? 'is' : 'are'} no longer available and ${notFoundItems.length === 1 ? 'has' : 'have'} been removed from your cart.`,
+          variant: "destructive",
+        });
+        setIsCheckingOut(false);
+        return;
+      }
+
+      const outOfStockItems = stockValidation.filter(v => !v.hasStock && !v.notFound);
 
       if (outOfStockItems.length > 0) {
         const itemNames = outOfStockItems.map(v => {
           const name = v.item.product.name;
           const size = v.item.size ? ` (${v.item.size})` : '';
-          const available = v.item.size && v.product.sizes
+          const available = v.item.size && v.product?.sizes
             ? (() => { const s = v.product.sizes.find((s: any) => s.size === v.item.size); return s ? s.quantity : 0; })()
-            : v.product.stock;
+            : (v.product?.stock ?? 0);
           return `${name}${size} (only ${available} available)`;
         });
         toast({
@@ -283,9 +303,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       setIsCheckingOut(false); // Reset checkout state when opening confirmation
 
     } catch (error) {
+      console.error('[handleCheckout] Stock validation error:', error);
       toast({
         title: "Error",
-        description: "Failed to validate stock. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to validate stock. Please try again.",
         variant: "destructive",
       });
       setIsCheckingOut(false);
