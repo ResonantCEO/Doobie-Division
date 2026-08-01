@@ -351,6 +351,7 @@ function openInboundDocument() {
 }
 
 export default function InventoryPage() {
+  const [activeSection, setActiveSection] = useState<'inventory' | 'bags' | 'discounts'>('inventory');
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -605,17 +606,32 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="inventory">
-        <TabsList className="mb-4">
-          <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          <TabsTrigger value="bags">Bags</TabsTrigger>
-          <TabsTrigger value="discounts">Discounts</TabsTrigger>
-        </TabsList>
+      {/* Section title switcher */}
+      <div className="flex items-baseline gap-4 flex-wrap">
+        <button
+          onClick={() => setActiveSection('inventory')}
+          className={`text-xl sm:text-2xl font-bold transition-colors ${activeSection === 'inventory' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70'}`}
+        >
+          Inventory Management
+        </button>
+        <button
+          onClick={() => setActiveSection('bags')}
+          className={`text-xl sm:text-2xl font-bold transition-colors ${activeSection === 'bags' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70'}`}
+        >
+          Bags
+        </button>
+        <button
+          onClick={() => setActiveSection('discounts')}
+          className={`text-xl sm:text-2xl font-bold transition-colors ${activeSection === 'discounts' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70'}`}
+        >
+          Discounts
+        </button>
+      </div>
 
-        <TabsContent value="inventory">
+      {activeSection === 'inventory' && (
+      <div className="space-y-6">
       {/* Header */}
       <div className="space-y-4">
-        <h2 className="text-xl sm:text-2xl font-bold text-foreground">Inventory Management</h2>
         
         {/* Mobile-first button layout */}
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-3">
@@ -874,16 +890,11 @@ export default function InventoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-        </TabsContent>
+      </div>
+      )}
 
-        <TabsContent value="bags">
-          <BagsTab />
-        </TabsContent>
-
-        <TabsContent value="discounts">
-          <DiscountsTab />
-        </TabsContent>
-      </Tabs>
+      {activeSection === 'bags' && <BagsTab />}
+      {activeSection === 'discounts' && <DiscountsTab />}
     </div>
   );
 }
