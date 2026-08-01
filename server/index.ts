@@ -307,12 +307,14 @@ app.use((req, res, next) => {
     console.warn("⚠ Could not verify grab_bags table:", error?.message);
   }
 
-  // Ensure order_items.size and order_items.metadata columns exist
+  // Ensure order_items columns added after initial schema exist
   try {
     const { sql } = await import("./db");
     await sql.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS size VARCHAR`);
     await sql.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS metadata JSONB`);
-    console.log("✓ Verified order_items.size and order_items.metadata columns exist");
+    await sql.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS removed BOOLEAN DEFAULT false`);
+    await sql.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS substituted_for_item_id INTEGER`);
+    console.log("✓ Verified order_items columns exist (size, metadata, removed, substituted_for_item_id)");
   } catch (error: any) {
     console.warn("⚠ Could not verify order_items columns:", error?.message);
   }
