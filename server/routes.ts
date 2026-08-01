@@ -1430,10 +1430,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Deduct stock for CG bag components (done here, after order is confirmed, to avoid
-      // createOrder's stock re-check seeing 0 and failing)
+      // createOrder's stock re-check seeing 0 and failing).
+      // We decrement BOTH stock and physical_inventory here so admins immediately see
+      // the committed inventory. fulfillOrderItem skips the physicalInventory decrement
+      // for fromCgBag items to avoid double-deducting.
       for (const { productId, qty } of cgStockDeductions) {
         try {
-          await db.execute(sql`UPDATE products SET stock = GREATEST(0, stock - ${qty}), updated_at = NOW() WHERE id = ${productId}`);
+          await db.execute(
+            sql`UPDATE products SET stock = GREATEST(0, stock - ${qty}), physical_inventory = GREATEST(0, physical_inventory - ${qty}), updated_at = NOW() WHERE id = ${productId}`
+          );
         } catch (err) {
           console.warn("[createOrder] Failed to deduct CG bag component stock:", err);
         }

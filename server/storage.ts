@@ -2132,10 +2132,14 @@ export class DatabaseStorage implements IStorage {
       physicalDelta = quantity * gramEquivalent;
     }
 
+    // CG bag items have physicalInventory decremented at order-creation time (in routes.ts),
+    // not at fulfillment — skip the decrement here to avoid double-deducting.
+    const isCgBagItem = !!(orderItem as any).metadata?.fromCgBag;
+
     const currentPhysicalInventory = product.physicalInventory || 0;
     const newPhysicalInventory = currentPhysicalInventory - physicalDelta;
 
-    if (newPhysicalInventory < 0) {
+    if (!isCgBagItem && newPhysicalInventory < 0) {
       throw new Error("Insufficient physical inventory");
     }
 
@@ -2143,14 +2147,17 @@ export class DatabaseStorage implements IStorage {
     const newPhysicalInventoryInt = Math.round(newPhysicalInventory);
     const physicalDeltaInt = Math.round(physicalDelta);
 
-    // Update only physical inventory (stock is reduced when order is placed, not when fulfilled)
-    await db
-      .update(products)
-      .set({
-        physicalInventory: newPhysicalInventoryInt,
-        updatedAt: new Date()
-      })
-      .where(eq(products.id, productId));
+    // Update physical inventory only for non-CG-bag items; CG bag items already had
+    // physicalInventory decremented when the order was placed.
+    if (!isCgBagItem) {
+      await db
+        .update(products)
+        .set({
+          physicalInventory: newPhysicalInventoryInt,
+          updatedAt: new Date()
+        })
+        .where(eq(products.id, productId));
+    }
 
     // Mark the specific order item as fulfilled
     const fulfillFilter = orderItemId
@@ -2162,10 +2169,10 @@ export class DatabaseStorage implements IStorage {
       .set({ fulfilled: true })
       .where(fulfillFilter);
 
-    // Update per-size physical quantity if applicable.
+    // Update per-size physical quantity if applicable (non-CG-bag only — same reason).
     // Prefer the dedicated size column on the order item; fall back to parsing the product name.
     const sizeName = (orderItem as any).size || this.extractSizeFromProductName(orderItem.productName);
-    if (sizeName) {
+    if (!isCgBagItem && sizeName) {
       await db.execute(
         sql`UPDATE product_sizes SET physical_quantity = physical_quantity - ${physicalDeltaInt}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
       );
@@ -2176,10 +2183,12 @@ export class DatabaseStorage implements IStorage {
       productId,
       userId,
       type: 'physical_out',
-      quantity: -physicalDeltaInt,
+      quantity: isCgBagItem ? 0 : -physicalDeltaInt,
       previousStock: Math.round(currentPhysicalInventory),
-      newStock: newPhysicalInventoryInt,
-      reason: `Order fulfillment - Order #${orderId} (Physical inventory reduced)`,
+      newStock: isCgBagItem ? Math.round(currentPhysicalInventory) : newPhysicalInventoryInt,
+      reason: isCgBagItem
+        ? `Order fulfillment - Order #${orderId} (CG bag — inventory pre-deducted at order time)`
+        : `Order fulfillment - Order #${orderId} (Physical inventory reduced)`,
       createdAt: new Date()
     });
   }
