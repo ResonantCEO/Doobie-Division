@@ -21,6 +21,8 @@ import BulkQRModal from "@/components/modals/bulk-qr-modal";
 import PriceTemplatesModal from "@/components/modals/price-templates-modal";
 import { Plus, QrCode, AlertTriangle, Settings, FileText, Download } from "lucide-react";
 import type { Product, Category, ProductSize } from "@shared/schema";
+import BagsTab from "@/components/BagsTab";
+import DiscountsTab from "@/components/DiscountsTab";
 
 function openInventoryPrintSheet(
   products: (Product & { category: Category | null; sizes?: ProductSize[] })[]
@@ -603,6 +605,14 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
+      <Tabs defaultValue="inventory">
+        <TabsList className="mb-4">
+          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="bags">Bags</TabsTrigger>
+          <TabsTrigger value="discounts">Discounts</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="inventory">
       {/* Header */}
       <div className="space-y-4">
         <h2 className="text-xl sm:text-2xl font-bold text-foreground">Inventory Management</h2>
@@ -864,6 +874,16 @@ export default function InventoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="bags">
+          <BagsTab />
+        </TabsContent>
+
+        <TabsContent value="discounts">
+          <DiscountsTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
