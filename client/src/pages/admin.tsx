@@ -162,13 +162,16 @@ function GenBagProductsList({
                   <div className="space-y-1.5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Contents</p>
                     {items.map((item, idx) => {
-                      // Prefer SKU lookup so size-variants resolve to the right child product
-                      const liveProduct = (item.sku ? allProducts.find(p => p.sku === item.sku) : undefined)
-                        ?? (item.productId ? allProducts.find(p => p.id === item.productId) : undefined);
-                      const stock = liveProduct?.stock ?? null;
-                      const physical = (liveProduct as any)?.physicalInventory ?? null;
-                      const stockLow = stock !== null && stock <= ((liveProduct as any)?.minStockThreshold ?? 0);
-                      const stockOut = stock === 0;
+                      const liveProduct = item.productId ? allProducts.find(p => p.id === item.productId) : undefined;
+                      // For sized products, use the specific size's quantity; fall back to product-level stock
+                      const sizeEntry = liveProduct?.sizes && item.selectedSize
+                        ? liveProduct.sizes.find((s: any) => s.size === item.selectedSize)
+                        : null;
+                      const stock = sizeEntry != null ? (sizeEntry.quantity ?? 0) : (liveProduct?.stock ?? null);
+                      const physical = sizeEntry != null ? (sizeEntry.physicalQuantity ?? null) : ((liveProduct as any)?.physicalInventory ?? null);
+                      const threshold = (liveProduct as any)?.minStockThreshold ?? 0;
+                      const stockLow = stock !== null && stock > 0 && stock <= threshold;
+                      const stockOut = stock !== null && stock <= 0;
                       return (
                         <div key={idx} className="flex items-center justify-between text-sm gap-2">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
