@@ -96,7 +96,7 @@ function GenBagProductsList({
           <div key={bag.id} className="border rounded-lg dark:border-gray-700 overflow-hidden">
             {/* Row */}
             <div className="flex items-center gap-3 p-3">
-              <div className={`p-2 rounded-md shrink-0 ${bag.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+              <div className="p-2 rounded-md shrink-0 bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                 <ShoppingBag className="h-4 w-4" />
               </div>
 
@@ -111,7 +111,7 @@ function GenBagProductsList({
                   )}
                 </div>
                 <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
-                  <span className="font-semibold text-green-600 dark:text-green-400">${Number(bag.price).toFixed(2)}</span>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100">${Number(bag.price).toFixed(2)}</span>
                   <span>{bag.stock ?? 0} in stock</span>
                   {templateName && <span className="text-gray-400">from template: {templateName}</span>}
                   <span className="font-mono text-gray-300 dark:text-gray-600">{bag.sku}</span>
@@ -155,7 +155,7 @@ function GenBagProductsList({
                       return (
                         <div key={idx} className="flex items-center justify-between text-sm gap-2">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className="w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs flex items-center justify-center font-semibold shrink-0">
+                            <span className="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs flex items-center justify-center font-semibold shrink-0">
                               {idx + 1}
                             </span>
                             <span className="font-medium truncate">{item.name}</span>
@@ -165,13 +165,13 @@ function GenBagProductsList({
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
                             {stock !== null && (
-                              <span className={`text-xs font-medium ${(stock <= 0) ? 'text-red-500 dark:text-red-400' : stockLow ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                              <span className={`text-xs font-medium ${(stock <= 0) ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                 {stock} stock
                                 {physical !== null && <span className="text-gray-400 dark:text-gray-500"> / {physical} physical</span>}
                               </span>
                             )}
                             {item.price && (
-                              <span className="text-xs font-semibold text-green-600 dark:text-green-400">
+                              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                                 ${Number(item.price).toFixed(2)}
                               </span>
                             )}
@@ -2603,7 +2603,7 @@ export default function AdminPage() {
                         return (
                           <div key={bag.id} className="flex items-start justify-between p-4 border rounded-lg dark:border-gray-700">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
-                              <div className={`mt-0.5 p-2 rounded-md shrink-0 ${bag.isActive ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                              <div className="mt-0.5 p-2 rounded-md shrink-0 bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                                 <ShoppingBag className="h-4 w-4" />
                               </div>
                               <div className="flex-1 min-w-0">
@@ -2611,11 +2611,11 @@ export default function AdminPage() {
                                   <span className="font-semibold text-sm">{bag.name}</span>
                                   <Badge variant={bag.isActive ? "default" : "secondary"} className="text-xs">{bag.isActive ? 'Active' : 'Inactive'}</Badge>
                                   {(bag as any).type === 'customer_generated'
-                                    ? <Badge variant="outline" className="text-xs text-blue-600 border-blue-400 dark:text-blue-400">Customer Generated</Badge>
-                                    : <Badge variant="outline" className="text-xs text-purple-600 border-purple-400 dark:text-purple-400">Standard</Badge>
+                                    ? <Badge variant="secondary" className="text-xs">Customer Generated</Badge>
+                                    : <Badge variant="secondary" className="text-xs">Standard</Badge>
                                   }
-                                  <Badge variant="outline" className="text-xs text-green-700 border-green-400 dark:text-green-400">Sells for ${Number(bag.sellingPrice).toFixed(2)}</Badge>
-                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">Target value ${Number(bag.maxTotalItemPrice).toFixed(2)}</Badge>
+                                  <Badge variant="secondary" className="text-xs">Sells for ${Number(bag.sellingPrice).toFixed(2)}</Badge>
+                                  <Badge variant="secondary" className="text-xs">Target ${Number(bag.maxTotalItemPrice).toFixed(2)}</Badge>
                                 </div>
                                 {bag.description && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 truncate">{bag.description}</p>}
                                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
@@ -2636,7 +2636,7 @@ export default function AdminPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="text-purple-600 border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                                  className="text-gray-700 border-gray-400 hover:bg-gray-50 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-800"
                                   onClick={() => generateGrabBagMutation.mutate(bag.id)}
                                   disabled={generateGrabBagMutation.isPending}
                                 >
