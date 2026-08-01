@@ -162,7 +162,9 @@ function GenBagProductsList({
                   <div className="space-y-1.5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Contents</p>
                     {items.map((item, idx) => {
-                      const liveProduct = item.productId ? allProducts.find(p => p.id === item.productId) : undefined;
+                      // Prefer SKU lookup so size-variants resolve to the right child product
+                      const liveProduct = (item.sku ? allProducts.find(p => p.sku === item.sku) : undefined)
+                        ?? (item.productId ? allProducts.find(p => p.id === item.productId) : undefined);
                       const stock = liveProduct?.stock ?? null;
                       const physical = (liveProduct as any)?.physicalInventory ?? null;
                       const stockLow = stock !== null && stock <= ((liveProduct as any)?.minStockThreshold ?? 0);
