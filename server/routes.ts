@@ -1437,21 +1437,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // decrement for fromCgBag items to avoid double-deducting.
       for (const { productId, qty } of cgStockDeductions) {
         try {
-          // Product-level deduction
+          // Product-level: reduce stock (prevents overselling); physical_inventory is
+          // reduced later when the admin fulfils the item.
           await db.execute(
-            sql`UPDATE products SET stock = GREATEST(0, stock - ${qty}), physical_inventory = GREATEST(0, physical_inventory - ${qty}), updated_at = NOW() WHERE id = ${productId}`
+            sql`UPDATE products SET stock = GREATEST(0, stock - ${qty}), updated_at = NOW() WHERE id = ${productId}`
           );
-          // Size-variant deduction: pick the size with the most physical stock and
-          // reserve from it so the inventory manager totals drop immediately.
-          // The admin picks the actual flavour at pack time; fulfillOrderItem then
-          // skips the physicalInventory decrement for CG bag items (already done here).
+          // Size-variant: deduct from the most-stocked size's quantity so inventory
+          // manager totals reflect the reservation. physical_quantity is left alone
+          // here and decremented at fulfilment time via fulfillOrderItem.
           const sizeResult = await db.execute(
-            sql`SELECT size, quantity, physical_quantity FROM product_sizes WHERE product_id = ${productId} AND COALESCE(physical_quantity, quantity) > 0 ORDER BY COALESCE(physical_quantity, quantity) DESC LIMIT 1`
+            sql`SELECT size, quantity FROM product_sizes WHERE product_id = ${productId} AND quantity > 0 ORDER BY quantity DESC LIMIT 1`
           );
           const topSize = sizeResult?.rows?.[0] as any;
           if (topSize?.size) {
             await db.execute(
-              sql`UPDATE product_sizes SET quantity = GREATEST(0, quantity - ${qty}), physical_quantity = GREATEST(0, COALESCE(physical_quantity, quantity) - ${qty}), updated_at = NOW() WHERE product_id = ${productId} AND size = ${topSize.size}`
+              sql`UPDATE product_sizes SET quantity = GREATEST(0, quantity - ${qty}), updated_at = NOW() WHERE product_id = ${productId} AND size = ${topSize.size}`
             );
           }
         } catch (err) {
