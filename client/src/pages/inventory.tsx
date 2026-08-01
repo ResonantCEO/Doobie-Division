@@ -604,29 +604,38 @@ export default function InventoryPage() {
 
   console.log('Rendering with products:', products.length);
 
+  const sections = [
+    { key: 'inventory', label: 'Inventory' },
+    { key: 'bags', label: 'Bags' },
+    { key: 'discounts', label: 'Discounts' },
+  ] as const;
+
   return (
-    <div className="space-y-6">
-      {/* Section title switcher */}
-      <div className="flex items-baseline gap-4 flex-wrap">
-        <button
-          onClick={() => setActiveSection('inventory')}
-          className={`text-xl sm:text-2xl font-bold transition-colors ${activeSection === 'inventory' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70'}`}
-        >
-          Inventory Management
-        </button>
-        <button
-          onClick={() => setActiveSection('bags')}
-          className={`text-xl sm:text-2xl font-bold transition-colors ${activeSection === 'bags' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70'}`}
-        >
-          Bags
-        </button>
-        <button
-          onClick={() => setActiveSection('discounts')}
-          className={`text-xl sm:text-2xl font-bold transition-colors ${activeSection === 'discounts' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70'}`}
-        >
-          Discounts
-        </button>
+    <div>
+      {/* Folder tabs */}
+      <div className="flex items-end gap-0.5 px-0">
+        {sections.map(({ key, label }) => {
+          const isActive = activeSection === key;
+          return (
+            <button
+              key={key}
+              onClick={() => setActiveSection(key)}
+              className={`
+                relative px-5 py-2.5 text-sm font-semibold rounded-t-lg border transition-all select-none
+                ${isActive
+                  ? 'bg-background border-border border-b-background text-foreground z-10 -mb-px pb-[calc(0.625rem+1px)]'
+                  : 'bg-muted/40 border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/70'
+                }
+              `}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
+
+      {/* Content panel with top border that the active tab breaks */}
+      <div className="border border-border rounded-b-lg rounded-tr-lg bg-background p-5 space-y-6">
 
       {activeSection === 'inventory' && (
       <div className="space-y-6">
@@ -895,6 +904,8 @@ export default function InventoryPage() {
 
       {activeSection === 'bags' && <BagsTab />}
       {activeSection === 'discounts' && <DiscountsTab />}
+
+      </div>{/* end content panel */}
     </div>
   );
 }
