@@ -1320,38 +1320,66 @@ export default function StorefrontPage() {
               if (parentCategoryId === 'byb') {
                 return (
                   <div key="build-your-bag" className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Gift className="h-6 w-6 text-blue-500" />
+                    <div className="flex items-center justify-between">
                       <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Build Your Bag</h3>
                     </div>
-                    <p className="text-sm text-muted-foreground">Pick your categories and we'll put together a mystery bag just for you.</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                       {cgTemplates.map((template) => (
-                        <div
-                          key={template.id}
-                          className="rounded-xl border bg-card shadow-sm p-5 flex flex-col gap-3 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
-                          onClick={() => {
-                            setCgBagModalTemplate(template);
-                            setCgBagSelectedCatIds([]);
-                            setCgBagModalOpen(true);
-                          }}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="p-2.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                              <Gift className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        <div key={template.id} className="product-card-mobile-grid sm:product-card-container">
+                          {/* Card styled to match ProductCard front face */}
+                          <div
+                            className="w-full h-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-premium hover:shadow-premium-hover transition-all duration-500 ease-out flex flex-col rounded-2xl overflow-hidden cursor-pointer"
+                            onClick={() => {
+                              setCgBagModalTemplate(template);
+                              setCgBagSelectedCatIds([]);
+                              setCgBagModalOpen(true);
+                            }}
+                          >
+                            {/* Image — same 42% proportion as product cards */}
+                            <div className="w-full h-[42%] overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 rounded-t-2xl relative">
+                              <img
+                                src="/cg-bag-image.png"
+                                alt={template.name}
+                                className="absolute inset-0 w-full h-full object-cover object-center hover:scale-105 transition-transform duration-500"
+                              />
                             </div>
-                            <div>
-                              <h4 className="font-semibold text-base">{template.name}</h4>
-                              {template.description && <p className="text-xs text-muted-foreground mt-0.5">{template.description}</p>}
+
+                            {/* Content — mirrors CardContent layout */}
+                            <div className="pt-2 pb-3 px-3 sm:pt-2 sm:pb-4 sm:px-4 bg-white dark:bg-gray-900 flex flex-col flex-1 min-h-0 overflow-hidden rounded-b-2xl">
+                              <div className="text-center flex-shrink-0">
+                                <h4
+                                  className="text-base sm:text-lg text-purple-600 dark:text-purple-400 line-clamp-2 mb-0.5 uppercase tracking-wide"
+                                  style={{ fontFamily: '"Fredoka One", "Bungee", "Chewy", "Modak", cursive, sans-serif' }}
+                                >
+                                  {template.name}
+                                </h4>
+                                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide mt-0.5">Build Your Bag</p>
+                              </div>
+
+                              <div className="flex-1 min-h-0" />
+
+                              <div className="space-y-1.5 sm:space-y-2 flex-shrink-0 mt-auto">
+                                <div className="text-center space-y-0.5">
+                                  <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                                    ${Number(template.sellingPrice).toFixed(2)}
+                                  </span>
+                                  <p className="text-xs text-muted-foreground">
+                                    Target up to ${Number(template.maxTotalItemPrice).toFixed(2)}
+                                  </p>
+                                </div>
+                                <button
+                                  className="w-full font-semibold py-2 text-xs sm:text-sm transition-all duration-300 bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg rounded-md transform hover:-translate-y-0.5"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCgBagModalTemplate(template);
+                                    setCgBagSelectedCatIds([]);
+                                    setCgBagModalOpen(true);
+                                  }}
+                                >
+                                  Choose Categories
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center justify-between mt-1">
-                            <span className="text-lg font-bold text-blue-600 dark:text-blue-400">${Number(template.sellingPrice).toFixed(2)}</span>
-                            <span className="text-xs text-muted-foreground">Target up to ${Number(template.maxTotalItemPrice).toFixed(2)}</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground">Pick from any category</div>
-                          <div className="mt-1 w-full text-sm font-medium text-center text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 rounded-lg py-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                            Choose Categories →
                           </div>
                         </div>
                       ))}
