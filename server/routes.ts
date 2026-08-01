@@ -1173,6 +1173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Expand grab bag products into individual line items + a discount line
       const finalItems: any[] = [];
       const grabBagProductIdsToDeduct: number[] = [];
+      const cgStockDeductions: { productId: number; qty: number }[] = [];
 
       for (const item of enrichedItems) {
         const product = await storage.getProduct(item.productId);
@@ -1384,13 +1385,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
 
-          // Deduct stock for each picked component (by quantity)
+          // Stock deductions collected here — applied AFTER createOrder succeeds
+          // (deducting before createOrder causes createOrder's re-check to see 0 and fail)
           for (const { item, qty } of cgPickMap.values()) {
-            try {
-              await db.execute(sql`UPDATE products SET stock = GREATEST(0, stock - ${qty}), updated_at = NOW() WHERE id = ${item.id}`);
-            } catch (err) {
-              console.warn("[createOrder] Failed to deduct CG bag component stock:", err);
-            }
+            cgStockDeductions.push({ productId: item.id, qty });
           }
         } catch (cgErr) {
           console.error("[createOrder] CG bag expansion error:", cgErr);
@@ -1416,6 +1414,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await db.execute(sql`UPDATE products SET stock = GREATEST(0, stock - 1), updated_at = NOW() WHERE id = ${bagProductId}`);
         } catch (err) {
           console.warn("[createOrder] Failed to deduct grab bag product stock:", err);
+        }
+      }
+
+      // Deduct stock for CG bag components (done here, after order is confirmed, to avoid
+      // createOrder's stock re-check seeing 0 and failing)
+      for (const { productId, qty } of cgStockDeductions) {
+        try {
+          await db.execute(sql`UPDATE products SET stock = GREATEST(0, stock - ${qty}), updated_at = NOW() WHERE id = ${productId}`);
+        } catch (err) {
+          console.warn("[createOrder] Failed to deduct CG bag component stock:", err);
         }
       }
 
