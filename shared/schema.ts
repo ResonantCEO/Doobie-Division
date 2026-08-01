@@ -593,6 +593,7 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
 export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
   id: true,
 }).extend({
+  productId: z.number().nullable().optional(),
   productPrice: z.string().or(z.number()).transform(val => String(val)),
   subtotal: z.string().or(z.number()).transform(val => String(val)),
   orderId: z.number().optional(),

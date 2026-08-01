@@ -1404,8 +1404,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const itemsData = finalItems.map((item: any) => insertOrderItemSchema.parse(item));
+      let itemsData: any[];
+      try {
+        itemsData = finalItems.map((item: any) => insertOrderItemSchema.parse(item));
+      } catch (parseErr) {
+        console.error('[CG-ORDER] insertOrderItemSchema.parse failed:', parseErr);
+        console.error('[CG-ORDER] finalItems snapshot:', JSON.stringify(finalItems.map(i => ({ productId: i.productId, productName: i.productName, quantity: i.quantity, metadata: i.metadata }))));
+        throw parseErr;
+      }
 
+      console.log(`[CG-ORDER] Creating order with ${itemsData.length} items (cgBags: ${cgBagsInput_typed.length})`);
       const newOrder = await storage.createOrder(orderData, itemsData);
 
       // Deduct stock for expanded grab bag container products (not in order items, createOrder won't handle them)

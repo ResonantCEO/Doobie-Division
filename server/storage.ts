@@ -1979,8 +1979,10 @@ export class DatabaseStorage implements IStorage {
         if (sizeLabel) {
           // Convert known weight options to their gram equivalent for stock deduction
           const gramEquivalent = this.getGramEquivalentFromSize(sizeLabel);
-          // Stock is tracked in grams for weight-based items, so multiply the quantity by the gram equivalent
-          stockToDeduct = item.quantity * gramEquivalent;
+          // Stock is tracked in grams for weight-based items, so multiply the quantity by the gram equivalent.
+          // Round to integer — the stock column is INTEGER and fractional values (e.g. 3.5g for an eighth)
+          // would cause "invalid input syntax for type integer" errors.
+          stockToDeduct = Math.round(item.quantity * gramEquivalent);
         }
 
         await db.execute(
