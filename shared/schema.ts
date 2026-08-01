@@ -165,9 +165,11 @@ export const orderItems = pgTable("order_items", {
   productPrice: decimal("product_price", { precision: 10, scale: 2 }).notNull(),
   quantity: integer("quantity").notNull(),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  size: varchar("size"),
   fulfilled: boolean("fulfilled").default(false),
   removed: boolean("removed").default(false),
   substitutedForItemId: integer("substituted_for_item_id"),
+  metadata: jsonb("metadata"),
 });
 
 export const inventoryLogs = pgTable("inventory_logs", {

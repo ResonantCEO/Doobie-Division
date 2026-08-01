@@ -1816,7 +1816,10 @@ export class DatabaseStorage implements IStorage {
           productPrice: orderItems.productPrice,
           quantity: orderItems.quantity,
           subtotal: orderItems.subtotal,
+          size: orderItems.size,
           fulfilled: orderItems.fulfilled,
+          removed: orderItems.removed,
+          metadata: orderItems.metadata,
           product: products,
         })
         .from(orderItems)
@@ -1952,7 +1955,7 @@ export class DatabaseStorage implements IStorage {
     } catch (itemsErr) {
       console.warn('[createOrder] Order items insert via ORM failed, using raw SQL:', itemsErr);
       for (const item of orderItemsData) {
-        await db.execute(sql`INSERT INTO order_items (order_id, product_id, product_name, product_sku, product_price, quantity, subtotal, size, fulfilled, removed) VALUES (${item.orderId}, ${item.productId ?? null}, ${item.productName}, ${(item as any).productSku ?? null}, ${item.productPrice}, ${item.quantity}, ${item.subtotal}, ${(item as any).size || null}, ${(item as any).fulfilled ?? false}, ${(item as any).removed ?? false})`);
+        await db.execute(sql`INSERT INTO order_items (order_id, product_id, product_name, product_sku, product_price, quantity, subtotal, size, fulfilled, removed, metadata) VALUES (${item.orderId}, ${item.productId ?? null}, ${item.productName}, ${(item as any).productSku ?? null}, ${item.productPrice}, ${item.quantity}, ${item.subtotal}, ${(item as any).size || null}, ${(item as any).fulfilled ?? false}, ${(item as any).removed ?? false}, ${(item as any).metadata ? JSON.stringify((item as any).metadata) : null})`);
       }
     }
 

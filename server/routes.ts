@@ -1276,7 +1276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // All eligible products across all selected categories (for top-up phase)
           const cgAllPool: CgPoolItem[] = [];
 
-          // Phase 1: one random pick per category
+          // Phase 1: one random pick per category (respecting cgTarget cap)
           for (const catId of cgBagReq.selectedCategoryIds) {
             try {
               const catProducts = await storage.getProducts({ categoryIds: [catId], isActive: true });
@@ -1296,17 +1296,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (!cgAllPool.find(x => x.id === e.id)) cgAllPool.push(e);
               }
 
-              // Pick one not-yet-picked item from this category first
-              const unpicked = eligible.filter(e => !cgPickMap.has(e.id));
-              const firstPick = unpicked.length > 0
-                ? unpicked[Math.floor(Math.random() * unpicked.length)]
-                : eligible.length > 0 ? eligible[Math.floor(Math.random() * eligible.length)] : null;
+              // Only pick items that fit within the remaining budget (hard cap = cgTarget)
+              const remainingBudget = cgTarget - currentRetail();
+              const unpickedFitting = eligible.filter(e => !cgPickMap.has(e.id) && e.price <= remainingBudget + 0.01);
+              const alreadyPickedFitting = eligible.filter(e => cgPickMap.has(e.id) && e.price <= remainingBudget + 0.01);
+              const candidates = unpickedFitting.length > 0 ? unpickedFitting : alreadyPickedFitting;
 
-              if (firstPick) {
-                const existing = cgPickMap.get(firstPick.id);
-                if (existing) existing.qty++;
-                else cgPickMap.set(firstPick.id, { item: firstPick, qty: 1 });
-              }
+              // If no item fits the budget for this category, skip it
+              if (candidates.length === 0) continue;
+
+              const firstPick = candidates[Math.floor(Math.random() * candidates.length)];
+              const existing = cgPickMap.get(firstPick.id);
+              if (existing) existing.qty++;
+              else cgPickMap.set(firstPick.id, { item: firstPick, qty: 1 });
             } catch (catErr) {
               console.warn(`[createOrder] CG bag category ${catId} fetch error:`, catErr);
             }
@@ -1330,11 +1332,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const pool = preferNovel.length > 0 ? preferNovel : cgAllPool.filter(p => p.price > 0);
             if (pool.length === 0) break;
 
-            // Pick the highest-priced item that fits within remaining budget; if nothing fits, pick smallest
+            // Pick the highest-priced item that fits within remaining budget.
+            // If nothing fits, stop — never overshoot the target cap.
             const fitting = pool.filter(p => p.price <= remaining + 0.01);
-            const pick = fitting.length > 0
-              ? fitting.reduce((best, p) => p.price > best.price ? p : best)
-              : pool.reduce((best, p) => p.price < best.price ? p : best);
+            if (fitting.length === 0) break;
+            const pick = fitting.reduce((best, p) => p.price > best.price ? p : best);
 
             const existing = cgPickMap.get(pick.id);
             if (existing) existing.qty++;
