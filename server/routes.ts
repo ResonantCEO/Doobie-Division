@@ -1431,14 +1431,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Deduct stock for CG bag components (done here, after order is confirmed, to avoid
       // createOrder's stock re-check seeing 0 and failing).
-      // We decrement BOTH stock and physical_inventory here so admins immediately see
-      // the committed inventory. fulfillOrderItem skips the physicalInventory decrement
-      // for fromCgBag items to avoid double-deducting.
+      // We decrement stock, physical_inventory, and — for size-variant products —
+      // product_sizes.quantity/physical_quantity so the inventory manager shows the
+      // reservation immediately. fulfillOrderItem skips its own physicalInventory
+      // decrement for fromCgBag items to avoid double-deducting.
       for (const { productId, qty } of cgStockDeductions) {
         try {
+          // Product-level deduction
           await db.execute(
             sql`UPDATE products SET stock = GREATEST(0, stock - ${qty}), physical_inventory = GREATEST(0, physical_inventory - ${qty}), updated_at = NOW() WHERE id = ${productId}`
           );
+          // Size-variant deduction: pick the size with the most physical stock and
+          // reserve from it so the inventory manager totals drop immediately.
+          // The admin picks the actual flavour at pack time; fulfillOrderItem then
+          // skips the physicalInventory decrement for CG bag items (already done here).
+          const sizeResult = await db.execute(
+            sql`SELECT size, quantity, physical_quantity FROM product_sizes WHERE product_id = ${productId} AND COALESCE(physical_quantity, quantity) > 0 ORDER BY COALESCE(physical_quantity, quantity) DESC LIMIT 1`
+          );
+          const topSize = sizeResult?.rows?.[0] as any;
+          if (topSize?.size) {
+            await db.execute(
+              sql`UPDATE product_sizes SET quantity = GREATEST(0, quantity - ${qty}), physical_quantity = GREATEST(0, COALESCE(physical_quantity, quantity) - ${qty}), updated_at = NOW() WHERE product_id = ${productId} AND size = ${topSize.size}`
+            );
+          }
         } catch (err) {
           console.warn("[createOrder] Failed to deduct CG bag component stock:", err);
         }
