@@ -1453,6 +1453,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await db.execute(
               sql`UPDATE product_sizes SET quantity = GREATEST(0, quantity - ${qty}), updated_at = NOW() WHERE product_id = ${productId} AND size = ${topSize.size}`
             );
+            // Write the chosen size back to the order item so the fulfillment screen
+            // shows exactly which flavour/variant to pull from the shelf.
+            await db.execute(
+              sql`UPDATE order_items SET size = ${topSize.size} WHERE order_id = ${newOrder.id} AND product_id = ${productId} AND (metadata->>'fromCgBag')::boolean = true`
+            );
           }
         } catch (err) {
           console.warn("[createOrder] Failed to deduct CG bag component stock:", err);
