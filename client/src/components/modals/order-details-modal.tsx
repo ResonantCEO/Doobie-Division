@@ -1469,7 +1469,30 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
               {/* Items list */}
               {displayOrder.items && displayOrder.items.length > 0 ? (
                 <div className="space-y-3">
+                  {/* Non-admin: render a single placeholder per hidden CG bag */}
+                  {!isAdmin && (() => {
+                    const bagNames = new Set<string>();
+                    displayOrder.items.forEach((item: any) => {
+                      const meta = item.metadata ?? item.meta;
+                      if (meta?.fromCgBag) bagNames.add(meta.grabBagName || "Custom Bag");
+                    });
+                    return [...bagNames].map((name) => (
+                      <div key={`cg-placeholder-${name}`} className="flex items-center gap-3 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                        <span className="text-2xl">🎁</span>
+                        <div>
+                          <p className="font-medium text-sm text-purple-800 dark:text-purple-300">{name}</p>
+                          <p className="text-xs text-purple-600 dark:text-purple-400">Contents are a surprise — revealed at delivery!</p>
+                        </div>
+                      </div>
+                    ));
+                  })()}
                   {displayOrder.items.map((item: any, index: number) => {
+                    // Non-admins: hide individual CG bag component items
+                    if (!isAdmin) {
+                      const meta = item.metadata ?? item.meta;
+                      if (meta?.fromCgBag) return null;
+                    }
+
                     const isRemoved = item.removed === true;
                     const isSubstitute = !!item.substitutedForItemId;
                     const isDiscount = (item.productSku || item.product_sku) === "GRAB-BAG-DISCOUNT";

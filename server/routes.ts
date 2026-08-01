@@ -1353,6 +1353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               subtotal: (item.price * qty).toFixed(2),
               fulfilled: false,
               removed: false,
+              metadata: { fromCgBag: true, grabBagName: template.name },
             });
           }
 
