@@ -79,15 +79,7 @@ function GenBagProductsList({
   onToggle: (id: number, isActive: boolean) => void;
   onDelete: (id: number) => void;
 }) {
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<{ id: number; name: string } | null>(null);
-
-  const toggle = (id: number) =>
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
 
   const sorted = [...bags].sort(
     (a, b) => (b.createdAt ? new Date(b.createdAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0)
@@ -100,23 +92,10 @@ function GenBagProductsList({
         try { meta = JSON.parse((bag as any).adminNotes || "{}"); } catch {}
         const items: BagItem[] = Array.isArray(meta.items) ? meta.items : [];
         const templateName: string | null = meta.bagName || null;
-        const isOpen = expanded.has(bag.id);
-
         return (
           <div key={bag.id} className="border rounded-lg dark:border-gray-700 overflow-hidden">
             {/* Row */}
             <div className="flex items-center gap-3 p-3">
-              {/* Expand toggle */}
-              <button
-                className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
-                onClick={() => toggle(bag.id)}
-                title={isOpen ? "Hide items" : "Show items"}
-              >
-                {isOpen
-                  ? <ChevronUp className="h-4 w-4 text-gray-400" />
-                  : <ChevronDown className="h-4 w-4 text-gray-400" />}
-              </button>
-
               <div className={`p-2 rounded-md shrink-0 ${bag.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
                 <ShoppingBag className="h-4 w-4" />
               </div>
@@ -155,9 +134,8 @@ function GenBagProductsList({
               </div>
             </div>
 
-            {/* Expanded items */}
-            {isOpen && (
-              <div className="border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 px-4 py-3">
+            {/* Items — always visible */}
+            <div className="border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 px-4 py-3">
                 {items.length === 0 ? (
                   <p className="text-xs text-gray-400 italic">No item data stored for this bag.</p>
                 ) : (
@@ -213,7 +191,6 @@ function GenBagProductsList({
                   </div>
                 )}
               </div>
-            )}
           </div>
         );
       })}
