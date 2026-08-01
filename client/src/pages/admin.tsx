@@ -910,6 +910,7 @@ export default function AdminPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/generated-bags"] });
       setGenerateResult(data);
       setGeneratePreview(null);
       toast({ title: "Grab bag added to storefront!", description: `"${data.product.name}" is now live in your catalog.` });
