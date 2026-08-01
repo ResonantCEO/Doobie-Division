@@ -733,20 +733,20 @@ export default function InventoryPage() {
           <TabsTrigger value="active">
             Active
             <Badge variant="secondary" className="ml-2">
-              {products.filter(p => p.isActive).length}
+              {products.filter(p => p.isActive && !p.sku?.startsWith('GRAB-BAG-')).length}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="archived">
             Archived
             <Badge variant="secondary" className="ml-2">
-              {products.filter(p => !p.isActive).length}
+              {products.filter(p => !p.isActive && !p.sku?.startsWith('GRAB-BAG-')).length}
             </Badge>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="active">
           <InventoryTable 
-            products={products.filter(p => p.isActive)} 
+            products={products.filter(p => p.isActive && !p.sku?.startsWith('GRAB-BAG-'))} 
             user={user}
             selectedProducts={selectedProducts}
             onSelectionChange={setSelectedProducts}
@@ -756,7 +756,7 @@ export default function InventoryPage() {
 
         <TabsContent value="archived">
           <InventoryTable 
-            products={products.filter(p => !p.isActive)} 
+            products={products.filter(p => !p.isActive && !p.sku?.startsWith('GRAB-BAG-'))} 
             user={user}
             selectedProducts={selectedProducts}
             onSelectionChange={setSelectedProducts}

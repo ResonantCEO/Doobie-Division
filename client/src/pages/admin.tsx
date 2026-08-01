@@ -584,6 +584,44 @@ export default function AdminPage() {
     },
   });
 
+  // Generated bag products (live product records with GRAB-BAG-* SKUs)
+  const { data: generatedBagProducts = [], isLoading: isLoadingGenBagProducts } = useQuery<ProductWithSizes[]>({
+    queryKey: ["/api/products/generated-bags"],
+    queryFn: async () => {
+      const res = await fetch("/api/products?includeInactive=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch products");
+      const all = await res.json();
+      return (all as ProductWithSizes[]).filter((p: ProductWithSizes) => p.sku?.startsWith("GRAB-BAG-"));
+    },
+    staleTime: 0,
+  });
+
+  const toggleGeneratedBagMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
+      const res = await apiRequest("PUT", `/api/products/${id}`, { isActive });
+      if (!res.ok) throw new Error("Failed to toggle");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products/generated-bags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    },
+    onError: () => toast({ title: "Failed to update bag", variant: "destructive" }),
+  });
+
+  const deleteGeneratedBagMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/products/${id}`);
+      if (!res.ok) throw new Error("Failed to delete");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products/generated-bags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      toast({ title: "Bag product deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete bag product", variant: "destructive" }),
+  });
+
   const { data: categoriesResponse = [] } = useQuery<(Category & { children?: Category[] })[]>({
     queryKey: ["/api/categories"],
     queryFn: async () => {
@@ -2461,6 +2499,88 @@ export default function AdminPage() {
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Generated Bag Products */}
+              <Card className="mt-4">
+                <CardHeader>
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Generated Bag Products
+                    </CardTitle>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      Live product listings created by generating bag templates. Toggle active to show/hide from storefront.
+                    </p>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingGenBagProducts ? (
+                    <div className="space-y-3">
+                      {[...Array(2)].map((_, i) => <div key={i} className="h-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />)}
+                    </div>
+                  ) : generatedBagProducts.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                      <ShoppingBag className="h-10 w-10 mb-3 opacity-30" />
+                      <p className="font-medium">No generated bags yet</p>
+                      <p className="text-sm">Generate a bag from a template above to create a product listing.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {generatedBagProducts
+                        .slice()
+                        .sort((a, b) => (b.createdAt ? new Date(b.createdAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0))
+                        .map((bag) => {
+                          // Parse template name from adminNotes if available
+                          let bagMeta: any = {};
+                          try { bagMeta = JSON.parse((bag as any).adminNotes || "{}"); } catch {}
+                          const templateName = bagMeta.bagName || null;
+
+                          return (
+                            <div key={bag.id} className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700 gap-3">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className={`p-2 rounded-md shrink-0 ${bag.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                                  <ShoppingBag className="h-4 w-4" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium text-sm truncate">{bag.name}</span>
+                                    <Badge variant={bag.isActive ? "default" : "secondary"} className="text-xs shrink-0">
+                                      {bag.isActive ? "Active" : "Inactive"}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
+                                    <span className="font-semibold text-green-600 dark:text-green-400">${Number(bag.price).toFixed(2)}</span>
+                                    <span>{bag.stock ?? 0} in stock</span>
+                                    {templateName && <span className="text-gray-400">from template: {templateName}</span>}
+                                    <span className="font-mono text-gray-300 dark:text-gray-600">{bag.sku}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <Switch
+                                  checked={bag.isActive ?? false}
+                                  onCheckedChange={(checked) => toggleGeneratedBagMutation.mutate({ id: bag.id, isActive: checked })}
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => {
+                                    if (confirm(`Delete "${bag.name}"? This cannot be undone.`)) {
+                                      deleteGeneratedBagMutation.mutate(bag.id);
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
                     </div>
                   )}
                 </CardContent>
