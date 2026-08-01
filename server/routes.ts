@@ -1225,6 +1225,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 fulfilled: false,
                 removed: false,
                 ...(bi.selectedSize ? { size: bi.selectedSize } : {}),
+                // Tag so createOrder skips the per-component stock re-check
+                // (components were already verified in the pre-check above).
+                metadata: { fromStandardBag: true },
               });
             }
 

@@ -1859,6 +1859,7 @@ export class DatabaseStorage implements IStorage {
     for (const item of items) {
       if (!item.productId) continue; // discount/virtual items have no product — skip stock check
       if ((item as any).metadata?.fromCgBag) continue; // CG bag items: stock validated & deducted separately in routes.ts
+      if ((item as any).metadata?.fromStandardBag) continue; // Standard bag components: pre-checked in routes.ts; product.stock may be 0 for size-tracked items
       try {
         const stockResult = await retryQuery(() =>
           db.execute(sql`SELECT stock, name FROM products WHERE id = ${item.productId}`)
