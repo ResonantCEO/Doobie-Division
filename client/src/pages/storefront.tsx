@@ -158,6 +158,18 @@ export default function StorefrontPage() {
     staleTime: 60000,
   });
 
+  // Build Your Bag sort order (controls where the BYB section appears among categories)
+  const { data: bybSortOrderData } = useQuery<{ key: string; value: string | null }>({
+    queryKey: ["/api/settings/build_your_bag_sort_order"],
+    queryFn: async () => {
+      const res = await fetch('/api/settings/build_your_bag_sort_order');
+      if (!res.ok) return { key: 'build_your_bag_sort_order', value: null };
+      return res.json();
+    },
+    staleTime: 60000,
+  });
+  const bybSortOrder = parseInt(bybSortOrderData?.value ?? '') || 9999;
+
   // Reorder mode (admin only)
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [localProductGroups, setLocalProductGroups] = useState<Map<string, (Product & { category: Category | null })[]>>(new Map());
@@ -1288,19 +1300,66 @@ export default function StorefrontPage() {
               productsByParentCategory.get(rootCategoryId)!.push(product);
             });
 
-            // Sort the root categories by their sortOrder before mapping
-            const sortedRootCategoryIds = Array.from(productsByParentCategory.keys()).sort((a, b) => {
-              if (a === null) return 1; // null (uncategorized) comes last
-              if (b === null) return -1;
-              const categoryA = categories.find(cat => cat.id === a);
-              const categoryB = categories.find(cat => cat.id === b);
-              if (!categoryA) return 1;
-              if (!categoryB) return -1;
-              return categoryA.sortOrder - categoryB.sortOrder;
+            // Sort the root categories + optional BYB sentinel by sortOrder
+            type SortedId = number | null | 'byb';
+            const rawIds: SortedId[] = Array.from(productsByParentCategory.keys());
+            if (cgTemplates.length > 0) rawIds.push('byb');
+
+            const sortedRootCategoryIds = rawIds.sort((a, b) => {
+              const getSortOrder = (id: SortedId): number => {
+                if (id === 'byb') return bybSortOrder;
+                if (id === null) return 9998; // uncategorized always near end
+                const cat = categories.find(c => c.id === id);
+                return cat?.sortOrder ?? 0;
+              };
+              return getSortOrder(a) - getSortOrder(b);
             });
 
-
             return sortedRootCategoryIds.map((parentCategoryId) => {
+              // Render Build Your Bag section at the right position
+              if (parentCategoryId === 'byb') {
+                return (
+                  <div key="build-your-bag" className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Gift className="h-6 w-6 text-blue-500" />
+                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Build Your Bag</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Pick your categories and we'll put together a mystery bag just for you.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {cgTemplates.map((template) => (
+                        <div
+                          key={template.id}
+                          className="rounded-xl border bg-card shadow-sm p-5 flex flex-col gap-3 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+                          onClick={() => {
+                            setCgBagModalTemplate(template);
+                            setCgBagSelectedCatIds([]);
+                            setCgBagModalOpen(true);
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                              <Gift className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-base">{template.name}</h4>
+                              {template.description && <p className="text-xs text-muted-foreground mt-0.5">{template.description}</p>}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-lg font-bold text-blue-600 dark:text-blue-400">${Number(template.sellingPrice).toFixed(2)}</span>
+                            <span className="text-xs text-muted-foreground">Target up to ${Number(template.maxTotalItemPrice).toFixed(2)}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">Pick from any category</div>
+                          <div className="mt-1 w-full text-sm font-medium text-center text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 rounded-lg py-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                            Choose Categories →
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+
               const categoryProducts = productsByParentCategory.get(parentCategoryId) || [];
               if (categoryProducts.length === 0) return null;
 
@@ -1339,50 +1398,6 @@ export default function StorefrontPage() {
               );
             }).filter(Boolean);
           })()}
-        </div>
-      )}
-
-      {/* Build Your Bag — Customer Generated templates */}
-      {cgTemplates.length > 0 && (
-        <div className="space-y-4 mt-2">
-          <div className="flex items-center gap-2">
-            <Gift className="h-6 w-6 text-blue-500" />
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Build Your Bag</h3>
-          </div>
-          <p className="text-sm text-muted-foreground">Pick your categories and we'll put together a mystery bag just for you.</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {cgTemplates.map((template) => (
-              <div
-                key={template.id}
-                className="rounded-xl border bg-card shadow-sm p-5 flex flex-col gap-3 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
-                onClick={() => {
-                  setCgBagModalTemplate(template);
-                  setCgBagSelectedCatIds([]);
-                  setCgBagModalOpen(true);
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                    <Gift className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-base">{template.name}</h4>
-                    {template.description && <p className="text-xs text-muted-foreground mt-0.5">{template.description}</p>}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-lg font-bold text-blue-600 dark:text-blue-400">${Number(template.sellingPrice).toFixed(2)}</span>
-                  <span className="text-xs text-muted-foreground">Target up to ${Number(template.maxTotalItemPrice).toFixed(2)}</span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Pick from any category
-                </div>
-                <div className="mt-1 w-full text-sm font-medium text-center text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 rounded-lg py-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                  Choose Categories →
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 

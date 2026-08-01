@@ -22,7 +22,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { insertCategorySchema } from "@shared/schema";
 import { z } from "zod";
-import { Plus, Edit2, Trash2, ChevronRight, GripVertical } from "lucide-react";
+import { Plus, Edit2, Trash2, ChevronRight, GripVertical, Gift } from "lucide-react";
 import type { Category } from "@shared/schema";
 
 const formSchema = insertCategorySchema.extend({
@@ -37,6 +37,9 @@ interface CategoryManagementModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   categories: CategoryWithChildren[];
+  hasCgBags?: boolean;
+  cgBagSortOrder?: number;
+  onCgBagSortOrderChange?: (order: number) => void;
 }
 
 function flattenCategories(cats: CategoryWithChildren[]): CategoryWithChildren[] {
@@ -50,7 +53,7 @@ function flattenCategories(cats: CategoryWithChildren[]): CategoryWithChildren[]
   return result;
 }
 
-export default function CategoryManagementModal({ open, onOpenChange, categories }: CategoryManagementModalProps) {
+export default function CategoryManagementModal({ open, onOpenChange, categories, hasCgBags, cgBagSortOrder, onCgBagSortOrderChange }: CategoryManagementModalProps) {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [mode, setMode] = useState<'create' | 'edit'>('create');
   const [localCategories, setLocalCategories] = useState<CategoryWithChildren[]>(() => flattenCategories(categories));
@@ -145,17 +148,44 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
     const { droppableId } = result.source;
 
     if (droppableId === "root-categories") {
-      // Reordering root categories
-      const rootCategories = localCategories.filter(cat => !cat.parentId);
-      const reordered = Array.from(rootCategories);
+      // Build the combined list (real root categories + virtual BYB if present), sorted by current sortOrder
+      type VirtualBYB = { id: -1; name: string; sortOrder: number; isBuildYourBag: true };
+      const bybEntry: VirtualBYB | null = hasCgBags ? { id: -1, name: 'Build Your Bag', sortOrder: cgBagSortOrder ?? 9999, isBuildYourBag: true } : null;
+      const realRoot = localCategories.filter(cat => !cat.parentId);
+      const combined: (CategoryWithChildren | VirtualBYB)[] = [
+        ...realRoot,
+        ...(bybEntry ? [bybEntry] : []),
+      ].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+      const reordered = Array.from(combined);
       const [removed] = reordered.splice(result.source.index, 1);
       reordered.splice(result.destination.index, 0, removed);
 
-      const updatedRoot = reordered.map((cat, index) => ({ ...cat, sortOrder: index }));
+      // Assign sort orders 0,1,2,... to all items in the new order
+      const realCatUpdates: { id: number; sortOrder: number }[] = [];
+      let newBybSortOrder: number | null = null;
+      reordered.forEach((item, index) => {
+        if ((item as any).isBuildYourBag) {
+          newBybSortOrder = index;
+        } else {
+          realCatUpdates.push({ id: (item as CategoryWithChildren).id, sortOrder: index });
+        }
+      });
+
+      // Update local state for real categories
+      const updatedRoot = realRoot.map(cat => {
+        const found = realCatUpdates.find(r => r.id === cat.id);
+        return found ? { ...cat, sortOrder: found.sortOrder } : cat;
+      });
       const nonRoot = localCategories.filter(cat => cat.parentId);
       setLocalCategories([...updatedRoot, ...nonRoot]);
 
-      reorderCategoriesMutation.mutate(updatedRoot.map((cat, index) => ({ id: cat.id, sortOrder: index })));
+      if (realCatUpdates.length > 0) {
+        reorderCategoriesMutation.mutate(realCatUpdates);
+      }
+      if (newBybSortOrder !== null && onCgBagSortOrderChange) {
+        onCgBagSortOrderChange(newBybSortOrder);
+      }
     } else if (droppableId.startsWith("subcategories-")) {
       // Reordering subcategories within a parent
       const parentId = parseInt(droppableId.replace("subcategories-", ""));
@@ -469,11 +499,37 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
                         ref={provided.innerRef}
                         className="space-y-3"
                       >
-                        {localCategories
-                          .filter(cat => !cat.parentId)
-                          .slice()
-                          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-                          .map((cat, index) => renderRootCategory(cat, index))}
+                        {(() => {
+                          // Combine real root categories with the virtual BYB entry, sorted by sortOrder
+                          type VItem = { id: number; name: string; sortOrder: number; isBuildYourBag?: true };
+                          const realRoot: VItem[] = localCategories.filter(cat => !cat.parentId).map(c => ({ ...c, sortOrder: c.sortOrder ?? 0 }));
+                          const bybVirtual: VItem | null = hasCgBags ? { id: -1, name: 'Build Your Bag', sortOrder: cgBagSortOrder ?? 9999, isBuildYourBag: true } : null;
+                          const combined = [...realRoot, ...(bybVirtual ? [bybVirtual] : [])].sort((a, b) => a.sortOrder - b.sortOrder);
+                          return combined.map((item, index) => {
+                            if (item.isBuildYourBag) {
+                              return (
+                                <Draggable key="build-your-bag" draggableId="build-your-bag" index={index}>
+                                  {(dragProv, dragSnap) => (
+                                    <div ref={dragProv.innerRef} {...dragProv.draggableProps} className="space-y-1" style={dragProv.draggableProps.style}>
+                                      <div className={`flex items-center justify-between p-3 border border-blue-300 dark:border-blue-700 rounded-lg transition-colors bg-blue-50 dark:bg-blue-900/20 ${dragSnap.isDragging ? 'shadow-lg' : ''}`}>
+                                        <div className="flex items-center space-x-2">
+                                          <div {...dragProv.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                                            <GripVertical className="h-4 w-4 text-gray-400" />
+                                          </div>
+                                          <Gift className="h-4 w-4 text-blue-500" />
+                                          <span className="font-medium text-blue-700 dark:text-blue-300">Build Your Bag</span>
+                                          <Badge variant="outline" className="text-xs border-blue-300 text-blue-600">CG Bags</Badge>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </Draggable>
+                              );
+                            }
+                            const cat = localCategories.find(c => c.id === item.id)!;
+                            return renderRootCategory(cat, index);
+                          });
+                        })()}
                         {provided.placeholder}
                       </div>
                     )}

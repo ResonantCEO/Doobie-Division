@@ -415,6 +415,39 @@ export default function InventoryPage() {
     queryKey: ["/api/categories"],
   });
 
+  // Fetch CG bag templates (to know whether to show BYB row in category modal)
+  const { data: cgTemplates = [] } = useQuery<{ id: number }[]>({
+    queryKey: ["/api/grab-bags/customer-generated"],
+    queryFn: async () => {
+      const res = await fetch('/api/grab-bags/customer-generated', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60000,
+  });
+
+  // Fetch Build Your Bag sort order setting
+  const { data: bybSortOrderData } = useQuery<{ key: string; value: string | null }>({
+    queryKey: ["/api/settings/build_your_bag_sort_order"],
+    queryFn: async () => {
+      const res = await fetch('/api/settings/build_your_bag_sort_order');
+      if (!res.ok) return { key: 'build_your_bag_sort_order', value: null };
+      return res.json();
+    },
+    staleTime: 60000,
+  });
+
+  const bybSortOrder = parseInt(bybSortOrderData?.value ?? '') || 9999;
+
+  const saveBybSortOrderMutation = useMutation({
+    mutationFn: async (order: number) => {
+      await apiRequest("PUT", "/api/admin/settings/build_your_bag_sort_order", { value: String(order) });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/build_your_bag_sort_order"] });
+    },
+  });
+
   // Fetch products with filters
   const { data: products = [], isLoading, error } = useQuery<(Product & { category: Category | null; sizes?: ProductSize[] })[]>({
     queryKey: ["/api/products", searchQuery, selectedCategory, stockFilter, categories],
@@ -758,6 +791,9 @@ export default function InventoryPage() {
         open={showCategoryModal}
         onOpenChange={setShowCategoryModal}
         categories={categories}
+        hasCgBags={cgTemplates.length > 0}
+        cgBagSortOrder={bybSortOrder}
+        onCgBagSortOrderChange={(order) => saveBybSortOrderMutation.mutate(order)}
       />
 
       <BulkQRModal
