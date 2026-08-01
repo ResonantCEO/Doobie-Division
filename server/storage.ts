@@ -2164,11 +2164,25 @@ export class DatabaseStorage implements IStorage {
 
     // Update per-size physical quantity if applicable.
     // Prefer the dedicated size column on the order item; fall back to parsing the product name.
+    // For CG bag items no size is recorded at order time — fall back to the size with the
+    // most physical stock so the inventory manager totals stay accurate.
     const sizeName = (orderItem as any).size || this.extractSizeFromProductName(orderItem.productName);
     if (sizeName) {
       await db.execute(
         sql`UPDATE product_sizes SET physical_quantity = physical_quantity - ${physicalDeltaInt}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
       );
+    } else {
+      // No explicit size — check whether this product has size rows at all and deduct
+      // from the one with the highest physical_quantity (CG bag fallback).
+      const fallbackResult = await db.execute(
+        sql`SELECT size FROM product_sizes WHERE product_id = ${productId} AND COALESCE(physical_quantity, quantity) > 0 ORDER BY COALESCE(physical_quantity, quantity) DESC LIMIT 1`
+      );
+      const fallbackSize = (fallbackResult?.rows?.[0] as any)?.size;
+      if (fallbackSize) {
+        await db.execute(
+          sql`UPDATE product_sizes SET physical_quantity = GREATEST(0, COALESCE(physical_quantity, quantity) - ${physicalDeltaInt}), updated_at = NOW() WHERE product_id = ${productId} AND size = ${fallbackSize}`
+        );
+      }
     }
 
     // Log the physical inventory change
@@ -2248,11 +2262,23 @@ export class DatabaseStorage implements IStorage {
 
     if (unfulfillItem) {
       // Prefer the dedicated size column; fall back to parsing the product name.
+      // For CG bag items with no recorded size, reverse from the size with the least
+      // physical stock (mirrors the fulfil deduction heuristic).
       const sizeName = (unfulfillItem as any).size || this.extractSizeFromProductName(unfulfillItem.productName);
       if (sizeName) {
         await db.execute(
           sql`UPDATE product_sizes SET physical_quantity = physical_quantity + ${physicalDeltaInt}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
         );
+      } else {
+        const fallbackResult = await db.execute(
+          sql`SELECT size FROM product_sizes WHERE product_id = ${productId} ORDER BY COALESCE(physical_quantity, quantity) ASC LIMIT 1`
+        );
+        const fallbackSize = (fallbackResult?.rows?.[0] as any)?.size;
+        if (fallbackSize) {
+          await db.execute(
+            sql`UPDATE product_sizes SET physical_quantity = COALESCE(physical_quantity, quantity) + ${physicalDeltaInt}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${fallbackSize}`
+          );
+        }
       }
     }
 
