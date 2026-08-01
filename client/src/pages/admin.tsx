@@ -140,7 +140,6 @@ export default function AdminPage() {
   const [editingGrabBag, setEditingGrabBag] = useState<GrabBag | null>(null);
   const [grabBagToDelete, setGrabBagToDelete] = useState<GrabBag | null>(null);
   const [deleteGrabBagConfirmOpen, setDeleteGrabBagConfirmOpen] = useState(false);
-  const [showLockedBagPopup, setShowLockedBagPopup] = useState(false);
   const [grabBagToGenerate, setGrabBagToGenerate] = useState<GrabBag | null>(null);
   const [flavorPickerProduct, setFlavorPickerProduct] = useState<ProductWithSizes | null>(null);
   const [weightPickerProduct, setWeightPickerProduct] = useState<ProductWithSizes | null>(null);
@@ -2615,12 +2614,10 @@ export default function AdminPage() {
                   Discard
                 </Button>
                 <Button
-                  onClick={() => setShowLockedBagPopup(true)}
-                  className="bg-gray-400 hover:bg-gray-500 text-white cursor-pointer"
-                  title="Feature locked — coming soon"
+                  onClick={() => generatePreview && confirmGrabBagMutation.mutate({ bagId: generatePreview.bagId, selectedProducts: generatePreview.selectedProducts })}
+                  disabled={confirmGrabBagMutation.isPending || !generatePreview}
                 >
-                  <Lock className="h-4 w-4 mr-1.5" />
-                  Add to Storefront
+                  {confirmGrabBagMutation.isPending ? "Adding…" : "Add to Storefront"}
                 </Button>
               </DialogFooter>
             </div>
@@ -2628,30 +2625,6 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Locked — Add to Storefront popup */}
-      <Dialog open={showLockedBagPopup} onOpenChange={setShowLockedBagPopup}>
-        <DialogContent className="sm:max-w-[340px] text-center">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-center gap-2 text-gray-700 dark:text-gray-200">
-              <Lock className="h-5 w-5 text-gray-500" />
-              Feature Locked
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col items-center gap-3 py-2">
-            <img
-              src="/nope-cat.png"
-              alt="Nope"
-              className="w-48 h-48 object-cover rounded-xl shadow-md"
-            />
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Naw... Not yet... This feature is still being built.
-            </p>
-          </div>
-          <DialogFooter className="justify-center">
-            <Button onClick={() => setShowLockedBagPopup(false)}>Got it</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Create / Edit Grab Bag Dialog */}
       <Dialog open={showGrabBagModal} onOpenChange={(open) => { setShowGrabBagModal(open); if (!open) { setEditingGrabBag(null); resetGrabBagForm(); } }}>
