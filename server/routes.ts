@@ -1275,6 +1275,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const cgPickMap = new Map<number, { item: CgPoolItem; qty: number }>();
           // All eligible products across all selected categories (for top-up phase)
           const cgAllPool: CgPoolItem[] = [];
+          // Declared here so Phase 1 can also use it for budget checks
+          const currentRetail = () =>
+            [...cgPickMap.values()].reduce((s, { item, qty }) => s + item.price * qty, 0);
 
           // Phase 1: one random pick per category (respecting cgTarget cap)
           for (const catId of cgBagReq.selectedCategoryIds) {
@@ -1320,9 +1323,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Phase 2: top-up loop — add more items until we reach cgTarget
-          const currentRetail = () =>
-            [...cgPickMap.values()].reduce((s, { item, qty }) => s + item.price * qty, 0);
-
           const MAX_TOPUP = 30;
           let topupCount = 0;
           while (currentRetail() < cgTarget - 0.01 && cgAllPool.length > 0 && topupCount < MAX_TOPUP) {
