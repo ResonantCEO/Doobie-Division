@@ -180,8 +180,8 @@ function GenBagProductsList({
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
                             {stock !== null && (
-                              <span className={`text-xs font-medium ${stockOut ? 'text-red-500 dark:text-red-400' : stockLow ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                {stock} sold
+                              <span className={`text-xs font-medium ${(stock <= 0) ? 'text-red-500 dark:text-red-400' : stockLow ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                {stock} stock
                                 {physical !== null && <span className="text-gray-400 dark:text-gray-500"> / {physical} physical</span>}
                               </span>
                             )}
