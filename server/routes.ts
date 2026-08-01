@@ -737,6 +737,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return component.stock ?? 0;
   }
 
+  function componentPhysical(component: any, selectedSize?: string): number {
+    if (component.sizes && component.sizes.length > 0) {
+      if (selectedSize) {
+        const sz = component.sizes.find((s: any) => s.size === selectedSize);
+        return sz ? (sz.physicalQuantity ?? sz.quantity ?? 0) : 0;
+      }
+      return component.sizes.reduce((sum: number, s: any) => sum + (sz => sz ? (sz.physicalQuantity ?? sz.quantity ?? 0) : 0)(s), 0);
+    }
+    return (component.physicalInventory ?? component.stock ?? 0);
+  }
+
+  // Returns true if a product (or a specific size of it) has both stock > 0 and physical > 0
+  function componentAvailable(component: any, selectedSize?: string): boolean {
+    if (component.sizes && component.sizes.length > 0) {
+      if (selectedSize) {
+        const sz = component.sizes.find((s: any) => s.size === selectedSize);
+        if (!sz) return false;
+        return (sz.quantity ?? 0) > 0 && (sz.physicalQuantity ?? sz.quantity ?? 0) > 0;
+      }
+      // At least one size must be fully available
+      return component.sizes.some((s: any) => (s.quantity ?? 0) > 0 && (s.physicalQuantity ?? s.quantity ?? 0) > 0);
+    }
+    return (component.stock ?? 0) > 0 && (component.physicalInventory ?? component.stock ?? 0) > 0;
+  }
+
   // Helper: scan all grab-bag products and sync their stock to the minimum available across components.
   // Disables the bag if any component is out of stock; re-enables and updates stock count when all are available.
   async function syncGrabBagAvailability(): Promise<void> {
@@ -763,20 +788,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const component = await storage.getProduct(item.productId);
           // Components may be inactive in the storefront (sold only via grab bags) — just check they exist and have stock
           if (!component) { anyUnavailable = true; break; }
-          const avail = componentStock(component, item.selectedSize);
-          if (avail <= 0) { anyUnavailable = true; break; }
-          minStock = Math.min(minStock, avail);
+          if (!componentAvailable(component, item.selectedSize)) { anyUnavailable = true; break; }
+          minStock = Math.min(minStock, componentStock(component, item.selectedSize));
         }
 
         const newStock = anyUnavailable ? 0 : (isFinite(minStock) ? minStock : 0);
+        const shouldBeActive = !anyUnavailable && newStock > 0;
         const currentStock = bag.stock ?? 0;
+        const currentActive = bag.isActive ?? false;
 
-        if (newStock !== currentStock) {
+        if (newStock !== currentStock || shouldBeActive !== currentActive) {
           await rawPool.query(
-            `UPDATE products SET stock = $1, physical_inventory = GREATEST(physical_inventory, $1), updated_at = NOW() WHERE id = $2`,
-            [newStock, bag.id]
+            `UPDATE products SET stock = $1, physical_inventory = GREATEST(physical_inventory, $1), is_active = $2, updated_at = NOW() WHERE id = $3`,
+            [newStock, shouldBeActive, bag.id]
           );
-          console.log(`[syncGrabBagAvailability] Bag #${bag.id} (${bag.name}): stock ${currentStock} → ${newStock}`);
+          console.log(`[syncGrabBagAvailability] Bag #${bag.id} (${bag.name}): stock ${currentStock} → ${newStock}, active ${currentActive} → ${shouldBeActive}`);
         }
       }
 
@@ -4150,6 +4176,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const p = await storage.getProduct(item.id);
         if (p) {
+          // Skip items with no stock or no physical inventory
+          if (!componentAvailable(p, item.size)) {
+            warnings.push(`"${p.name}" is out of stock or has no physical inventory — skipped.`);
+            continue;
+          }
           // Use slotBudget when no size is pinned so weight-based products don't eat the whole budget.
           const effectiveBudget = item.size ? Infinity : slotBudget;
           const { price, sellingMethod, weightLabel, selectedSize } = resolveProduct(p, effectiveBudget, item.size);
@@ -4184,6 +4215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const allInCat = await storage.getProducts({ categoryIds: [sel.categoryId], isActive: true });
         const pool = allInCat
           .filter(p => !selectedProducts.find(s => s.id === p.id) && !blacklistedIds.includes(p.id))
+          .filter(p => componentAvailable(p))  // exclude 0-stock or 0-physical items
           .map(p => { const r = resolveProduct(p, catSlotBudget); return { id: p.id, name: p.name, price: r.price, sku: p.sku, sellingMethod: r.sellingMethod, weightLabel: r.weightLabel, selectedSize: r.selectedSize, imageUrl: p.imageUrl, imageUrls: p.imageUrls }; })
           .filter(p => p.price > 0);
         if (pool.length === 0) {
