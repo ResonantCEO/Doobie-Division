@@ -1179,7 +1179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const product = await storage.getProduct(item.productId);
         const sku: string = product?.sku ?? "";
         if (product && sku.startsWith("GRAB-BAG-") && !sku.startsWith("GRAB-BAG-DISCOUNT")) {
-          type BagItem = { productId: number | null; name: string; sku: string | null; price: number };
+          type BagItem = { productId: number | null; name: string; sku: string | null; price: number; selectedSize?: string };
           let bagItems: BagItem[] | null = null;
 
           // Try structured JSON in adminNotes (new format)
@@ -1192,6 +1192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   name: String(bi.name),
                   sku: bi.sku ? String(bi.sku) : null,
                   price: Number(bi.price),
+                  selectedSize: bi.selectedSize ? String(bi.selectedSize) : undefined,
                 }));
               }
             } catch { /* fall through */ }
@@ -1223,6 +1224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 subtotal: bi.price.toFixed(2),
                 fulfilled: false,
                 removed: false,
+                ...(bi.selectedSize ? { size: bi.selectedSize } : {}),
               });
             }
 
