@@ -69,10 +69,12 @@ interface BagItem { productId?: number; name: string; sku?: string; price?: stri
 
 function GenBagProductsList({
   bags,
+  allProducts,
   onToggle,
   onDelete,
 }: {
   bags: ProductWithSizes[];
+  allProducts: ProductWithSizes[];
   onToggle: (id: number, isActive: boolean) => void;
   onDelete: (id: number, name: string) => void;
 }) {
@@ -159,24 +161,39 @@ function GenBagProductsList({
                 ) : (
                   <div className="space-y-1.5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Contents</p>
-                    {items.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs flex items-center justify-center font-semibold shrink-0">
-                            {idx + 1}
-                          </span>
-                          <span className="font-medium truncate">{item.name}</span>
-                          {item.selectedSize && (
-                            <Badge variant="outline" className="text-xs shrink-0">{item.selectedSize}</Badge>
-                          )}
+                    {items.map((item, idx) => {
+                      const liveProduct = item.productId ? allProducts.find(p => p.id === item.productId) : undefined;
+                      const stock = liveProduct?.stock ?? null;
+                      const physical = (liveProduct as any)?.physicalInventory ?? null;
+                      const stockLow = stock !== null && stock <= ((liveProduct as any)?.minStockThreshold ?? 0);
+                      const stockOut = stock === 0;
+                      return (
+                        <div key={idx} className="flex items-center justify-between text-sm gap-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs flex items-center justify-center font-semibold shrink-0">
+                              {idx + 1}
+                            </span>
+                            <span className="font-medium truncate">{item.name}</span>
+                            {item.selectedSize && (
+                              <Badge variant="outline" className="text-xs shrink-0">{item.selectedSize}</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            {stock !== null && (
+                              <span className={`text-xs font-medium ${stockOut ? 'text-red-500 dark:text-red-400' : stockLow ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                {stock} sold
+                                {physical !== null && <span className="text-gray-400 dark:text-gray-500"> / {physical} physical</span>}
+                              </span>
+                            )}
+                            {item.price && (
+                              <span className="text-xs font-semibold text-green-600 dark:text-green-400">
+                                ${Number(item.price).toFixed(2)}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        {item.price && (
-                          <span className="text-xs font-semibold text-green-600 dark:text-green-400 shrink-0 ml-3">
-                            ${Number(item.price).toFixed(2)}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                     {/* Total retail value */}
                     {items.some(i => i.price) && (
                       <div className="flex justify-between items-center pt-2 mt-2 border-t dark:border-gray-700 text-xs font-semibold">
@@ -2664,6 +2681,7 @@ export default function AdminPage() {
                   ) : (
                     <GenBagProductsList
                       bags={generatedBagProducts}
+                      allProducts={allProducts}
                       onToggle={(id, isActive) => toggleGeneratedBagMutation.mutate({ id, isActive })}
                       onDelete={(id, name) => { if (confirm(`Delete "${name}"? This cannot be undone.`)) deleteGeneratedBagMutation.mutate(id); }}
                     />
