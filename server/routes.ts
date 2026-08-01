@@ -4248,6 +4248,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return { selectedProducts, runningTotal, warnings, error: "No products could be selected. Check your category selections and that those categories have active products." };
     }
 
+    // ── Top-up: retail value must meet the selling price, ideally reaching targetTotal ──
+    // If the selected items fall short, add extra copies of existing items.
+    const sellingPriceNum = parseFloat(bag.sellingPrice) || 0;
+    const hardMin = sellingPriceNum;     // must reach at least this
+    const softTarget = Math.max(hardMin, targetTotal); // ideally reach this
+
+    if (runningTotal < hardMin) {
+      // Build a pool sorted cheapest → most-expensive for fine-grained filling
+      const baseItems = [...selectedProducts].sort((a, b) => a.price - b.price);
+      const SAFETY = 200; // max extra iterations
+      let iters = 0;
+
+      // Phase 1: reach hard minimum
+      while (runningTotal < hardMin && iters < SAFETY) {
+        iters++;
+        const shortfall = hardMin - runningTotal;
+        // Pick the most expensive item whose price ≤ shortfall (precise fill)
+        const fitting = baseItems.filter(p => p.price <= shortfall);
+        const toAdd = fitting.length > 0
+          ? fitting.reduce((a, b) => a.price > b.price ? a : b)
+          : baseItems[0]; // cheapest — will overshoot, but we must reach minimum
+        selectedProducts.push({ ...toAdd });
+        runningTotal += toAdd.price;
+      }
+
+      // Phase 2: also try to reach softTarget without exceeding it by more than the cheapest item
+      const cheapestPrice = baseItems[0]?.price ?? 0;
+      while (runningTotal < softTarget && iters < SAFETY) {
+        iters++;
+        const remaining = softTarget - runningTotal;
+        const fitting = baseItems.filter(p => p.price <= remaining);
+        if (fitting.length === 0) break; // would overshoot — stop
+        const toAdd = fitting.reduce((a, b) => a.price > b.price ? a : b);
+        selectedProducts.push({ ...toAdd });
+        runningTotal += toAdd.price;
+      }
+
+      warnings.push(`Retail value was topped up to $${runningTotal.toFixed(2)} to meet the $${hardMin.toFixed(2)} selling price.`);
+    }
+
     return { selectedProducts, runningTotal, warnings };
   }
 
