@@ -1855,7 +1855,6 @@ export class DatabaseStorage implements IStorage {
 
     for (const item of items) {
       if (!item.productId) continue; // discount/virtual items have no product — skip stock check
-      if ((item as any).metadata?.fromCgBag) continue; // CG bag items: stock already deducted before createOrder
       try {
         const stockResult = await retryQuery(() =>
           db.execute(sql`SELECT stock, name FROM products WHERE id = ${item.productId}`)
@@ -1963,6 +1962,9 @@ export class DatabaseStorage implements IStorage {
           console.warn('[createOrder] Skipping stock update for item without productId');
           continue;
         }
+        // CG bag items have their stock deducted separately in routes.ts after createOrder —
+        // skip here to prevent double-deduction.
+        if ((item as any).metadata?.fromCgBag) continue;
 
         // Parse size label from the item or product name
         // This supports both unit-based "Size: Large" and weight-based options like "1 oz"

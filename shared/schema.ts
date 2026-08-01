@@ -599,6 +599,8 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
   productSku: z.string().optional(),
   // Preserve size from the client so stock logic can distinguish weight options
   size: z.string().optional(),
+  // Preserve metadata so CG bag flags survive the parse
+  metadata: z.record(z.unknown()).nullable().optional(),
 });
 
 export const insertUserActivityLogSchema = createInsertSchema(userActivityLogs).omit({
