@@ -64,6 +64,139 @@ interface SupportTicketWithDetails {
 type SortField = 'createdAt' | 'product' | 'sku' | 'type' | 'quantity' | 'previousStock' | 'newStock' | 'changedBy' | 'reason';
 type SortDirection = 'asc' | 'desc';
 
+// ── Generated Bag Products List ────────────────────────────────────────────
+interface BagItem { productId?: number; name: string; sku?: string; price?: string; selectedSize?: string | null }
+
+function GenBagProductsList({
+  bags,
+  onToggle,
+  onDelete,
+}: {
+  bags: ProductWithSizes[];
+  onToggle: (id: number, isActive: boolean) => void;
+  onDelete: (id: number, name: string) => void;
+}) {
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  const toggle = (id: number) =>
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
+  const sorted = [...bags].sort(
+    (a, b) => (b.createdAt ? new Date(b.createdAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0)
+  );
+
+  return (
+    <div className="space-y-2">
+      {sorted.map(bag => {
+        let meta: any = {};
+        try { meta = JSON.parse((bag as any).adminNotes || "{}"); } catch {}
+        const items: BagItem[] = Array.isArray(meta.items) ? meta.items : [];
+        const templateName: string | null = meta.bagName || null;
+        const isOpen = expanded.has(bag.id);
+
+        return (
+          <div key={bag.id} className="border rounded-lg dark:border-gray-700 overflow-hidden">
+            {/* Row */}
+            <div className="flex items-center gap-3 p-3">
+              {/* Expand toggle */}
+              <button
+                className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
+                onClick={() => toggle(bag.id)}
+                title={isOpen ? "Hide items" : "Show items"}
+              >
+                {isOpen
+                  ? <ChevronUp className="h-4 w-4 text-gray-400" />
+                  : <ChevronDown className="h-4 w-4 text-gray-400" />}
+              </button>
+
+              <div className={`p-2 rounded-md shrink-0 ${bag.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                <ShoppingBag className="h-4 w-4" />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-sm truncate">{bag.name}</span>
+                  <Badge variant={bag.isActive ? "default" : "secondary"} className="text-xs shrink-0">
+                    {bag.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                  {items.length > 0 && (
+                    <span className="text-xs text-gray-400">{items.length} item{items.length !== 1 ? 's' : ''}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
+                  <span className="font-semibold text-green-600 dark:text-green-400">${Number(bag.price).toFixed(2)}</span>
+                  <span>{bag.stock ?? 0} in stock</span>
+                  {templateName && <span className="text-gray-400">from template: {templateName}</span>}
+                  <span className="font-mono text-gray-300 dark:text-gray-600">{bag.sku}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <Switch
+                  checked={bag.isActive ?? false}
+                  onCheckedChange={checked => onToggle(bag.id, checked)}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => onDelete(bag.id, bag.name)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Expanded items */}
+            {isOpen && (
+              <div className="border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 px-4 py-3">
+                {items.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic">No item data stored for this bag.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Contents</p>
+                    {items.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs flex items-center justify-center font-semibold shrink-0">
+                            {idx + 1}
+                          </span>
+                          <span className="font-medium truncate">{item.name}</span>
+                          {item.selectedSize && (
+                            <Badge variant="outline" className="text-xs shrink-0">{item.selectedSize}</Badge>
+                          )}
+                        </div>
+                        {item.price && (
+                          <span className="text-xs font-semibold text-green-600 dark:text-green-400 shrink-0 ml-3">
+                            ${Number(item.price).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    {/* Total retail value */}
+                    {items.some(i => i.price) && (
+                      <div className="flex justify-between items-center pt-2 mt-2 border-t dark:border-gray-700 text-xs font-semibold">
+                        <span className="text-gray-500 dark:text-gray-400 uppercase tracking-wide">Retail value</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          ${items.reduce((sum, i) => sum + (i.price ? Number(i.price) : 0), 0).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -2529,59 +2662,11 @@ export default function AdminPage() {
                       <p className="text-sm">Generate a bag from a template above to create a product listing.</p>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      {generatedBagProducts
-                        .slice()
-                        .sort((a, b) => (b.createdAt ? new Date(b.createdAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0))
-                        .map((bag) => {
-                          // Parse template name from adminNotes if available
-                          let bagMeta: any = {};
-                          try { bagMeta = JSON.parse((bag as any).adminNotes || "{}"); } catch {}
-                          const templateName = bagMeta.bagName || null;
-
-                          return (
-                            <div key={bag.id} className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700 gap-3">
-                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className={`p-2 rounded-md shrink-0 ${bag.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
-                                  <ShoppingBag className="h-4 w-4" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-medium text-sm truncate">{bag.name}</span>
-                                    <Badge variant={bag.isActive ? "default" : "secondary"} className="text-xs shrink-0">
-                                      {bag.isActive ? "Active" : "Inactive"}
-                                    </Badge>
-                                  </div>
-                                  <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
-                                    <span className="font-semibold text-green-600 dark:text-green-400">${Number(bag.price).toFixed(2)}</span>
-                                    <span>{bag.stock ?? 0} in stock</span>
-                                    {templateName && <span className="text-gray-400">from template: {templateName}</span>}
-                                    <span className="font-mono text-gray-300 dark:text-gray-600">{bag.sku}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <Switch
-                                  checked={bag.isActive ?? false}
-                                  onCheckedChange={(checked) => toggleGeneratedBagMutation.mutate({ id: bag.id, isActive: checked })}
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() => {
-                                    if (confirm(`Delete "${bag.name}"? This cannot be undone.`)) {
-                                      deleteGeneratedBagMutation.mutate(bag.id);
-                                    }
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
+                    <GenBagProductsList
+                      bags={generatedBagProducts}
+                      onToggle={(id, isActive) => toggleGeneratedBagMutation.mutate({ id, isActive })}
+                      onDelete={(id, name) => { if (confirm(`Delete "${name}"? This cannot be undone.`)) deleteGeneratedBagMutation.mutate(id); }}
+                    />
                   )}
                 </CardContent>
               </Card>
