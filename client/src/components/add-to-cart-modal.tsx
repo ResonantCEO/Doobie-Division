@@ -600,14 +600,22 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
             {product.category && (
               <p className="text-xs text-muted-foreground">{product.category.name}</p>
             )}
-            {isGrabBag && (product as any).description && (() => {
+            {isGrabBag && (() => {
               const grabBagMeta = (() => { try { return JSON.parse((product as any).adminNotes || "{}"); } catch { return {}; } })();
               if (grabBagMeta.hideItems) return null;
-              const bagItems = parseGrabBagItems((product as any).description);
-              return bagItems.length > 0 ? (
+              // Prefer structured adminNotes.items (has selectedSize); fall back to description bullets
+              const structuredItems: { name: string; price: string; selectedSize?: string }[] =
+                grabBagMeta.items && Array.isArray(grabBagMeta.items) && grabBagMeta.items.length > 0
+                  ? grabBagMeta.items.map((bi: any) => ({ name: String(bi.name), price: String(Number(bi.price).toFixed(2)), selectedSize: bi.selectedSize || undefined }))
+                  : (product as any).description ? parseGrabBagItems((product as any).description) : [];
+              return structuredItems.length > 0 ? (
                 <div className="mt-1.5 space-y-0.5 border-t border-dashed border-muted-foreground/20 pt-1.5">
-                  {bagItems.map((gi, i) => (
-                    <p key={i} className="text-xs text-muted-foreground">• {gi.name} <span className="text-muted-foreground/60">(${gi.price})</span></p>
+                  {structuredItems.map((gi, i) => (
+                    <p key={i} className="text-xs text-muted-foreground">
+                      • {gi.name}
+                      {gi.selectedSize && <span className="text-primary/80 ml-1">({gi.selectedSize})</span>}
+                      {' '}<span className="text-muted-foreground/60">(${gi.price})</span>
+                    </p>
                   ))}
                 </div>
               ) : null;

@@ -665,14 +665,21 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                       {item.product.category && (
                         <p className="text-xs text-muted-foreground">{item.product.category.name}</p>
                       )}
-                      {item.product.sku?.startsWith("GRAB-BAG-") && (item.product as any).description && (() => {
+                      {item.product.sku?.startsWith("GRAB-BAG-") && (() => {
                         const grabBagMeta = (() => { try { return JSON.parse((item.product as any).adminNotes || "{}"); } catch { return {}; } })();
                         if (grabBagMeta.hideItems) return null;
-                        const bagItems = parseGrabBagItems((item.product as any).description);
-                        return bagItems.length > 0 ? (
+                        const structuredItems: { name: string; price: string; selectedSize?: string }[] =
+                          grabBagMeta.items && Array.isArray(grabBagMeta.items) && grabBagMeta.items.length > 0
+                            ? grabBagMeta.items.map((bi: any) => ({ name: String(bi.name), price: String(Number(bi.price).toFixed(2)), selectedSize: bi.selectedSize || undefined }))
+                            : (item.product as any).description ? parseGrabBagItems((item.product as any).description) : [];
+                        return structuredItems.length > 0 ? (
                           <div className="mt-1 space-y-0.5 border-t border-dashed border-muted-foreground/20 pt-1">
-                            {bagItems.map((gi, i) => (
-                              <p key={i} className="text-xs text-muted-foreground">• {gi.name} <span className="text-muted-foreground/60">(${gi.price})</span></p>
+                            {structuredItems.map((gi, i) => (
+                              <p key={i} className="text-xs text-muted-foreground">
+                                • {gi.name}
+                                {gi.selectedSize && <span className="text-primary/80 ml-1">({gi.selectedSize})</span>}
+                                {' '}<span className="text-muted-foreground/60">(${gi.price})</span>
+                              </p>
                             ))}
                           </div>
                         ) : null;
