@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -76,9 +77,10 @@ function GenBagProductsList({
   bags: ProductWithSizes[];
   allProducts: ProductWithSizes[];
   onToggle: (id: number, isActive: boolean) => void;
-  onDelete: (id: number, name: string) => void;
+  onDelete: (id: number) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; name: string } | null>(null);
 
   const toggle = (id: number) =>
     setExpanded(prev => {
@@ -146,7 +148,7 @@ function GenBagProductsList({
                   variant="ghost"
                   size="sm"
                   className="text-destructive hover:text-destructive"
-                  onClick={() => onDelete(bag.id, bag.name)}
+                  onClick={() => setPendingDelete({ id: bag.id, name: bag.name })}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -215,6 +217,25 @@ function GenBagProductsList({
           </div>
         );
       })}
+      <AlertDialog open={!!pendingDelete} onOpenChange={open => { if (!open) setPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete generated bag?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{pendingDelete?.name}&rdquo; will be permanently removed from your catalog. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (pendingDelete) { onDelete(pendingDelete.id); setPendingDelete(null); } }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -2689,7 +2710,7 @@ export default function AdminPage() {
                       bags={generatedBagProducts}
                       allProducts={allProducts}
                       onToggle={(id, isActive) => toggleGeneratedBagMutation.mutate({ id, isActive })}
-                      onDelete={(id, name) => { if (confirm(`Delete "${name}"? This cannot be undone.`)) deleteGeneratedBagMutation.mutate(id); }}
+                      onDelete={(id) => deleteGeneratedBagMutation.mutate(id)}
                     />
                   )}
                 </CardContent>
