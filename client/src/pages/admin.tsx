@@ -2529,42 +2529,6 @@ export default function AdminPage() {
 
         {/* Bags Tab */}
         <TabsContent value="bags">
-              {/* Feature Description */}
-              <Card className="mb-4 border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-900/10">
-                <CardContent className="pt-5 pb-4">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-purple-100 dark:bg-purple-900/40 rounded-lg shrink-0">
-                      <Gift className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                      <p className="font-semibold text-purple-800 dark:text-purple-300 text-base">How Grab Bags Work</p>
-                      <p>
-                        Grab Bags are <strong>template-driven mystery bundles</strong>. Each template defines what goes inside a bag — either
-                        hand-picked specific products, random picks from chosen categories, or a mix of both — along with a selling price
-                        and a maximum retail value cap so the customer always gets a deal.
-                      </p>
-                      <p>
-                        When you hit <strong>Generate</strong> on a template, the system picks available in-stock items that fit the rules and shows you a
-                        preview. You review the contents, then confirm to instantly publish it as a real product in the storefront with
-                        a fully auto-generated name, description, and SKU.
-                      </p>
-                      <p>
-                        Each generated bag is its own live product — customers buy it like any other item, and stock is tracked automatically.
-                        If any component item runs out of stock after a bag is sold, the system disables the bag product to prevent
-                        overselling.
-                      </p>
-                      <div className="mt-2 p-3 bg-purple-100/70 dark:bg-purple-900/30 rounded-md text-xs text-purple-800 dark:text-purple-300 space-y-1">
-                        <p className="font-semibold uppercase tracking-wide">Template settings</p>
-                        <p>• <strong>Selling Price</strong> — what the customer pays for the bag</p>
-                        <p>• <strong>Target Value</strong> — the maximum combined retail price of items the system will pack in</p>
-                        <p>• <strong>Specific Products</strong> — items always included in every bag (guaranteed contents)</p>
-                        <p>• <strong>Category Picks</strong> — random slots filled from a category at generation time</p>
-                        <p>• <strong>Hide Items</strong> — when on, the bag description won't list what's inside (true mystery bag)</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
 
               <Card>
                 <CardHeader>
