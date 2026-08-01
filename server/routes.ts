@@ -1283,7 +1283,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const eligible = catProducts
                 .filter(p => {
                   if ((p.sku ?? '').startsWith('GRAB-BAG-')) return false;
-                  const hasStock = ((p.stock ?? 0) > 0) || ((p.physicalInventory ?? 0) > 0);
+                  // Use only `stock` (not physicalInventory) — createOrder's stock check
+                  // validates against `stock`, so picking items with stock=0 causes a 500.
+                  const hasStock = (p.stock ?? 0) > 0;
                   const price = parseFloat(String(p.price ?? '')) || 0;
                   return hasStock && price > 0;
                 })
