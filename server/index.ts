@@ -307,13 +307,14 @@ app.use((req, res, next) => {
     console.warn("⚠ Could not verify grab_bags table:", error?.message);
   }
 
-  // Ensure order_items.metadata column exists (for CG bag item flags)
+  // Ensure order_items.size and order_items.metadata columns exist
   try {
     const { sql } = await import("./db");
+    await sql.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS size VARCHAR`);
     await sql.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS metadata JSONB`);
-    console.log("✓ Verified order_items.metadata column exists");
+    console.log("✓ Verified order_items.size and order_items.metadata columns exist");
   } catch (error: any) {
-    console.warn("⚠ Could not verify grab_bags table:", error?.message);
+    console.warn("⚠ Could not verify order_items columns:", error?.message);
   }
 
   // Fix user_activity_logs sequence if it has fallen behind actual data
