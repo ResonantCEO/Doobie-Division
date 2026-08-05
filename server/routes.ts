@@ -4199,6 +4199,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // 2. Pick items from category selections targeting the remaining value
     let blacklistedIds: number[] = [];
     try { blacklistedIds = bag.blacklistedProductIds ? JSON.parse(bag.blacklistedProductIds) : []; } catch { /* ignore */ }
+    let blacklistedCategoryIds: number[] = [];
+    try { blacklistedCategoryIds = bag.blacklistedCategoryIds ? JSON.parse(bag.blacklistedCategoryIds) : []; } catch { /* ignore */ }
 
     // Compute how much of the target remains after specific products
     const remainingTarget = Math.max(0, targetTotal - runningTotal);
@@ -4211,10 +4213,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     type PoolEntry = { sel: { categoryId: number; count: number }; pool: Array<{ id: number; name: string; price: number; sku: string; sellingMethod: string; weightLabel: string; selectedSize?: string; imageUrl?: string | null; imageUrls?: string | null }> };
     const poolEntries: PoolEntry[] = [];
     for (const sel of categorySelections) {
+      // Skip entire category if it's blacklisted
+      if (blacklistedCategoryIds.includes(sel.categoryId)) {
+        warnings.push(`"${catLabel(sel.categoryId)}" is blacklisted and was skipped.`);
+        continue;
+      }
       try {
         const allInCat = await storage.getProducts({ categoryIds: [sel.categoryId], isActive: true });
         const pool = allInCat
-          .filter(p => !selectedProducts.find(s => s.id === p.id) && !blacklistedIds.includes(p.id))
+          .filter(p => !selectedProducts.find(s => s.id === p.id) && !blacklistedIds.includes(p.id) && !blacklistedCategoryIds.includes(p.categoryId ?? -1))
           .filter(p => componentAvailable(p))  // exclude 0-stock or 0-physical items
           .map(p => { const r = resolveProduct(p, catSlotBudget); return { id: p.id, name: p.name, price: r.price, sku: p.sku, sellingMethod: r.sellingMethod, weightLabel: r.weightLabel, selectedSize: r.selectedSize, imageUrl: p.imageUrl, imageUrls: p.imageUrls }; })
           .filter(p => p.price > 0);

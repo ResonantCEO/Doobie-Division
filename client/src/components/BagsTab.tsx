@@ -191,13 +191,14 @@ export default function BagsTab() {
     specificProductIds: [] as { id: number; size?: string }[],
     categorySelections: [] as { categoryId: number; count: number }[],
     blacklistedProductIds: [] as number[],
+    blacklistedCategoryIds: [] as number[],
     hideItems: false,
     isActive: true,
   });
 
   const resetGrabBagForm = () => setGrabBagForm({
     name: "", description: "", type: "standard", sellingPrice: "", maxTotalItemPrice: "",
-    specificProductIds: [], categorySelections: [], blacklistedProductIds: [], hideItems: false, isActive: true,
+    specificProductIds: [], categorySelections: [], blacklistedProductIds: [], blacklistedCategoryIds: [], hideItems: false, isActive: true,
   });
 
   const openEditGrabBag = (g: GrabBag) => {
@@ -218,6 +219,7 @@ export default function BagsTab() {
       })(),
       categorySelections: g.categorySelections ? JSON.parse(g.categorySelections) : [],
       blacklistedProductIds: g.blacklistedProductIds ? JSON.parse(g.blacklistedProductIds) : [],
+      blacklistedCategoryIds: (g as any).blacklistedCategoryIds ? JSON.parse((g as any).blacklistedCategoryIds) : [],
       hideItems: bagType === 'customer_generated' ? true : (g.hideItems ?? false),
       isActive: g.isActive,
     });
@@ -325,6 +327,7 @@ export default function BagsTab() {
         specificProductIds: !isCg && data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
         categorySelections: !isCg && data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
         blacklistedProductIds: data.blacklistedProductIds.length > 0 ? JSON.stringify(data.blacklistedProductIds) : null,
+        blacklistedCategoryIds: data.blacklistedCategoryIds.length > 0 ? JSON.stringify(data.blacklistedCategoryIds) : null,
         hideItems: isCg ? true : data.hideItems,
         isActive: data.isActive,
       });
@@ -352,6 +355,7 @@ export default function BagsTab() {
         specificProductIds: !isCg && data.specificProductIds.length > 0 ? JSON.stringify(data.specificProductIds) : null,
         categorySelections: !isCg && data.categorySelections.length > 0 ? JSON.stringify(data.categorySelections) : null,
         blacklistedProductIds: data.blacklistedProductIds.length > 0 ? JSON.stringify(data.blacklistedProductIds) : null,
+        blacklistedCategoryIds: data.blacklistedCategoryIds.length > 0 ? JSON.stringify(data.blacklistedCategoryIds) : null,
         hideItems: isCg ? true : data.hideItems,
         isActive: data.isActive,
       });
@@ -992,6 +996,47 @@ export default function BagsTab() {
                         <span className="text-red-700 dark:text-red-300">{prod ? `${prod.name}${cat ? ` (${cat.name})` : ''} — $${Number(prod.price).toFixed(2)}` : `Product #${pid}`}</span>
                         <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setGrabBagForm(f => ({ ...f, blacklistedProductIds: f.blacklistedProductIds.filter(id => id !== pid) }))}>
                           <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Blacklisted Categories */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1">
+                <Trash2 className="h-4 w-4 text-orange-500" />
+                Never Include — Blacklisted Categories
+              </Label>
+              <p className="text-xs text-gray-400">Products from these categories will never be randomly picked for this bag.</p>
+              <select
+                className="w-full border dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm px-3 py-2 text-foreground"
+                value=""
+                onChange={e => {
+                  const id = parseInt(e.target.value);
+                  if (id && !grabBagForm.blacklistedCategoryIds.includes(id)) {
+                    setGrabBagForm(f => ({ ...f, blacklistedCategoryIds: [...f.blacklistedCategoryIds, id] }));
+                  }
+                }}
+              >
+                <option value="">Add a category to block…</option>
+                {allCategories
+                  .filter(c => !grabBagForm.blacklistedCategoryIds.includes(c.id))
+                  .map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+              </select>
+              {grabBagForm.blacklistedCategoryIds.length > 0 && (
+                <div className="space-y-1 mt-2">
+                  {grabBagForm.blacklistedCategoryIds.map(cid => {
+                    const cat = allCategories.find(c => c.id === cid);
+                    return (
+                      <div key={cid} className="flex items-center justify-between p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded text-sm">
+                        <span className="text-orange-700 dark:text-orange-300">{cat?.name ?? `Category #${cid}`}</span>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setGrabBagForm(f => ({ ...f, blacklistedCategoryIds: f.blacklistedCategoryIds.filter(id => id !== cid) }))}>
+                          <Trash2 className="h-3.5 w-3.5 text-orange-400" />
                         </Button>
                       </div>
                     );
