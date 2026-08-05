@@ -458,10 +458,17 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, initialState);
 
-  // Global weight pricing is currently locked off — do not enable until ready
+  // Sync global weight pricing setting from the server
+  const { data: weightPricingData } = useQuery<{ key: string; value: string | null }>({
+    queryKey: ['/api/settings/global_weight_pricing_enabled'],
+    queryFn: () => fetch('/api/settings/global_weight_pricing_enabled').then(r => r.ok ? r.json() : { key: 'global_weight_pricing_enabled', value: 'false' }),
+    staleTime: 30_000,
+  });
+
   useEffect(() => {
-    dispatch({ type: 'SET_WEIGHT_PRICING', payload: false });
-  }, []);
+    const enabled = weightPricingData?.value === 'true';
+    dispatch({ type: 'SET_WEIGHT_PRICING', payload: enabled });
+  }, [weightPricingData]);
 
   useEffect(() => {
     const savedCart = localStorage.getItem('cart');
