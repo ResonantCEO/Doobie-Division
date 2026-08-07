@@ -232,8 +232,13 @@ function getApplicableTierPrice(product: Product & { category: Category | null; 
   if (!tiers || tiers.length === 0) return basePrice;
   const sortedTiers = [...tiers].sort((a, b) => b.minQuantity - a.minQuantity);
   const applicable = sortedTiers.find(t => totalProductQty >= t.minQuantity);
-  if (applicable) return Number(applicable.pricePerItem);
-  return basePrice;
+  if (!applicable) return basePrice;
+  // Bundle covers `applicable.minQuantity` items at the tier price;
+  // any extras beyond the bundle revert to the normal base price.
+  const bundleTotal = Number(applicable.pricePerItem) * applicable.minQuantity;
+  const extraTotal = (totalProductQty - applicable.minQuantity) * basePrice;
+  // Return effective unit price so callers can multiply by item.quantity normally.
+  return (bundleTotal + extraTotal) / totalProductQty;
 }
 
 function computeTotal(items: CartItem[], globalWeightPricing: boolean): number {

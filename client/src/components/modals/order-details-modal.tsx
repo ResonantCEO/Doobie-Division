@@ -17,7 +17,10 @@ function getTieredUnitPrice(basePrice: number, tiers: Array<{ minQuantity: numbe
   if (!tiers || tiers.length === 0) return basePrice;
   const sorted = [...tiers].sort((a, b) => b.minQuantity - a.minQuantity);
   const applicable = sorted.find(t => totalQty >= t.minQuantity);
-  return applicable ? Number(applicable.pricePerItem) : basePrice;
+  if (!applicable) return basePrice;
+  const bundleTotal = Number(applicable.pricePerItem) * applicable.minQuantity;
+  const extraTotal = (totalQty - applicable.minQuantity) * basePrice;
+  return (bundleTotal + extraTotal) / totalQty;
 }
 
 interface OrderDetailsModalProps {

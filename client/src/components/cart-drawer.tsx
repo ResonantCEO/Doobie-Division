@@ -462,8 +462,11 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         const totalQty = productQtyMap.get(product.id) || 0;
         const sorted = [...tiers].sort((a, b) => b.minQuantity - a.minQuantity);
         const applicable = sorted.find(t => totalQty >= t.minQuantity);
-        if (applicable) return Number(applicable.pricePerItem);
-        return basePrice;
+        if (!applicable) return basePrice;
+        // Bundle covers the tier quantity at tier price; extras revert to base price.
+        const bundleTotal = Number(applicable.pricePerItem) * applicable.minQuantity;
+        const extraTotal = (totalQty - applicable.minQuantity) * basePrice;
+        return (bundleTotal + extraTotal) / totalQty;
       };
 
       const orderItems = state.items.map(item => {
