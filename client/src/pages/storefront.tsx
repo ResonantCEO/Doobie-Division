@@ -1303,7 +1303,7 @@ export default function StorefrontPage() {
             // Sort the root categories + optional BYB sentinel by sortOrder
             type SortedId = number | null | 'byb';
             const rawIds: SortedId[] = Array.from(productsByParentCategory.keys());
-            if (cgTemplates.length > 0 && !adProductFilter) rawIds.push('byb');
+            if (cgTemplates.length > 0 && !adProductFilter && !debouncedSearchQuery) rawIds.push('byb');
 
             const sortedRootCategoryIds = rawIds.sort((a, b) => {
               const getSortOrder = (id: SortedId): number => {
