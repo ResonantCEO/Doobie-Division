@@ -1303,7 +1303,8 @@ export default function StorefrontPage() {
             // Sort the root categories + optional BYB sentinel by sortOrder
             type SortedId = number | null | 'byb';
             const rawIds: SortedId[] = Array.from(productsByParentCategory.keys());
-            if (cgTemplates.length > 0 && !adProductFilter && !debouncedSearchQuery) rawIds.push('byb');
+            const searchMatchesBYB = debouncedSearchQuery && ['bag', 'build', 'your bag', 'grab bag', 'custom'].some(kw => debouncedSearchQuery.toLowerCase().includes(kw));
+            if (cgTemplates.length > 0 && !adProductFilter && (!debouncedSearchQuery || searchMatchesBYB)) rawIds.push('byb');
 
             const sortedRootCategoryIds = rawIds.sort((a, b) => {
               const getSortOrder = (id: SortedId): number => {
