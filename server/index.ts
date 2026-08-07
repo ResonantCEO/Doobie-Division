@@ -320,6 +320,18 @@ app.use((req, res, next) => {
     console.warn("⚠ Could not verify order_items columns:", error?.message);
   }
 
+  // Clamp any existing negative stock / physical values to zero
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`UPDATE products SET stock = GREATEST(0, stock) WHERE stock < 0`);
+    await sql.query(`UPDATE products SET physical_inventory = GREATEST(0, physical_inventory) WHERE physical_inventory < 0`);
+    await sql.query(`UPDATE product_sizes SET quantity = GREATEST(0, quantity) WHERE quantity < 0`);
+    await sql.query(`UPDATE product_sizes SET physical_quantity = GREATEST(0, physical_quantity) WHERE physical_quantity < 0`);
+    console.log("✓ Clamped any negative stock/physical values to zero");
+  } catch (error: any) {
+    console.warn("⚠ Could not clamp negative stock values:", error?.message);
+  }
+
   // Fix user_activity_logs sequence if it has fallen behind actual data
   try {
     const { sql } = await import("./db");

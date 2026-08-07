@@ -1991,14 +1991,14 @@ export class DatabaseStorage implements IStorage {
         }
 
         await db.execute(
-          sql`UPDATE products SET stock = stock - ${stockToDeduct}, updated_at = NOW() WHERE id = ${item.productId}`
+          sql`UPDATE products SET stock = GREATEST(0, stock - ${stockToDeduct}), updated_at = NOW() WHERE id = ${item.productId}`
         );
 
         // Use item.size directly (preferred) or fall back to extracting from product name
         const sizeName = (item as any).size || this.extractSizeFromProductName(item.productName);
         if (sizeName) {
           await db.execute(
-            sql`UPDATE product_sizes SET quantity = quantity - ${item.quantity}, updated_at = NOW() WHERE product_id = ${item.productId} AND size = ${sizeName}`
+            sql`UPDATE product_sizes SET quantity = GREATEST(0, quantity - ${item.quantity}), updated_at = NOW() WHERE product_id = ${item.productId} AND size = ${sizeName}`
           );
         }
       } catch (stockErr) {
