@@ -327,7 +327,10 @@ app.use((req, res, next) => {
     await sql.query(`UPDATE products SET physical_inventory = GREATEST(0, physical_inventory) WHERE physical_inventory < 0`);
     await sql.query(`UPDATE product_sizes SET quantity = GREATEST(0, quantity) WHERE quantity < 0`);
     await sql.query(`UPDATE product_sizes SET physical_quantity = GREATEST(0, physical_quantity) WHERE physical_quantity < 0`);
-    console.log("✓ Clamped any negative stock/physical values to zero");
+    // Physical must always be >= stock — correct any existing violations
+    await sql.query(`UPDATE products SET physical_inventory = stock WHERE physical_inventory < stock`);
+    await sql.query(`UPDATE product_sizes SET physical_quantity = quantity WHERE COALESCE(physical_quantity, quantity) < quantity`);
+    console.log("✓ Clamped any negative stock/physical values to zero and enforced physical >= stock");
   } catch (error: any) {
     console.warn("⚠ Could not clamp negative stock values:", error?.message);
   }

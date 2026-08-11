@@ -1442,6 +1442,17 @@ export class DatabaseStorage implements IStorage {
     console.log('[updateProduct] Product updated successfully, id:', product.id);
 
     if (sizes !== undefined) {
+      // Preserve existing physical_quantity values before deleting rows
+      let existingPhysicalBySize: Record<string, number> = {};
+      try {
+        const existing = await db.select().from(productSizes).where(eq(productSizes.productId, id));
+        for (const row of existing) {
+          existingPhysicalBySize[row.size] = row.physicalQuantity ?? row.quantity ?? 0;
+        }
+      } catch (e: any) {
+        console.log('[updateProduct] Could not fetch existing sizes for physical preservation:', e?.message);
+      }
+
       try {
         await retryQuery(() =>
           db.delete(productSizes).where(eq(productSizes.productId, id))
@@ -1451,14 +1462,20 @@ export class DatabaseStorage implements IStorage {
       }
 
       if (sizes && sizes.length > 0) {
-        const sizeRecords: InsertProductSize[] = sizes.map((size: any) => ({
-          productId: id,
-          size: size.size,
-          quantity: size.quantity,
-          physicalQuantity: size.quantity,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }));
+        const sizeRecords: InsertProductSize[] = sizes.map((size: any) => {
+          const newQty = size.quantity ?? 0;
+          const prevPhysical = existingPhysicalBySize[size.size] ?? newQty;
+          // Physical must always be >= stock; preserve the higher value
+          const physQty = Math.max(prevPhysical, newQty);
+          return {
+            productId: id,
+            size: size.size,
+            quantity: newQty,
+            physicalQuantity: physQty,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+        });
 
         try {
           await retryQuery(() =>
@@ -2170,7 +2187,8 @@ export class DatabaseStorage implements IStorage {
     const sizeName = (orderItem as any).size || this.extractSizeFromProductName(orderItem.productName);
     if (sizeName) {
       await db.execute(
-        sql`UPDATE product_sizes SET physical_quantity = physical_quantity - ${physicalDeltaInt}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
+        // Clamp so physical_quantity never drops below quantity (stock) — physical must always >= stock
+        sql`UPDATE product_sizes SET physical_quantity = GREATEST(quantity, COALESCE(physical_quantity, quantity) - ${physicalDeltaInt}), updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
       );
     } else {
       // No explicit size — check whether this product has size rows at all and deduct
