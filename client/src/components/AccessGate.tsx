@@ -10,9 +10,10 @@ import { useLocation } from "wouter";
 
 interface AccessGateProps {
   onGranted: () => void;
+  onBack?: () => void;
 }
 
-export default function AccessGate({ onGranted }: AccessGateProps) {
+export default function AccessGate({ onGranted, onBack }: AccessGateProps) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
@@ -45,6 +46,11 @@ export default function AccessGate({ onGranted }: AccessGateProps) {
   };
 
   const handleBack = async () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    // Default: log out and go home (legacy full-screen gate behaviour)
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
       queryClient.clear();

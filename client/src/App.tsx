@@ -23,17 +23,45 @@ import InactivityWarning from "@/components/InactivityWarning";
 import { useInactivityTimer } from "@/hooks/useInactivityTimer";
 import { useCallback, useEffect, useState } from "react";
 
-function Router() {
-  const { user, isAuthenticated, isLoading } = useAuth();
+// Wraps the storefront so only that page requires an access code for customers.
+function StorefrontWithGate() {
+  const { user, isAuthenticated } = useAuth();
   const [accessGrantedLocally, setAccessGrantedLocally] = useState(false);
-  const qc = useQueryClient();
+
+  const isCustomer = isAuthenticated && user?.role === "customer";
 
   const { data: accessStatus, isLoading: isLoadingAccess } = useQuery<{ granted: boolean }>({
     queryKey: ["/api/access/status"],
     queryFn: getQueryFn({ on401: "returnNull" }),
-    enabled: isAuthenticated && user?.role === "customer",
+    enabled: isCustomer,
     retry: false,
   });
+
+  if (isCustomer) {
+    if (isLoadingAccess) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
+    const accessGranted = accessGrantedLocally || accessStatus?.granted;
+    if (!accessGranted) {
+      return (
+        <AccessGate
+          onGranted={() => setAccessGrantedLocally(true)}
+          onBack={() => { window.location.href = "/"; }}
+        />
+      );
+    }
+  }
+
+  return <StorefrontPage />;
+}
+
+function Router() {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const qc = useQueryClient();
 
   const handleInactivityLogout = useCallback(async () => {
     try {
@@ -58,23 +86,6 @@ function Router() {
     );
   }
 
-  // Show access gate for customers who haven't been granted access yet
-  if (isAuthenticated && user?.role === "customer") {
-    const accessGranted = accessGrantedLocally || accessStatus?.granted;
-    if (!accessGranted && !isLoadingAccess) {
-      return (
-        <AccessGate onGranted={() => setAccessGrantedLocally(true)} />
-      );
-    }
-    if (isLoadingAccess) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      );
-    }
-  }
-
   return (
     <>
       <InactivityWarning
@@ -85,7 +96,7 @@ function Router() {
       />
       <Switch>
         <Route path="/" component={isAuthenticated ? Dashboard : Landing} />
-        <Route path="/storefront" component={StorefrontPage} />
+        <Route path="/storefront" component={StorefrontWithGate} />
         <Route path="/dashboard/:tab?" component={Dashboard} />
         <Route path="/inventory" component={InventoryPage} />
         <Route path="/orders" component={OrdersPage} />
