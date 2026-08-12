@@ -10,6 +10,7 @@ import Dashboard from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
 import WireframePage from "@/pages/wireframe";
 import StorefrontPage from "@/pages/storefront";
+import StorefrontWithGate from "@/components/StorefrontWithGate";
 import InventoryPage from "@/pages/inventory";
 import OrdersPage from "@/pages/orders";
 import AnalyticsPage from "@/pages/analytics";
@@ -23,51 +24,6 @@ import InactivityWarning from "@/components/InactivityWarning";
 import { useInactivityTimer } from "@/hooks/useInactivityTimer";
 import { useCallback, useEffect, useState } from "react";
 
-// Wraps the storefront so only that page requires an access code for customers.
-function StorefrontWithGate() {
-  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
-  const [accessGrantedLocally, setAccessGrantedLocally] = useState(false);
-
-  const isCustomer = isAuthenticated && user?.role === "customer";
-
-  const { data: accessStatus, isLoading: isLoadingAccess } = useQuery<{ granted: boolean }>({
-    queryKey: ["/api/access/status"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-    enabled: isCustomer,
-    retry: false,
-  });
-
-  // Wait for auth to resolve before deciding anything
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (isCustomer) {
-    // Wait for access check to resolve
-    if (isLoadingAccess) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      );
-    }
-    const accessGranted = accessGrantedLocally || accessStatus?.granted;
-    if (!accessGranted) {
-      return (
-        <AccessGate
-          onGranted={() => setAccessGrantedLocally(true)}
-          onBack={() => { window.location.href = "/"; }}
-        />
-      );
-    }
-  }
-
-  return <StorefrontPage />;
-}
 
 function Router() {
   const { user, isAuthenticated, isLoading } = useAuth();

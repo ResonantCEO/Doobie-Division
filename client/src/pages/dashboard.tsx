@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/navigation";
 import logoImage from '@assets/Remove_White_Background_(1)_1782586580039.png';
 import StorefrontPage from "./storefront";
+import StorefrontWithGate from "@/components/StorefrontWithGate";
 import InventoryPage from "./inventory";
 import OrdersPage from "./orders";
 import AnalyticsPage from "./analytics";
@@ -50,19 +51,19 @@ export default function Dashboard() {
   const renderTabContent = () => {
     switch (tab) {
       case "storefront":
-        return <StorefrontPage />;
+        return <StorefrontWithGate />;
       case "inventory":
-        return user.role === 'admin' || user.role === 'manager' ? <InventoryPage /> : <StorefrontPage />;
+        return user.role === 'admin' || user.role === 'manager' ? <InventoryPage /> : <StorefrontWithGate />;
       case "orders":
-        return user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <OrdersPage /> : <StorefrontPage />;
+        return user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <OrdersPage /> : <StorefrontWithGate />;
       case "analytics":
-        return user.role === 'admin' || user.role === 'manager' ? <AnalyticsPage /> : <StorefrontPage />;
+        return user.role === 'admin' || user.role === 'manager' ? <AnalyticsPage /> : <StorefrontWithGate />;
       case "users":
-        return user.role === 'admin' ? <UsersPage /> : <StorefrontPage />;
+        return user.role === 'admin' ? <UsersPage /> : <StorefrontWithGate />;
       case "admin":
-        return user.role === 'admin' ? <AdminPage /> : <StorefrontPage />;
+        return user.role === 'admin' ? <AdminPage /> : <StorefrontWithGate />;
       default:
-        return <StorefrontPage />;
+        return <StorefrontWithGate />;
     }
   };
 
