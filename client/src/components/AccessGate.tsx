@@ -63,7 +63,7 @@ export default function AccessGate({ onGranted, onBack }: AccessGateProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
-      <Card className="w-full max-w-sm shadow-lg">
+      <Card className="w-full max-w-sm shadow-lg bg-white dark:bg-gray-900">
         <CardHeader className="text-center space-y-3 pb-4">
           <div className="flex justify-center">
             <div className="p-3 rounded-full bg-primary/10">
