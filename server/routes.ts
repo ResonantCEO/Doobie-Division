@@ -1757,6 +1757,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/orders/:id/shipping-address', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { shippingAddress } = req.body;
+      if (!shippingAddress || typeof shippingAddress !== 'string' || !shippingAddress.trim()) {
+        return res.status(400).json({ message: "A valid shipping address is required" });
+      }
+      const order = await storage.updateOrderShippingAddress(id, shippingAddress.trim());
+      res.json(order);
+    } catch (error) {
+      console.error('Failed to update shipping address:', error);
+      res.status(500).json({ message: "Failed to update shipping address" });
+    }
+  });
+
   app.patch('/api/orders/:id/total', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);

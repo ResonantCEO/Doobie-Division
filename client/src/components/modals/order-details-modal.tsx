@@ -67,6 +67,11 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [paymentPhotoUploading, setPaymentPhotoUploading] = useState(false);
   const paymentPhotoInputRef = useRef<HTMLInputElement>(null);
 
+  // Shipping address edit state
+  const [editingShippingAddress, setEditingShippingAddress] = useState(false);
+  const [pendingShippingAddress, setPendingShippingAddress] = useState("");
+  const [shippingAddressSaving, setShippingAddressSaving] = useState(false);
+
   // Payment method edit state
   const [editingPaymentMethod, setEditingPaymentMethod] = useState(false);
   const [pendingPaymentMethod, setPendingPaymentMethod] = useState<"prepay" | "cod">("cod");
@@ -607,17 +612,85 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
             </div>
 
             {/* Shipping Address */}
-            {(displayOrder.shippingAddress || (displayOrder as any).shipping_address) && (
+            {(displayOrder.shippingAddress || (displayOrder as any).shipping_address || isAdmin) && (
               <>
                 <Separator />
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-gray-600 dark:text-gray-300" />
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Shipping Address</h3>
+                    {isAdmin && !editingShippingAddress && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-muted-foreground ml-1"
+                        onClick={() => {
+                          setPendingShippingAddress(displayOrder.shippingAddress || (displayOrder as any).shipping_address || "");
+                          setEditingShippingAddress(true);
+                        }}
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />Edit
+                      </Button>
+                    )}
                   </div>
-                  <div className="text-sm">
-                    <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{displayOrder.shippingAddress || (displayOrder as any).shipping_address}</pre>
-                  </div>
+                  {!editingShippingAddress ? (
+                    <div className="text-sm">
+                      <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                        {displayOrder.shippingAddress || (displayOrder as any).shipping_address || <span className="text-muted-foreground italic">Not provided</span>}
+                      </pre>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-3 space-y-3">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Edit Shipping Address</p>
+                      <textarea
+                        className="w-full rounded-md border border-gray-200 dark:border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-900 dark:text-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                        rows={3}
+                        value={pendingShippingAddress}
+                        onChange={(e) => setPendingShippingAddress(e.target.value)}
+                        placeholder="Enter shipping address"
+                      />
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs"
+                          disabled={shippingAddressSaving || !pendingShippingAddress.trim()}
+                          onClick={async () => {
+                            if (!displayOrder?.id) return;
+                            setShippingAddressSaving(true);
+                            try {
+                              const res = await fetch(`/api/orders/${displayOrder.id}/shipping-address`, {
+                                method: "PATCH",
+                                credentials: "include",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ shippingAddress: pendingShippingAddress.trim() }),
+                              });
+                              if (!res.ok) throw new Error("Failed to update");
+                              await queryClient.invalidateQueries({ queryKey: ["/api/orders", displayOrder.id] });
+                              await queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+                              toast({ title: "Shipping address updated" });
+                              setEditingShippingAddress(false);
+                            } catch {
+                              toast({ title: "Failed to update shipping address", variant: "destructive" });
+                            } finally {
+                              setShippingAddressSaving(false);
+                            }
+                          }}
+                        >
+                          {shippingAddressSaving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                          Save
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          disabled={shippingAddressSaving}
+                          onClick={() => setEditingShippingAddress(false)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}
