@@ -1462,20 +1462,16 @@ export class DatabaseStorage implements IStorage {
       }
 
       if (sizes && sizes.length > 0) {
-        const sizeRecords: InsertProductSize[] = sizes.map((size: any) => {
-          const newQty = size.quantity ?? 0;
-          const prevPhysical = existingPhysicalBySize[size.size] ?? newQty;
-          // Physical must always be >= stock; preserve the higher value
-          const physQty = Math.max(prevPhysical, newQty);
-          return {
-            productId: id,
-            size: size.size,
-            quantity: newQty,
-            physicalQuantity: physQty,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-        });
+        const sizeRecords: InsertProductSize[] = sizes.map((size: any) => ({
+          productId: id,
+          size: size.size,
+          quantity: size.quantity,
+          // When an admin explicitly edits quantities, physical syncs to the new stock value.
+          // The fulfillment path separately enforces physical >= stock during order processing.
+          physicalQuantity: size.quantity,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
 
         try {
           await retryQuery(() =>
