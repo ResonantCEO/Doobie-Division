@@ -25,7 +25,7 @@ import { useCallback, useEffect, useState } from "react";
 
 // Wraps the storefront so only that page requires an access code for customers.
 function StorefrontWithGate() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [accessGrantedLocally, setAccessGrantedLocally] = useState(false);
 
   const isCustomer = isAuthenticated && user?.role === "customer";
@@ -37,7 +37,17 @@ function StorefrontWithGate() {
     retry: false,
   });
 
+  // Wait for auth to resolve before deciding anything
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   if (isCustomer) {
+    // Wait for access check to resolve
     if (isLoadingAccess) {
       return (
         <div className="min-h-screen flex items-center justify-center">
