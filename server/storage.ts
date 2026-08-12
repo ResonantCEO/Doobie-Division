@@ -107,6 +107,7 @@ export interface IStorage {
   updateOrderStatus(id: number, status: string): Promise<Order>;
   updateOrderTotal(id: number, total: number): Promise<Order>;
   updateOrderShippingAddress(id: number, shippingAddress: string): Promise<Order>;
+  updateOrderNotes(id: number, notes: string): Promise<Order>;
   updateOrderPaymentPhoto(id: number, photoUrl: string | null): Promise<Order>;
   updateOrderPaymentMethod(id: number, paymentMethod: string, photoUrl?: string | null): Promise<Order>;
   fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
@@ -2072,6 +2073,20 @@ export class DatabaseStorage implements IStorage {
       db
         .update(orders)
         .set({ total: total.toString(), updatedAt: new Date() })
+        .where(eq(orders.id, orderId))
+        .returning()
+    );
+    if (!updatedOrder) {
+      throw new Error("Order not found");
+    }
+    return updatedOrder;
+  }
+
+  async updateOrderNotes(orderId: number, notes: string): Promise<Order> {
+    const [updatedOrder] = await retryQuery(() =>
+      db
+        .update(orders)
+        .set({ notes: notes || null, updatedAt: new Date() })
         .where(eq(orders.id, orderId))
         .returning()
     );

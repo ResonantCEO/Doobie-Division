@@ -1757,6 +1757,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/orders/:id/notes', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { notes } = req.body;
+      if (notes === undefined || notes === null) {
+        return res.status(400).json({ message: "notes field is required" });
+      }
+      const order = await storage.updateOrderNotes(id, String(notes));
+      res.json(order);
+    } catch (error) {
+      console.error('Failed to update order notes:', error);
+      res.status(500).json({ message: "Failed to update order notes" });
+    }
+  });
+
   app.patch('/api/orders/:id/shipping-address', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);

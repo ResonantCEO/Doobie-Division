@@ -67,6 +67,11 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [paymentPhotoUploading, setPaymentPhotoUploading] = useState(false);
   const paymentPhotoInputRef = useRef<HTMLInputElement>(null);
 
+  // Notes edit state
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [pendingNotes, setPendingNotes] = useState("");
+  const [notesSaving, setNotesSaving] = useState(false);
+
   // Shipping address edit state
   const [editingShippingAddress, setEditingShippingAddress] = useState(false);
   const [pendingShippingAddress, setPendingShippingAddress] = useState("");
@@ -1793,14 +1798,82 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
             </div>
 
             {/* Notes */}
-            {displayOrder.notes && (
+            {(displayOrder.notes || isAdmin) && (
               <>
                 <Separator />
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Notes</h3>
-                  <div className="text-sm text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-300 dark:border-gray-600">
-                    <p className="whitespace-pre-wrap">{displayOrder.notes}</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Notes</h3>
+                    {isAdmin && !editingNotes && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-muted-foreground ml-1"
+                        onClick={() => {
+                          setPendingNotes(displayOrder.notes || "");
+                          setEditingNotes(true);
+                        }}
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />Edit
+                      </Button>
+                    )}
                   </div>
+                  {!editingNotes ? (
+                    <div className="text-sm text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-300 dark:border-gray-600">
+                      <p className="whitespace-pre-wrap">{displayOrder.notes || <span className="text-muted-foreground italic">No notes</span>}</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-3 space-y-3">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Edit Notes</p>
+                      <textarea
+                        className="w-full rounded-md border border-gray-200 dark:border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-900 dark:text-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                        rows={4}
+                        value={pendingNotes}
+                        onChange={(e) => setPendingNotes(e.target.value)}
+                        placeholder="Add notes for this order…"
+                      />
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs"
+                          disabled={notesSaving}
+                          onClick={async () => {
+                            if (!displayOrder?.id) return;
+                            setNotesSaving(true);
+                            try {
+                              const res = await fetch(`/api/orders/${displayOrder.id}/notes`, {
+                                method: "PATCH",
+                                credentials: "include",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ notes: pendingNotes }),
+                              });
+                              if (!res.ok) throw new Error("Failed to update");
+                              await queryClient.invalidateQueries({ queryKey: ["/api/orders", displayOrder.id] });
+                              await queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+                              toast({ title: "Notes updated" });
+                              setEditingNotes(false);
+                            } catch {
+                              toast({ title: "Failed to update notes", variant: "destructive" });
+                            } finally {
+                              setNotesSaving(false);
+                            }
+                          }}
+                        >
+                          {notesSaving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                          Save
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          disabled={notesSaving}
+                          onClick={() => setEditingNotes(false)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}
