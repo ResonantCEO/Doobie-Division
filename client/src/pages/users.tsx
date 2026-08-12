@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,9 @@ import {
   Save,
   ShoppingCart,
   Trash2,
-  Search
+  Search,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { format } from "date-fns";
 import type { User } from "@shared/schema";
@@ -55,7 +57,7 @@ export default function UsersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<(User & { orderCount?: number }) | null>(null);
   const [selectedPhotoType, setSelectedPhotoType] = useState<'id' | 'verification' | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [activityModalOpen, setActivityModalOpen] = useState(false);
@@ -67,13 +69,46 @@ export default function UsersPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
+  // Debounce search input — reset to page 1 on change
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
-  // Fetch users with stats
-  const { data: users = [], isLoading } = useQuery<(User & { orderCount?: number })[]>({
-    queryKey: ["/api/users"],
-    refetchInterval: 30000, // Refetch every 30 seconds
+  const PAGE_SIZE = 25;
+
+  // Fetch users with stats (paginated, server-side search)
+  const { data, isLoading } = useQuery<{
+    users: (User & { orderCount?: number })[];
+    total: number;
+    activeCount: number;
+    pendingCount: number;
+    adminCount: number;
+  }>({
+    queryKey: ["/api/users", currentPage, debouncedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(PAGE_SIZE),
+        search: debouncedSearch,
+      });
+      const res = await fetch(`/api/users?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return res.json();
+    },
+    refetchInterval: 30000,
+    placeholderData: (prev) => prev,
   });
+
+  const pagedUsers = data?.users ?? [];
+  const totalUsers = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE));
 
   // Update user status mutation
   const updateStatusMutation = useMutation({
@@ -81,7 +116,7 @@ export default function UsersPage() {
       await apiRequest("PUT", `/api/users/${userId}/status`, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", currentPage, debouncedSearch] });
       toast({
         title: "Success",
         description: "User status updated successfully",
@@ -113,7 +148,7 @@ export default function UsersPage() {
       await apiRequest("PUT", `/api/users/${userId}/role`, { role });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", currentPage, debouncedSearch] });
       toast({
         title: "Success",
         description: "User role updated successfully",
@@ -145,7 +180,7 @@ export default function UsersPage() {
       await apiRequest("PUT", `/api/users/${userId}`, userData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", currentPage, debouncedSearch] });
       setEditModalOpen(false);
       setEditingUser(null);
       toast({
@@ -178,7 +213,7 @@ export default function UsersPage() {
       await apiRequest("DELETE", `/api/users/${userId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", currentPage, debouncedSearch] });
       setDeleteConfirmOpen(false);
       setUserToDelete(null);
       toast({
@@ -217,32 +252,14 @@ export default function UsersPage() {
     }
   };
 
-  const getUserStats = () => {
-    const stats = {
-      total: users.length,
-      active: users.filter(u => u.status === 'active').length,
-      pending: users.filter(u => u.status === 'pending').length,
-      admins: users.filter(u => u.role === 'admin').length,
-    };
-    return stats;
+  const stats = {
+    total: totalUsers,
+    active: data?.activeCount ?? 0,
+    pending: data?.pendingCount ?? 0,
+    admins: data?.adminCount ?? 0,
   };
 
-  const stats = getUserStats();
-  const pendingUsers = users.filter(u => u.status === 'pending');
-
-  const filteredUsers = searchQuery.trim()
-    ? users.filter((u) => {
-        const q = searchQuery.toLowerCase();
-        return (
-          `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
-          (u.email?.toLowerCase().includes(q)) ||
-          (u.telegramUsername?.toLowerCase().includes(q)) ||
-          (u.city?.toLowerCase().includes(q)) ||
-          (u.state?.toLowerCase().includes(q)) ||
-          (u.address?.toLowerCase().includes(q))
-        );
-      })
-    : users;
+  const hasPendingUsers = stats.pending > 0;
 
   const getRoleBadge = (role: string) => {
     switch (role?.toLowerCase()) {
@@ -278,7 +295,7 @@ export default function UsersPage() {
   };
 
   const handleRejectUser = (userId: string) => {
-    const user = users.find(u => u.id === userId);
+    const user = pagedUsers.find(u => u.id === userId);
     if (user) {
       setUserToSuspend(user);
       setSuspendConfirmOpen(true);
@@ -286,7 +303,7 @@ export default function UsersPage() {
   };
 
   const handleSuspendUser = (userId: string) => {
-    const user = users.find(u => u.id === userId);
+    const user = pagedUsers.find(u => u.id === userId);
     if (user) {
       setUserToSuspend(user);
       setSuspendConfirmOpen(true);
@@ -322,7 +339,7 @@ export default function UsersPage() {
   };
 
   const handleViewActivity = async (userId: string) => {
-    const user = users.find(u => u.id === userId);
+    const user = pagedUsers.find(u => u.id === userId);
     if (user) {
       setSelectedUser(user);
       try {
@@ -406,7 +423,7 @@ export default function UsersPage() {
       </div>
 
       {/* Pending Approvals Alert */}
-      {pendingUsers.length > 0 && (
+      {hasPendingUsers && (
         <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800">
           <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -415,7 +432,7 @@ export default function UsersPage() {
                 <div>
                   <h3 className="font-semibold text-yellow-800 dark:text-yellow-200">Pending User Approvals</h3>
                   <p className="text-yellow-700 dark:text-yellow-300 text-sm">
-                    {pendingUsers.length} new users are waiting for approval to access the system
+                    {stats.pending} new users are waiting for approval to access the system
                   </p>
                 </div>
               </div>
@@ -498,7 +515,7 @@ export default function UsersPage() {
           </div>
         </div>
         <CardContent className="p-0">
-          {filteredUsers.length === 0 ? (
+          {pagedUsers.length === 0 ? (
             <div className="text-center py-12">
               <UsersIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500 text-lg">{searchQuery.trim() ? "No users match your search" : "No users found"}</p>
@@ -507,7 +524,7 @@ export default function UsersPage() {
             <>
               {/* Mobile Card View */}
               <div className="md:hidden space-y-3 p-4">
-                {filteredUsers.map((user) => (
+                {pagedUsers.map((user) => (
                   <div key={user.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
                     {/* User Header */}
                     <div className="flex items-start justify-between">
@@ -713,7 +730,7 @@ export default function UsersPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredUsers.map((user) => (
+                    {pagedUsers.map((user) => (
                       <TableRow key={user.id}>
                         <TableCell>
                           <div className="flex items-center space-x-3">
@@ -885,6 +902,38 @@ export default function UsersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2">
+          <p className="text-sm text-muted-foreground">
+            Showing {Math.min((currentPage - 1) * PAGE_SIZE + 1, totalUsers)}–{Math.min(currentPage * PAGE_SIZE, totalUsers)} of {totalUsers} users
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground px-2">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Photo/Video Enlargement Modal */}
       <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>

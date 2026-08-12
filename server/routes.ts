@@ -2677,8 +2677,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User management routes (admin only)
   app.get('/api/users', isAuthenticated, requireRole(['admin']), async (req, res) => {
     try {
-      const users = await storage.getUsersWithStats();
-      res.json(users);
+      const page = Math.max(1, parseInt(String(req.query.page || '1')));
+      const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '25'))));
+      const search = String(req.query.search || '').trim();
+      const result = await storage.getUsersWithStatsPaginated({ page, limit, search });
+      res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch users" });
     }

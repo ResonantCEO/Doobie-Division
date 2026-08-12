@@ -167,6 +167,13 @@ export interface IStorage {
 
   // User management
   getUsersWithStats(): Promise<(User & { orderCount?: number })[]>;
+  getUsersWithStatsPaginated(params: { page: number; limit: number; search: string }): Promise<{
+    users: (User & { orderCount?: number })[];
+    total: number;
+    activeCount: number;
+    pendingCount: number;
+    adminCount: number;
+  }>;
   updateUserStatus(id: string, status: string): Promise<User>;
   updateUserRole(id: string, role: string): Promise<User>;
   updateUserIdVerification(id: string, status: string): Promise<User>;
@@ -3545,6 +3552,71 @@ export class DatabaseStorage implements IStorage {
       updatedAt: r.updatedAt,
       orderCount: Number(r.orderCount),
     }));
+  }
+
+  async getUsersWithStatsPaginated({ page, limit, search }: { page: number; limit: number; search: string }) {
+    const offset = (page - 1) * limit;
+    const trimmed = search.trim();
+
+    const searchCondition = trimmed
+      ? or(
+          ilike(users.firstName, `%${trimmed}%`),
+          ilike(users.lastName, `%${trimmed}%`),
+          ilike(users.email, `%${trimmed}%`),
+          ilike(users.telegramUsername, `%${trimmed}%`),
+          ilike(users.city, `%${trimmed}%`),
+          ilike(users.state, `%${trimmed}%`),
+          ilike(users.address, `%${trimmed}%`),
+          sql`CONCAT(${users.firstName}, ' ', ${users.lastName}) ILIKE ${'%' + trimmed + '%'}`
+        )
+      : undefined;
+
+    const selectFields = {
+      id: users.id,
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      password: users.password,
+      profileImageUrl: users.profileImageUrl,
+      idImageUrl: users.idImageUrl,
+      verificationPhotoUrl: users.verificationPhotoUrl,
+      idVerificationStatus: users.idVerificationStatus,
+      role: users.role,
+      status: users.status,
+      address: users.address,
+      city: users.city,
+      state: users.state,
+      postalCode: users.postalCode,
+      country: users.country,
+      telegramUsername: users.telegramUsername,
+      minPurchaseExempt: users.minPurchaseExempt,
+      minPurchaseOverride: users.minPurchaseOverride,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+      orderCount: sql<number>`COUNT(${orders.id})`,
+    };
+
+    const pagedRows = searchCondition
+      ? await db.select(selectFields).from(users).leftJoin(orders, eq(users.id, orders.customerId)).where(searchCondition).groupBy(users.id).orderBy(desc(users.createdAt)).limit(limit).offset(offset)
+      : await db.select(selectFields).from(users).leftJoin(orders, eq(users.id, orders.customerId)).groupBy(users.id).orderBy(desc(users.createdAt)).limit(limit).offset(offset);
+
+    const [{ total }] = searchCondition
+      ? await db.select({ total: sql<number>`COUNT(*)` }).from(users).where(searchCondition)
+      : await db.select({ total: sql<number>`COUNT(*)` }).from(users);
+
+    const [counts] = await db.select({
+      activeCount: sql<number>`COUNT(*) FILTER (WHERE ${users.status} = 'active')`,
+      pendingCount: sql<number>`COUNT(*) FILTER (WHERE ${users.status} = 'pending')`,
+      adminCount: sql<number>`COUNT(*) FILTER (WHERE ${users.role} = 'admin')`,
+    }).from(users);
+
+    return {
+      users: pagedRows.map(r => ({ ...r, orderCount: Number(r.orderCount) })),
+      total: Number(total),
+      activeCount: Number(counts.activeCount),
+      pendingCount: Number(counts.pendingCount),
+      adminCount: Number(counts.adminCount),
+    };
   }
 
   async updateUserStatus(id: string, status: string): Promise<User> {
