@@ -369,6 +369,8 @@ export async function setupAuth(app: Express) {
         customerPhone: user.address || 'Not provided', // Use address field or default
         subject: `Password Reset Request - ${user.firstName} ${user.lastName}`,
         message: `User ${user.firstName} ${user.lastName} (${user.email}) has requested a password reset.
+- Telegram: ${user.telegramUsername ? `@${user.telegramUsername}` : 'Not provided'}
+- Phone: ${user.phoneNumber || 'Not provided'}
 
 RESET TOKEN: ${resetToken}
 RESET URL: ${resetUrl}
