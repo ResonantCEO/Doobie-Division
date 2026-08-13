@@ -763,7 +763,9 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                           if (!response.ok) throw new Error('Failed to get upload URL');
                           const { uploadURL, objectPath } = await response.json();
                           file.meta.objectPath = objectPath;
-                          return { method: 'PUT' as const, url: uploadURL };
+                          // Include Content-Type so GCS stores the correct MIME type
+                          const mimeType = file.type || 'video/mp4';
+                          return { method: 'PUT' as const, url: uploadURL, headers: { 'Content-Type': mimeType } };
                         }}
                         onComplete={(result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
                           if (result.successful && result.successful.length > 0) {

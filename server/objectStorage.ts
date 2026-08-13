@@ -155,6 +155,12 @@ export class ObjectStorageService {
     }
   }
 
+  // Generates a short-lived signed GET URL for a file (for media redirect).
+  async getSignedDownloadUrl(file: File, ttlSec: number = 60): Promise<string> {
+    const { bucketName, objectName } = parseObjectPath(`/${file.bucket.name}/${file.name}`);
+    return signObjectURL({ bucketName, objectName, method: "GET", ttlSec });
+  }
+
   // Gets the upload URL for an object entity.
   async getObjectEntityUploadURL(): Promise<{ uploadURL: string; objectPath: string }> {
     const privateObjectDir = this.getPrivateObjectDir();

@@ -174,6 +174,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!canAccess) {
         return res.sendStatus(401);
       }
+
+      // For video content, redirect to a short-lived GCS signed URL so the
+      // browser can stream it directly with full Range-request support.
+      // This avoids proxy issues and content-type guessing problems.
+      const [metadata] = await objectFile.getMetadata();
+      const contentType: string = metadata.contentType || "application/octet-stream";
+      if (contentType.startsWith("video/") || contentType === "application/octet-stream") {
+        // Also redirect octet-stream because it may be a video uploaded without MIME type
+        const signedUrl = await objectStorageService.getSignedDownloadUrl(objectFile, 120);
+        return res.redirect(302, signedUrl);
+      }
+
       objectStorageService.downloadObject(objectFile, res, req);
     } catch (error) {
       if (error instanceof ObjectNotFoundError) {
