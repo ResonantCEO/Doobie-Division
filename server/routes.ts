@@ -174,7 +174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!canAccess) {
         return res.sendStatus(401);
       }
-      objectStorageService.downloadObject(objectFile, res);
+      objectStorageService.downloadObject(objectFile, res, req);
     } catch (error) {
       if (error instanceof ObjectNotFoundError) {
         return res.sendStatus(404);
