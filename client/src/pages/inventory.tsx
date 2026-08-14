@@ -193,7 +193,7 @@ function openInventoryPrintSheet(
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: #fff; }
-    .page-section { page-break-after: ${lowInventoryMode ? "auto" : "always"}; }
+    .page-section { page-break-after: ${lowInventoryMode ? "auto" : "always"}; page-break-inside: avoid; break-inside: avoid; }
     .page-section.last-section { page-break-after: auto; }
     .page-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 12px 16px 8px; border-bottom: 2px solid #111; }
     .page-header h1 { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
