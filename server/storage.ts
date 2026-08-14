@@ -2232,7 +2232,9 @@ export class DatabaseStorage implements IStorage {
       const fallbackSize = (fallbackResult?.rows?.[0] as any)?.size;
       if (fallbackSize) {
         await db.execute(
-          sql`UPDATE product_sizes SET physical_quantity = GREATEST(0, COALESCE(physical_quantity, quantity) - ${physicalDeltaInt}), updated_at = NOW() WHERE product_id = ${productId} AND size = ${fallbackSize}`
+          // Use GREATEST(quantity, ...) — same clamp as the explicit-size path — so
+          // physical_quantity can never drop below quantity (stock) even via the fallback.
+          sql`UPDATE product_sizes SET physical_quantity = GREATEST(quantity, COALESCE(physical_quantity, quantity) - ${physicalDeltaInt}), updated_at = NOW() WHERE product_id = ${productId} AND size = ${fallbackSize}`
         );
       }
     }
