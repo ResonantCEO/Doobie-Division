@@ -343,6 +343,19 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     const { customerName, street, city, state: shippingState, zipCode } = shippingForm;
 
     if (!validateForm()) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required shipping fields before placing your order.",
+        variant: "destructive",
+      });
+      // Scroll to the first error field so the user sees it
+      setTimeout(() => {
+        const firstError = document.querySelector('[data-checkout-form] .border-red-500');
+        if (firstError) {
+          (firstError as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+          (firstError as HTMLElement).focus();
+        }
+      }, 50);
       return;
     }
 
@@ -922,7 +935,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+          <div className="space-y-4 overflow-y-auto flex-1 pr-1" data-checkout-form>
             {/* Order Summary */}
             <div className="bg-muted/50 p-4 rounded-lg">
               <h4 className="font-medium mb-2">Order Summary</h4>
