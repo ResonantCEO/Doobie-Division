@@ -144,14 +144,15 @@ function openInventoryPrintSheet(
       </tr>`).join("");
 
     const isLast = sectionIdx === categoryNames.length - 1;
+    const showHeader = !lowInventoryMode || sectionIdx === 0;
     return `
   <div class="page-section${isLast ? " last-section" : ""}">
-    <div class="page-header">
+    ${showHeader ? `<div class="page-header">
       <div>
         <h1>${sheetTitle}</h1>
         <p>${sheetSubtitle}</p>
       </div>
-    </div>
+    </div>` : ""}
     <div class="category-banner"><span class="cat-count">${catRows.length} item${catRows.length !== 1 ? "s" : ""}</span></div>
     <div class="legend">
       <span><span class="dot" style="background:#27ae60"></span> In Stock</span>
