@@ -25,7 +25,8 @@ import BagsTab from "@/components/BagsTab";
 import DiscountsTab from "@/components/DiscountsTab";
 
 function openInventoryPrintSheet(
-  products: (Product & { category: Category | null; sizes?: ProductSize[] })[]
+  products: (Product & { category: Category | null; sizes?: ProductSize[] })[],
+  lowInventoryMode = false
 ) {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", {
@@ -74,6 +75,15 @@ function openInventoryPrintSheet(
 
     if (product.sizes && product.sizes.length > 0) {
       for (const size of product.sizes) {
+        // In low inventory mode only include sizes with 1–3 units
+        if (lowInventoryMode && !(size.quantity > 0 && size.quantity < 4)) continue;
+        // Per-size status: override product-level status when the size itself is low
+        const sizeStatus =
+          size.quantity === 0
+            ? "Out of Stock"
+            : size.quantity < 4
+            ? "Low Stock"
+            : "In Stock";
         rows.push({
           sku: product.sku,
           name: product.name,
@@ -81,10 +91,12 @@ function openInventoryPrintSheet(
           price,
           systemStock: String(size.quantity),
           size: size.size,
-          status,
+          status: sizeStatus,
         });
       }
     } else {
+      // In low inventory mode only include products with 1–3 units
+      if (lowInventoryMode && !(product.stock > 0 && product.stock < 4)) continue;
       const stockDisplay =
         product.sellingMethod === "weight"
           ? `${product.stock}g`
@@ -113,6 +125,11 @@ function openInventoryPrintSheet(
 
   const categoryNames = Array.from(categoryMap.keys());
 
+  const sheetTitle = lowInventoryMode ? "Low Inventory Alert Sheet" : "Inventory Count Sheet";
+  const sheetSubtitle = lowInventoryMode
+    ? `Exported ${dateStr} at ${timeStr} &nbsp;·&nbsp; Items with 1–3 units remaining`
+    : `Exported ${dateStr} at ${timeStr} &nbsp;·&nbsp; ${products.length} products total`;
+
   const categorySections = categoryNames.map((catName, sectionIdx) => {
     const catRows = categoryMap.get(catName)!;
     const tableRows = catRows.map((r, i) => `
@@ -131,8 +148,8 @@ function openInventoryPrintSheet(
   <div class="page-section${isLast ? " last-section" : ""}">
     <div class="page-header">
       <div>
-        <h1>Inventory Count Sheet</h1>
-        <p>Exported ${dateStr} at ${timeStr} &nbsp;·&nbsp; ${products.length} products total</p>
+        <h1>${sheetTitle}</h1>
+        <p>${sheetSubtitle}</p>
       </div>
     </div>
     <div class="category-banner"><span class="cat-count">${catRows.length} item${catRows.length !== 1 ? "s" : ""}</span></div>
@@ -163,7 +180,7 @@ function openInventoryPrintSheet(
       </thead>
       <tbody>${tableRows}</tbody>
     </table>
-    <div class="footer">Doobie Division! · Inventory Count Sheet · ${dateStr} · ${esc(catName)}</div>
+    <div class="footer">Doobie Division! · ${sheetTitle} · ${dateStr} · ${esc(catName)}</div>
   </div>`;
   }).join("");
 
@@ -364,6 +381,7 @@ export default function InventoryPage() {
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [showPrintCategoryDialog, setShowPrintCategoryDialog] = useState(false);
   const [selectedPrintCategories, setSelectedPrintCategories] = useState<Set<string>>(new Set());
+  const [lowInventoryMode, setLowInventoryMode] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedProductWithCategory, setSelectedProductWithCategory] = useState<(Product & { category: Category | null }) | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
@@ -530,7 +548,28 @@ export default function InventoryPage() {
 
   function openPrintDialog() {
     setSelectedPrintCategories(new Set(allPrintCategories));
+    setLowInventoryMode(false);
     setShowPrintCategoryDialog(true);
+  }
+
+  // Returns true if a product has any size/unit with 1–3 stock (low but not zero)
+  function hasLowInventoryItems(product: Product & { sizes?: ProductSize[] }): boolean {
+    if (product.sizes && product.sizes.length > 0) {
+      return product.sizes.some(s => s.quantity > 0 && s.quantity < 4);
+    }
+    return product.stock > 0 && product.stock < 4;
+  }
+
+  function selectLowInventory() {
+    // Pre-select only categories that contain at least one low-inventory item
+    const lowCats = new Set<string>();
+    for (const p of products) {
+      if (hasLowInventoryItems(p)) {
+        lowCats.add(p.category?.name ?? "Uncategorized");
+      }
+    }
+    setSelectedPrintCategories(lowCats);
+    setLowInventoryMode(true);
   }
 
   function togglePrintCategory(name: string) {
@@ -848,12 +887,12 @@ export default function InventoryPage() {
           <DialogHeader>
             <DialogTitle>Select Categories to Print</DialogTitle>
           </DialogHeader>
-          <div className="flex gap-2 mb-3">
+          <div className="flex gap-2 mb-3 flex-wrap">
             <Button
               size="sm"
               variant="outline"
               className="text-xs"
-              onClick={() => setSelectedPrintCategories(new Set(allPrintCategories))}
+              onClick={() => { setSelectedPrintCategories(new Set(allPrintCategories)); setLowInventoryMode(false); }}
             >
               Select All
             </Button>
@@ -861,11 +900,24 @@ export default function InventoryPage() {
               size="sm"
               variant="outline"
               className="text-xs"
-              onClick={() => setSelectedPrintCategories(new Set())}
+              onClick={() => { setSelectedPrintCategories(new Set()); setLowInventoryMode(false); }}
             >
               Deselect All
             </Button>
+            <Button
+              size="sm"
+              variant={lowInventoryMode ? "default" : "outline"}
+              className="text-xs"
+              onClick={selectLowInventory}
+            >
+              ⚠ Low Inventory
+            </Button>
           </div>
+          {lowInventoryMode && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">
+              Only items with 1–3 units remaining will be printed (including individual flavors/sizes).
+            </p>
+          )}
           <div className="flex flex-col gap-3 max-h-72 overflow-y-auto pr-1">
             {allPrintCategories.map(cat => (
               <label key={cat} className="flex items-center gap-3 cursor-pointer select-none">
@@ -891,7 +943,7 @@ export default function InventoryPage() {
                 const filtered = products.filter(p =>
                   selectedPrintCategories.has(p.category?.name ?? "Uncategorized")
                 );
-                openInventoryPrintSheet(filtered);
+                openInventoryPrintSheet(filtered, lowInventoryMode);
               }}
             >
               Generate Sheet
