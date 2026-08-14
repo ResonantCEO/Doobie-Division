@@ -128,7 +128,7 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[400px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Adjust Stock - {product?.name}</DialogTitle>
           <DialogDescription>
@@ -136,7 +136,7 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-1">
           <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
             <h4 className="font-medium mb-2">{product.name}</h4>
             <p className="text-sm text-muted-foreground mb-1">SKU: {product.sku}</p>
