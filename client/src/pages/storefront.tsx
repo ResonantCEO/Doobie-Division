@@ -366,7 +366,8 @@ export default function StorefrontPage() {
 
   const slides: Slide[] = useMemo(() => {
     const result: Slide[] = [];
-    if (allDiscountedProducts.length > 0) result.push({ type: 'deals' });
+    // Daily Deals slide hidden — re-enable by uncommenting the line below
+    // if (allDiscountedProducts.length > 0) result.push({ type: 'deals' });
     activeAds.forEach(ad => result.push({ type: 'ad', ad }));
     return result;
   }, [allDiscountedProducts.length, activeAds]);
