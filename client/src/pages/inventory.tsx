@@ -166,7 +166,7 @@ function openInventoryPrintSheet(
         <tr>
           <th colspan="7" style="background:#fff; color:#111; padding: 6px 8px 4px; border-bottom: 1px solid #ddd; border-right: none; text-align:right;">
             <span style="font-size:14px; font-weight:800; color:#111;">${esc(catName)}</span>
-            <span style="font-size:11px; font-weight:600; color:#111; margin-left:10px;">· Page ${sectionIdx + 1} of ${categoryNames.length}</span>
+            ${!lowInventoryMode ? `<span style="font-size:11px; font-weight:600; color:#111; margin-left:10px;">· Page ${sectionIdx + 1} of ${categoryNames.length}</span>` : ""}
           </th>
         </tr>
         <tr>
