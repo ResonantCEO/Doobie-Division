@@ -68,6 +68,10 @@ export default function UsersPage() {
   const [userToSuspend, setUserToSuspend] = useState<User | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [ordersModalOpen, setOrdersModalOpen] = useState(false);
+  const [ordersUser, setOrdersUser] = useState<User | null>(null);
+  const [ordersData, setOrdersData] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -336,6 +340,22 @@ export default function UsersPage() {
       minPurchaseOverride: user.minPurchaseOverride || "",
     });
     setEditModalOpen(true);
+  };
+
+  const handleViewOrders = async (user: User) => {
+    setOrdersUser(user);
+    setOrdersData([]);
+    setOrdersLoading(true);
+    setOrdersModalOpen(true);
+    try {
+      const response = await fetch(`/api/orders?customerId=${user.id}`, { credentials: "include" });
+      const data = await response.json();
+      setOrdersData(Array.isArray(data) ? data : []);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to fetch orders", variant: "destructive" });
+    } finally {
+      setOrdersLoading(false);
+    }
   };
 
   const handleViewActivity = async (userId: string) => {
@@ -680,6 +700,15 @@ export default function UsersPage() {
                             <Button
                               variant="outline"
                               size="sm"
+                              onClick={() => handleViewOrders(user)}
+                              className="w-full"
+                            >
+                              <ShoppingCart className="h-4 w-4 mr-1" />
+                              Orders
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleViewActivity(user.id)}
                               className="w-full"
                             >
@@ -868,6 +897,10 @@ export default function UsersPage() {
                                 <DropdownMenuItem onClick={() => handleEditUser(user)}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit User
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleViewOrders(user)}>
+                                  <ShoppingCart className="h-4 w-4 mr-2" />
+                                  View Orders
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleViewActivity(user.id)}>
                                   <History className="h-4 w-4 mr-2" />
@@ -1426,6 +1459,70 @@ export default function UsersPage() {
 
           <div className="flex justify-end pt-4 border-t mt-6 px-4 sm:px-0 pb-4 sm:pb-0">
             <Button variant="outline" onClick={() => setActivityModalOpen(false)} className="w-full sm:w-auto">
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Orders Modal */}
+      <Dialog open={ordersModalOpen} onOpenChange={setOrdersModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              Orders — {ordersUser?.firstName} {ordersUser?.lastName}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 pr-1">
+            {ordersLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                ))}
+              </div>
+            ) : ordersData.length === 0 ? (
+              <div className="py-12 text-center text-gray-500">
+                <ShoppingCart className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                <p>No orders found for this customer.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {ordersData.map((order: any) => (
+                  <div key={order.id} className="flex items-center justify-between p-3 rounded-lg border bg-white dark:bg-gray-900">
+                    <div className="space-y-0.5">
+                      <p className="font-medium text-sm">Order #{order.orderNumber}</p>
+                      <p className="text-xs text-gray-500">
+                        {order.createdAt ? format(new Date(order.createdAt), "MMM d, yyyy 'at' h:mm a") : "—"}
+                      </p>
+                      {order.shippingAddress && (
+                        <p className="text-xs text-gray-400 truncate max-w-xs">{order.shippingAddress}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold">${Number(order.total).toFixed(2)}</span>
+                      <Badge
+                        variant="secondary"
+                        className={
+                          order.status === "shipped" ? "bg-green-100 text-green-800" :
+                          order.status === "pending" ? "bg-orange-100 text-orange-800" :
+                          order.status === "processing" ? "bg-blue-100 text-blue-800" :
+                          order.status === "cancelled" ? "bg-red-100 text-red-800" :
+                          ""
+                        }
+                      >
+                        {order.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-between items-center pt-4 border-t">
+            {!ordersLoading && ordersData.length > 0 && (
+              <span className="text-sm text-gray-500">{ordersData.length} order{ordersData.length !== 1 ? "s" : ""}</span>
+            )}
+            <Button variant="outline" onClick={() => setOrdersModalOpen(false)} className="ml-auto">
               Close
             </Button>
           </div>

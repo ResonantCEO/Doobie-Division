@@ -991,6 +991,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (req.currentUser.role === 'staff') {
         // Staff can only see orders assigned to them
         filters.assignedUserId = req.currentUser.id;
+      } else if (req.currentUser.role === 'admin' || req.currentUser.role === 'manager') {
+        // Admins/managers can filter by a specific customer
+        if (req.query.customerId) {
+          filters.customerId = req.query.customerId as string;
+        }
       }
       // Managers and admins can see all orders
 
