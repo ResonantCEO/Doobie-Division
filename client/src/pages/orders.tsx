@@ -123,33 +123,42 @@ export default function OrdersPage() {
     };
 
     const headers = [
-      "Name",
+      "Customer Name",
       "Phone",
       "Email",
+      "Telegram Username",
       "Address Line 1",
       "City",
       "State",
       "Zip",
-      "Package Size",
       "Order Number",
       "Order Total",
+      "Items Ordered",
       "Date",
       "Notes",
     ];
 
     const rows = tabOrders.map(o => {
       const addr = parseAddress(o.shippingAddress);
+      const items = (o.orderItems ?? []).map(item => {
+        const size = item.size ? `, Size/Flavor: ${item.size}` : "";
+        const sku = item.productSku ? ` [${item.productSku}]` : "";
+        const removed = item.removed ? " (removed)" : "";
+        return `${item.productName}${sku} x${item.quantity}${size} - $${Number(item.subtotal).toFixed(2)}${removed}`;
+      }).join("\n");
+
       return [
         escape(o.customerName),
         escape(o.customerPhone),
         escape(o.customerEmail),
+        escape(o.customerTelegramUsername),
         escape(addr.line1),
         escape(addr.city),
         escape(addr.state),
         escape(addr.zip),
-        escape(Number(o.total).toFixed(2)),
         escape(o.orderNumber),
         escape(Number(o.total).toFixed(2)),
+        escape(items || o.productNames),
         escape(o.createdAt ? new Date(o.createdAt).toLocaleDateString() : ""),
         escape(o.notes),
       ];

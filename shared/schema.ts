@@ -666,6 +666,14 @@ export type Order = typeof orders.$inferSelect & {
   };
   customerTelegramUsername?: string | null;
   productNames?: string | null;
+  orderItems?: Array<{
+    productName: string;
+    productSku: string | null;
+    quantity: number;
+    size: string | null;
+    subtotal: string;
+    removed: boolean;
+  }>;
 };
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;

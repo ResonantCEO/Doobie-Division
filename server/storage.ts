@@ -1766,6 +1766,28 @@ export class DatabaseStorage implements IStorage {
           assignedUser: users,
           customerTelegramUsername: sql<string | null>`(SELECT telegram_username FROM users WHERE id = ${orders.customerId})`,
           productNames: sql<string | null>`(SELECT string_agg(product_name, ' ') FROM order_items WHERE order_id = ${orders.id})`,
+           orderItems: sql<Array<{
+             productName: string;
+             productSku: string | null;
+             quantity: number;
+             size: string | null;
+             subtotal: string;
+             removed: boolean;
+           }>>`(
+             SELECT COALESCE(
+               json_agg(json_build_object(
+                 'productName', product_name,
+                 'productSku', product_sku,
+                 'quantity', quantity,
+                 'size', size,
+                 'subtotal', subtotal,
+                 'removed', removed
+               ) ORDER BY id),
+               '[]'::json
+             )
+             FROM order_items
+             WHERE order_id = ${orders.id}
+           )`,
         })
         .from(orders)
         .leftJoin(users, eq(orders.assignedUserId, users.id));
