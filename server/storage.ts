@@ -2443,7 +2443,7 @@ export class DatabaseStorage implements IStorage {
 
   private async restoreInventoryForDeletedOrderItem(
     item: any,
-    userId: string,
+    userId: string | null,
     restorePhysical: boolean
   ): Promise<void> {
     if (!item.productId || item.removed) return;
@@ -2458,68 +2458,70 @@ export class DatabaseStorage implements IStorage {
     const stockDelta = Math.round(item.quantity * gramEquivalent);
     const physicalDelta = stockDelta;
 
-    const [productBefore] = await db
-      .select({ stock: products.stock, physicalInventory: products.physicalInventory })
-      .from(products)
-      .where(eq(products.id, item.productId))
-      .limit(1);
-    if (!productBefore) return;
+    await db.transaction(async (tx) => {
+      const [productBefore] = await tx
+        .select({ stock: products.stock, physicalInventory: products.physicalInventory })
+        .from(products)
+        .where(eq(products.id, item.productId))
+        .limit(1);
+      if (!productBefore) return;
 
-    await db
-      .update(products)
-      .set({
-        stock: sql`${products.stock} + ${stockDelta}`,
-        ...(restorePhysical
-          ? { physicalInventory: sql`${products.physicalInventory} + ${physicalDelta}` }
-          : {}),
-        updatedAt: new Date(),
-      })
-      .where(eq(products.id, item.productId));
+      await tx
+        .update(products)
+        .set({
+          stock: sql`${products.stock} + ${stockDelta}`,
+          ...(restorePhysical
+            ? { physicalInventory: sql`${products.physicalInventory} + ${physicalDelta}` }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(products.id, item.productId));
 
-    // Stock reservations for sized products are stored both on the product
-    // aggregate and on the selected size row.
-    if (sizeLabel) {
-      if (restorePhysical) {
-        await db.execute(
-          sql`UPDATE product_sizes
-              SET quantity = quantity + ${item.quantity},
-                  physical_quantity = COALESCE(physical_quantity, quantity) + ${physicalDelta},
-                  updated_at = NOW()
-              WHERE product_id = ${item.productId} AND size = ${sizeLabel}`
-        );
-      } else {
-        await db.execute(
-          sql`UPDATE product_sizes
-              SET quantity = quantity + ${item.quantity},
-                  updated_at = NOW()
-              WHERE product_id = ${item.productId} AND size = ${sizeLabel}`
-        );
+      // Stock reservations for sized products are stored both on the product
+      // aggregate and on the selected size row.
+      if (sizeLabel) {
+        if (restorePhysical) {
+          await tx.execute(
+            sql`UPDATE product_sizes
+                SET quantity = quantity + ${item.quantity},
+                    physical_quantity = COALESCE(physical_quantity, quantity) + ${physicalDelta},
+                    updated_at = NOW()
+                WHERE product_id = ${item.productId} AND size = ${sizeLabel}`
+          );
+        } else {
+          await tx.execute(
+            sql`UPDATE product_sizes
+                SET quantity = quantity + ${item.quantity},
+                    updated_at = NOW()
+                WHERE product_id = ${item.productId} AND size = ${sizeLabel}`
+          );
+        }
       }
-    }
 
-    await db.insert(inventoryLogs).values({
-      productId: item.productId,
-      userId,
-      type: 'stock_in',
-      quantity: stockDelta,
-      previousStock: productBefore.stock,
-      newStock: productBefore.stock + stockDelta,
-      reason: `Order item removed/deleted - Order #${item.orderId} (stock restored)`,
-      createdAt: new Date(),
-    });
-
-    if (restorePhysical && item.fulfilled) {
-      await db.insert(inventoryLogs).values({
+      await tx.insert(inventoryLogs).values({
         productId: item.productId,
         userId,
-        type: 'physical_in',
-        quantity: physicalDelta,
-        previousStock: productBefore.physicalInventory ?? 0,
-        newStock: (productBefore.physicalInventory ?? 0) + physicalDelta,
-        reason: `Deleted fulfilled order item - Order #${item.orderId} (physical inventory restored)`,
+        type: 'stock_in',
+        quantity: stockDelta,
+        previousStock: productBefore.stock,
+        newStock: productBefore.stock + stockDelta,
+        reason: `Order item removed/deleted - Order #${item.orderId} (stock restored)`,
         createdAt: new Date(),
       });
-    }
+
+      if (restorePhysical && item.fulfilled) {
+        await tx.insert(inventoryLogs).values({
+          productId: item.productId,
+          userId,
+          type: 'physical_in',
+          quantity: physicalDelta,
+          previousStock: productBefore.physicalInventory ?? 0,
+          newStock: (productBefore.physicalInventory ?? 0) + physicalDelta,
+          reason: `Deleted fulfilled order item - Order #${item.orderId} (physical inventory restored)`,
+          createdAt: new Date(),
+        });
+      }
+    });
   }
 
   async removeOrderItem(orderId: number, itemId: number, userId: string): Promise<void> {
@@ -2866,7 +2868,7 @@ export class DatabaseStorage implements IStorage {
     for (const item of items) {
       // A fulfilled item consumed physical inventory, so deleting the order
       // restores both the reservation and the physical count.
-      await this.restoreInventoryForDeletedOrderItem(item, 'system', Boolean(item.fulfilled));
+      await this.restoreInventoryForDeletedOrderItem(item, null, Boolean(item.fulfilled));
     }
     try {
       await this.snapshotOrdersBeforeDeletion([id]);
@@ -2899,7 +2901,7 @@ export class DatabaseStorage implements IStorage {
       .where(inArray(orderItems.orderId, orderIds));
 
     for (const item of items) {
-      await this.restoreInventoryForDeletedOrderItem(item, 'system', Boolean(item.fulfilled));
+      await this.restoreInventoryForDeletedOrderItem(item, null, Boolean(item.fulfilled));
     }
 
     try {
@@ -2925,7 +2927,7 @@ export class DatabaseStorage implements IStorage {
         .from(orderItems)
         .where(inArray(orderItems.orderId, orderIds));
       for (const item of items) {
-        await this.restoreInventoryForDeletedOrderItem(item, 'system', Boolean(item.fulfilled));
+        await this.restoreInventoryForDeletedOrderItem(item, null, Boolean(item.fulfilled));
       }
       try {
         await this.snapshotOrdersBeforeDeletion(orderIds);
@@ -2946,7 +2948,7 @@ export class DatabaseStorage implements IStorage {
       .from(orderItems)
       .where(inArray(orderItems.orderId, orderIds));
     for (const item of items) {
-      await this.restoreInventoryForDeletedOrderItem(item, 'system', Boolean(item.fulfilled));
+      await this.restoreInventoryForDeletedOrderItem(item, null, Boolean(item.fulfilled));
     }
     try {
       await this.snapshotOrdersBeforeDeletion(orderIds);
