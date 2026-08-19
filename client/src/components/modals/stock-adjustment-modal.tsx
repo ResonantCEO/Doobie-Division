@@ -134,6 +134,9 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
           <DialogDescription>
             Adjust the stock level for this product. Current stock: {product?.sellingMethod === "weight" ? formatWeight(product?.stock || 0) : `${product?.stock || 0} units`}
           </DialogDescription>
+            <p className="text-xs text-muted-foreground mt-1">
+              This changes sellable stock only; physical inventory will not change.
+            </p>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-1">

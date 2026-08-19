@@ -1583,6 +1583,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async adjustStock(productId: number, quantity: number, userId: string, reason: string, sizeName?: string): Promise<void> {
+    // This action adjusts sellable stock only. Physical inventory is tracked
+    // separately through fulfillment and physical-inventory workflows.
     if (!productId || typeof productId !== 'number') {
       throw new Error("Invalid product ID");
     }
@@ -1616,15 +1618,13 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Insufficient stock for this size");
       }
 
-      const newSizePhysicalQty = Math.max((sizeRow.physicalQuantity ?? sizeRow.quantity) + quantity, newSizeQty);
       await db.update(productSizes)
-        .set({ quantity: newSizeQty, physicalQuantity: newSizePhysicalQty, updatedAt: new Date() })
+        .set({ quantity: newSizeQty, updatedAt: new Date() })
         .where(and(eq(productSizes.productId, productId), eq(productSizes.size, sizeName)));
 
       const newTotalStock = product.stock + quantity;
-      const newPhysicalInventory = Math.max((product.physicalInventory ?? product.stock) + quantity, newTotalStock);
       await db.update(products)
-        .set({ stock: newTotalStock, physicalInventory: newPhysicalInventory, updatedAt: new Date() })
+        .set({ stock: newTotalStock, updatedAt: new Date() })
         .where(eq(products.id, productId));
 
       await db.insert(inventoryLogs).values({
@@ -1655,11 +1655,9 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Insufficient stock");
       }
 
-      const newPhysical = Math.max((product.physicalInventory ?? product.stock) + quantity, newStock);
       await db.update(products)
         .set({
           stock: newStock,
-          physicalInventory: newPhysical,
           updatedAt: new Date()
         })
         .where(eq(products.id, productId));
