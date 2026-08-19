@@ -2457,15 +2457,22 @@ export class DatabaseStorage implements IStorage {
     // Stock reservations for sized products are stored both on the product
     // aggregate and on the selected size row.
     if (sizeLabel) {
-      await db.execute(
-        sql`UPDATE product_sizes
-            SET quantity = quantity + ${item.quantity},
-                ${restorePhysical
-                  ? sql`physical_quantity = COALESCE(physical_quantity, quantity) + ${item.quantity},`
-                  : sql``}
-                updated_at = NOW()
-            WHERE product_id = ${item.productId} AND size = ${sizeLabel}`
-      );
+      if (restorePhysical) {
+        await db.execute(
+          sql`UPDATE product_sizes
+              SET quantity = quantity + ${item.quantity},
+                  physical_quantity = COALESCE(physical_quantity, quantity) + ${physicalDelta},
+                  updated_at = NOW()
+              WHERE product_id = ${item.productId} AND size = ${sizeLabel}`
+        );
+      } else {
+        await db.execute(
+          sql`UPDATE product_sizes
+              SET quantity = quantity + ${item.quantity},
+                  updated_at = NOW()
+              WHERE product_id = ${item.productId} AND size = ${sizeLabel}`
+        );
+      }
     }
 
     await db.insert(inventoryLogs).values({
@@ -2891,6 +2898,13 @@ export class DatabaseStorage implements IStorage {
       const matchingOrders = await retryQuery(() => db.select({ id: orders.id }).from(orders).where(inArray(orders.status, statuses)));
       if (matchingOrders.length === 0) return 0;
       const orderIds = matchingOrders.map(o => o.id);
+      const items = await db
+        .select()
+        .from(orderItems)
+        .where(inArray(orderItems.orderId, orderIds));
+      for (const item of items) {
+        await this.restoreInventoryForDeletedOrderItem(item, 'system', Boolean(item.fulfilled));
+      }
       try {
         await this.snapshotOrdersBeforeDeletion(orderIds);
       } catch (e) {
@@ -2903,8 +2917,17 @@ export class DatabaseStorage implements IStorage {
     }
     // Snapshot all orders first
     const allOrderIds = await retryQuery(() => db.select({ id: orders.id }).from(orders));
+    const orderIds = allOrderIds.map(order => order.id);
+    if (orderIds.length === 0) return 0;
+    const items = await db
+      .select()
+      .from(orderItems)
+      .where(inArray(orderItems.orderId, orderIds));
+    for (const item of items) {
+      await this.restoreInventoryForDeletedOrderItem(item, 'system', Boolean(item.fulfilled));
+    }
     try {
-      await this.snapshotOrdersBeforeDeletion(allOrderIds.map(o => o.id));
+      await this.snapshotOrdersBeforeDeletion(orderIds);
     } catch (e) {
       console.warn('[clearAllOrders] Failed to snapshot orders for analytics:', e);
     }
