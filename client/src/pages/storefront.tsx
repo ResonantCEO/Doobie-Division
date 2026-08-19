@@ -711,7 +711,7 @@ export default function StorefrontPage() {
                  {post.imageUrl && (isVideoMedia(post.imageUrl) ? (
                    <video
                      src={post.imageUrl}
-                     className="w-full max-h-72 object-cover"
+                     className="w-full h-auto object-contain block"
                      controls
                      muted
                      loop
@@ -721,7 +721,7 @@ export default function StorefrontPage() {
                    <img
                      src={post.imageUrl}
                      alt="Board post"
-                     className="w-full max-h-72 object-cover"
+                     className="w-full h-auto object-contain block"
                    />
                  ))}
                 <div className={post.imageUrl ? 'p-4' : 'p-4'}>
