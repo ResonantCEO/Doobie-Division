@@ -276,11 +276,20 @@ export default function StorefrontPage() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const isMp4 = file.type === "video/mp4" || file.name.toLowerCase().endsWith(".mp4");
+    if (!file.type.startsWith("image/") && !isMp4) {
+      toast({ title: "Unsupported file", description: "Please choose an image or MP4 video.", variant: "destructive" });
+      e.target.value = "";
+      return;
+    }
     setPostImageFile(file);
     const reader = new FileReader();
     reader.onload = (ev) => setPostImagePreview(ev.target?.result as string);
     reader.readAsDataURL(file);
   };
+
+  const isVideoMedia = (url: string | null | undefined) =>
+    Boolean(url && /\.mp4(?:$|\?)/i.test(url));
 
   const resetPostModal = () => {
     setPostText("");
@@ -699,13 +708,22 @@ export default function StorefrontPage() {
                     </button>
                   </div>
                 )}
-                {post.imageUrl && (
-                  <img
-                    src={post.imageUrl}
-                    alt="Board post"
-                    className="w-full max-h-72 object-cover"
-                  />
-                )}
+                 {post.imageUrl && (isVideoMedia(post.imageUrl) ? (
+                   <video
+                     src={post.imageUrl}
+                     className="w-full max-h-72 object-cover"
+                     controls
+                     muted
+                     loop
+                     playsInline
+                   />
+                 ) : (
+                   <img
+                     src={post.imageUrl}
+                     alt="Board post"
+                     className="w-full max-h-72 object-cover"
+                   />
+                 ))}
                 <div className={post.imageUrl ? 'p-4' : 'p-4'}>
                   {post.text && (
                     <p className="text-sm text-foreground whitespace-pre-wrap">{post.text}</p>
@@ -757,11 +775,15 @@ export default function StorefrontPage() {
               className="resize-none"
             />
 
-            {/* Image upload area */}
+             {/* Image/video upload area */}
             <div>
               {postImagePreview ? (
                 <div className="relative">
-                  <img src={postImagePreview} alt="Preview" className="rounded-lg max-h-48 w-full object-cover" />
+                   {postImageFile && (postImageFile.type === "video/mp4" || postImageFile.name.toLowerCase().endsWith(".mp4")) ? (
+                     <video src={postImagePreview} className="rounded-lg max-h-48 w-full object-cover" controls muted playsInline />
+                   ) : (
+                     <img src={postImagePreview} alt="Preview" className="rounded-lg max-h-48 w-full object-cover" />
+                   )}
                   <button
                     onClick={() => { setPostImageFile(null); setPostImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
                     className="absolute top-2 right-2 bg-black/60 rounded-full p-1 text-white hover:bg-black/80"
@@ -771,7 +793,11 @@ export default function StorefrontPage() {
                 </div>
               ) : editingExistingImageUrl ? (
                 <div className="relative">
-                  <img src={editingExistingImageUrl} alt="Current image" className="rounded-lg max-h-48 w-full object-cover" />
+                   {isVideoMedia(editingExistingImageUrl) ? (
+                     <video src={editingExistingImageUrl} className="rounded-lg max-h-48 w-full object-cover" controls muted playsInline />
+                   ) : (
+                     <img src={editingExistingImageUrl} alt="Current image" className="rounded-lg max-h-48 w-full object-cover" />
+                   )}
                   <div className="absolute inset-0 flex items-end gap-2 p-2">
                     <button
                       type="button"
@@ -796,13 +822,13 @@ export default function StorefrontPage() {
                   className="w-full border-2 border-dashed border-border rounded-lg py-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                 >
                   <ImagePlus className="w-6 h-6" />
-                  <span className="text-sm">Click to upload an image (optional)</span>
+                   <span className="text-sm">Click to upload an image or MP4 video (optional)</span>
                 </button>
               )}
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                 accept="image/*,video/mp4,.mp4"
                 className="hidden"
                 onChange={handleImageSelect}
               />

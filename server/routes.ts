@@ -44,17 +44,18 @@ const requireRole = (roles: string[]) => {
   };
 };
 
-// Configure multer for image uploads (memory storage for Object Storage)
+// Configure media uploads for advertisements (memory storage for Object Storage)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 20 * 1024 * 1024, // 20MB limit
   },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
+    const isMp4 = file.mimetype === 'video/mp4' || file.originalname.toLowerCase().endsWith('.mp4');
+    if (file.mimetype.startsWith('image/') || isMp4) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Only image or MP4 video files are allowed'));
     }
   }
 });
@@ -3973,33 +3974,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Board Posts - upload image (admin only)
+  // Board Posts - upload image or MP4 video (admin only)
   app.post("/api/upload/board-image", isAuthenticated, requireRole(["admin"]), upload.single("image"), async (req: any, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ message: "No image file provided" });
+        return res.status(400).json({ message: "No image or MP4 file provided" });
       }
 
-      const compressedBuffer = await sharp(req.file.buffer)
-        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: 82 })
-        .toBuffer();
+      const isMp4 = req.file.mimetype === 'video/mp4' || req.file.originalname.toLowerCase().endsWith('.mp4');
+      const extension = isMp4 ? 'mp4' : 'webp';
+      const contentType = isMp4 ? 'video/mp4' : 'image/webp';
+      const mediaBuffer = isMp4
+        ? req.file.buffer
+        : await sharp(req.file.buffer)
+            .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+            .webp({ quality: 82 })
+            .toBuffer();
 
       const objectStorageService = new ObjectStorageService();
       const privateDir = objectStorageService.getPrivateObjectDir();
       const uniqueId = uuidv4();
-      const objectName = `board-images/${uniqueId}.webp`;
+      const objectName = `board-images/${uniqueId}.${extension}`;
       const fullPath = `${privateDir}/${objectName}`;
       const parts = fullPath.startsWith("/") ? fullPath.slice(1).split("/") : fullPath.split("/");
       const bucketName = parts[0];
       const objectKey = parts.slice(1).join("/");
       const bucket = objectStorageClient.bucket(bucketName);
       const file = bucket.file(objectKey);
-      await file.save(compressedBuffer, { metadata: { contentType: 'image/webp' } });
-      const imageUrl = `/api/board-images/${uniqueId}.webp`;
+      await file.save(mediaBuffer, { metadata: { contentType } });
+      const imageUrl = `/api/board-images/${uniqueId}.${extension}`;
       res.json({ imageUrl });
     } catch (error) {
-      res.status(500).json({ message: "Failed to upload image" });
+      res.status(500).json({ message: "Failed to upload advertisement media" });
     }
   });
 
