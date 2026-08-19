@@ -142,7 +142,16 @@ export default function TelegramUsernamePrompt({ user }: TelegramUsernamePromptP
             Adding your Telegram username gives us an easier way to communicate with you and send access codes when needed.
             <br />
             <br />
-            Please message t.me/doobiedivision with code ACCESS for instant access to access codes!
+            Please message{" "}
+            <a
+              href="https://t.me/doobiedivision"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-primary underline underline-offset-2"
+            >
+              t.me/doobiedivision
+            </a>{" "}
+            with code "ACCESS" to recieve daily access codes!
           </DialogDescription>
         </DialogHeader>
 
