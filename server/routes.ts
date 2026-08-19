@@ -1845,22 +1845,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete all archived orders — must be before /:id to avoid "archived" being parsed as an id
   app.delete('/api/orders/archived', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
     try {
-      const { sql: pool } = await import("./db");
-      const { invalidateCache } = await import("./cache");
-      // Snapshot archived orders before deleting so analytics data is preserved
-      const archivedIds = await pool.query(`SELECT id FROM orders WHERE archived = true`);
-      const ids = (archivedIds as any).rows.map((r: any) => r.id) as number[];
-      if (ids.length > 0) {
-        try {
-          await storage.snapshotOrdersBeforeArchiveDeletion(ids);
-        } catch (e) {
-          console.warn('Failed to snapshot archived orders for analytics:', e);
-        }
-      }
-      await pool.query(`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE archived = true)`);
-      await pool.query(`DELETE FROM orders WHERE archived = true`);
-      // Invalidate server-side analytics cache so next request returns fresh data
-      try { invalidateCache.analytics(); } catch (e) { console.warn('Cache invalidation error:', e); }
+      await storage.clearArchivedOrders();
       res.json({ message: "All archived orders have been cleared" });
     } catch (error) {
       console.error('Failed to clear archived orders:', error);

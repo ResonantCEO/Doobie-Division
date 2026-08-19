@@ -120,6 +120,7 @@ export interface IStorage {
   markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }>;
   assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order>;
   deleteOrder(id: number): Promise<void>;
+  clearArchivedOrders(): Promise<number>;
   clearAllOrders(statuses?: string[]): Promise<number>;
 
   // Analytics operations
@@ -2418,32 +2419,89 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  private async restoreInventoryForDeletedOrderItem(
+    item: any,
+    userId: string,
+    restorePhysical: boolean
+  ): Promise<void> {
+    if (!item.productId || item.removed) return;
+
+    const sizeLabel =
+      item.size ||
+      this.extractWeightOptionFromProductName(item.productName) ||
+      this.extractSizeFromProductName(item.productName);
+    const gramEquivalent = sizeLabel
+      ? this.getGramEquivalentFromSize(sizeLabel)
+      : 1;
+    const stockDelta = Math.round(item.quantity * gramEquivalent);
+    const physicalDelta = stockDelta;
+
+    const [productBefore] = await db
+      .select({ stock: products.stock, physicalInventory: products.physicalInventory })
+      .from(products)
+      .where(eq(products.id, item.productId))
+      .limit(1);
+    if (!productBefore) return;
+
+    await db
+      .update(products)
+      .set({
+        stock: sql`${products.stock} + ${stockDelta}`,
+        ...(restorePhysical
+          ? { physicalInventory: sql`${products.physicalInventory} + ${physicalDelta}` }
+          : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(products.id, item.productId));
+
+    // Stock reservations for sized products are stored both on the product
+    // aggregate and on the selected size row.
+    if (sizeLabel) {
+      await db.execute(
+        sql`UPDATE product_sizes
+            SET quantity = quantity + ${item.quantity},
+                ${restorePhysical
+                  ? sql`physical_quantity = COALESCE(physical_quantity, quantity) + ${item.quantity},`
+                  : sql``}
+                updated_at = NOW()
+            WHERE product_id = ${item.productId} AND size = ${sizeLabel}`
+      );
+    }
+
+    await db.insert(inventoryLogs).values({
+      productId: item.productId,
+      userId,
+      type: 'stock_in',
+      quantity: stockDelta,
+      previousStock: productBefore.stock,
+      newStock: productBefore.stock + stockDelta,
+      reason: `Order item removed/deleted - Order #${item.orderId} (stock restored)`,
+      createdAt: new Date(),
+    });
+
+    if (restorePhysical && item.fulfilled) {
+      await db.insert(inventoryLogs).values({
+        productId: item.productId,
+        userId,
+        type: 'physical_in',
+        quantity: physicalDelta,
+        previousStock: productBefore.physicalInventory ?? 0,
+        newStock: (productBefore.physicalInventory ?? 0) + physicalDelta,
+        reason: `Deleted fulfilled order item - Order #${item.orderId} (physical inventory restored)`,
+        createdAt: new Date(),
+      });
+    }
+  }
+
   async removeOrderItem(orderId: number, itemId: number, userId: string): Promise<void> {
     const [item] = await db.select().from(orderItems).where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId))).limit(1);
     if (!item) throw new Error("Order item not found");
 
-    // Hard-delete the item from the order
+    // Removing an item from the details screen restores reserved stock only.
+    // Physical inventory is intentionally unchanged here, even if the item
+    // had been fulfilled.
+    await this.restoreInventoryForDeletedOrderItem(item, userId, false);
     await db.delete(orderItems).where(eq(orderItems.id, itemId));
-
-    // Restore stock only if it wasn't already removed (soft-removed items already had stock restored)
-    if (!item.removed && item.productId) {
-      await db.update(products).set({ stock: sql`${products.stock} + ${item.quantity}`, updatedAt: new Date() }).where(eq(products.id, item.productId));
-
-      // Log inventory restore
-      const [updatedProduct] = await db.select().from(products).where(eq(products.id, item.productId)).limit(1);
-      if (updatedProduct) {
-        await db.insert(inventoryLogs).values({
-          productId: item.productId,
-          userId,
-          type: 'stock_in',
-          quantity: item.quantity,
-          previousStock: updatedProduct.stock - item.quantity,
-          newStock: updatedProduct.stock,
-          reason: `Item removed from Order #${orderId} - stock restored`,
-          createdAt: new Date()
-        });
-      }
-    }
 
     // Recalculate order total from remaining items
     const remainingItems = await db.select().from(orderItems).where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
@@ -2775,6 +2833,12 @@ export class DatabaseStorage implements IStorage {
     if (existing.length === 0) {
       throw new Error("Order not found");
     }
+    const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id));
+    for (const item of items) {
+      // A fulfilled item consumed physical inventory, so deleting the order
+      // restores both the reservation and the physical count.
+      await this.restoreInventoryForDeletedOrderItem(item, 'system', Boolean(item.fulfilled));
+    }
     try {
       await this.snapshotOrdersBeforeDeletion([id]);
     } catch (e) {
@@ -2791,6 +2855,35 @@ export class DatabaseStorage implements IStorage {
       console.warn('[deleteOrder] Failed to delete order:', e);
     }
     try { invalidateCache.analytics(); } catch (e) { console.warn('Cache invalidation error:', e); }
+  }
+
+  async clearArchivedOrders(): Promise<number> {
+    const archived = await retryQuery(() =>
+      db.select({ id: orders.id }).from(orders).where(eq(orders.archived, true))
+    );
+    if (archived.length === 0) return 0;
+
+    const orderIds = archived.map(order => order.id);
+    const items = await db
+      .select()
+      .from(orderItems)
+      .where(inArray(orderItems.orderId, orderIds));
+
+    for (const item of items) {
+      await this.restoreInventoryForDeletedOrderItem(item, 'system', Boolean(item.fulfilled));
+    }
+
+    try {
+      await this.snapshotOrdersBeforeDeletion(orderIds);
+    } catch (e) {
+      console.warn('[clearArchivedOrders] Failed to snapshot orders for analytics:', e);
+    }
+    await retryQuery(() => db.delete(orderItems).where(inArray(orderItems.orderId, orderIds)));
+    const deleted = await retryQuery(() =>
+      db.delete(orders).where(inArray(orders.id, orderIds)).returning({ id: orders.id })
+    );
+    try { invalidateCache.analytics(); } catch (e) { console.warn('Cache invalidation error:', e); }
+    return deleted.length;
   }
 
   async clearAllOrders(statuses?: string[]): Promise<number> {
