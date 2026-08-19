@@ -140,6 +140,9 @@ export default function TelegramUsernamePrompt({ user }: TelegramUsernamePromptP
           <DialogTitle>Stay connected on Telegram</DialogTitle>
           <DialogDescription className="leading-6">
             Adding your Telegram username gives us an easier way to communicate with you and send access codes when needed.
+            <br />
+            <br />
+            Please message t.me/doobiedivision with code ACCESS for instant access to access codes!
           </DialogDescription>
         </DialogHeader>
 
