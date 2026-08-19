@@ -345,8 +345,10 @@ export const promoCodes = pgTable("promo_codes", {
   id: serial("id").primaryKey(),
   code: varchar("code").notNull().unique(),
   description: text("description"),
-  discountType: varchar("discount_type").notNull().default("percent"), // 'percent' | 'fixed'
+  discountType: varchar("discount_type").notNull().default("percent"), // 'percent' | 'fixed' | 'item_free' | 'item_price'
   discountValue: text("discount_value").notNull().default("0"),
+  targetProductIds: text("target_product_ids"), // JSON product IDs in deal priority order
+  itemDealQuantity: integer("item_deal_quantity").notNull().default(1),
   minOrderAmount: text("min_order_amount"),
   bypassPurchaseMinimum: boolean("bypass_purchase_minimum").notNull().default(false),
   usageLimitType: varchar("usage_limit_type").notNull().default("unlimited"), // 'unlimited' | 'once_per_user'
@@ -371,8 +373,10 @@ export const insertPromoCodeSchema = createInsertSchema(promoCodes).omit({
   createdAt: true,
 }).extend({
   code: z.string().min(1, "Code is required"),
-  discountType: z.enum(["percent", "fixed"]),
+  discountType: z.enum(["percent", "fixed", "item_free", "item_price"]),
   discountValue: z.string().min(1, "Discount value is required"),
+  targetProductIds: z.string().nullable().optional(),
+  itemDealQuantity: z.number().int().min(1).optional(),
   minOrderAmount: z.string().nullable().optional(),
   bypassPurchaseMinimum: z.boolean().optional(),
   usageLimitType: z.enum(["unlimited", "once_per_user"]),

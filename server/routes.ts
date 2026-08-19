@@ -1047,6 +1047,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  type PromoCartItem = {
+    productId: number;
+    quantity: number;
+    size?: string;
+    productPrice?: string | number;
+    unitPrice?: string | number;
+  };
+
+  function getItemPromoTargetIds(promo: any): number[] {
+    try {
+      const ids = JSON.parse(promo.targetProductIds || "[]");
+      if (!Array.isArray(ids)) return [];
+      const seen = new Set<number>();
+      return ids.map(Number).filter((id) => {
+        if (!Number.isInteger(id) || id <= 0 || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  function getItemPromoAllocations(promo: any, items: PromoCartItem[]) {
+    const targetIds = getItemPromoTargetIds(promo);
+    const maxQuantity = Math.max(1, Number(promo.itemDealQuantity) || 1);
+    const promoPrice = promo.discountType === "item_free"
+      ? 0
+      : Math.max(0, Number(promo.discountValue) || 0);
+    const allocations: Array<PromoCartItem & { itemIndex: number; quantity: number; promoPrice: number; normalUnitPrice: number }> = [];
+    let remaining = maxQuantity;
+
+    for (const targetId of targetIds) {
+      for (let itemIndex = 0; itemIndex < items.length && remaining > 0; itemIndex++) {
+        const item = items[itemIndex];
+        if (Number(item.productId) !== targetId) continue;
+        const quantity = Math.min(Math.max(0, Number(item.quantity) || 0), remaining);
+        if (quantity <= 0) continue;
+        const normalUnitPrice = Math.max(0, Number(item.productPrice ?? item.unitPrice) || 0);
+        allocations.push({ ...item, itemIndex, quantity, promoPrice, normalUnitPrice });
+        remaining -= quantity;
+      }
+    }
+
+    return allocations;
+  }
+
+  async function getPromoValidationError(promo: any, userId: string | undefined, cartTotal: number): Promise<string | null> {
+    if (!promo) return "Code not found";
+    if (!promo.isActive) return "This code is no longer active";
+    const now = new Date();
+    if (promo.validFrom && now < promo.validFrom) return "This code isn't valid yet";
+    if (promo.validTo && now > promo.validTo) return "This code has expired";
+
+    if (promo.minOrderAmount != null && cartTotal < Number(promo.minOrderAmount)) {
+      return `This code requires a minimum order of $${Number(promo.minOrderAmount).toFixed(2)}.`;
+    }
+    if (promo.maxTotalUses != null && promo.totalUses >= promo.maxTotalUses) {
+      return "This code has reached its usage limit";
+    }
+    if (promo.usageLimitType === "once_per_user" && userId) {
+      const uses = await storage.getPromoCodeUsesForUser(promo.id, userId);
+      if (uses > 0) return "You've already used this code";
+    }
+    if (promo.discountType === "item_free" || promo.discountType === "item_price") {
+      if (getItemPromoTargetIds(promo).length === 0) return "This item deal is not configured correctly";
+      if (promo.discountType === "item_price" && (!Number.isFinite(Number(promo.discountValue)) || Number(promo.discountValue) < 0)) {
+        return "This item deal has an invalid promotional price";
+      }
+    }
+    return null;
+  }
+
   app.post('/api/orders', async (req, res) => {
     try {
       const { order, items, cgBags: cgBagsInput = [] } = req.body;
@@ -1055,6 +1128,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // NOTE: promoCode is not in insertOrderSchema, so read from raw request body
       const promoCodeStr = (order.promoCode || (orderData as any).promoCode) as string | undefined;
+      let verifiedPromo: any = null;
+      if (promoCodeStr) {
+        verifiedPromo = await storage.getPromoCodeByCode(promoCodeStr.trim());
+        const promoError = await getPromoValidationError(
+          verifiedPromo,
+          orderData.customerId || req.user?.claims?.sub,
+          Number(orderData.originalTotal || orderData.total || 0),
+        );
+        if (promoError) return res.status(400).json({ message: promoError });
+      }
 
       // Server-side delivery block and purchase limit enforcement
       if (orderData.shippingAddress) {
@@ -1211,6 +1294,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Order cannot be processed due to stock issues",
           errors: stockErrors
         });
+      }
+
+      // Item-specific promo codes are recalculated on the server from the actual
+      // cart quantities. This prevents a browser from discounting another product,
+      // using more units than allowed, or choosing an unapproved promo price.
+      if (verifiedPromo && (verifiedPromo.discountType === "item_free" || verifiedPromo.discountType === "item_price")) {
+        const allocations = getItemPromoAllocations(verifiedPromo, enrichedItems);
+        if (allocations.length === 0) {
+          return res.status(400).json({
+            message: "This promo code requires one of its eligible items to be in your cart.",
+          });
+        }
+
+        const serverPromoSavings = allocations.reduce(
+          (total, allocation) => total + Math.max(0, allocation.normalUnitPrice - allocation.promoPrice) * allocation.quantity,
+          0,
+        );
+        const requestedPromoSavings = Math.max(0, Number((order as any).promoDiscount) || 0);
+        if (Math.abs(serverPromoSavings - requestedPromoSavings) > 0.02) {
+          return res.status(400).json({
+            message: "Your promo price has changed. Please apply the code again before placing your order.",
+          });
+        }
+
+        const allocationsByItemIndex = new Map<number, typeof allocations[number]>();
+        allocations.forEach((allocation) => allocationsByItemIndex.set(allocation.itemIndex, allocation));
+        const promoAdjustedItems: any[] = [];
+        enrichedItems.forEach((item: any, itemIndex: number) => {
+          const allocation = allocationsByItemIndex.get(itemIndex);
+          if (!allocation) {
+            promoAdjustedItems.push(item);
+            return;
+          }
+
+          const regularQuantity = item.quantity - allocation.quantity;
+          if (regularQuantity > 0) {
+            promoAdjustedItems.push({
+              ...item,
+              quantity: regularQuantity,
+              subtotal: (allocation.normalUnitPrice * regularQuantity).toFixed(2),
+            });
+          }
+          promoAdjustedItems.push({
+            ...item,
+            quantity: allocation.quantity,
+            productPrice: allocation.promoPrice.toFixed(2),
+            subtotal: (allocation.promoPrice * allocation.quantity).toFixed(2),
+            metadata: { ...(item.metadata || {}), itemPromoCode: verifiedPromo.code },
+          });
+        });
+        enrichedItems.splice(0, enrichedItems.length, ...promoAdjustedItems);
+
+        const mutableOrderData: any = orderData;
+        mutableOrderData.promoDiscount = serverPromoSavings.toFixed(2);
+        mutableOrderData.total = Math.max(
+          0,
+          Number(orderData.total || 0) + requestedPromoSavings - serverPromoSavings,
+        ).toFixed(2);
       }
 
       // Expand grab bag products into individual line items + a discount line
@@ -1526,7 +1667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Track promo code usage
       if (promoCodeStr) {
         try {
-          const promoRecord = await storage.getPromoCodeByCode(promoCodeStr.trim());
+          const promoRecord = verifiedPromo || await storage.getPromoCodeByCode(promoCodeStr.trim());
           if (promoRecord) {
             await storage.incrementPromoCodeTotalUses(promoRecord.id);
             if (orderData.customerId) {
@@ -3778,50 +3919,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Public (authenticated): validate a promo code
   app.post("/api/promo-codes/validate", isAuthenticated, async (req: any, res) => {
     try {
-      const { code, cartTotal } = req.body;
+      const { code, cartTotal, items = [] } = req.body;
       if (!code) return res.status(400).json({ valid: false, message: "No code provided" });
 
       const promo = await storage.getPromoCodeByCode(code.trim());
-      if (!promo) return res.json({ valid: false, message: "Code not found" });
-      if (!promo.isActive) return res.json({ valid: false, message: "This code is no longer active" });
-
-      // Date validation
-      const now = new Date();
-      if (promo.validFrom && now < promo.validFrom) return res.json({ valid: false, message: "This code isn't valid yet" });
-      if (promo.validTo && now > promo.validTo) return res.json({ valid: false, message: "This code has expired" });
-
-      // Minimum order amount check
-      if (promo.minOrderAmount != null) {
-        const minAmt = parseFloat(promo.minOrderAmount);
-        const cartAmt = parseFloat(cartTotal || "0");
-        if (cartAmt < minAmt) {
-          return res.json({
-            valid: false,
-            message: `This code requires a minimum order of $${minAmt.toFixed(2)}. Your cart total is $${cartAmt.toFixed(2)}.`,
-            minOrderAmount: minAmt,
-            cartTotal: cartAmt,
-          });
-        }
-      }
-
-      // Total uses cap
-      if (promo.maxTotalUses != null && promo.totalUses >= promo.maxTotalUses) {
-        return res.json({ valid: false, message: "This code has reached its usage limit" });
-      }
-
-      // Per-user limit
-      const userId = req.user?.claims?.sub;
-      if (promo.usageLimitType === "once_per_user" && userId) {
-        const uses = await storage.getPromoCodeUsesForUser(promo.id, userId);
-        if (uses > 0) return res.json({ valid: false, message: "You've already used this code" });
-      }
+      const total = parseFloat(cartTotal || "0");
+      const promoError = await getPromoValidationError(promo, req.user?.claims?.sub, total);
+      if (promoError) return res.json({ valid: false, message: promoError });
 
       // Calculate discount amount
-      const total = parseFloat(cartTotal || "0");
       const discountValue = parseFloat(promo.discountValue);
-      const discountAmount = promo.discountType === "percent"
+      let discountAmount = promo.discountType === "percent"
         ? Math.min(total, total * discountValue / 100)
         : Math.min(total, discountValue);
+      let itemAllocations: any[] = [];
+      if (promo.discountType === "item_free" || promo.discountType === "item_price") {
+        itemAllocations = getItemPromoAllocations(promo, Array.isArray(items) ? items : []);
+        if (itemAllocations.length === 0) {
+          return res.json({
+            valid: false,
+            message: "Add one of this promo's eligible items to your cart before using the code.",
+          });
+        }
+        discountAmount = itemAllocations.reduce(
+          (s, allocation) => s + Math.max(0, allocation.normalUnitPrice - allocation.promoPrice) * allocation.quantity,
+          0,
+        );
+      }
 
       res.json({
         valid: true,
@@ -3832,6 +3956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountValue: promo.discountValue,
         discountAmount: parseFloat(discountAmount.toFixed(2)),
         bypassPurchaseMinimum: promo.bypassPurchaseMinimum,
+        itemAllocations: itemAllocations.map(({ productId, size, quantity, promoPrice }) => ({ productId, size, quantity, promoPrice })),
       });
     } catch (e) {
       res.status(500).json({ valid: false, message: "Error validating code" });

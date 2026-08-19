@@ -44,6 +44,13 @@ interface DiscountEvalResult {
   totalSavings: number;
 }
 
+interface PromoItemAllocation {
+  productId: number;
+  size?: string;
+  quantity: number;
+  promoPrice: number;
+}
+
 function parseGrabBagItems(desc: string): { name: string; price: string }[] {
   return desc.split('\n')
     .filter(l => l.trim().startsWith('•'))
@@ -87,7 +94,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [discountResult, setDiscountResult] = useState<DiscountEvalResult | null>(null);
   const [promoInput, setPromoInput] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<{ promoId: number; code: string; description?: string; discountType: string; discountValue: string; discountAmount: number; bypassPurchaseMinimum: boolean } | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<{ promoId: number; code: string; description?: string; discountType: string; discountValue: string; discountAmount: number; bypassPurchaseMinimum: boolean; itemAllocations?: PromoItemAllocation[] } | null>(null);
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
   const [shippingForm, setShippingForm] = useState({
     customerName: "",
@@ -155,6 +162,12 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       .then(data => { if (data) setDiscountResult(data); })
       .catch(() => {});
   }, [state.items, user]);
+
+  // A promo is priced from the current cart. Require revalidation after any cart
+  // change so the displayed discount cannot become stale.
+  useEffect(() => {
+    setAppliedPromo(null);
+  }, [state.items]);
 
   // Auto-fill form with user data when confirmation modal opens
   useEffect(() => {
@@ -319,16 +332,29 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     setIsValidatingPromo(true);
     try {
       const effectiveTotal = combinedTotal - (discountResult?.totalSavings || 0);
+      const promoCartItems = state.items.map(item => ({
+        productId: item.product.id,
+        quantity: item.quantity,
+        size: item.size,
+        productPrice: getEffectivePrice(item.product.id, item.size).toFixed(2),
+      }));
       const res = await fetch('/api/promo-codes/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ code: promoInput.trim(), cartTotal: effectiveTotal.toString() }),
+        body: JSON.stringify({ code: promoInput.trim(), cartTotal: effectiveTotal.toString(), items: promoCartItems }),
       });
       const data = await res.json();
       if (data.valid) {
         setAppliedPromo(data);
-        toast({ title: `Promo code applied!`, description: data.discountType === 'percent' ? `${data.discountValue}% off your order` : `$${Number(data.discountAmount).toFixed(2)} off your order` });
+        const itemDealText = data.discountType === "item_free"
+          ? "Selected item(s) are free"
+          : data.discountType === "item_price"
+            ? `Selected item(s) are $${Number(data.discountValue).toFixed(2)} each`
+            : data.discountType === 'percent'
+              ? `${data.discountValue}% off your order`
+              : `$${Number(data.discountAmount).toFixed(2)} off your order`;
+        toast({ title: "Promo code applied!", description: itemDealText });
       } else {
         toast({ title: "Invalid code", description: data.message, variant: "destructive" });
       }
@@ -858,12 +884,22 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 )}
                 {/* Applied promo code */}
                 {appliedPromo && (
-                  <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
-                    <span className="flex items-center gap-1">
-                      <Tag className="h-3 w-3" />
-                      Promo: <span className="font-mono font-bold ml-1">{appliedPromo.code}</span>
-                    </span>
-                    <span>-${appliedPromo.discountAmount.toFixed(2)}</span>
+                  <div className="text-sm text-green-600 dark:text-green-400">
+                    <div className="flex justify-between">
+                      <span className="flex items-center gap-1">
+                        <Tag className="h-3 w-3" />
+                        Promo: <span className="font-mono font-bold ml-1">{appliedPromo.code}</span>
+                      </span>
+                      <span>-${appliedPromo.discountAmount.toFixed(2)}</span>
+                    </div>
+                    {appliedPromo.itemAllocations && appliedPromo.itemAllocations.length > 0 && (
+                      <p className="mt-1 text-xs">
+                        Applies to {appliedPromo.itemAllocations.map(allocation => {
+                          const product = state.items.find(item => item.product.id === allocation.productId && item.size === allocation.size)?.product;
+                          return `${allocation.quantity}× ${product?.name || "eligible item"}${allocation.promoPrice === 0 ? " free" : ` at $${allocation.promoPrice.toFixed(2)}`}`;
+                        }).join(", ")}
+                      </p>
+                    )}
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
@@ -982,9 +1018,19 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   </div>
                 )}
                 {appliedPromo && (
-                  <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
-                    <span className="flex items-center gap-1"><Tag className="h-3 w-3" /> Promo: {appliedPromo.code}</span>
-                    <span>-${appliedPromo.discountAmount.toFixed(2)}</span>
+                  <div className="text-sm text-green-600 dark:text-green-400">
+                    <div className="flex justify-between">
+                      <span className="flex items-center gap-1"><Tag className="h-3 w-3" /> Promo: {appliedPromo.code}</span>
+                      <span>-${appliedPromo.discountAmount.toFixed(2)}</span>
+                    </div>
+                    {appliedPromo.itemAllocations && appliedPromo.itemAllocations.length > 0 && (
+                      <p className="mt-1 text-xs">
+                        Applies to {appliedPromo.itemAllocations.map(allocation => {
+                          const product = state.items.find(item => item.product.id === allocation.productId && item.size === allocation.size)?.product;
+                          return `${allocation.quantity}× ${product?.name || "eligible item"}${allocation.promoPrice === 0 ? " free" : ` at $${allocation.promoPrice.toFixed(2)}`}`;
+                        }).join(", ")}
+                      </p>
+                    )}
                   </div>
                 )}
                 <div className="flex justify-between font-semibold text-base mt-1">

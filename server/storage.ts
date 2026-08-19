@@ -4725,11 +4725,13 @@ export class DatabaseStorage implements IStorage {
       code: data.code.toUpperCase().trim(),
       discountType: data.discountType,
       discountValue: data.discountValue,
+      itemDealQuantity: data.itemDealQuantity || 1,
       bypassPurchaseMinimum: data.bypassPurchaseMinimum || false,
       usageLimitType: data.usageLimitType || 'unlimited',
       isActive: data.isActive !== false,
     };
     if (data.description) toInsert.description = data.description;
+    if ('targetProductIds' in data) toInsert.targetProductIds = data.targetProductIds || null;
     if (data.minOrderAmount != null && data.minOrderAmount !== "") toInsert.minOrderAmount = data.minOrderAmount;
     if (data.maxTotalUses != null) toInsert.maxTotalUses = data.maxTotalUses;
     if (data.validFrom) toInsert.validFrom = new Date(data.validFrom);
@@ -4746,6 +4748,8 @@ export class DatabaseStorage implements IStorage {
     if (data.description !== undefined) toUpdate.description = data.description;
     if (data.discountType !== undefined) toUpdate.discountType = data.discountType;
     if (data.discountValue !== undefined) toUpdate.discountValue = data.discountValue;
+    if ('targetProductIds' in data) toUpdate.targetProductIds = data.targetProductIds || null;
+    if ('itemDealQuantity' in data) toUpdate.itemDealQuantity = data.itemDealQuantity || 1;
     if ('minOrderAmount' in data) toUpdate.minOrderAmount = (data.minOrderAmount != null && data.minOrderAmount !== "") ? data.minOrderAmount : null;
     if (data.bypassPurchaseMinimum !== undefined) toUpdate.bypassPurchaseMinimum = data.bypassPurchaseMinimum;
     if (data.usageLimitType !== undefined) toUpdate.usageLimitType = data.usageLimitType;

@@ -8,11 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
-import { Tag, Plus, Pencil, Trash2, Package } from "lucide-react";
+import { Tag, Plus, Pencil, Trash2, Package, ArrowUp, ArrowDown, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
-import type { PromoCode } from "@shared/schema";
+import type { Product, PromoCode } from "@shared/schema";
 
 export default function DiscountsTab() {
   const { toast } = useToast();
@@ -21,8 +21,10 @@ export default function DiscountsTab() {
   // ── State ──────────────────────────────────────────────────────────────────
   const [promoCodeForm, setPromoCodeForm] = useState({
     code: "", description: "",
-    discountType: "percent" as "percent" | "fixed",
+    discountType: "percent" as "percent" | "fixed" | "item_free" | "item_price",
     discountValue: "",
+    targetProductIds: [] as number[],
+    itemDealQuantity: "1",
     minOrderAmount: "",
     bypassPurchaseMinimum: false,
     usageLimitType: "unlimited" as "unlimited" | "once_per_user",
@@ -34,11 +36,14 @@ export default function DiscountsTab() {
   const [editingPromoCode, setEditingPromoCode] = useState<PromoCode | null>(null);
   const [promoCodeToDelete, setPromoCodeToDelete] = useState<PromoCode | null>(null);
   const [deletePromoCodeConfirmOpen, setDeletePromoCodeConfirmOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
 
   const resetPromoCodeForm = () => setPromoCodeForm({
     code: "", description: "",
     discountType: "percent",
     discountValue: "",
+    targetProductIds: [],
+    itemDealQuantity: "1",
     minOrderAmount: "",
     bypassPurchaseMinimum: false,
     usageLimitType: "unlimited",
@@ -52,8 +57,17 @@ export default function DiscountsTab() {
     setPromoCodeForm({
       code: p.code,
       description: p.description || "",
-      discountType: (p.discountType as "percent" | "fixed") || "percent",
+      discountType: (p.discountType as "percent" | "fixed" | "item_free" | "item_price") || "percent",
       discountValue: p.discountValue?.toString() || "",
+      targetProductIds: (() => {
+        try {
+          const ids = JSON.parse(p.targetProductIds || "[]");
+          return Array.isArray(ids) ? ids.map(Number).filter(Number.isFinite) : [];
+        } catch {
+          return [];
+        }
+      })(),
+      itemDealQuantity: String(p.itemDealQuantity || 1),
       minOrderAmount: p.minOrderAmount?.toString() || "",
       bypassPurchaseMinimum: p.bypassPurchaseMinimum || false,
       usageLimitType: (p.usageLimitType as "unlimited" | "once_per_user") || "unlimited",
@@ -81,6 +95,23 @@ export default function DiscountsTab() {
     retry: 5,
     retryDelay: attempt => Math.min(1000 * 2 ** attempt, 8000),
   });
+  const { data: allProducts = [] } = useQuery<Product[]>({
+    queryKey: ["/api/products"],
+  });
+  const isItemDeal = promoCodeForm.discountType === "item_free" || promoCodeForm.discountType === "item_price";
+  const selectedDealProducts = promoCodeForm.targetProductIds
+    .map(id => allProducts.find(product => product.id === id))
+    .filter(Boolean) as Product[];
+  const matchingProducts = allProducts.filter(product =>
+    product.isActive &&
+    !promoCodeForm.targetProductIds.includes(product.id) &&
+    `${product.name} ${product.sku || ""}`.toLowerCase().includes(productSearch.toLowerCase())
+  ).slice(0, 8);
+  const promoSummary = (promo: PromoCode) => {
+    if (promo.discountType === "item_free") return `Free item deal · ${promo.itemDealQuantity || 1} item${(promo.itemDealQuantity || 1) === 1 ? "" : "s"}`;
+    if (promo.discountType === "item_price") return `$${Number(promo.discountValue).toFixed(2)} item deal · ${promo.itemDealQuantity || 1} item${(promo.itemDealQuantity || 1) === 1 ? "" : "s"}`;
+    return promo.discountType === "percent" ? `${promo.discountValue}% off` : `$${Number(promo.discountValue).toFixed(2)} off`;
+  };
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const toggleWeightPricingMutation = useMutation({
@@ -99,7 +130,9 @@ export default function DiscountsTab() {
         code: data.code.toUpperCase().trim(),
         description: data.description || null,
         discountType: data.discountType,
-        discountValue: data.discountValue,
+        discountValue: data.discountType === "item_free" ? "0" : data.discountValue,
+        targetProductIds: data.targetProductIds.length ? JSON.stringify(data.targetProductIds) : null,
+        itemDealQuantity: parseInt(data.itemDealQuantity) || 1,
         minOrderAmount: data.minOrderAmount || null,
         bypassPurchaseMinimum: data.bypassPurchaseMinimum,
         usageLimitType: data.usageLimitType,
@@ -127,7 +160,9 @@ export default function DiscountsTab() {
         code: data.code.toUpperCase().trim(),
         description: data.description || null,
         discountType: data.discountType,
-        discountValue: data.discountValue,
+        discountValue: data.discountType === "item_free" ? "0" : data.discountValue,
+        targetProductIds: data.targetProductIds.length ? JSON.stringify(data.targetProductIds) : null,
+        itemDealQuantity: parseInt(data.itemDealQuantity) || 1,
         minOrderAmount: data.minOrderAmount || null,
         bypassPurchaseMinimum: data.bypassPurchaseMinimum,
         usageLimitType: data.usageLimitType,
@@ -247,7 +282,7 @@ export default function DiscountsTab() {
                     <div className="px-4 py-3 space-y-2">
                       <div className="flex flex-wrap gap-1.5">
                         <Badge variant="outline" className="text-sm font-semibold">
-                          {p.discountType === 'percent' ? `${p.discountValue}% off` : `$${Number(p.discountValue).toFixed(2)} off`}
+                          {promoSummary(p)}
                         </Badge>
                         {p.minOrderAmount && (
                           <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">Min. ${Number(p.minOrderAmount).toFixed(2)}</Badge>
@@ -302,7 +337,7 @@ export default function DiscountsTab() {
                           <span className="font-mono font-bold tracking-wider text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{p.code}</span>
                           <Badge variant={p.isActive ? "default" : "secondary"} className="text-xs">{p.isActive ? 'Active' : 'Inactive'}</Badge>
                           <Badge variant="outline" className="text-xs">
-                            {p.discountType === 'percent' ? `${p.discountValue}% off` : `$${Number(p.discountValue).toFixed(2)} off`}
+                            {promoSummary(p)}
                           </Badge>
                           {p.minOrderAmount && (
                             <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">Min. ${Number(p.minOrderAmount).toFixed(2)}</Badge>
@@ -391,19 +426,68 @@ export default function DiscountsTab() {
                   <SelectContent>
                     <SelectItem value="percent">Percentage off (%)</SelectItem>
                     <SelectItem value="fixed">Fixed amount ($)</SelectItem>
+                    <SelectItem value="item_free">Free selected item(s)</SelectItem>
+                    <SelectItem value="item_price">Selected item(s) for a set price</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>{promoCodeForm.discountType === 'percent' ? 'Percent Off *' : 'Dollar Amount Off *'}</Label>
+              {promoCodeForm.discountType !== "item_free" && <div className="space-y-2">
+                <Label>{promoCodeForm.discountType === 'percent' ? 'Percent Off *' : promoCodeForm.discountType === "item_price" ? 'Promotional Price Per Item *' : 'Dollar Amount Off *'}</Label>
                 <Input
                   type="number" min="0" step={promoCodeForm.discountType === 'percent' ? "1" : "0.01"}
-                  placeholder={promoCodeForm.discountType === 'percent' ? "e.g. 20" : "e.g. 10.00"}
+                  placeholder={promoCodeForm.discountType === 'percent' ? "e.g. 20" : promoCodeForm.discountType === "item_price" ? "e.g. 5.00" : "e.g. 10.00"}
                   value={promoCodeForm.discountValue}
                   onChange={e => setPromoCodeForm(f => ({ ...f, discountValue: e.target.value }))}
                 />
-              </div>
+              </div>}
             </div>
+            {isItemDeal && (
+              <div className="space-y-3 rounded-lg border p-3 bg-muted/20">
+                <div>
+                  <Label>Eligible Items (priority order) *</Label>
+                  <p className="text-xs text-muted-foreground mt-1">The deal is applied to eligible cart items in this order.</p>
+                </div>
+                {selectedDealProducts.length > 0 && (
+                  <div className="space-y-2">
+                    {selectedDealProducts.map((product, index) => (
+                      <div key={product.id} className="flex items-center gap-2 rounded border bg-background px-2 py-1.5 text-sm">
+                        <span className="w-5 text-muted-foreground">{index + 1}.</span>
+                        <span className="min-w-0 flex-1 truncate">{product.name}{product.sku ? <span className="ml-1 text-xs text-muted-foreground">({product.sku})</span> : null}</span>
+                        <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === 0} onClick={() => setPromoCodeForm(f => {
+                          const ids = [...f.targetProductIds];
+                          [ids[index - 1], ids[index]] = [ids[index], ids[index - 1]];
+                          return { ...f, targetProductIds: ids };
+                        })}><ArrowUp className="h-3.5 w-3.5" /></Button>
+                        <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === selectedDealProducts.length - 1} onClick={() => setPromoCodeForm(f => {
+                          const ids = [...f.targetProductIds];
+                          [ids[index], ids[index + 1]] = [ids[index + 1], ids[index]];
+                          return { ...f, targetProductIds: ids };
+                        })}><ArrowDown className="h-3.5 w-3.5" /></Button>
+                        <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setPromoCodeForm(f => ({ ...f, targetProductIds: f.targetProductIds.filter(id => id !== product.id) }))}><X className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Input value={productSearch} onChange={e => setProductSearch(e.target.value)} placeholder="Search products to add…" />
+                {productSearch && (
+                  <div className="max-h-40 overflow-y-auto rounded border bg-background">
+                    {matchingProducts.length ? matchingProducts.map(product => (
+                      <button type="button" key={product.id} className="w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => {
+                        setPromoCodeForm(f => ({ ...f, targetProductIds: [...f.targetProductIds, product.id] }));
+                        setProductSearch("");
+                      }}>
+                        {product.name}{product.sku ? <span className="ml-1 text-xs text-muted-foreground">({product.sku})</span> : null}
+                      </button>
+                    )) : <p className="px-3 py-2 text-sm text-muted-foreground">No matching available products.</p>}
+                  </div>
+                )}
+                <div className="max-w-[220px] space-y-2">
+                  <Label>Deal applies to up to</Label>
+                  <Input type="number" min="1" step="1" value={promoCodeForm.itemDealQuantity} onChange={e => setPromoCodeForm(f => ({ ...f, itemDealQuantity: e.target.value }))} />
+                  <p className="text-xs text-muted-foreground">eligible item(s) per order.</p>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Usage Limit</Label>
               <Select value={promoCodeForm.usageLimitType} onValueChange={v => setPromoCodeForm(f => ({ ...f, usageLimitType: v as any }))}>
@@ -451,7 +535,7 @@ export default function DiscountsTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowPromoCodeModal(false); setEditingPromoCode(null); resetPromoCodeForm(); }}>Cancel</Button>
             <Button
-              disabled={!promoCodeForm.code || !promoCodeForm.discountValue || createPromoCodeMutation.isPending || updatePromoCodeMutation.isPending}
+              disabled={!promoCodeForm.code || (promoCodeForm.discountType !== "item_free" && !promoCodeForm.discountValue) || (isItemDeal && promoCodeForm.targetProductIds.length === 0) || createPromoCodeMutation.isPending || updatePromoCodeMutation.isPending}
               onClick={() => {
                 if (editingPromoCode) {
                   updatePromoCodeMutation.mutate({ id: editingPromoCode.id, data: promoCodeForm });
