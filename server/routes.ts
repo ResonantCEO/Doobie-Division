@@ -2892,7 +2892,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const ticketData = insertSupportTicketSchema.parse(req.body);
       const { userId, ...rest } = ticketData;
-      const insertData = userId ? { ...rest, userId } : rest;
+      const linkedUser = userId ? await storage.getUser(userId) : undefined;
+      const insertData = userId
+        ? {
+            ...rest,
+            userId,
+            customerTelegram: linkedUser?.telegramUsername || null,
+          }
+        : rest;
       const ticket = await storage.createSupportTicket(insertData);
 
       // Push real-time notification to all admin/manager clients
