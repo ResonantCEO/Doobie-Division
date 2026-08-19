@@ -21,6 +21,7 @@ import CustomerOrdersWrapper from "@/pages/customer-orders-wrapper";
 import SupportPage from "@/pages/support";
 import AccessGate from "@/components/AccessGate";
 import InactivityWarning from "@/components/InactivityWarning";
+import TelegramUsernamePrompt from "@/components/TelegramUsernamePrompt";
 import { useInactivityTimer } from "@/hooks/useInactivityTimer";
 import { useCallback, useEffect, useState } from "react";
 
@@ -60,6 +61,7 @@ function Router() {
         onStayLoggedIn={stayLoggedIn}
         onLogoutNow={handleInactivityLogout}
       />
+      <TelegramUsernamePrompt user={user} />
       <Switch>
         <Route path="/" component={isAuthenticated ? Dashboard : Landing} />
         <Route path="/storefront" component={StorefrontWithGate} />

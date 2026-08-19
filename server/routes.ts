@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import QRCode from "qrcode";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./auth";
+import { setupAuth, isAuthenticated, normalizeTelegramUsername } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema, insertSupportTicketSchema, insertCityPurchaseLimitSchema } from "@shared/schema";
 import { z } from "zod";
 import { db, sql as rawPool } from "./db";
@@ -2910,15 +2910,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/users/:id', isAuthenticated, async (req: any, res) => {
     try {
       const id = req.params.id;
-      const userData = req.body;
+      let userData = req.body ?? {};
+      const isAdmin = req.currentUser.role === 'admin';
 
-      // Regular users can only update their own profile
-      if (req.currentUser.role === 'customer' && req.currentUser.id !== id) {
+      // Only administrators can manage other accounts or update protected fields.
+      // Every other role may edit only its own limited profile fields.
+      if (!isAdmin && req.currentUser.id !== id) {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      // If not admin, restrict what fields can be updated
-      if (req.currentUser.role === 'customer') {
+      if (Object.prototype.hasOwnProperty.call(userData, 'telegramUsername')) {
+        const submittedTelegramUsername = typeof userData.telegramUsername === 'string'
+          ? userData.telegramUsername.trim()
+          : '';
+
+        if (!submittedTelegramUsername) {
+          const targetUser = await storage.getUser(id);
+          if (normalizeTelegramUsername(targetUser?.telegramUsername)) {
+            return res.status(400).json({ message: "A saved Telegram username cannot be removed." });
+          }
+
+          const { telegramUsername: _, ...dataWithoutTelegramUsername } = userData;
+          userData = dataWithoutTelegramUsername;
+        } else {
+          const telegramUsername = normalizeTelegramUsername(submittedTelegramUsername);
+          if (!telegramUsername) {
+            return res.status(400).json({ message: "Telegram usernames must use 5-32 letters, numbers, or underscores." });
+          }
+          userData = { ...userData, telegramUsername };
+        }
+      }
+
+      if (!isAdmin) {
         const allowedFields = ['firstName', 'lastName', 'address', 'city', 'state', 'postalCode', 'country', 'telegramUsername', 'phoneNumber'];
         const filteredData = Object.keys(userData)
           .filter(key => allowedFields.includes(key))

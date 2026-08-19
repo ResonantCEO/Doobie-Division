@@ -244,7 +244,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
     e.preventDefault();
     if (signupStep === 1) {
       // Validate step 1 fields
-      if (!registerData.firstName || !registerData.lastName || !registerData.email || !registerData.confirmEmail || !registerData.password || !registerData.confirmPassword) {
+      if (!registerData.firstName || !registerData.lastName || !registerData.email || !registerData.confirmEmail || !registerData.password || !registerData.confirmPassword || !registerData.telegramUsername.trim()) {
         toast({
           title: "Missing fields",
           description: "All fields are required.",
@@ -266,6 +266,15 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
         toast({
           title: "Password mismatch",
           description: "Passwords do not match.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!/^[A-Za-z0-9_]{5,32}$/.test(registerData.telegramUsername.trim().replace(/^@+/, ""))) {
+        toast({
+          title: "Invalid Telegram username",
+          description: "Use 5-32 letters, numbers, or underscores.",
           variant: "destructive",
         });
         return;
@@ -461,9 +470,7 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="telegramUsername">
-                        Telegram Username <span className="text-muted-foreground font-normal">(optional)</span>
-                      </Label>
+                      <Label htmlFor="telegramUsername">Telegram Username</Label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground select-none">@</span>
                         <Input
@@ -473,10 +480,11 @@ export function AuthForms({ onSuccess }: AuthFormsProps = {}) {
                           value={registerData.telegramUsername}
                           onChange={(e) => setRegisterData({ ...registerData, telegramUsername: e.target.value.replace(/^@/, "") })}
                           className="pl-7"
+                        required
                         />
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Not required, but providing your Telegram username helps us reach you faster for order updates and support.
+                        We use Telegram to communicate more easily and send access codes when needed.
                       </p>
                     </div>
                     <div className="space-y-2">

@@ -1,2 +1,3 @@
 - [Neon DB driver fix](neon-pool-fix.md) — HTTP mode collapses under concurrent admin queries; switch to WebSocket Pool mode.
 - [CG bag stock check bypass](cg-bag-stock-checks.md) — createOrder has two stock check points; both must skip items where metadata.fromCgBag=true.
+- [Telegram contact rollout](telegram-contact-rollout.md) — new accounts require a handle immediately; existing accounts have one persisted two-week grace period.

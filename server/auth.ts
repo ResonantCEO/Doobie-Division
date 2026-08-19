@@ -10,6 +10,27 @@ const SALT_ROUNDS = 12;
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_TIME = 5 * 60 * 1000; // 5 minutes
 const SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
+const TELEGRAM_REQUIREMENT_DEADLINE_KEY = "telegram_requirement_deadline";
+const TELEGRAM_GRACE_PERIOD_MS = 14 * 24 * 60 * 60 * 1000;
+
+export function normalizeTelegramUsername(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const username = value.trim().replace(/^@+/, "");
+  return /^[A-Za-z0-9_]{5,32}$/.test(username) ? username : null;
+}
+
+async function getTelegramRequirementDeadline(): Promise<Date> {
+  const savedDeadline = await storage.getSiteSetting(TELEGRAM_REQUIREMENT_DEADLINE_KEY);
+  const parsedDeadline = savedDeadline ? new Date(savedDeadline) : null;
+
+  if (parsedDeadline && !Number.isNaN(parsedDeadline.getTime())) {
+    return parsedDeadline;
+  }
+
+  const deadline = new Date(Date.now() + TELEGRAM_GRACE_PERIOD_MS);
+  await storage.setSiteSetting(TELEGRAM_REQUIREMENT_DEADLINE_KEY, deadline.toISOString());
+  return deadline;
+}
 
 export function getSession() {
   const pgStore = connectPg(session);
@@ -37,6 +58,7 @@ export function getSession() {
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use(getSession());
+  await getTelegramRequirementDeadline();
 
   // Email availability check endpoint
   app.post("/api/auth/check-email", async (req, res) => {
@@ -71,6 +93,11 @@ export async function setupAuth(app: Express) {
       // Only check for essential fields that are actually sent from frontend
       if (!email || !password || !firstName || !lastName) {
         return res.status(400).json({ message: "All required fields must be provided" });
+      }
+
+      const normalizedTelegramUsername = normalizeTelegramUsername(telegramUsername);
+      if (!normalizedTelegramUsername) {
+        return res.status(400).json({ message: "A valid Telegram username is required. Use 5-32 letters, numbers, or underscores." });
       }
 
       // Validate photo uploads are provided and in correct format
@@ -175,7 +202,7 @@ export async function setupAuth(app: Express) {
         state,
         postalCode,
         country: country || 'USA',
-        telegramUsername: telegramUsername || null,
+        telegramUsername: normalizedTelegramUsername,
         idVerificationStatus: isFirstUser ? "verified" : (processedIdImageUrl ? "pending" : "not_provided"),
         role: isFirstUser ? "admin" : "customer",
         status: isFirstUser ? "active" : "pending",
@@ -510,6 +537,44 @@ Please manually send this reset URL to the user via their preferred communicatio
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Telegram contact rollout status for signed-in users. The deadline is stored
+  // in site settings so it remains the same across server restarts.
+  app.get("/api/auth/telegram-requirement", isAuthenticated, async (req: any, res) => {
+    try {
+      const deadline = await getTelegramRequirementDeadline();
+      const user = req.currentUser;
+      const hasTelegramUsername = Boolean(normalizeTelegramUsername(user?.telegramUsername));
+      const requiredNow = Date.now() >= deadline.getTime();
+
+      res.json({
+        hasTelegramUsername,
+        deadline: deadline.toISOString(),
+        requiredNow,
+      });
+    } catch (error) {
+      console.error("Error checking Telegram requirement:", error);
+      res.status(500).json({ message: "Failed to check Telegram requirement" });
+    }
+  });
+
+  // Allows a signed-in user to satisfy the Telegram requirement without
+  // opening their full profile, including when the deadline has passed.
+  app.put("/api/auth/telegram-username", isAuthenticated, async (req: any, res) => {
+    try {
+      const telegramUsername = normalizeTelegramUsername(req.body?.telegramUsername);
+      if (!telegramUsername) {
+        return res.status(400).json({ message: "Enter a valid Telegram username using 5-32 letters, numbers, or underscores." });
+      }
+
+      const updatedUser = await storage.updateUser(req.currentUser.id, { telegramUsername });
+      const { password: _, ...userResponse } = updatedUser;
+      res.json(userResponse);
+    } catch (error) {
+      console.error("Error saving Telegram username:", error);
+      res.status(500).json({ message: "Failed to save Telegram username" });
     }
   });
 }
