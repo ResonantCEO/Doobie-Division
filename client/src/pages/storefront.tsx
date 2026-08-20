@@ -22,12 +22,14 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
+  useDroppable,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   useSortable,
   rectSortingStrategy,
+  verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -91,6 +93,95 @@ function CategoryReorderGrid({
         </div>
       </SortableContext>
     </DndContext>
+  );
+}
+
+function SortableStorefrontAd({ post }: { post: BoardPost }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `board-post-${post.id}`,
+    data: { kind: "board-post", postId: post.id, categoryId: post.categoryId },
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.45 : 1,
+  };
+  const label = post.text?.replace(/\s+/g, " ").trim() || (post.imageUrl ? "Image advertisement" : "Advertisement");
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="flex items-center gap-2 rounded-md border bg-background px-2 py-2 text-sm shadow-sm cursor-grab touch-none active:cursor-grabbing"
+    >
+      <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+      {post.imageUrl ? (
+        <img src={post.imageUrl} alt="" className="h-8 w-10 shrink-0 rounded object-cover" />
+      ) : (
+        <Megaphone className="h-4 w-4 shrink-0 text-primary" />
+      )}
+      <span className="line-clamp-1">{label}</span>
+    </div>
+  );
+}
+
+function StorefrontAdDropZone({
+  id,
+  categoryId,
+  children,
+}: {
+  id: string;
+  categoryId: number | null;
+  children: React.ReactNode;
+}) {
+  const { isOver, setNodeRef } = useDroppable({
+    id,
+    data: { kind: "ad-zone", categoryId },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`min-h-14 rounded-md border border-dashed p-2 transition-colors ${
+        isOver ? "border-primary bg-primary/10" : "border-border bg-muted/30"
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function SortableStorefrontCategory({
+  category,
+  children,
+}: {
+  category: Category;
+  children: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `storefront-category-${category.id}`,
+    data: { kind: "category", categoryId: category.id },
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.45 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="rounded-lg border bg-card p-3 shadow-sm">
+      <div
+        {...attributes}
+        {...listeners}
+        className="mb-2 flex cursor-grab touch-none items-center gap-2 font-medium active:cursor-grabbing"
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+        {category.name}
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -173,6 +264,8 @@ export default function StorefrontPage() {
   // Reorder mode (admin only)
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [localProductGroups, setLocalProductGroups] = useState<Map<string, (Product & { category: Category | null })[]>>(new Map());
+  const [isStorefrontLayoutMode, setIsStorefrontLayoutMode] = useState(false);
+  const [localRootCategoryOrder, setLocalRootCategoryOrder] = useState<number[] | null>(null);
 
   const reorderMutation = useMutation({
     mutationFn: async (orders: { id: number; sortOrder: number }[]) => {
@@ -269,6 +362,46 @@ export default function StorefrontPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/board-posts"] });
       toast({ title: "Post removed" });
+    },
+  });
+
+  const updateBoardPostLayoutMutation = useMutation({
+    mutationFn: async (placements: { id: number; categoryId: number | null; sortOrder: number }[]) => {
+      await apiRequest("PATCH", "/api/board-posts/layout", { placements });
+    },
+    onMutate: async (placements) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/board-posts"] });
+      const previousPosts = queryClient.getQueryData<BoardPost[]>(["/api/board-posts"]);
+      queryClient.setQueryData<BoardPost[]>(["/api/board-posts"], (posts = []) =>
+        posts.map((post) => {
+          const placement = placements.find((item) => item.id === post.id);
+          return placement ? { ...post, categoryId: placement.categoryId, sortOrder: placement.sortOrder } : post;
+        })
+      );
+      return { previousPosts };
+    },
+    onError: (_error, _placements, context) => {
+      if (context?.previousPosts) {
+        queryClient.setQueryData(["/api/board-posts"], context.previousPosts);
+      }
+      toast({ title: "Failed to save ad placement", variant: "destructive" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/board-posts"] });
+    },
+  });
+
+  const updateCategoryOrderMutation = useMutation({
+    mutationFn: async (orders: { id: number; sortOrder: number }[]) => {
+      await apiRequest("PATCH", "/api/categories/reorder", { orders });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      setLocalRootCategoryOrder(null);
+    },
+    onError: () => {
+      setLocalRootCategoryOrder(null);
+      toast({ title: "Failed to save category order", variant: "destructive" });
     },
   });
 
@@ -435,6 +568,89 @@ export default function StorefrontPage() {
 
     return flattenCategories(categoriesResponse);
   }, [categoriesResponse]);
+
+  const unassignedBoardPosts = useMemo(
+    () => boardPosts
+      .filter((post) => post.categoryId === null)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
+    [boardPosts]
+  );
+
+  const rootCategoriesForLayout = useMemo(() => {
+    const roots = categories
+      .filter((category) => !category.parentId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    if (!localRootCategoryOrder) return roots;
+    const indexById = new Map(localRootCategoryOrder.map((id, index) => [id, index]));
+    return [...roots].sort((a, b) => (indexById.get(a.id) ?? 9999) - (indexById.get(b.id) ?? 9999));
+  }, [categories, localRootCategoryOrder]);
+
+  const getCategoryBoardPosts = (categoryId: number) =>
+    boardPosts
+      .filter((post) => post.categoryId === categoryId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const handleStorefrontLayoutDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over) return;
+    const activeData = active.data.current as { kind?: string; postId?: number; categoryId?: number | null } | undefined;
+    const overData = over.data.current as { kind?: string; postId?: number; categoryId?: number | null } | undefined;
+    if (!activeData || !overData || active.id === over.id) return;
+
+    if (activeData.kind === "category") {
+      const activeCategoryId = activeData.categoryId;
+      const overCategoryId = overData.categoryId;
+      if (!activeCategoryId || !overCategoryId || activeCategoryId === overCategoryId) return;
+      const oldIndex = rootCategoriesForLayout.findIndex((category) => category.id === activeCategoryId);
+      const newIndex = rootCategoriesForLayout.findIndex((category) => category.id === overCategoryId);
+      if (oldIndex < 0 || newIndex < 0) return;
+
+      const reordered = arrayMove(rootCategoriesForLayout, oldIndex, newIndex);
+      setLocalRootCategoryOrder(reordered.map((category) => category.id));
+      updateCategoryOrderMutation.mutate(reordered.map((category, index) => ({ id: category.id, sortOrder: index })));
+      return;
+    }
+
+    if (activeData.kind !== "board-post" || !activeData.postId) return;
+    const movingPost = boardPosts.find((post) => post.id === activeData.postId);
+    if (!movingPost) return;
+
+    let destinationCategoryId: number | null | undefined;
+    if (overData.kind === "board-post" || overData.kind === "ad-zone" || overData.kind === "category") {
+      destinationCategoryId = overData.categoryId;
+    }
+    if (destinationCategoryId === undefined) return;
+
+    const sourceCategoryId = movingPost.categoryId;
+    const sourcePosts = sourceCategoryId === null
+      ? unassignedBoardPosts
+      : getCategoryBoardPosts(sourceCategoryId);
+    const destinationPosts = destinationCategoryId === null
+      ? unassignedBoardPosts
+      : getCategoryBoardPosts(destinationCategoryId);
+
+    let placements: { id: number; categoryId: number | null; sortOrder: number }[];
+    if (sourceCategoryId === destinationCategoryId) {
+      const oldIndex = sourcePosts.findIndex((post) => post.id === movingPost.id);
+      const overIndex = overData.kind === "board-post"
+        ? sourcePosts.findIndex((post) => post.id === overData.postId)
+        : sourcePosts.length - 1;
+      if (oldIndex < 0 || overIndex < 0 || oldIndex === overIndex) return;
+      placements = arrayMove(sourcePosts, oldIndex, overIndex)
+        .map((post, sortOrder) => ({ id: post.id, categoryId: sourceCategoryId, sortOrder }));
+    } else {
+      const remainingSourcePosts = sourcePosts.filter((post) => post.id !== movingPost.id);
+      const nextDestinationPosts = destinationPosts.filter((post) => post.id !== movingPost.id);
+      const overIndex = overData.kind === "board-post"
+        ? nextDestinationPosts.findIndex((post) => post.id === overData.postId)
+        : nextDestinationPosts.length;
+      nextDestinationPosts.splice(overIndex < 0 ? nextDestinationPosts.length : overIndex, 0, movingPost);
+      placements = [
+        ...remainingSourcePosts.map((post, sortOrder) => ({ id: post.id, categoryId: sourceCategoryId, sortOrder })),
+        ...nextDestinationPosts.map((post, sortOrder) => ({ id: post.id, categoryId: destinationCategoryId, sortOrder })),
+      ];
+    }
+    updateBoardPostLayoutMutation.mutate(placements);
+  };
 
 
 
@@ -607,10 +823,89 @@ export default function StorefrontPage() {
     return ids;
   }, [allProductsRaw]);
 
-  // Helper function to check if a category has products (including descendants)
+  const categoriesWithContent = useMemo(() => {
+    const ids = new Set(categoriesWithProducts);
+    const categoryById = new Map(categories.map((category) => [category.id, category]));
+
+    for (const post of boardPosts) {
+      let currentCategoryId = post.categoryId;
+      const visited = new Set<number>();
+      while (currentCategoryId && !visited.has(currentCategoryId)) {
+        ids.add(currentCategoryId);
+        visited.add(currentCategoryId);
+        currentCategoryId = categoryById.get(currentCategoryId)?.parentId ?? null;
+      }
+    }
+    return ids;
+  }, [boardPosts, categories, categoriesWithProducts]);
+
+  // Helper function to check if a category has products or assigned ads (including descendants)
   const categoryHasProducts = useCallback((categoryId: number): boolean => {
-    return categoriesWithProducts.has(categoryId);
-  }, [categoriesWithProducts]);
+    return categoriesWithContent.has(categoryId);
+  }, [categoriesWithContent]);
+
+  const renderBoardPost = (post: BoardPost) => {
+    const linkedIds: number[] = post.productIds ? (() => { try { return JSON.parse(post.productIds); } catch { return []; } })() : [];
+    const hasLinkedProducts = linkedIds.length > 0;
+    const isActive = adProductFilter !== null && linkedIds.length > 0 && linkedIds.every(id => adProductFilter.includes(id));
+    return (
+      <div
+        key={post.id}
+        className={`relative rounded-xl border bg-card shadow-sm overflow-hidden ${hasLinkedProducts ? 'cursor-pointer hover:border-primary transition-colors' : ''} ${isActive ? 'border-primary ring-1 ring-primary' : 'border-border'}`}
+        onClick={hasLinkedProducts ? () => {
+          if (isActive) {
+            setAdProductFilter(null);
+          } else {
+            setAdProductFilter(linkedIds);
+            setTimeout(() => {
+              document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+          }
+        } : undefined}
+      >
+        {isAdmin && (
+          <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
+            <button
+              onClick={(event) => { event.stopPropagation(); openEditModal(post); }}
+              className="bg-black/50 rounded-full p-1.5 text-white hover:bg-primary/80 transition-colors"
+              title="Edit post"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={(event) => { event.stopPropagation(); deleteBoardPostMutation.mutate(post.id); }}
+              className="bg-black/50 rounded-full p-1.5 text-white hover:bg-destructive/80 transition-colors"
+              title="Remove post"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        {post.imageUrl && (isVideoMedia(post.imageUrl) ? (
+          <video src={post.imageUrl} className="w-full h-auto object-contain block" controls muted loop playsInline />
+        ) : (
+          <img src={post.imageUrl} alt="Board post" className="w-full h-auto object-contain block" />
+        ))}
+        <div className="p-4">
+          {post.text && <p className="text-sm text-foreground whitespace-pre-wrap">{post.text}</p>}
+          {hasLinkedProducts && (
+            <div className={`flex items-center gap-1.5 mt-2 text-xs font-medium ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
+              <ShoppingBag className="w-3.5 h-3.5" />
+              {isActive ? 'Showing linked products — tap to clear' : `Tap to shop ${linkedIds.length === 1 ? 'this product' : `${linkedIds.length} products`}`}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderCategoryBoardPosts = (categoryId: number) => {
+    const posts = getCategoryBoardPosts(categoryId);
+    if (posts.length === 0) return null;
+    return <div className="space-y-3">{posts.map(renderBoardPost)}</div>;
+  };
+
+  const hasAssignedBoardPosts = boardPosts.some((post) => post.categoryId !== null);
 
   if (productsLoading || categoriesLoading) {
     return (
@@ -654,9 +949,21 @@ export default function StorefrontPage() {
     <div className="space-y-8 relative min-h-screen">
       <div className="relative z-10">
 
-      {/* Admin: Advertise button + Message Board */}
+      {/* Admin: Advertisement and storefront organization controls */}
       {isAdmin && (
-        <div className="flex justify-end mb-2">
+        <div className="flex flex-wrap justify-end gap-2 mb-2">
+          <Button
+            variant={isStorefrontLayoutMode ? "default" : "outline"}
+            className="flex items-center gap-2"
+            onClick={() => {
+              setIsStorefrontLayoutMode((enabled) => !enabled);
+              setIsReorderMode(false);
+              setLocalProductGroups(new Map());
+            }}
+          >
+            <ArrowUpDown className="w-4 h-4" />
+            {isStorefrontLayoutMode ? "Done Organizing" : "Organize Storefront"}
+          </Button>
           <Button
             variant="outline"
             className="flex items-center gap-2 border-primary text-primary hover:bg-primary hover:text-white"
@@ -668,76 +975,65 @@ export default function StorefrontPage() {
         </div>
       )}
 
-      {/* Message Board - board posts shown above daily deals */}
-      {boardPosts.length > 0 && (
-        <div className="space-y-3 mb-4">
-          {boardPosts.map((post) => {
-            const linkedIds: number[] = post.productIds ? (() => { try { return JSON.parse(post.productIds); } catch { return []; } })() : [];
-            const hasLinkedProducts = linkedIds.length > 0;
-            const isActive = adProductFilter !== null && linkedIds.length > 0 && linkedIds.every(id => adProductFilter.includes(id));
-            return (
-              <div
-                key={post.id}
-                className={`relative rounded-xl border bg-card shadow-sm overflow-hidden ${hasLinkedProducts ? 'cursor-pointer hover:border-primary transition-colors' : ''} ${isActive ? 'border-primary ring-1 ring-primary' : 'border-border'}`}
-                onClick={hasLinkedProducts ? () => {
-                  if (isActive) {
-                    setAdProductFilter(null);
-                  } else {
-                    setAdProductFilter(linkedIds);
-                    setTimeout(() => {
-                      document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }, 100);
-                  }
-                } : undefined}
+      {isStorefrontLayoutMode && isAdmin && (
+        <DndContext onDragEnd={handleStorefrontLayoutDragEnd}>
+          <section className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-4">
+            <div>
+              <h2 className="font-semibold">Organize storefront</h2>
+              <p className="text-sm text-muted-foreground">
+                Drag categories to reorder them. Drag ads into a category, or back to Unassigned ads. Changes save automatically.
+              </p>
+            </div>
+
+            <StorefrontAdDropZone id="board-post-zone-unassigned" categoryId={null}>
+              <p className="mb-2 text-sm font-medium">Unassigned ads</p>
+              <SortableContext
+                items={unassignedBoardPosts.map((post) => `board-post-${post.id}`)}
+                strategy={verticalListSortingStrategy}
               >
-                {isAdmin && (
-                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openEditModal(post); }}
-                      className="bg-black/50 rounded-full p-1.5 text-white hover:bg-primary/80 transition-colors"
-                      title="Edit post"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteBoardPostMutation.mutate(post.id); }}
-                      className="bg-black/50 rounded-full p-1.5 text-white hover:bg-destructive/80 transition-colors"
-                      title="Remove post"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-                 {post.imageUrl && (isVideoMedia(post.imageUrl) ? (
-                   <video
-                     src={post.imageUrl}
-                     className="w-full h-auto object-contain block"
-                     controls
-                     muted
-                     loop
-                     playsInline
-                   />
-                 ) : (
-                   <img
-                     src={post.imageUrl}
-                     alt="Board post"
-                     className="w-full h-auto object-contain block"
-                   />
-                 ))}
-                <div className={post.imageUrl ? 'p-4' : 'p-4'}>
-                  {post.text && (
-                    <p className="text-sm text-foreground whitespace-pre-wrap">{post.text}</p>
-                  )}
-                  {hasLinkedProducts && (
-                    <div className={`flex items-center gap-1.5 mt-2 text-xs font-medium ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
-                      <ShoppingBag className="w-3.5 h-3.5" />
-                      {isActive ? 'Showing linked products — tap to clear' : `Tap to shop ${linkedIds.length === 1 ? 'this product' : `${linkedIds.length} products`}`}
-                    </div>
-                  )}
+                <div className="space-y-2">
+                  {unassignedBoardPosts.length > 0
+                    ? unassignedBoardPosts.map((post) => <SortableStorefrontAd key={post.id} post={post} />)
+                    : <p className="py-2 text-xs text-muted-foreground">Drop an ad here to keep it at the top of the storefront.</p>}
                 </div>
+              </SortableContext>
+            </StorefrontAdDropZone>
+
+            <SortableContext
+              items={rootCategoriesForLayout.map((category) => `storefront-category-${category.id}`)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-3">
+                {rootCategoriesForLayout.map((category) => {
+                  const categoryPosts = getCategoryBoardPosts(category.id);
+                  return (
+                    <SortableStorefrontCategory key={category.id} category={category}>
+                      <StorefrontAdDropZone id={`board-post-zone-${category.id}`} categoryId={category.id}>
+                        <p className="mb-2 text-xs text-muted-foreground">Ads shown in {category.name}</p>
+                        <SortableContext
+                          items={categoryPosts.map((post) => `board-post-${post.id}`)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className="space-y-2">
+                            {categoryPosts.length > 0
+                              ? categoryPosts.map((post) => <SortableStorefrontAd key={post.id} post={post} />)
+                              : <p className="py-2 text-xs text-muted-foreground">Drop an ad here.</p>}
+                          </div>
+                        </SortableContext>
+                      </StorefrontAdDropZone>
+                    </SortableStorefrontCategory>
+                  );
+                })}
               </div>
-            );
-          })}
+            </SortableContext>
+          </section>
+        </DndContext>
+      )}
+
+      {/* Unassigned ads remain at the top of the storefront */}
+      {!isStorefrontLayoutMode && unassignedBoardPosts.length > 0 && (
+        <div className="space-y-3 mb-4">
+          {unassignedBoardPosts.map(renderBoardPost)}
         </div>
       )}
 
@@ -1164,7 +1460,7 @@ export default function StorefrontPage() {
           )}
         </div>
       )}
-      {products.length === 0 ? (
+      {products.length === 0 && !hasAssignedBoardPosts ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground text-lg">No products found</p>
           <p className="text-muted-foreground/60 mt-2">Try adjusting your search or category filter</p>
@@ -1196,7 +1492,7 @@ export default function StorefrontPage() {
               const sections: JSX.Element[] = [];
 
               // Show parent category products if any exist
-              if (parentDirectProducts.length > 0) {
+              if (parentDirectProducts.length > 0 || getCategoryBoardPosts(currentParentCategory).length > 0) {
                 sections.push(
                   <div key={`${currentParentCategory}-direct`} className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -1207,6 +1503,7 @@ export default function StorefrontPage() {
                         {parentCategory?.name || "All Products"}
                       </h3>
                     </div>
+                    {renderCategoryBoardPosts(currentParentCategory)}
                     {isReorderMode ? (
                       <CategoryReorderGrid
                         categoryKey={`parent-direct-${currentParentCategory}`}
@@ -1258,7 +1555,7 @@ export default function StorefrontPage() {
                 const subcategorySections = subcategoriesForParent
                   .filter(subcategory => {
                     const subcategoryProducts = getProductsForSubcategory(subcategory.id);
-                    return subcategoryProducts.length > 0;
+                    return subcategoryProducts.length > 0 || getCategoryBoardPosts(subcategory.id).length > 0;
                   })
                   .map(subcategory => {
                     const subcategoryProducts = getProductsForSubcategory(subcategory.id);
@@ -1273,6 +1570,7 @@ export default function StorefrontPage() {
                           {subcategory.name}
                         </h3>
                       </div>
+                      {renderCategoryBoardPosts(subcategory.id)}
 
                       {isReorderMode ? (
                         <CategoryReorderGrid
@@ -1330,6 +1628,11 @@ export default function StorefrontPage() {
             // Sort the root categories + optional BYB sentinel by sortOrder
             type SortedId = number | null | 'byb';
             const rawIds: SortedId[] = Array.from(productsByParentCategory.keys());
+            rootCategoriesForLayout.forEach((category) => {
+              if (getCategoryBoardPosts(category.id).length > 0 && !rawIds.includes(category.id)) {
+                rawIds.push(category.id);
+              }
+            });
             const searchMatchesBYB = debouncedSearchQuery && ['bag', 'build', 'your bag', 'grab bag', 'custom'].some(kw => debouncedSearchQuery.toLowerCase().includes(kw));
             if (cgTemplates.length > 0 && !adProductFilter && (!debouncedSearchQuery || searchMatchesBYB)) rawIds.push('byb');
 
@@ -1417,7 +1720,7 @@ export default function StorefrontPage() {
               }
 
               const categoryProducts = productsByParentCategory.get(parentCategoryId) || [];
-              if (categoryProducts.length === 0) return null;
+              if (categoryProducts.length === 0 && (!parentCategoryId || getCategoryBoardPosts(parentCategoryId).length === 0)) return null;
 
               // Find the root category info
               const rootCategory = parentCategoryId 
@@ -1440,6 +1743,8 @@ export default function StorefrontPage() {
                       {categoryName}
                     </h3>
                   </div>
+
+                  {parentCategoryId ? renderCategoryBoardPosts(parentCategoryId) : null}
 
                   {isReorderMode ? (
                     <CategoryReorderGrid

@@ -4816,19 +4816,31 @@ export class DatabaseStorage implements IStorage {
 
   // Board Posts
   async getBoardPosts(): Promise<BoardPost[]> {
-    return retryQuery(() => db.select().from(boardPosts).where(eq(boardPosts.isActive, true)).orderBy(desc(boardPosts.createdAt)));
+    return retryQuery(() => db.select().from(boardPosts)
+      .where(eq(boardPosts.isActive, true))
+      .orderBy(asc(boardPosts.categoryId), asc(boardPosts.sortOrder), desc(boardPosts.createdAt)));
   }
 
   async getAllBoardPosts(): Promise<BoardPost[]> {
-    return retryQuery(() => db.select().from(boardPosts).orderBy(desc(boardPosts.createdAt)));
+    return retryQuery(() => db.select().from(boardPosts)
+      .orderBy(asc(boardPosts.categoryId), asc(boardPosts.sortOrder), desc(boardPosts.createdAt)));
   }
 
-  async createBoardPost(data: { text?: string | null; imageUrl?: string | null; productIds?: string | null; createdBy: string }): Promise<BoardPost> {
+  async createBoardPost(data: {
+    text?: string | null;
+    imageUrl?: string | null;
+    productIds?: string | null;
+    categoryId?: number | null;
+    sortOrder?: number;
+    createdBy: string;
+  }): Promise<BoardPost> {
     const results = await retryQuery(() =>
       db.insert(boardPosts).values({
         text: data.text ?? null,
         imageUrl: data.imageUrl ?? null,
         productIds: data.productIds ?? null,
+        categoryId: data.categoryId ?? null,
+        sortOrder: data.sortOrder ?? 0,
         createdBy: data.createdBy,
         isActive: true,
       }).returning()
@@ -4845,6 +4857,16 @@ export class DatabaseStorage implements IStorage {
       }).where(eq(boardPosts.id, id)).returning()
     );
     return results[0];
+  }
+
+  async updateBoardPostLayout(placements: { id: number; categoryId: number | null; sortOrder: number }[]): Promise<void> {
+    await retryQuery(() => db.transaction(async (tx) => {
+      for (const placement of placements) {
+        await tx.update(boardPosts)
+          .set({ categoryId: placement.categoryId, sortOrder: placement.sortOrder })
+          .where(eq(boardPosts.id, placement.id));
+      }
+    }));
   }
 
   async deleteBoardPost(id: number): Promise<void> {

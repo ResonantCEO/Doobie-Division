@@ -10,7 +10,7 @@ import { setupAuth, isAuthenticated, normalizeTelegramUsername } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema, insertSupportTicketSchema, insertCityPurchaseLimitSchema } from "@shared/schema";
 import { z } from "zod";
 import { db, sql as rawPool } from "./db";
-import { orders, products, orderItems, users, supportTickets, notifications } from "@shared/schema";
+import { orders, products, orderItems, users, supportTickets, notifications, categories, boardPosts } from "@shared/schema";
 import { eq, sql, desc, and, gte, lt, inArray, like } from "drizzle-orm";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
@@ -95,6 +95,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       )
     `);
     await db.execute(sql`ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS product_ids TEXT`);
+    await db.execute(sql`ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL`);
+    await db.execute(sql`ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`);
   } catch (e: any) {
     console.warn('[startup] Could not ensure board_posts table:', e?.message);
   }
@@ -516,6 +518,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid category data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create category" });
+    }
+  });
+
+  app.patch('/api/categories/reorder', isAuthenticated, requireRole(['admin']), async (req, res) => {
+    try {
+      const orders = z.array(z.object({
+        id: z.number().int().positive(),
+        sortOrder: z.number().int().min(0),
+      })).min(1).parse(req.body.orders);
+      if (new Set(orders.map((order) => order.id)).size !== orders.length) {
+        return res.status(400).json({ message: "Category orders must not contain duplicate IDs" });
+      }
+      const existing = await db.select({ id: categories.id }).from(categories).where(inArray(categories.id, orders.map((order) => order.id)));
+      if (existing.length !== orders.length) {
+        return res.status(400).json({ message: "One or more categories do not exist" });
+      }
+      await Promise.all(orders.map(({ id, sortOrder }) => storage.updateCategory(id, { sortOrder })));
+      res.json({ success: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid category order data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to reorder categories" });
     }
   });
 
@@ -4078,6 +4103,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(posts);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch board posts" });
+    }
+  });
+
+  app.patch("/api/board-posts/layout", isAuthenticated, requireRole(["admin"]), async (req, res) => {
+    try {
+      const placements = z.array(z.object({
+        id: z.number().int().positive(),
+        categoryId: z.number().int().positive().nullable(),
+        sortOrder: z.number().int().min(0),
+      })).min(1).parse(req.body.placements);
+      if (new Set(placements.map((placement) => placement.id)).size !== placements.length) {
+        return res.status(400).json({ message: "Ad placements must not contain duplicate IDs" });
+      }
+
+      const postIds = placements.map((placement) => placement.id);
+      const existingPosts = await db.select({ id: boardPosts.id }).from(boardPosts).where(inArray(boardPosts.id, postIds));
+      if (existingPosts.length !== postIds.length) {
+        return res.status(400).json({ message: "One or more ads do not exist" });
+      }
+
+      const categoryIds = Array.from(new Set(placements
+        .map((placement) => placement.categoryId)
+        .filter((id): id is number => id !== null)));
+      if (categoryIds.length > 0) {
+        const existingCategories = await db.select({ id: categories.id }).from(categories).where(inArray(categories.id, categoryIds));
+        if (existingCategories.length !== categoryIds.length) {
+          return res.status(400).json({ message: "One or more categories do not exist" });
+        }
+      }
+
+      await storage.updateBoardPostLayout(placements);
+      res.json({ success: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid ad layout data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to save ad layout" });
     }
   });
 

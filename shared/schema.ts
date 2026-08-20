@@ -298,6 +298,8 @@ export const boardPosts = pgTable("board_posts", {
   text: text("text"),
   imageUrl: text("image_url"),
   productIds: text("product_ids"), // JSON array of product IDs
+  categoryId: integer("category_id").references(() => categories.id, { onDelete: "set null" }),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdBy: varchar("created_by").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -310,6 +312,8 @@ export const insertBoardPostSchema = createInsertSchema(boardPosts).omit({
   text: z.string().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
   productIds: z.string().nullable().optional(),
+  categoryId: z.number().int().positive().nullable().optional(),
+  sortOrder: z.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
 });
 
