@@ -4137,10 +4137,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const isMp4 = req.file.mimetype === 'video/mp4' || req.file.originalname.toLowerCase().endsWith('.mp4');
-      const extension = isMp4 ? 'mp4' : 'webp';
-      const contentType = isMp4 ? 'video/mp4' : 'image/webp';
+      const isGif = req.file.mimetype === 'image/gif' || req.file.originalname.toLowerCase().endsWith('.gif');
+      const extension = isMp4 ? 'mp4' : isGif ? 'gif' : 'webp';
+      const contentType = isMp4 ? 'video/mp4' : isGif ? 'image/gif' : 'image/webp';
       const mediaBuffer = isMp4
         ? req.file.buffer
+        : isGif
+          ? req.file.buffer
         : await sharp(req.file.buffer)
             .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
             .webp({ quality: 82 })

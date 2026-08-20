@@ -822,13 +822,13 @@ export default function StorefrontPage() {
                   className="w-full border-2 border-dashed border-border rounded-lg py-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                 >
                   <ImagePlus className="w-6 h-6" />
-                   <span className="text-sm">Click to upload an image or MP4 video (optional)</span>
+                   <span className="text-sm">Click to upload an image, GIF, or MP4 video (optional)</span>
                 </button>
               )}
               <input
                 ref={fileInputRef}
                 type="file"
-                 accept="image/*,video/mp4,.mp4"
+                  accept="image/*,video/mp4,.mp4,.gif"
                 className="hidden"
                 onChange={handleImageSelect}
               />
