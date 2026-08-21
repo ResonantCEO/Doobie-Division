@@ -246,7 +246,9 @@ app.use((req, res, next) => {
     await sql.query(`
       ALTER TABLE products
       ADD COLUMN IF NOT EXISTS bogo_enabled BOOLEAN NOT NULL DEFAULT false,
-      ADD COLUMN IF NOT EXISTS bogo_free_option_index INTEGER
+      ADD COLUMN IF NOT EXISTS bogo_free_option_index INTEGER,
+      ADD COLUMN IF NOT EXISTS bogo_discount_type VARCHAR DEFAULT 'free',
+      ADD COLUMN IF NOT EXISTS bogo_discount_value DECIMAL(10,2) DEFAULT 0
     `);
     console.log("✓ Verified BOGO columns exist");
   } catch (error: any) {
