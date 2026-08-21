@@ -101,12 +101,16 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       updateItemFulfilledCache(orderItemId, true);
       return { previousData };
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast({
         title: "Item Fulfilled",
-        description: "Physical inventory has been adjusted",
+        description: variables.productId
+          ? "Physical inventory has been adjusted"
+          : "Custom item has been checked off",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      if (variables.productId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      }
     },
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
@@ -148,12 +152,16 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       updateItemFulfilledCache(orderItemId, false);
       return { previousData };
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast({
         title: "Item Unfulfilled",
-        description: "Inventory has been restored",
+        description: variables.productId
+          ? "Inventory has been restored"
+          : "Custom item has been marked pending",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      if (variables.productId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      }
     },
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
