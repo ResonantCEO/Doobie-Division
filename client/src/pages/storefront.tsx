@@ -410,8 +410,19 @@ export default function StorefrontPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const isMp4 = file.type === "video/mp4" || file.name.toLowerCase().endsWith(".mp4");
+    const isGif = file.type === "image/gif" || file.name.toLowerCase().endsWith(".gif");
     if (!file.type.startsWith("image/") && !isMp4) {
       toast({ title: "Unsupported file", description: "Please choose an image or MP4 video.", variant: "destructive" });
+      e.target.value = "";
+      return;
+    }
+    const maxFileSize = (isGif ? 100 : 20) * 1024 * 1024;
+    if (file.size > maxFileSize) {
+      toast({
+        title: "File is too large",
+        description: `${isGif ? "GIFs" : "Images and MP4 videos"} must be ${isGif ? "100" : "20"} MB or smaller.`,
+        variant: "destructive",
+      });
       e.target.value = "";
       return;
     }
@@ -460,7 +471,10 @@ export default function StorefrontPage() {
         const formData = new FormData();
         formData.append('image', postImageFile);
         const uploadRes = await fetch('/api/upload/board-image', { method: 'POST', body: formData });
-        if (!uploadRes.ok) throw new Error('Image upload failed');
+        if (!uploadRes.ok) {
+          const errorData = await uploadRes.json().catch(() => null);
+          throw new Error(errorData?.message || 'Image upload failed');
+        }
         const uploadData = await uploadRes.json();
         imageUrl = uploadData.imageUrl;
       }

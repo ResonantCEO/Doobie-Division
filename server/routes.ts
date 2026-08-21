@@ -44,11 +44,16 @@ const requireRole = (roles: string[]) => {
   };
 };
 
+// Advertisement GIFs can be substantially larger than optimized images.
+// Keep the higher multer ceiling limited by an explicit per-type check below.
+const MAX_AD_IMAGE_OR_VIDEO_SIZE = 20 * 1024 * 1024;
+const MAX_AD_GIF_SIZE = 100 * 1024 * 1024;
+
 // Configure media uploads for advertisements (memory storage for Object Storage)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20MB limit
+    fileSize: MAX_AD_GIF_SIZE,
   },
   fileFilter: (req, file, cb) => {
     const isMp4 = file.mimetype === 'video/mp4' || file.originalname.toLowerCase().endsWith('.mp4');
@@ -4200,6 +4205,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const isMp4 = req.file.mimetype === 'video/mp4' || req.file.originalname.toLowerCase().endsWith('.mp4');
       const isGif = req.file.mimetype === 'image/gif' || req.file.originalname.toLowerCase().endsWith('.gif');
+      const maxFileSize = isGif ? MAX_AD_GIF_SIZE : MAX_AD_IMAGE_OR_VIDEO_SIZE;
+      if (req.file.size > maxFileSize) {
+        const limitLabel = isGif ? '100 MB' : '20 MB';
+        return res.status(413).json({ message: `Advertisement files of this type must be ${limitLabel} or smaller` });
+      }
       const extension = isMp4 ? 'mp4' : isGif ? 'gif' : 'webp';
       const contentType = isMp4 ? 'video/mp4' : isGif ? 'image/gif' : 'image/webp';
       const mediaBuffer = isMp4
