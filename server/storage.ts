@@ -729,7 +729,8 @@ export class DatabaseStorage implements IStorage {
         // table may not exist yet, ignore
       }
 
-      // Fetch bogo fields via direct SQL (bypasses Drizzle ORM column caching)
+      // Fetch BOGO fields explicitly so products created before these columns were
+      // added still return their current promotion configuration.
       const bogoByProductId = new Map<number, {
         bogoEnabled: boolean;
         bogoFreeOptionIndex: number | null;
@@ -737,9 +738,13 @@ export class DatabaseStorage implements IStorage {
         bogoDiscountValue: string;
       }>();
       try {
-        const { sql: rawSql } = await import("./db");
-        const bogoResult = await rawSql`SELECT id, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value FROM products WHERE id = ANY(${productIds})`;
-        for (const row of bogoResult) {
+        const bogoProductIds = sql.join(productIds.map((productId) => sql`${productId}`), sql`, `);
+        const bogoResult = await db.execute(sql`
+          SELECT id, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value
+          FROM products
+          WHERE id IN (${bogoProductIds})
+        `);
+        for (const row of bogoResult.rows) {
           bogoByProductId.set(Number(row.id), {
             bogoEnabled: row.bogo_enabled === true || row.bogo_enabled === 't' || row.bogo_enabled === 'true',
             bogoFreeOptionIndex: row.bogo_free_option_index != null ? parseInt(String(row.bogo_free_option_index)) : null,
