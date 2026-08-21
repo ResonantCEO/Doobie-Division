@@ -110,8 +110,8 @@ export interface IStorage {
   updateOrderNotes(id: number, notes: string): Promise<Order>;
   updateOrderPaymentPhoto(id: number, photoUrl: string | null): Promise<Order>;
   updateOrderPaymentMethod(id: number, paymentMethod: string, photoUrl?: string | null): Promise<Order>;
-  fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
-  unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void>;
+  fulfillOrderItem(orderId: number, productId: number | null, quantity: number, userId: string, orderItemId?: number): Promise<void>;
+  unfulfillOrderItem(orderId: number, productId: number | null, quantity: number, userId: string, orderItemId?: number): Promise<void>;
   substituteOrderItem(orderId: number, oldItemId: number, newProductId: number, quantity: number, userId: string): Promise<void>;
   removeOrderItem(orderId: number, itemId: number, userId: string): Promise<void>;
   addOrderItem(orderId: number, productId: number, quantity: number, userId: string, unitPrice?: number, unitLabel?: string): Promise<void>;
@@ -2168,14 +2168,7 @@ export class DatabaseStorage implements IStorage {
     return updatedOrder;
   }
 
-  async fulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void> {
-    // Get the product
-    const productRows = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-    if (productRows.length === 0) {
-      throw new Error("Product not found");
-    }
-    const product = productRows[0];
-
+  async fulfillOrderItem(orderId: number, productId: number | null, quantity: number, userId: string, orderItemId?: number): Promise<void> {
     // Get the specific order item — prefer matching by item ID when provided to
     // correctly handle multiple variants of the same product in one order
     const itemFilter = orderItemId
@@ -2191,6 +2184,22 @@ export class DatabaseStorage implements IStorage {
     if (!orderItem) {
       throw new Error("Order item not found");
     }
+
+    // Custom order items are fulfillment checkmarks only. They have no catalog
+    // product and must never affect product or physical inventory.
+    if (productId === null) {
+      await db
+        .update(orderItems)
+        .set({ fulfilled: true })
+        .where(and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItem.id)));
+      return;
+    }
+
+    const productRows = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+    if (productRows.length === 0) {
+      throw new Error("Product not found");
+    }
+    const product = productRows[0];
 
     const sizeLabel =
       (orderItem as any).size ||
@@ -2273,13 +2282,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async unfulfillOrderItem(orderId: number, productId: number, quantity: number, userId: string, orderItemId?: number): Promise<void> {
-    // Get the product
-    const product = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-    if (product.length === 0) {
-      throw new Error("Product not found");
-    }
-
+  async unfulfillOrderItem(orderId: number, productId: number | null, quantity: number, userId: string, orderItemId?: number): Promise<void> {
     // Get the specific order item — prefer matching by item ID when provided
     const unfulfillItemFilter = orderItemId
       ? and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItemId))
@@ -2297,6 +2300,20 @@ export class DatabaseStorage implements IStorage {
 
     if (!orderItem[0].fulfilled) {
       throw new Error("Order item is not fulfilled");
+    }
+
+    // Custom items only track whether an employee accounted for them.
+    if (productId === null) {
+      await db
+        .update(orderItems)
+        .set({ fulfilled: false })
+        .where(and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItem[0].id)));
+      return;
+    }
+
+    const product = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+    if (product.length === 0) {
+      throw new Error("Product not found");
     }
 
     const sizeLabel =

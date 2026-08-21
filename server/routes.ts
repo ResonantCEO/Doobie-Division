@@ -2137,8 +2137,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orderId = parseInt(req.params.id);
       const { productId, quantity, orderItemId } = req.body;
 
-      if (!productId || !quantity || quantity <= 0) {
-        return res.status(400).json({ message: "Product ID and positive quantity are required" });
+      if (!quantity || quantity <= 0 || (!productId && !orderItemId)) {
+        return res.status(400).json({ message: "Order item and positive quantity are required" });
       }
 
       // Get the order and verify it exists
@@ -2150,12 +2150,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if order is in a fulfillable status
       if (!['pending', 'processing'].includes(order.status)) {
         return res.status(400).json({ message: "Order cannot be fulfilled in its current status" });
-      }
-
-      // Get the product
-      const product = await storage.getProduct(productId);
-      if (!product) {
-        return res.status(404).json({ message: "Product not found" });
       }
 
       // Verify the specific order item exists (match by item ID when provided)
@@ -2172,6 +2166,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (quantity > orderItem.quantity) {
         return res.status(400).json({ message: `Order only requires ${orderItem.quantity} units` });
+      }
+
+      const isCustomItem = !orderItem.productId && orderItem.productSku === 'CUSTOM';
+      if (isCustomItem) {
+        await storage.fulfillOrderItem(orderId, null, quantity, req.currentUser.id, orderItemId);
+        return res.status(200).json({ message: "Custom order item marked as fulfilled" });
+      }
+
+      if (!productId) {
+        return res.status(400).json({ message: "Product ID is required for catalog items" });
+      }
+
+      const product = await storage.getProduct(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
       }
 
       // Check physicalInventory since fulfillment reduces physical inventory, not stock.
@@ -2233,8 +2242,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orderId = parseInt(req.params.id);
       const { productId, quantity, orderItemId } = req.body;
 
-      if (!productId || !quantity || quantity <= 0) {
-        return res.status(400).json({ message: "Product ID and positive quantity are required" });
+      if (!quantity || quantity <= 0 || (!productId && !orderItemId)) {
+        return res.status(400).json({ message: "Order item and positive quantity are required" });
       }
 
       // Get the order and verify it exists
@@ -2258,6 +2267,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!orderItem.fulfilled) {
         return res.status(400).json({ message: "This order item is not fulfilled" });
+      }
+
+      const isCustomItem = !orderItem.productId && orderItem.productSku === 'CUSTOM';
+      if (isCustomItem) {
+        await storage.unfulfillOrderItem(orderId, null, orderItem.quantity, req.currentUser.id, orderItemId);
+        return res.status(200).json({ message: "Custom order item marked as unfulfilled" });
+      }
+
+      if (!productId) {
+        return res.status(400).json({ message: "Product ID is required for catalog items" });
       }
 
       // Unfulfill the item (restore physical inventory and mark as not fulfilled)

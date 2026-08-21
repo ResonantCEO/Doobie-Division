@@ -82,7 +82,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
   };
 
   const fulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number | null; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,7 +129,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
   });
 
   const unfulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number | null; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/unfulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -175,12 +175,12 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
     }
   });
 
-  const handleFulfillItem = (itemId: number, productId: number, quantity: number) => {
+  const handleFulfillItem = (itemId: number, productId: number | null, quantity: number) => {
     setFulfillingItems(prev => new Set(prev).add(itemId));
     fulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
 
-  const handleUnfulfillItem = (itemId: number, productId: number, quantity: number) => {
+  const handleUnfulfillItem = (itemId: number, productId: number | null, quantity: number) => {
     setFulfillingItems(prev => new Set(prev).add(itemId));
     unfulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
@@ -228,16 +228,16 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                     <Checkbox
                       checked={fulfilled}
                       onCheckedChange={(checked) => {
-                        if (item.productId) {
-                          if (checked) {
-                            handleFulfillItem(item.id, item.productId, item.quantity);
-                          } else {
-                            handleUnfulfillItem(item.id, item.productId, item.quantity);
-                          }
+                        if (checked) {
+                          handleFulfillItem(item.id, item.productId ?? null, item.quantity);
+                        } else {
+                          handleUnfulfillItem(item.id, item.productId ?? null, item.quantity);
                         }
                       }}
                       className="h-5 w-5"
-                      title={fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory"}
+                      title={fulfilled
+                        ? (item.productId ? "Click to unfulfill and restore inventory" : "Click to mark custom item pending")
+                        : (item.productId ? "Click to fulfill and adjust inventory" : "Click to mark custom item fulfilled")}
                     />
                   )}
                   <div>
