@@ -1007,6 +1007,14 @@ export default function CartDrawer({ children }: CartDrawerProps) {
               <div className="space-y-1 text-sm">
                 {state.items.map((item, index) => {
                   const itemKey = item.size ? `${item.product.id}-${item.size}-${index}` : `${item.product.id}-${index}`;
+                    const isDiscountedBogoItem = !item.isFree && item.customPrice !== undefined && item.product.bogoEnabled === true;
+                    const bogoType = (item.product as any).bogoDiscountType || "free";
+                    const bogoValue = parseFloat((item.product as any).bogoDiscountValue || "0");
+                    const bogoItemLabel = bogoType === "percentage"
+                      ? `BOGO ${bogoValue.toFixed(0)}% OFF`
+                      : bogoType === "amount"
+                        ? `BOGO $${bogoValue.toFixed(2)} OFF`
+                        : "BOGO FREE";
                   return (
                   <div key={itemKey} className="flex justify-between">
                     <span>
