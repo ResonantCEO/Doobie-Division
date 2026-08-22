@@ -1085,23 +1085,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     unitPrice?: string | number;
   };
 
-  function getItemPromoTargetIds(promo: any): number[] {
+  type ItemPromoTarget = {
+    productId: number;
+    sizes?: string[];
+  };
+
+  // Older promo codes store [1, 2] while newer records may store
+  // [{ productId: 1, sizes: ["Small", "Large"] }]. Treat legacy values
+  // as product-wide targets so existing deals continue to work.
+  function getItemPromoTargets(promo: any): ItemPromoTarget[] {
     try {
-      const ids = JSON.parse(promo.targetProductIds || "[]");
-      if (!Array.isArray(ids)) return [];
+      const rawTargets = JSON.parse(promo.targetProductIds || "[]");
+      if (!Array.isArray(rawTargets)) return [];
       const seen = new Set<number>();
-      return ids.map(Number).filter((id) => {
-        if (!Number.isInteger(id) || id <= 0 || seen.has(id)) return false;
+      return rawTargets.flatMap((rawTarget: any): ItemPromoTarget[] => {
+        const id = Number(typeof rawTarget === "number" ? rawTarget : rawTarget?.productId);
+        if (!Number.isInteger(id) || id <= 0 || seen.has(id)) return [];
         seen.add(id);
-        return true;
+        const sizes = Array.isArray(rawTarget?.sizes)
+          ? [...new Set(rawTarget.sizes.map(String).map((size: string) => size.trim()).filter(Boolean))]
+          : undefined;
+        return [{ productId: id, ...(sizes?.length ? { sizes } : {}) }];
       });
     } catch {
       return [];
     }
   }
 
+  function getItemPromoTargetIds(promo: any): number[] {
+    return getItemPromoTargets(promo).map(target => target.productId);
+  }
+
   function getItemPromoAllocations(promo: any, items: PromoCartItem[]) {
-    const targetIds = getItemPromoTargetIds(promo);
+    const targets = getItemPromoTargets(promo);
     const maxQuantity = Math.max(1, Number(promo.itemDealQuantity) || 1);
     const promoPrice = promo.discountType === "item_free"
       ? 0
@@ -1109,10 +1125,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const allocations: Array<PromoCartItem & { itemIndex: number; quantity: number; promoPrice: number; normalUnitPrice: number }> = [];
     let remaining = maxQuantity;
 
-    for (const targetId of targetIds) {
+    for (const target of targets) {
       for (let itemIndex = 0; itemIndex < items.length && remaining > 0; itemIndex++) {
         const item = items[itemIndex];
-        if (Number(item.productId) !== targetId) continue;
+        if (Number(item.productId) !== target.productId) continue;
+        if (target.sizes?.length && (!item.size || !target.sizes.includes(item.size))) continue;
         const quantity = Math.min(Math.max(0, Number(item.quantity) || 0), remaining);
         if (quantity <= 0) continue;
         const normalUnitPrice = Math.max(0, Number(item.productPrice ?? item.unitPrice) || 0);

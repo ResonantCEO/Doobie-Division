@@ -14,6 +14,30 @@ import { format } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import type { Product, PromoCode } from "@shared/schema";
 
+type PromoTarget = {
+  productId: number;
+  sizes?: string[];
+};
+
+function parsePromoTargets(value: string | null | undefined): PromoTarget[] {
+  try {
+    const parsed = JSON.parse(value || "[]");
+    if (!Array.isArray(parsed)) return [];
+    const seen = new Set<number>();
+    return parsed.flatMap((target): PromoTarget[] => {
+      const productId = Number(typeof target === "number" ? target : target?.productId);
+      if (!Number.isInteger(productId) || productId <= 0 || seen.has(productId)) return [];
+      seen.add(productId);
+      const sizes = Array.isArray(target?.sizes)
+        ? [...new Set(target.sizes.map(String).map(size => size.trim()).filter(Boolean))]
+        : undefined;
+      return [{ productId, ...(sizes?.length ? { sizes } : {}) }];
+    });
+  } catch {
+    return [];
+  }
+}
+
 export default function DiscountsTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -23,7 +47,7 @@ export default function DiscountsTab() {
     code: "", description: "",
     discountType: "percent" as "percent" | "fixed" | "item_free" | "item_price",
     discountValue: "",
-    targetProductIds: [] as number[],
+    targetProducts: [] as PromoTarget[],
     itemDealQuantity: "1",
     minOrderAmount: "",
     bypassPurchaseMinimum: false,
@@ -42,7 +66,7 @@ export default function DiscountsTab() {
     code: "", description: "",
     discountType: "percent",
     discountValue: "",
-    targetProductIds: [],
+    targetProducts: [],
     itemDealQuantity: "1",
     minOrderAmount: "",
     bypassPurchaseMinimum: false,
@@ -59,14 +83,7 @@ export default function DiscountsTab() {
       description: p.description || "",
       discountType: (p.discountType as "percent" | "fixed" | "item_free" | "item_price") || "percent",
       discountValue: p.discountValue?.toString() || "",
-      targetProductIds: (() => {
-        try {
-          const ids = JSON.parse(p.targetProductIds || "[]");
-          return Array.isArray(ids) ? ids.map(Number).filter(Number.isFinite) : [];
-        } catch {
-          return [];
-        }
-      })(),
+      targetProducts: parsePromoTargets(p.targetProductIds),
       itemDealQuantity: String(p.itemDealQuantity || 1),
       minOrderAmount: p.minOrderAmount?.toString() || "",
       bypassPurchaseMinimum: p.bypassPurchaseMinimum || false,
@@ -99,12 +116,15 @@ export default function DiscountsTab() {
     queryKey: ["/api/products"],
   });
   const isItemDeal = promoCodeForm.discountType === "item_free" || promoCodeForm.discountType === "item_price";
-  const selectedDealProducts = promoCodeForm.targetProductIds
-    .map(id => allProducts.find(product => product.id === id))
-    .filter(Boolean) as Product[];
+  const selectedDealProducts = promoCodeForm.targetProducts
+    .map(target => ({
+      target,
+      product: allProducts.find(product => product.id === target.productId),
+    }))
+    .filter((entry): entry is { target: PromoTarget; product: Product } => Boolean(entry.product));
   const matchingProducts = allProducts.filter(product =>
     product.isActive &&
-    !promoCodeForm.targetProductIds.includes(product.id) &&
+    !promoCodeForm.targetProducts.some(target => target.productId === product.id) &&
     `${product.name} ${product.sku || ""}`.toLowerCase().includes(productSearch.toLowerCase())
   ).slice(0, 8);
   const promoSummary = (promo: PromoCode) => {
@@ -131,7 +151,7 @@ export default function DiscountsTab() {
         description: data.description || null,
         discountType: data.discountType,
         discountValue: data.discountType === "item_free" ? "0" : data.discountValue,
-        targetProductIds: data.targetProductIds.length ? JSON.stringify(data.targetProductIds) : null,
+        targetProductIds: data.targetProducts.length ? JSON.stringify(data.targetProducts) : null,
         itemDealQuantity: parseInt(data.itemDealQuantity) || 1,
         minOrderAmount: data.minOrderAmount || null,
         bypassPurchaseMinimum: data.bypassPurchaseMinimum,
@@ -161,7 +181,7 @@ export default function DiscountsTab() {
         description: data.description || null,
         discountType: data.discountType,
         discountValue: data.discountType === "item_free" ? "0" : data.discountValue,
-        targetProductIds: data.targetProductIds.length ? JSON.stringify(data.targetProductIds) : null,
+        targetProductIds: data.targetProducts.length ? JSON.stringify(data.targetProducts) : null,
         itemDealQuantity: parseInt(data.itemDealQuantity) || 1,
         minOrderAmount: data.minOrderAmount || null,
         bypassPurchaseMinimum: data.bypassPurchaseMinimum,
@@ -449,23 +469,69 @@ export default function DiscountsTab() {
                 </div>
                 {selectedDealProducts.length > 0 && (
                   <div className="space-y-2">
-                    {selectedDealProducts.map((product, index) => (
-                      <div key={product.id} className="flex items-center gap-2 rounded border bg-background px-2 py-1.5 text-sm">
-                        <span className="w-5 text-muted-foreground">{index + 1}.</span>
-                        <span className="min-w-0 flex-1 truncate">{product.name}{product.sku ? <span className="ml-1 text-xs text-muted-foreground">({product.sku})</span> : null}</span>
-                        <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === 0} onClick={() => setPromoCodeForm(f => {
-                          const ids = [...f.targetProductIds];
-                          [ids[index - 1], ids[index]] = [ids[index], ids[index - 1]];
-                          return { ...f, targetProductIds: ids };
-                        })}><ArrowUp className="h-3.5 w-3.5" /></Button>
-                        <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === selectedDealProducts.length - 1} onClick={() => setPromoCodeForm(f => {
-                          const ids = [...f.targetProductIds];
-                          [ids[index], ids[index + 1]] = [ids[index + 1], ids[index]];
-                          return { ...f, targetProductIds: ids };
-                        })}><ArrowDown className="h-3.5 w-3.5" /></Button>
-                        <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setPromoCodeForm(f => ({ ...f, targetProductIds: f.targetProductIds.filter(id => id !== product.id) }))}><X className="h-3.5 w-3.5" /></Button>
+                    {selectedDealProducts.map(({ product, target }, index) => {
+                      const productOptions = Array.isArray((product as any).sizes)
+                        ? (product as any).sizes.map((size: any) => String(size.size)).filter(Boolean)
+                        : [];
+                      const selectedSizes = target.sizes || [];
+                      const updateTargetSizes = (sizes?: string[]) => setPromoCodeForm(f => ({
+                        ...f,
+                        targetProducts: f.targetProducts.map(existing =>
+                          existing.productId === product.id
+                            ? { ...existing, ...(sizes?.length ? { sizes } : { sizes: undefined }) }
+                            : existing,
+                        ),
+                      }));
+                      return (
+                      <div key={product.id} className="rounded border bg-background p-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 text-muted-foreground">{index + 1}.</span>
+                          <span className="min-w-0 flex-1 truncate">{product.name}{product.sku ? <span className="ml-1 text-xs text-muted-foreground">({product.sku})</span> : null}</span>
+                          <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === 0} onClick={() => setPromoCodeForm(f => {
+                            const targets = [...f.targetProducts];
+                            [targets[index - 1], targets[index]] = [targets[index], targets[index - 1]];
+                            return { ...f, targetProducts: targets };
+                          })}><ArrowUp className="h-3.5 w-3.5" /></Button>
+                          <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === selectedDealProducts.length - 1} onClick={() => setPromoCodeForm(f => {
+                            const targets = [...f.targetProducts];
+                            [targets[index], targets[index + 1]] = [targets[index + 1], targets[index]];
+                            return { ...f, targetProducts: targets };
+                          })}><ArrowDown className="h-3.5 w-3.5" /></Button>
+                          <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setPromoCodeForm(f => ({ ...f, targetProducts: f.targetProducts.filter(existing => existing.productId !== product.id) }))}><X className="h-3.5 w-3.5" /></Button>
+                        </div>
+                        {productOptions.length > 0 && (
+                          <div className="mt-2 border-t pt-2">
+                            <p className="text-xs font-medium">Applies to</p>
+                            <label className="mt-1 flex cursor-pointer items-center gap-2 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={selectedSizes.length === 0}
+                                onChange={() => updateTargetSizes(undefined)}
+                              />
+                              Any size / option for this product
+                            </label>
+                            <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
+                              {productOptions.map((size: string) => (
+                                <label key={size} className="flex cursor-pointer items-center gap-2 text-xs">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedSizes.includes(size)}
+                                    onChange={(event) => {
+                                      const next = event.target.checked
+                                        ? [...selectedSizes, size]
+                                        : selectedSizes.filter(selectedSize => selectedSize !== size);
+                                      updateTargetSizes(next);
+                                    }}
+                                  />
+                                  {size}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 <Input value={productSearch} onChange={e => setProductSearch(e.target.value)} placeholder="Search products to add…" />
@@ -473,7 +539,7 @@ export default function DiscountsTab() {
                   <div className="max-h-40 overflow-y-auto rounded border bg-background">
                     {matchingProducts.length ? matchingProducts.map(product => (
                       <button type="button" key={product.id} className="w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => {
-                        setPromoCodeForm(f => ({ ...f, targetProductIds: [...f.targetProductIds, product.id] }));
+                        setPromoCodeForm(f => ({ ...f, targetProducts: [...f.targetProducts, { productId: product.id }] }));
                         setProductSearch("");
                       }}>
                         {product.name}{product.sku ? <span className="ml-1 text-xs text-muted-foreground">({product.sku})</span> : null}
@@ -535,7 +601,7 @@ export default function DiscountsTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowPromoCodeModal(false); setEditingPromoCode(null); resetPromoCodeForm(); }}>Cancel</Button>
             <Button
-              disabled={!promoCodeForm.code || (promoCodeForm.discountType !== "item_free" && !promoCodeForm.discountValue) || (isItemDeal && promoCodeForm.targetProductIds.length === 0) || createPromoCodeMutation.isPending || updatePromoCodeMutation.isPending}
+              disabled={!promoCodeForm.code || (promoCodeForm.discountType !== "item_free" && !promoCodeForm.discountValue) || (isItemDeal && promoCodeForm.targetProducts.length === 0) || createPromoCodeMutation.isPending || updatePromoCodeMutation.isPending}
               onClick={() => {
                 if (editingPromoCode) {
                   updatePromoCodeMutation.mutate({ id: editingPromoCode.id, data: promoCodeForm });
