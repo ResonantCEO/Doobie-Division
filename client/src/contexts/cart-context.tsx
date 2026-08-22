@@ -573,6 +573,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const item = paidItems.find(i => i.product.id === productId && i.size === size);
     if (!item) return 0;
 
+    // Discounted BOGO items carry their final unit price separately from the
+    // product's regular price. Use it for cart display and subtotals.
+    if (item.customPrice !== undefined) {
+      return item.customPrice;
+    }
+
     if (item.product.sellingMethod === 'weight' && !usesQuantityPricing(item.product) && item.customPrice === undefined) {
       if (state.globalWeightPricing) {
         // Bucket pricing: subtotal covers all units; divide to get avg unit price for display

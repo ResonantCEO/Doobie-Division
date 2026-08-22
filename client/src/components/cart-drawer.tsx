@@ -699,8 +699,20 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 ))}
                 {state.items.map((item, index) => {
                   const itemKey = item.size ? `${item.product.id}-${item.size}-${index}` : `${item.product.id}-${index}`;
+                  const isDiscountedBogoItem = !item.isFree && item.customPrice !== undefined && item.product.bogoEnabled === true;
+                  const bogoType = (item.product as any).bogoDiscountType || "free";
+                  const bogoValue = parseFloat((item.product as any).bogoDiscountValue || "0");
+                  const bogoItemLabel = bogoType === "percentage"
+                    ? `BOGO ${bogoValue.toFixed(0)}% OFF`
+                    : bogoType === "amount"
+                      ? `BOGO $${bogoValue.toFixed(2)} OFF`
+                      : "BOGO FREE";
+                  const regularUnitPrice = getEffectiveUnitPrice(item.product, item.size);
+                  const displayedUnitPrice = item.customPrice !== undefined
+                    ? item.customPrice
+                    : getEffectivePrice(item.product.id, item.size);
                   return (
-                  <div key={itemKey} className={`flex items-start gap-4 p-4 border rounded-lg ${item.isFree ? 'border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10' : ''}`}>
+                  <div key={itemKey} className={`flex items-start gap-4 p-4 border rounded-lg ${item.isFree ? 'border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10' : isDiscountedBogoItem ? 'border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-900/10' : ''}`}>
                     <div className="relative">
                       <img
                         src={item.product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=100&h=100&fit=crop"}
@@ -712,6 +724,11 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                           FREE
                         </span>
                       )}
+                      {isDiscountedBogoItem && (
+                        <span className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                          BOGO
+                        </span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-1">
@@ -719,6 +736,11 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         {item.isFree && (
                           <span className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700 px-1.5 py-0.5 rounded-full">
                             <Gift className="h-2.5 w-2.5" /> BOGO FREE
+                          </span>
+                        )}
+                        {isDiscountedBogoItem && (
+                          <span className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 px-1.5 py-0.5 rounded-full">
+                            <Gift className="h-2.5 w-2.5" /> {bogoItemLabel}
                           </span>
                         )}
                       </div>
@@ -751,9 +773,16 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         {item.isFree ? (
                           <p className="font-semibold text-green-600 dark:text-green-400">FREE</p>
                         ) : (
-                          <p className="font-semibold text-primary">
-                            ${getEffectivePrice(item.product.id, item.size).toFixed(2)}
-                          </p>
+                          <div>
+                            {isDiscountedBogoItem && regularUnitPrice > displayedUnitPrice && (
+                              <p className="text-xs text-muted-foreground line-through">
+                                ${regularUnitPrice.toFixed(2)}
+                              </p>
+                            )}
+                            <p className={`font-semibold ${isDiscountedBogoItem ? "text-blue-600 dark:text-blue-400" : "text-primary"}`}>
+                              ${displayedUnitPrice.toFixed(2)}
+                            </p>
+                          </div>
                         )}
                       </div>
 
@@ -809,7 +838,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         {item.isFree ? (
                           <span className="text-green-600 dark:text-green-400">Subtotal: FREE</span>
                         ) : (
-                          <>Subtotal: ${(getEffectivePrice(item.product.id, item.size) * item.quantity).toFixed(2)}</>
+                          <>Subtotal: ${(displayedUnitPrice * item.quantity).toFixed(2)}</>
                         )}
                       </p>
                     </div>
@@ -984,10 +1013,11 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                       {item.product.name}
                       {item.size && <span className="text-xs text-muted-foreground"> (Size: {item.size})</span>}
                       {item.isFree && <span className="text-xs font-bold text-green-600 dark:text-green-400"> [FREE]</span>}
+                      {isDiscountedBogoItem && <span className="text-xs font-bold text-blue-600 dark:text-blue-400"> [{bogoItemLabel}]</span>}
                       {' '}x {item.quantity}
                     </span>
-                    <span className={item.isFree ? "text-green-600 dark:text-green-400 font-semibold" : ""}>
-                      {item.isFree ? "FREE" : `$${(getEffectiveUnitPrice(item.product, item.size) * item.quantity).toFixed(2)}`}
+                    <span className={item.isFree ? "text-green-600 dark:text-green-400 font-semibold" : isDiscountedBogoItem ? "text-blue-600 dark:text-blue-400 font-semibold" : ""}>
+                      {item.isFree ? "FREE" : `$${((item.customPrice !== undefined ? item.customPrice : getEffectiveUnitPrice(item.product, item.size)) * item.quantity).toFixed(2)}`}
                     </span>
                   </div>
                   );
