@@ -377,6 +377,20 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
       ? `BOGO ${bogoValue.toFixed(0)}% Off`
       : `BOGO $${bogoValue.toFixed(2)} Off`;
 
+  const initialBogoLabel = isFreeType
+    ? "Buy 1 Get 1 FREE"
+    : bogoType === "percentage"
+      ? `Buy 1 Get 1 ${bogoValue.toFixed(0)}% OFF`
+      : `Buy 1 Get 1 $${bogoValue.toFixed(2)} OFF`;
+  const initialBogoActionLabel = isFreeType
+    ? "Add to Cart & Pick Free Items"
+    : "Add to Cart & Pick Discounted Items";
+  const initialBogoClassName = isFreeType
+    ? "text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700"
+    : bogoType === "percentage"
+      ? "text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700"
+      : "text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700";
+
   const bogoStepTitle = isFreeType ? "Select Your Free Items" : "Select Your Discounted Items";
   const bogoStepDesc = isFreeType
     ? <span>You get <span className="font-semibold text-green-600 dark:text-green-400">{paidQtyForBogo} free {paidQtyForBogo === 1 ? 'item' : 'items'}</span> with your purchase!</span>
@@ -673,8 +687,8 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
               )}
               {isBogoProduct && (
                 <div className="mt-1.5">
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 px-1.5 py-0.5 rounded-full">
-                    <Gift className="h-2.5 w-2.5" /> Buy 1 Get 1 FREE
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-semibold border px-1.5 py-0.5 rounded-full ${initialBogoClassName}`}>
+                    <Gift className="h-2.5 w-2.5" /> {initialBogoLabel}
                   </span>
                 </div>
               )}
@@ -896,14 +910,14 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
             : hasSizes
               ? Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
                 ? "Select Items"
-                : isBogoProduct ? "Add to Cart & Pick Free Items" : "Add to Cart"
+                : isBogoProduct ? initialBogoActionLabel : "Add to Cart"
               : hasWeightOptions
                 ? Object.values(weightOptionQuantities).reduce((sum, qty) => sum + qty, 0) <= 0
                   ? "Select Items"
-                  : isBogoProduct ? "Add to Cart & Pick Free Items" : "Add to Cart"
+                  : isBogoProduct ? initialBogoActionLabel : "Add to Cart"
                 : (isWeightBased ? weight : quantity) > maxStock
                   ? "Insufficient Stock"
-                  : isBogoProduct ? "Add to Cart & Pick Free Items" : "Add to Cart"
+                  : isBogoProduct ? initialBogoActionLabel : "Add to Cart"
           }
         </Button>
       </DialogFooter>
