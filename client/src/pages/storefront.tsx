@@ -316,7 +316,10 @@ export default function StorefrontPage() {
   // Filter to deal products for hero section
   const allDiscountedProducts = useMemo(() => {
     return allProductsRaw.filter((product: Product) => {
-      if (product.stock <= 0) return false;
+      const hasStock = Array.isArray((product as any).sizes) && (product as any).sizes.length > 0
+        ? (product as any).sizes.some((size: any) => Number(size.quantity) > 0)
+        : product.stock > 0;
+      if (!hasStock) return false;
       const discount = product.discountPercentage;
       const hasDiscountPct = discount && discount !== "0" && discount !== 0 &&
         !isNaN(typeof discount === 'number' ? discount : parseFloat(String(discount))) &&
@@ -737,7 +740,9 @@ export default function StorefrontPage() {
   // IMPORTANT: All hooks must be called before any conditional returns
   const products = useMemo(() => {
     return allProducts.filter((product: Product & { category: Category | null }) => {
-      const hasStock = product.stock > 0;
+      const hasStock = Array.isArray((product as any).sizes) && (product as any).sizes.length > 0
+        ? (product as any).sizes.some((size: any) => Number(size.quantity) > 0)
+        : product.stock > 0;
       if (adProductFilter) return hasStock && adProductFilter.includes(product.id);
       if (!showDealsOnly) return hasStock;
       const hasDiscountPct = product.discountPercentage && parseFloat(String(product.discountPercentage)) > 0;

@@ -178,6 +178,35 @@ app.use((req, res, next) => {
   // A single warmup query serializes startup and prevents the null-map crash.
   await warmupDatabase();
 
+  // Size/flavor rows are the source of truth for products with variants. Keep the
+  // cached parent totals aligned so in-stock flavors remain visible on the storefront.
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`
+      UPDATE products AS product
+      SET
+        stock = totals.sellable_stock,
+        physical_inventory = totals.physical_stock,
+        updated_at = NOW()
+      FROM (
+        SELECT
+          product_id,
+          SUM(quantity)::integer AS sellable_stock,
+          SUM(COALESCE(physical_quantity, quantity))::integer AS physical_stock
+        FROM product_sizes
+        GROUP BY product_id
+      ) AS totals
+      WHERE product.id = totals.product_id
+        AND (
+          product.stock IS DISTINCT FROM totals.sellable_stock
+          OR product.physical_inventory IS DISTINCT FROM totals.physical_stock
+        )
+    `);
+    console.log("✓ Reconciled variant product stock totals");
+  } catch (error: any) {
+    console.warn("⚠ Could not reconcile variant product stock totals:", error?.message);
+  }
+
   // Add verified_at column to users table if not already present
   try {
     const { sql } = await import("./db");

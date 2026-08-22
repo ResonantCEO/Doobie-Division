@@ -158,7 +158,10 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   const hasSizes = product.sizes && product.sizes.length > 0;
   const allSizesOutOfStock = hasSizes && product.sizes!.every(s => s.quantity <= 0);
-  const isOutOfStock = product.stock === 0 || allSizesOutOfStock;
+  // Size-level inventory is authoritative for products with flavors/options.
+  // This keeps an in-stock flavor purchasable even if a cached parent stock total
+  // has not yet caught up.
+  const isOutOfStock = hasSizes ? allSizesOutOfStock : product.stock === 0;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
