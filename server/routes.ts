@@ -4388,8 +4388,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const exact = p.sizes.find((s: any) => s.size === preferredSize);
           selectedSize = exact ? exact.size : preferredSize;
         } else {
-          const withStock = p.sizes.find((s: any) => (s.quantity ?? 0) > 0);
-          selectedSize = (withStock ?? p.sizes[0]).size;
+          // Unpinned specific products mean “any flavor.” Choose at generation time
+          // from the currently available options so a sold-out flavor is skipped.
+          const withStock = p.sizes.filter((s: any) =>
+            (s.quantity ?? 0) > 0 && (s.physicalQuantity ?? s.quantity ?? 0) > 0
+          );
+          const chosen = withStock.length > 0
+            ? withStock[Math.floor(Math.random() * withStock.length)]
+            : undefined;
+          selectedSize = (chosen ?? p.sizes[0]).size;
         }
       }
 

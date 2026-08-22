@@ -839,6 +839,7 @@ export default function BagsTab() {
                     const prod = allProducts.find(p => p.id === entry.id);
                     const cat = prod ? allCategories.find(c => c.id === prod.categoryId) : null;
                     const isWeightBased = prod?.sellingMethod === "weight";
+                    const hasFlavors = Boolean(prod?.sizes && prod.sizes.length > 0);
                     const sizeData = entry.size && prod?.sizes ? prod.sizes.find(s => s.size === entry.size) : null;
                     const weightTiers: Record<string, string | null | undefined> = prod ? {
                       "g": (prod as any).pricePerGram,
@@ -856,6 +857,7 @@ export default function BagsTab() {
                         <span>
                           {prod ? prod.name : `Product #${entry.id}`}
                           {entry.size && !isWeightBased && <span className="text-blue-500 ml-1">({entry.size}{sizeData ? ` · ${sizeData.quantity} in stock` : ''})</span>}
+                          {!entry.size && hasFlavors && <span className="text-green-600 dark:text-green-400 ml-1">(Any flavor)</span>}
                           {isWeightBased && entry.size && <span className="text-purple-500 ml-1">({entry.size})</span>}
                           {cat && !entry.size && <span className="text-gray-400 ml-1">({cat.name})</span>}
                           {displayPrice && <span className="text-gray-500"> — {displayPrice}</span>}
@@ -1095,15 +1097,35 @@ export default function BagsTab() {
           <DialogHeader>
             <DialogTitle>Choose a Flavor</DialogTitle>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {flavorPickerProduct?.name} — select a flavor to add to the bag.
+              {flavorPickerProduct?.name} — choose a specific flavor or let the bag select one in stock.
             </p>
           </DialogHeader>
+          <button
+            type="button"
+            className="w-full flex items-center justify-between px-4 py-3 rounded-lg border-2 border-green-500/60 bg-green-50/50 dark:bg-green-900/20 hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors text-left"
+            onClick={() => {
+              if (!flavorPickerProduct) return;
+              setGrabBagForm(f => ({
+                ...f,
+                // No size means any flavor; the generator resolves this at generation time.
+                specificProductIds: [...f.specificProductIds, { id: flavorPickerProduct.id }],
+              }));
+              setFlavorPickerProduct(null);
+            }}
+          >
+            <span>
+              <span className="block font-medium text-sm">Any flavor</span>
+              <span className="block text-xs text-gray-500 dark:text-gray-400">Randomly choose an in-stock flavor when generated</span>
+            </span>
+            <span className="text-sm text-green-600 dark:text-green-400">Auto-select</span>
+          </button>
           <div className="space-y-2 max-h-80 overflow-y-auto py-1">
             {[...(flavorPickerProduct?.sizes ?? [])].sort((a, b) => a.size.localeCompare(b.size)).map(sz => (
               <button
                 key={sz.size}
                 type="button"
-                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                disabled={sz.quantity <= 0}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 enabled:hover:bg-gray-50 enabled:dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 transition-colors text-left"
                 onClick={() => {
                   setGrabBagForm(f => ({
                     ...f,
