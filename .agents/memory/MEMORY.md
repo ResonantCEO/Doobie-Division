@@ -3,3 +3,4 @@
 - [Telegram contact rollout](telegram-contact-rollout.md) — new accounts require a handle immediately; existing accounts have one persisted two-week grace period.
 - [Product BOGO reads](product-bogo-reads.md) — explicitly query BOGO fields for product lists; dynamic Pool imports and ANY-list interpolation can silently omit them.
 - [Promo option targeting](promo-option-targeting.md) — item promo targets accept legacy product IDs and product-plus-size records; preserve both formats when changing promo matching.
+- [Grab bag flavor selection](grab-bag-flavor-selection.md) — an unpinned sized product means any flavor; choose randomly from currently in-stock flavors at generation time.
