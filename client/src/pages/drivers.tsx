@@ -150,7 +150,7 @@ export default function DriversPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-3">
           {shippedOrders.map((order) => {
             const items = (order.orderItems ?? []).filter((item) => !item.removed);
             return (
@@ -159,86 +159,105 @@ export default function DriversPage() {
                 className="cursor-pointer transition-shadow hover:shadow-md focus-within:ring-2 focus-within:ring-primary"
                 onClick={() => setSelectedOrder(order)}
               >
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
-                        {order.customerName}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">Order {order.orderNumber}</p>
+                <CardContent className="p-4 md:p-5">
+                  <div className="grid gap-4 md:grid-cols-[minmax(240px,1.35fr)_minmax(210px,1fr)_minmax(190px,0.9fr)_auto] md:items-center">
+                    <div className="min-w-0">
+                      <div className="flex items-start justify-between gap-3 md:block">
+                        <div>
+                          <h3 className="font-semibold text-gray-900 dark:text-white">
+                            {order.customerName}
+                          </h3>
+                          <p className="mt-1 text-sm text-muted-foreground">Order {order.orderNumber}</p>
+                        </div>
+                        <Badge
+                          variant="secondary"
+                          className={`shrink-0 md:hidden ${order.paymentMethod === "prepay"
+                            ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700"
+                            : "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700"}`}
+                        >
+                          {order.paymentMethod === "prepay" ? "Pre-Pay" : "PUA"}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span className="truncate">{order.shippingAddress || "Address unavailable"}</span>
+                      </div>
                     </div>
-                    <Badge
-                      variant="secondary"
-                      className={order.paymentMethod === "prepay"
-                        ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700"
-                        : "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700"}
-                    >
-                      {order.paymentMethod === "prepay" ? "Pre-Pay" : "PUA"}
-                    </Badge>
-                  </div>
 
-                  <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                    <div className="flex items-start gap-2">
-                      <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>{order.shippingAddress || "Address unavailable"}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 shrink-0" />
-                      <span>{formatDate(order.createdAt)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 shrink-0" />
-                      <span>{order.paymentMethod === "prepay" ? "Pre-paid" : "Pay upon arrival"}</span>
-                    </div>
-                  </div>
-
-                  {canAssignDrivers && (
-                    <div
-                      className="mt-4 space-y-2 border-t pt-4"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <label className="text-sm font-medium text-foreground">Assigned Driver</label>
-                      <Select
-                        value={order.assignedUserId || "unassigned"}
-                        onValueChange={(driverId) => assignDriverMutation.mutate({
-                          orderId: order.id,
-                          assignedUserId: driverId === "unassigned" ? null : driverId,
-                        })}
-                        disabled={assignDriverMutation.isPending}
+                    <div className="flex items-center gap-5 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 shrink-0" />
+                        <span>{formatDate(order.createdAt)}</span>
+                      </div>
+                      <Badge
+                        variant="secondary"
+                        className={`hidden shrink-0 md:inline-flex ${order.paymentMethod === "prepay"
+                          ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700"
+                          : "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700"}`}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose a driver" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unassigned">Unassigned</SelectItem>
-                          {drivers.map((driver) => (
-                            <SelectItem key={driver.id} value={driver.id}>
-                              {driver.firstName || driver.lastName
-                                ? `${driver.firstName || ""} ${driver.lastName || ""}`.trim()
-                                : driver.email || driver.id}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        {order.paymentMethod === "prepay" ? "Pre-Pay" : "PUA"}
+                      </Badge>
                     </div>
-                  )}
 
-                  <div className="mt-4 flex items-center justify-between border-t pt-4">
-                    <span className="text-sm text-muted-foreground">
-                      {items.length} {items.length === 1 ? "item" : "items"}
-                    </span>
-                    <span className="font-semibold">${Number(order.total).toFixed(2)}</span>
+                    {canAssignDrivers ? (
+                      <div
+                        className="space-y-2"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Assigned Driver
+                        </label>
+                        <Select
+                          value={order.assignedUserId || "unassigned"}
+                          onValueChange={(driverId) => assignDriverMutation.mutate({
+                            orderId: order.id,
+                            assignedUserId: driverId === "unassigned" ? null : driverId,
+                          })}
+                          disabled={assignDriverMutation.isPending}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Choose a driver" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unassigned">Unassigned</SelectItem>
+                            {drivers.map((driver) => (
+                              <SelectItem key={driver.id} value={driver.id}>
+                                {driver.firstName || driver.lastName
+                                  ? `${driver.firstName || ""} ${driver.lastName || ""}`.trim()
+                                  : driver.email || driver.id}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Truck className="h-4 w-4 shrink-0" />
+                        <span>Assigned to you</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-4 border-t pt-4 md:min-w-[150px] md:flex-col md:items-end md:border-t-0 md:pt-0">
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground">
+                          {items.length} {items.length === 1 ? "item" : "items"}
+                        </div>
+                        <div className="font-semibold text-gray-900 dark:text-white">
+                          ${Number(order.total).toFixed(2)}
+                        </div>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        className="shrink-0 md:w-full"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedOrder(order);
+                        }}
+                      >
+                        View details
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    variant="secondary"
-                    className="mt-4 w-full"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setSelectedOrder(order);
-                    }}
-                  >
-                    View order details
-                  </Button>
                 </CardContent>
               </Card>
             );
