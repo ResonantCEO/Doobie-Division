@@ -4283,7 +4283,7 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(
         and(
-          or(eq(users.role, 'staff'), eq(users.role, 'manager'), eq(users.role, 'admin')),
+          or(eq(users.role, 'staff'), eq(users.role, 'driver'), eq(users.role, 'manager'), eq(users.role, 'admin')),
           eq(users.status, 'active')
         )
       )

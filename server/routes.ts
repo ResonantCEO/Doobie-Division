@@ -463,9 +463,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve payment photos (staff/manager/admin only)
-  app.get('/api/payment-photos/:filename', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
+  // Serve payment photos (staff/driver/manager/admin only)
+  app.get('/api/payment-photos/:filename', isAuthenticated, requireRole(['admin', 'manager', 'staff', 'driver']), async (req: any, res) => {
     try {
+      if (req.currentUser.role === 'driver') {
+        const photoUrl = `/api/payment-photos/${req.params.filename}`;
+        const [assignedOrder] = await db
+          .select({ id: orders.id })
+          .from(orders)
+          .where(
+            and(
+              eq(orders.paymentPhotoUrl, photoUrl),
+              eq(orders.assignedUserId, req.currentUser.id)
+            )
+          )
+          .limit(1);
+
+        if (!assignedOrder) {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+      }
+
       const objectStorageService = new ObjectStorageService();
       const privateDir = objectStorageService.getPrivateObjectDir();
       const fullPath = `${privateDir}/payment-photos/${req.params.filename}`;
@@ -1019,7 +1037,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.customerId = req.currentUser.id;
         // Hide delivered orders older than 48 hours for customers
         filters.hideOldDelivered = true;
-      } else if (req.currentUser.role === 'staff') {
+      } else if (req.currentUser.role === 'staff' || req.currentUser.role === 'driver') {
         // Staff can only see orders assigned to them
         filters.assignedUserId = req.currentUser.id;
       } else if (req.currentUser.role === 'admin' || req.currentUser.role === 'manager') {
@@ -1046,8 +1064,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Order not found" });
       }
 
-      // Regular customers can only see their own orders
+      // Regular customers and drivers can only see their own permitted orders.
       if (req.currentUser.role === 'customer' && order.customerId !== req.currentUser.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      if (req.currentUser.role === 'driver' && order.assignedUserId !== req.currentUser.id) {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -1739,10 +1760,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Create notifications for staff, managers, and admins about the new order
+      // Create notifications for staff, managers, and admins about the new order.
+      // Drivers receive order information only after an order is assigned to them.
       try {
         const staffUsers = await storage.getStaffUsers();
-        for (const user of staffUsers) {
+        for (const user of staffUsers.filter((user) => user.role !== 'driver')) {
           await storage.createNotification({
             userId: user.id,
             type: 'new_order',
@@ -2025,6 +2047,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const order = await storage.assignOrderToUser(id, assignedUserId);
+
+      try {
+        const assignedUser = await storage.getUser(assignedUserId);
+        if (assignedUser?.role === 'driver') {
+          await storage.createNotification({
+            userId: assignedUser.id,
+            type: 'order_assigned',
+            title: 'Order Assigned',
+            message: `Order #${order.orderNumber} has been assigned to you`,
+            data: { orderId: order.id, orderNumber: order.orderNumber }
+          });
+        }
+      } catch (notificationError) {
+        console.error('Failed to create assignment notification:', notificationError);
+      }
+
       res.json(order);
     } catch (error) {
       res.status(500).json({ message: "Failed to assign order" });

@@ -66,6 +66,7 @@ function Router() {
         <Route path="/" component={isAuthenticated ? Dashboard : Landing} />
         <Route path="/storefront" component={StorefrontWithGate} />
         <Route path="/dashboard/orders" component={Dashboard} />
+        <Route path="/dashboard/drivers" component={Dashboard} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/dashboard/:tab" component={Dashboard} />
         <Route path="/inventory" component={InventoryPage} />

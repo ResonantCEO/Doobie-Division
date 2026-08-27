@@ -40,7 +40,7 @@ export const users = pgTable("users", {
   idImageUrl: varchar("id_image_url"),
   verificationPhotoUrl: varchar("verification_photo_url"),
   idVerificationStatus: varchar("id_verification_status").notNull().default("pending"), // pending, verified, rejected
-  role: varchar("role").notNull().default("customer"), // customer, staff, manager, admin
+  role: varchar("role").notNull().default("customer"), // customer, staff, driver, manager, admin
   status: varchar("status").notNull().default("pending"), // pending, active, suspended
   address: text("address"),
   city: varchar("city"),

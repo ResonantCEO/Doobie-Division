@@ -87,6 +87,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
     { id: "storefront", path: "/dashboard/storefront", label: "Storefront" },
     { id: "inventory", path: "/dashboard/inventory", roles: ["admin", "manager"], label: "Inventory Management" },
     { id: "orders", path: "/dashboard/orders", roles: ["admin", "manager", "staff"], label: "Order Management" },
+    { id: "drivers", path: "/dashboard/drivers", roles: ["admin", "manager", "driver"], label: "Drivers" },
     { id: "analytics", path: "/dashboard/analytics", roles: ["admin", "manager"], label: "Analytics" },
     { id: "users", path: "/dashboard/users", roles: ["admin"], label: "User Management" },
     { id: "admin", path: "/dashboard/admin", roles: ["admin"], label: "Admin" },

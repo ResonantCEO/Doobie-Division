@@ -273,6 +273,8 @@ export default function UsersPage() {
         return <Badge className="role-manager">Manager</Badge>;
       case "staff":
         return <Badge className="role-manager">Staff</Badge>;
+      case "driver":
+        return <Badge className="role-manager">Driver</Badge>;
       case "customer":
       case "user":
         return <Badge className="role-customer">Customer</Badge>;
@@ -650,6 +652,7 @@ export default function UsersPage() {
                         <SelectContent>
                           <SelectItem value="customer">Customer</SelectItem>
                           <SelectItem value="staff">Staff</SelectItem>
+                          <SelectItem value="driver">Driver</SelectItem>
                           <SelectItem value="manager">Manager</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
                         </SelectContent>
@@ -856,6 +859,7 @@ export default function UsersPage() {
                             <SelectContent>
                               <SelectItem value="customer">Customer</SelectItem>
                               <SelectItem value="staff">Staff</SelectItem>
+                              <SelectItem value="driver">Driver</SelectItem>
                               <SelectItem value="manager">Manager</SelectItem>
                               <SelectItem value="admin">Admin</SelectItem>
                             </SelectContent>
@@ -1051,6 +1055,7 @@ export default function UsersPage() {
                     <SelectContent>
                       <SelectItem value="customer">Customer</SelectItem>
                       <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="driver">Driver</SelectItem>
                       <SelectItem value="manager">Manager</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
