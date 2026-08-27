@@ -23,30 +23,6 @@ type DriverOrder = Order & {
   }>;
 };
 
-function statusLabel(status: string) {
-  switch (status) {
-    case "pending": return "Pending";
-    case "processing": return "Processing";
-    case "packed": return "Packed";
-    case "shipped": return "Shipped";
-    case "delivered": return "Delivered";
-    case "cancelled": return "Cancelled";
-    default: return status || "Unknown";
-  }
-}
-
-function statusClass(status: string) {
-  switch (status) {
-    case "pending": return "bg-orange-100 text-orange-800 border-orange-200";
-    case "processing": return "bg-blue-100 text-blue-800 border-blue-200";
-    case "packed": return "bg-purple-100 text-purple-800 border-purple-200";
-    case "shipped":
-    case "delivered": return "bg-green-100 text-green-800 border-green-200";
-    case "cancelled": return "bg-red-100 text-red-800 border-red-200";
-    default: return "bg-muted text-muted-foreground";
-  }
-}
-
 function formatDate(value: unknown) {
   if (!value) return "Date unavailable";
   const date = new Date(value as string);
@@ -142,12 +118,17 @@ export default function DriversPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h3 className="font-semibold text-gray-900 dark:text-white">
-                        Order {order.orderNumber}
+                        {order.customerName}
                       </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">{order.customerName}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">Order {order.orderNumber}</p>
                     </div>
-                    <Badge variant="outline" className={statusClass(order.status)}>
-                      {statusLabel(order.status)}
+                    <Badge
+                      variant="secondary"
+                      className={order.paymentMethod === "prepay"
+                        ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700"
+                        : "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700"}
+                    >
+                      {order.paymentMethod === "prepay" ? "Pre-Pay" : "PUA"}
                     </Badge>
                   </div>
 
