@@ -112,6 +112,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
         title: "Item Fulfilled",
         description: "Physical inventory has been adjusted",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: Error, _variables, context) => {
@@ -159,6 +160,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
         title: "Item Unfulfilled",
         description: "Inventory has been restored",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: Error, _variables, context) => {
@@ -341,6 +343,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
         title: "Item Fulfilled",
         description: "Physical inventory has been adjusted",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: Error, _variables, context) => {
@@ -388,6 +391,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
         title: "Item Unfulfilled",
         description: "Inventory has been restored",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: Error, _variables, context) => {
