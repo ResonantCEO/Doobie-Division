@@ -30,8 +30,12 @@ interface OrderDetailsModalProps {
   userRole?: string;
 }
 
+type OrderWithItems = Order & {
+  items: any[];
+};
+
 export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: OrderDetailsModalProps) {
-  const [fullOrder, setFullOrder] = useState<Order | null>(null);
+  const [fullOrder, setFullOrder] = useState<OrderWithItems | null>(null);
   const [scanningMode, setScanningMode] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -100,13 +104,21 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: orderDetails, isLoading } = useQuery({
+  const { data: orderDetails, isLoading } = useQuery<OrderWithItems | null>({
     queryKey: ["/api/orders", order?.id],
     queryFn: async () => {
       if (!order?.id) return null;
       const response = await fetch(`/api/orders/${order.id}`, { credentials: "include" });
       if (!response.ok) throw new Error(`Failed to fetch order details: ${response.statusText}`);
-      return response.json() as unknown as Order;
+      const raw = await response.json();
+      return {
+        ...raw,
+        items: Array.isArray(raw?.items)
+          ? raw.items
+          : Array.isArray(raw?.orderItems)
+            ? raw.orderItems
+            : [],
+      } as OrderWithItems;
     },
     enabled: isOpen && !!order?.id,
   });
@@ -115,7 +127,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     if (orderDetails) {
       setFullOrder(orderDetails);
     } else if (order) {
-      setFullOrder(order);
+      setFullOrder({
+        ...order,
+        items: Array.isArray((order as any).items)
+          ? (order as any).items
+          : Array.isArray((order as any).orderItems)
+            ? (order as any).orderItems
+            : [],
+      });
     }
   }, [orderDetails, order]);
 
@@ -143,13 +162,13 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     onMutate: async ({ orderId, orderItemId }) => {
       await queryClient.cancelQueries({ queryKey: ["/api/orders", orderId] });
       const previousFullOrder = fullOrder;
-      const updateOrder = (current: Order): Order => {
+      const updateOrder = (current: OrderWithItems): OrderWithItems => {
         return {
           ...current,
-          items: (current as any).items?.map((item: any) =>
+          items: current.items.map((item: any) =>
             item.id === orderItemId ? { ...item, fulfilled: true } : item
           ),
-        } as Order;
+        };
       };
       setFullOrder(current => current ? updateOrder(current) : null);
       return { previousFullOrder };
@@ -570,7 +589,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
   if (!order) return null;
 
-  const displayOrder = fullOrder || order;
+  const displayOrder: OrderWithItems = fullOrder || {
+    ...order,
+    items: Array.isArray((order as any).items)
+      ? (order as any).items
+      : Array.isArray((order as any).orderItems)
+        ? (order as any).orderItems
+        : [],
+  };
   const isAdmin = userRole === 'admin';
   const canScan = userRole === 'staff' || userRole === 'manager' || userRole === 'admin';
 

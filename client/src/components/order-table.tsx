@@ -1291,15 +1291,17 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
 
   return (
     <>
-      <OrderDetailsModal
-        order={selectedOrder}
-        isOpen={isOrderDetailsOpen}
-        onClose={() => {
-          setIsOrderDetailsOpen(false);
-          setSelectedOrder(null);
-        }}
-        userRole={user?.role}
-      />
+      {isOrderDetailsOpen && selectedOrder && (
+        <OrderDetailsModal
+          order={selectedOrder}
+          isOpen={isOrderDetailsOpen}
+          onClose={() => {
+            setIsOrderDetailsOpen(false);
+            setSelectedOrder(null);
+          }}
+          userRole={user?.role}
+        />
+      )}
       <AlertDialog open={deleteOrderId !== null} onOpenChange={(open) => { if (!open) setDeleteOrderId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>

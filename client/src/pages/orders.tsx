@@ -279,15 +279,17 @@ export default function OrdersPage() {
       {/* Orders Table */}
       <OrderTable orders={processedOrders} user={user} staffUsers={staffUsers} activeTab={activeTab} onActiveTabChange={setActiveTab} />
 
-      <OrderDetailsModal
-        order={selectedOrder}
-        isOpen={isOrderDetailsOpen}
-        onClose={() => {
-          setIsOrderDetailsOpen(false);
-          setSelectedOrder(null);
-        }}
-        userRole={user?.role}
-      />
+      {isOrderDetailsOpen && selectedOrder && (
+        <OrderDetailsModal
+          order={selectedOrder}
+          isOpen={isOrderDetailsOpen}
+          onClose={() => {
+            setIsOrderDetailsOpen(false);
+            setSelectedOrder(null);
+          }}
+          userRole={user?.role}
+        />
+      )}
 
       <RouteManagementModal
         isOpen={isRouteManagementOpen}
