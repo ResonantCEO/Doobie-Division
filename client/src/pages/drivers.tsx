@@ -56,6 +56,10 @@ export default function DriversPage() {
     gcTime: 0,
   });
 
+  const shippedOrders = orders.filter(
+    (order) => order.status === "shipped" && !order.archived
+  );
+
   if (authLoading || (canViewDrivers && ordersLoading)) {
     return (
       <div className="flex min-h-[280px] items-center justify-center">
@@ -94,7 +98,7 @@ export default function DriversPage() {
         <Alert variant="destructive">
           <AlertDescription>Assigned orders could not be loaded. Please try again.</AlertDescription>
         </Alert>
-      ) : orders.length === 0 ? (
+      ) : shippedOrders.length === 0 ? (
         <Card>
           <CardContent className="flex min-h-[220px] flex-col items-center justify-center p-6 text-center">
             <Truck className="mb-3 h-10 w-10 text-muted-foreground" />
@@ -106,7 +110,7 @@ export default function DriversPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {orders.map((order) => {
+          {shippedOrders.map((order) => {
             const items = (order.orderItems ?? []).filter((item) => !item.removed);
             return (
               <Card
