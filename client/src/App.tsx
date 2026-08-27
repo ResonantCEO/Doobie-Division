@@ -23,7 +23,7 @@ import AccessGate from "@/components/AccessGate";
 import InactivityWarning from "@/components/InactivityWarning";
 import TelegramUsernamePrompt from "@/components/TelegramUsernamePrompt";
 import { useInactivityTimer } from "@/hooks/useInactivityTimer";
-import { useCallback, useEffect, useState } from "react";
+import { Component, useCallback, useEffect, type ErrorInfo, type ReactNode } from "react";
 
 
 function Router() {
@@ -65,7 +65,9 @@ function Router() {
       <Switch>
         <Route path="/" component={isAuthenticated ? Dashboard : Landing} />
         <Route path="/storefront" component={StorefrontWithGate} />
-        <Route path="/dashboard/:tab?" component={Dashboard} />
+        <Route path="/dashboard/orders" component={Dashboard} />
+        <Route path="/dashboard" component={Dashboard} />
+        <Route path="/dashboard/:tab" component={Dashboard} />
         <Route path="/inventory" component={InventoryPage} />
         <Route path="/orders" component={OrdersPage} />
         <Route path="/scanner" component={ScannerPage} />
@@ -79,6 +81,43 @@ function Router() {
       </Switch>
     </>
   );
+}
+
+class AppErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[App] Unhandled render error", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen bg-background p-6 text-foreground">
+          <div className="mx-auto mt-20 max-w-xl rounded-lg border border-destructive/50 bg-card p-6 shadow-lg">
+            <h1 className="text-xl font-bold">The page could not be displayed</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {this.state.error.message || "An unexpected display error occurred."}
+            </p>
+            <button
+              className="mt-5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              onClick={() => window.location.reload()}
+            >
+              Reload page
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function App() {
@@ -97,7 +136,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <CartProvider>
-          <Router />
+          <AppErrorBoundary>
+            <Router />
+          </AppErrorBoundary>
           <Toaster />
         </CartProvider>
       </ThemeProvider>

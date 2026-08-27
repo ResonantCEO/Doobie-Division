@@ -68,6 +68,9 @@ function customServeStatic(app: express.Express) {
 
     // For all other routes, serve index.html to allow client-side routing
     try {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       res.sendFile(path.join(clientDistPath, "index.html"));
     } catch (error) {
       console.error("Error serving index.html:", error);
