@@ -82,7 +82,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
   };
 
   const fulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number | null; quantity: number; orderItemId: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -101,16 +101,12 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       updateItemFulfilledCache(orderItemId, true);
       return { previousData };
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       toast({
         title: "Item Fulfilled",
-        description: variables.productId
-          ? "Physical inventory has been adjusted"
-          : "Custom item has been checked off",
+        description: "Physical inventory has been adjusted",
       });
-      if (variables.productId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      }
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
@@ -133,7 +129,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
   });
 
   const unfulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number | null; quantity: number; orderItemId: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/unfulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,16 +148,12 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
       updateItemFulfilledCache(orderItemId, false);
       return { previousData };
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       toast({
         title: "Item Unfulfilled",
-        description: variables.productId
-          ? "Inventory has been restored"
-          : "Custom item has been marked pending",
+        description: "Inventory has been restored",
       });
-      if (variables.productId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      }
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
@@ -183,12 +175,12 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
     }
   });
 
-  const handleFulfillItem = (itemId: number, productId: number | null, quantity: number) => {
+  const handleFulfillItem = (itemId: number, productId: number, quantity: number) => {
     setFulfillingItems(prev => new Set(prev).add(itemId));
     fulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
 
-  const handleUnfulfillItem = (itemId: number, productId: number | null, quantity: number) => {
+  const handleUnfulfillItem = (itemId: number, productId: number, quantity: number) => {
     setFulfillingItems(prev => new Set(prev).add(itemId));
     unfulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
@@ -236,16 +228,16 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                     <Checkbox
                       checked={fulfilled}
                       onCheckedChange={(checked) => {
-                        if (checked) {
-                          handleFulfillItem(item.id, item.productId ?? null, item.quantity);
-                        } else {
-                          handleUnfulfillItem(item.id, item.productId ?? null, item.quantity);
+                        if (item.productId) {
+                          if (checked) {
+                            handleFulfillItem(item.id, item.productId, item.quantity);
+                          } else {
+                            handleUnfulfillItem(item.id, item.productId, item.quantity);
+                          }
                         }
                       }}
                       className="h-5 w-5"
-                      title={fulfilled
-                        ? (item.productId ? "Click to unfulfill and restore inventory" : "Click to mark custom item pending")
-                        : (item.productId ? "Click to fulfill and adjust inventory" : "Click to mark custom item fulfilled")}
+                      title={fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory"}
                     />
                   )}
                   <div>
@@ -319,7 +311,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
   };
 
   const fulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number | null; quantity: number; orderItemId: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -338,16 +330,12 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       updateItemFulfilledCache(orderItemId, true);
       return { previousData };
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       toast({
         title: "Item Fulfilled",
-        description: variables.productId
-          ? "Physical inventory has been adjusted"
-          : "Custom item has been checked off",
+        description: "Physical inventory has been adjusted",
       });
-      if (variables.productId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      }
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
@@ -370,7 +358,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
   });
 
   const unfulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number | null; quantity: number; orderItemId: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/unfulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -389,16 +377,12 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       updateItemFulfilledCache(orderItemId, false);
       return { previousData };
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       toast({
         title: "Item Unfulfilled",
-        description: variables.productId
-          ? "Inventory has been restored"
-          : "Custom item has been marked pending",
+        description: "Inventory has been restored",
       });
-      if (variables.productId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      }
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: Error, _variables, context) => {
       if (context?.previousData) {
@@ -420,12 +404,12 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
     }
   });
 
-  const handleFulfillItem = (itemId: number, productId: number | null, quantity: number) => {
+  const handleFulfillItem = (itemId: number, productId: number, quantity: number) => {
     setFulfillingItems(prev => new Set(prev).add(itemId));
     fulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
 
-  const handleUnfulfillItem = (itemId: number, productId: number | null, quantity: number) => {
+  const handleUnfulfillItem = (itemId: number, productId: number, quantity: number) => {
     setFulfillingItems(prev => new Set(prev).add(itemId));
     unfulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
@@ -465,16 +449,16 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
             <Checkbox
               checked={fulfilled}
               onCheckedChange={(checked) => {
-                if (checked) {
-                  handleFulfillItem(item.id, item.productId ?? null, item.quantity);
-                } else {
-                  handleUnfulfillItem(item.id, item.productId ?? null, item.quantity);
+                if (item.productId) {
+                  if (checked) {
+                    handleFulfillItem(item.id, item.productId, item.quantity);
+                  } else {
+                    handleUnfulfillItem(item.id, item.productId, item.quantity);
+                  }
                 }
               }}
               className="h-5 w-5 flex-shrink-0"
-              title={fulfilled
-                ? (item.productId ? "Click to unfulfill and restore inventory" : "Click to mark custom item pending")
-                : (item.productId ? "Click to fulfill and adjust inventory" : "Click to mark custom item fulfilled")}
+              title={fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory"}
             />
           )}
           <div className="flex-1 min-w-0">

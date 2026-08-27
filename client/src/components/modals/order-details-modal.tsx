@@ -146,45 +146,21 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
   // Fulfill order item mutation
   const fulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number | null; quantity: number; orderItemId: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId?: number }) => {
       const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ productId, quantity, orderItemId })
       });
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(error?.message || 'Failed to fulfill item');
-      }
+      if (!response.ok) throw new Error('Failed to fulfill item');
       return response.json();
     },
-    onMutate: async ({ orderId, orderItemId }) => {
-      await queryClient.cancelQueries({ queryKey: ["/api/orders", orderId] });
-      const previousFullOrder = fullOrder;
-      const updateOrder = (current: OrderWithItems): OrderWithItems => {
-        return {
-          ...current,
-          items: current.items.map((item: any) =>
-            item.id === orderItemId ? { ...item, fulfilled: true } : item
-          ),
-        };
-      };
-      setFullOrder(current => current ? updateOrder(current) : null);
-      return { previousFullOrder };
-    },
-    onSuccess: (_, variables) => {
-      toast({
-        title: "Item Fulfilled",
-        description: variables.productId
-          ? "Order item fulfilled and inventory updated"
-          : "Custom item has been checked off",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders", variables.orderId] });
+    onSuccess: () => {
+      toast({ title: "Item Fulfilled", description: "Order item fulfilled and inventory updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      if (variables.productId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      }
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       isFulfillingRef.current = false;
       setPendingFulfillment(null);
       setConfirmQuantity("");
@@ -192,14 +168,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       setSelectedItemId(null);
       stopScanning();
     },
-    onError: (error: any, variables, context) => {
-      if (context?.previousFullOrder) {
-        setFullOrder(context.previousFullOrder);
-      }
+    onError: (error: any) => {
       isFulfillingRef.current = false;
       setPendingFulfillment(null);
       setConfirmQuantity("");
-      queryClient.invalidateQueries({ queryKey: ["/api/orders", variables.orderId] });
       toast({ title: "Fulfillment Failed", description: error.message || "Failed to fulfill item", variant: "destructive" });
     }
   });
@@ -509,19 +481,6 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     if (isScanningRef.current) animationFrameRef.current = requestAnimationFrame(detectQRCode);
   }, []);
 
-  const isCustomOrderItem = (item: any) =>
-    !item.productId && (item.productSku || item.product_sku) === "CUSTOM";
-
-  const fulfillCustomItem = (item: any) => {
-    if (!fullOrder || item.fulfilled || item.removed) return;
-    fulfillItemMutation.mutate({
-      orderId: fullOrder.id,
-      productId: null,
-      quantity: item.quantity,
-      orderItemId: item.id,
-    });
-  };
-
   const handleQRCodeDetected = (qrData: string) => {
     if (!selectedItemId || !fullOrder) return;
     if (isFulfillingRef.current) return;
@@ -562,10 +521,6 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
   const handleItemClick = async (itemId: number, item: any) => {
     if (item.fulfilled) return;
-    if (isCustomOrderItem(item)) {
-      fulfillCustomItem(item);
-      return;
-    }
     setSelectedItemId(itemId);
     setScanningMode(true);
     setScanningError("");
@@ -1717,10 +1672,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                           <p className="text-xs text-gray-600 dark:text-gray-400">
                             ${(item.productPrice || item.product_price) ? parseFloat((item.productPrice || item.product_price).toString()).toFixed(2) : "0.00"} × {item.quantity || 0}
                           </p>
-                           {!isRemoved && !item.fulfilled && canScan && (
-                             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                               {isCustomOrderItem(item) ? "Click to mark fulfilled" : "Click to scan and fulfill item"}
-                             </p>
+                          {!isRemoved && !item.fulfilled && canScan && (
+                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Click to scan and fulfill item</p>
                           )}
                         </div>
                         <div className="text-right flex flex-col items-end gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
@@ -1793,22 +1746,9 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                 <CheckCircle className="h-3 w-3 mr-1" />Fulfilled
                               </Badge>
                             ) : canScan ? (
-                              isCustomOrderItem(item) ? (
-                                <Button
-                                  size="sm"
-                                  className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700"
-                                  onClick={() => fulfillCustomItem(item)}
-                                  disabled={fulfillItemMutation.isPending}
-                                >
-                                  {fulfillItemMutation.isPending
-                                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                                    : <><CheckCircle className="h-3 w-3 mr-1" />Mark fulfilled</>}
-                                </Button>
-                              ) : (
-                                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                                  <Scan className="h-3 w-3 mr-1" />Click to scan
-                                </Badge>
-                              )
+                              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                                <Scan className="h-3 w-3 mr-1" />Click to scan
+                              </Badge>
                             ) : (
                               <Badge variant="secondary" className="bg-orange-100 text-orange-800">
                                 <Clock className="h-3 w-3 mr-1" />Pending
