@@ -474,7 +474,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(
             and(
               eq(orders.paymentPhotoUrl, photoUrl),
-              eq(orders.assignedUserId, req.currentUser.id)
+              eq(orders.assignedUserId, req.currentUser.id),
+              eq(orders.status, 'shipped'),
+              eq(orders.archived, false)
             )
           )
           .limit(1);
@@ -1037,7 +1039,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.customerId = req.currentUser.id;
         // Hide delivered orders older than 48 hours for customers
         filters.hideOldDelivered = true;
-      } else if (req.currentUser.role === 'staff' || req.currentUser.role === 'driver') {
+      } else if (req.currentUser.role === 'driver') {
+        filters.assignedUserId = req.currentUser.id;
+        filters.status = 'shipped';
+        filters.archived = false;
+      } else if (req.currentUser.role === 'staff') {
         // Staff can only see orders assigned to them
         filters.assignedUserId = req.currentUser.id;
       } else if (req.currentUser.role === 'admin' || req.currentUser.role === 'manager') {
@@ -1069,6 +1075,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       if (req.currentUser.role === 'driver' && order.assignedUserId !== req.currentUser.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      if (req.currentUser.role === 'driver' && (order.status !== 'shipped' || order.archived)) {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -2042,17 +2051,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const { assignedUserId } = req.body;
 
-      if (!assignedUserId) {
-        return res.status(400).json({ message: "Assigned user ID is required" });
+      const existingOrder = await storage.getOrder(id);
+      if (!existingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      if (existingOrder.status !== 'shipped' || existingOrder.archived) {
+        return res.status(400).json({ message: "Drivers can only be assigned to orders in the Shipped column" });
       }
 
-      const order = await storage.assignOrderToUser(id, assignedUserId);
+      let assignedDriver = null;
+      if (assignedUserId) {
+        assignedDriver = await storage.getUser(assignedUserId);
+        if (assignedDriver?.role !== 'driver' || assignedDriver.status !== 'active') {
+          return res.status(400).json({ message: "Orders can only be assigned to active drivers" });
+        }
+      }
+
+      const order = await storage.assignOrderToUser(id, assignedUserId || null);
 
       try {
-        const assignedUser = await storage.getUser(assignedUserId);
-        if (assignedUser?.role === 'driver') {
+        if (assignedDriver) {
           await storage.createNotification({
-            userId: assignedUser.id,
+            userId: assignedDriver.id,
             type: 'order_assigned',
             title: 'Order Assigned',
             message: `Order #${order.orderNumber} has been assigned to you`,
@@ -2988,6 +3008,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(staffUsers);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch staff users" });
+    }
+  });
+
+  app.get('/api/users/drivers', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const driverUsers = await storage.getDriverUsers();
+      res.json(driverUsers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch drivers" });
     }
   });
 

@@ -33,7 +33,6 @@ import type { Order, User, OrderItem, Product } from "@shared/schema";
 interface OrderTableProps {
   orders: Order[];
   user: User | null | undefined; // Assuming user object contains role information
-  staffUsers: User[]; // Array of staff users to populate the dropdown
   activeTab: OrderTab;
   onActiveTabChange: (tab: OrderTab) => void;
 }
@@ -544,7 +543,7 @@ function PackButton({ order, onOpenDetails, updateStatusMutation }: {
   );
 }
 
-export default function OrderTable({ orders, user, staffUsers, activeTab, onActiveTabChange }: OrderTableProps) {
+export default function OrderTable({ orders, user, activeTab, onActiveTabChange }: OrderTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -792,37 +791,6 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
     }
   };
 
-  const assignOrderMutation = useMutation({
-    mutationFn: async ({ orderId, assignedUserId }: { orderId: number; assignedUserId: string }) => {
-      await apiRequest("PUT", `/api/orders/${orderId}/assign`, { assignedUserId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      toast({
-        title: "Success",
-        description: "Order assigned successfully",
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: "Failed to assign order",
-        variant: "destructive",
-      });
-    },
-  });
-
   const getPaymentBadge = (paymentMethod: string) => {
     if (paymentMethod === "prepay") {
       return <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700">Pre-Pay</Badge>;
@@ -851,10 +819,6 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
 
   const handleStatusUpdate = (orderId: number, status: string) => {
     updateStatusMutation.mutate({ orderId, status });
-  };
-
-  const handleAssignOrder = (orderId: number, assignedUserId: string) => {
-    assignOrderMutation.mutate({ orderId, assignedUserId });
   };
 
   const handleViewOrder = (orderId: number) => {
@@ -1096,9 +1060,6 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
                 <TableHead className="text-gray-300">Total</TableHead>
                 <TableHead className="text-gray-300">Payment</TableHead>
                 <TableHead className="text-gray-300">Date</TableHead>
-                {(user?.role === 'admin' || user?.role === 'manager') && (
-                  <TableHead className="text-gray-300">Assigned To</TableHead>
-                )}
                 <TableHead className="text-gray-300">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -1160,37 +1121,6 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
                     <TableCell className="text-gray-900 dark:text-white">
                       {formatOrderDate(order.createdAt, "MMM dd, yyyy")}
                     </TableCell>
-                    {(user?.role === 'admin' || user?.role === 'manager') && (
-                      <TableCell>
-                        <div className="space-y-1">
-                          <Select
-                            value={order.assignedUserId || "unassigned"}
-                            onValueChange={(assignedUserId) => handleAssignOrder(order.id, assignedUserId === "unassigned" ? "" : assignedUserId)}
-                          >
-                            <SelectTrigger className="w-full min-w-28 h-8 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600">
-                              <SelectValue placeholder="Assign to staff..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="unassigned">Unassigned</SelectItem>
-                              {staffUsers.filter((staffUser) => typeof staffUser.id === "string" && staffUser.id.trim() !== "").map((staffUser) => (
-                                <SelectItem key={staffUser.id} value={staffUser.id}>
-                                  {staffUser.firstName && staffUser.lastName
-                                    ? `${staffUser.firstName} ${staffUser.lastName}`
-                                    : staffUser.email || staffUser.id}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {order.assignedUser && (
-                            <div className="text-xs text-green-600 dark:text-green-400 font-medium">
-                              Assigned to: {order.assignedUser.firstName && order.assignedUser.lastName
-                                ? `${order.assignedUser.firstName} ${order.assignedUser.lastName}`
-                                : order.assignedUser.email}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                    )}
                     <TableCell>
                       <div className="flex items-center justify-start space-x-2">
                         {activeTab === "packed" ? (
@@ -1272,7 +1202,7 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
                   {isOrderExpanded(order.id) && (
                     <OrderItemsRow 
                       orderId={order.id} 
-                      colSpan={(user?.role === 'admin' || user?.role === 'manager') ? 7 : 6}
+                      colSpan={6}
                     />
                   )}
                 </Fragment>

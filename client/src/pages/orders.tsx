@@ -98,19 +98,10 @@ export default function OrdersPage() {
     gcTime: 0,
   });
 
-  // Fetch staff users if the current user is an admin or manager
-  const { data: staffUsers = [], isLoading: staffLoading } = useQuery({
-    queryKey: ["/api/users/staff"],
-    queryFn: () => apiRequest("GET", "/api/users/staff"),
-    enabled: user?.role === 'admin' || user?.role === 'manager',
-  });
-
   // Derive unique cities from all orders
   const safeOrders = Array.isArray(orders) ? orders.filter(
     (order): order is Order => !!order && typeof order === "object"
   ) : [];
-
-  const safeStaffUsers = Array.isArray(staffUsers) ? staffUsers : [];
 
   const uniqueCities = useMemo(() => {
     const cities = new Set(safeOrders.map(o => extractCity(o.shippingAddress)));
@@ -221,9 +212,6 @@ export default function OrdersPage() {
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
     queryClient.invalidateQueries({ queryKey: ["/api/analytics/order-status-breakdown"] });
-    if (user?.role === 'admin' || user?.role === 'manager') {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/staff"] });
-    }
   };
 
   const handleViewOrderDetails = (order: Order) => {
@@ -232,7 +220,7 @@ export default function OrdersPage() {
   };
 
 
-  if (authLoading || ordersLoading || (user?.role === 'admin' || user?.role === 'manager' ? staffLoading : false)) {
+  if (authLoading || ordersLoading) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse space-y-4">
@@ -320,7 +308,7 @@ export default function OrdersPage() {
 
       {/* Orders Table */}
       <OrdersRenderBoundary>
-        <OrderTable orders={processedOrders} user={user} staffUsers={safeStaffUsers} activeTab={activeTab} onActiveTabChange={setActiveTab} />
+        <OrderTable orders={processedOrders} user={user} activeTab={activeTab} onActiveTabChange={setActiveTab} />
       </OrdersRenderBoundary>
 
       {isOrderDetailsOpen && selectedOrder && (

@@ -101,7 +101,7 @@ export interface IStorage {
   getLowStockProducts(): Promise<Product[]>;
 
   // Order operations
-  getOrders(filters?: { status?: string; statuses?: string[]; customerId?: string; assignedUserId?: string; hideOldDelivered?: boolean }): Promise<Order[]>;
+  getOrders(filters?: { status?: string; statuses?: string[]; customerId?: string; assignedUserId?: string; archived?: boolean; hideOldDelivered?: boolean }): Promise<Order[]>;
   getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined>;
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
@@ -118,7 +118,7 @@ export interface IStorage {
   addCustomOrderItem(orderId: number, customName: string, price: number, quantity: number, userId: string): Promise<void>;
   updateOrderItemPrice(orderId: number, itemId: number, newPrice: number): Promise<Order>;
   markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }>;
-  assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order>;
+  assignOrderToUser(orderId: number, assignedUserId: string | null): Promise<Order>;
   deleteOrder(id: number): Promise<void>;
   clearArchivedOrders(): Promise<number>;
   clearAllOrders(statuses?: string[]): Promise<number>;
@@ -181,6 +181,7 @@ export interface IStorage {
   getUsersPendingVerification(): Promise<User[]>;
   updateUser(id: string, userData: any): Promise<User>;
   getStaffUsers(): Promise<User[]>;
+  getDriverUsers(): Promise<Pick<User, 'id' | 'firstName' | 'lastName' | 'email'>[]>;
   getUsersWithRole(role: string): Promise<User[]>;
   deleteUser(id: string): Promise<void>;
 
@@ -1759,6 +1760,7 @@ export class DatabaseStorage implements IStorage {
     statuses?: string[];
     customerId?: string;
     assignedUserId?: string;
+    archived?: boolean;
     hideOldDelivered?: boolean;
   } = {}): Promise<Order[]> {
     try {
@@ -1840,6 +1842,10 @@ export class DatabaseStorage implements IStorage {
 
       if (filters.assignedUserId) {
         conditions.push(eq(orders.assignedUserId, filters.assignedUserId));
+      }
+
+      if (typeof filters.archived === 'boolean') {
+        conditions.push(eq(orders.archived, filters.archived));
       }
 
       // Hide shipped orders older than 48 hours for customers
@@ -2800,7 +2806,7 @@ export class DatabaseStorage implements IStorage {
     return { success: true, allPacked };
   }
 
-  async assignOrderToUser(orderId: number, assignedUserId: string): Promise<Order> {
+  async assignOrderToUser(orderId: number, assignedUserId: string | null): Promise<Order> {
     const [updatedOrder] = await retryQuery(() =>
       db
         .update(orders)
@@ -4284,6 +4290,24 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           or(eq(users.role, 'staff'), eq(users.role, 'driver'), eq(users.role, 'manager'), eq(users.role, 'admin')),
+          eq(users.status, 'active')
+        )
+      )
+      .orderBy(asc(users.firstName), asc(users.lastName));
+  }
+
+  async getDriverUsers(): Promise<Pick<User, 'id' | 'firstName' | 'lastName' | 'email'>[]> {
+    return db
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+      })
+      .from(users)
+      .where(
+        and(
+          eq(users.role, 'driver'),
           eq(users.status, 'active')
         )
       )

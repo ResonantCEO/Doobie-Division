@@ -1,16 +1,25 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RefreshCw, Truck, MapPin, Calendar, CreditCard, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import type { Order } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import OrderDetailsModal from "@/components/modals/order-details-modal";
 
 type DriverOrder = Order & {
+  assignedUser?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+  };
   orderItems?: Array<{
     id: number;
     productName: string;
@@ -23,6 +32,13 @@ type DriverOrder = Order & {
   }>;
 };
 
+type DriverOption = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+};
+
 function formatDate(value: unknown) {
   if (!value) return "Date unavailable";
   const date = new Date(value as string);
@@ -31,9 +47,12 @@ function formatDate(value: unknown) {
 
 export default function DriversPage() {
   const { user, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const canViewDrivers = user?.role === "admin" || user?.role === "manager" || user?.role === "driver";
+  const canAssignDrivers = user?.role === "admin" || user?.role === "manager";
 
   const {
     data: orders = [],
@@ -56,11 +75,33 @@ export default function DriversPage() {
     gcTime: 0,
   });
 
+  const { data: drivers = [], isLoading: driversLoading } = useQuery<DriverOption[]>({
+    queryKey: ["/api/users/drivers"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/users/drivers");
+      return response.json();
+    },
+    enabled: canAssignDrivers,
+  });
+
+  const assignDriverMutation = useMutation({
+    mutationFn: async ({ orderId, assignedUserId }: { orderId: number; assignedUserId: string | null }) => {
+      await apiRequest("PUT", `/api/orders/${orderId}/assign`, { assignedUserId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Driver updated", description: "The order's driver assignment has been saved." });
+    },
+    onError: () => {
+      toast({ title: "Assignment failed", description: "The driver assignment could not be saved.", variant: "destructive" });
+    },
+  });
+
   const shippedOrders = orders.filter(
     (order) => order.status === "shipped" && !order.archived
   );
 
-  if (authLoading || (canViewDrivers && ordersLoading)) {
+  if (authLoading || (canViewDrivers && ordersLoading) || (canAssignDrivers && driversLoading)) {
     return (
       <div className="flex min-h-[280px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -85,7 +126,7 @@ export default function DriversPage() {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Drivers</h2>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {user?.role === "driver" ? "Orders assigned to you" : "Assigned delivery orders"}
+            {user?.role === "driver" ? "Shipped orders assigned to you" : "Assign drivers to shipped orders"}
           </p>
         </div>
         <Button variant="outline" onClick={() => refetch()} disabled={isFetching} className="gap-2">
@@ -102,9 +143,9 @@ export default function DriversPage() {
         <Card>
           <CardContent className="flex min-h-[220px] flex-col items-center justify-center p-6 text-center">
             <Truck className="mb-3 h-10 w-10 text-muted-foreground" />
-            <h3 className="text-lg font-semibold">No assigned orders</h3>
+            <h3 className="text-lg font-semibold">No shipped orders</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Orders assigned to you will appear here.
+              {user?.role === "driver" ? "Shipped orders assigned to you will appear here." : "Orders in the Shipped column will appear here."}
             </p>
           </CardContent>
         </Card>
@@ -150,6 +191,37 @@ export default function DriversPage() {
                       <span>{order.paymentMethod === "prepay" ? "Pre-paid" : "Pay upon arrival"}</span>
                     </div>
                   </div>
+
+                  {canAssignDrivers && (
+                    <div
+                      className="mt-4 space-y-2 border-t pt-4"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <label className="text-sm font-medium text-foreground">Assigned Driver</label>
+                      <Select
+                        value={order.assignedUserId || "unassigned"}
+                        onValueChange={(driverId) => assignDriverMutation.mutate({
+                          orderId: order.id,
+                          assignedUserId: driverId === "unassigned" ? null : driverId,
+                        })}
+                        disabled={assignDriverMutation.isPending}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a driver" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {drivers.map((driver) => (
+                            <SelectItem key={driver.id} value={driver.id}>
+                              {driver.firstName || driver.lastName
+                                ? `${driver.firstName || ""} ${driver.lastName || ""}`.trim()
+                                : driver.email || driver.id}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   <div className="mt-4 flex items-center justify-between border-t pt-4">
                     <span className="text-sm text-muted-foreground">
