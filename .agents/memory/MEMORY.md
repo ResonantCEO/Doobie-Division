@@ -6,3 +6,4 @@
 - [Grab bag flavor selection](grab-bag-flavor-selection.md) — an unpinned sized product means any flavor; choose randomly from currently in-stock flavors at generation time.
 - [Variant inventory totals](variant-inventory-totals.md) — flavor rows are authoritative; parent totals are cached aggregates that must be reconciled.
 - [Custom item fulfillment](custom-item-fulfillment.md) — null-product order items must be addressed by item ID and must never enter catalog inventory paths.
+- [Order list request fan-out](order-list-request-fanout.md) — do not mount per-row detail queries just to calculate list actions; include compact action state in the list response.

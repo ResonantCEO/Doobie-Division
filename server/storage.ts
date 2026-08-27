@@ -1795,20 +1795,24 @@ export class DatabaseStorage implements IStorage {
           customerTelegramUsername: sql<string | null>`(SELECT telegram_username FROM users WHERE id = ${orders.customerId})`,
           productNames: sql<string | null>`(SELECT string_agg(product_name, ' ') FROM order_items WHERE order_id = ${orders.id})`,
            orderItems: sql<Array<{
+             id: number;
              productName: string;
              productSku: string | null;
              quantity: number;
              size: string | null;
              subtotal: string;
+             fulfilled: boolean;
              removed: boolean;
            }>>`(
              SELECT COALESCE(
                json_agg(json_build_object(
+                  'id', id,
                  'productName', product_name,
                  'productSku', product_sku,
                  'quantity', quantity,
                  'size', size,
                  'subtotal', subtotal,
+                  'fulfilled', fulfilled,
                  'removed', removed
                ) ORDER BY id),
                '[]'::json

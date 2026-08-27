@@ -505,21 +505,12 @@ function PackButton({ order, onOpenDetails, updateStatusMutation }: {
   onOpenDetails: () => void; 
   updateStatusMutation: ReturnType<typeof useMutation<void, Error, { orderId: number; status: string }>>;
 }) {
-  const { data: orderWithItems, isLoading } = useQuery<OrderWithItems>({
-    queryKey: ['/api/order-detail', order.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/orders/${order.id}`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch order');
-      return res.json();
-    },
-    staleTime: 30000,
-    gcTime: Infinity,
-  });
-
-  const allFulfilled = !isLoading && 
-    orderWithItems?.items != null && 
-    orderWithItems.items.length > 0 && 
-    orderWithItems.items.every(item => item.fulfilled);
+  const orderItems = Array.isArray((order as any).orderItems)
+    ? (order as any).orderItems.filter((item: any) => !item.removed)
+    : [];
+  const allFulfilled =
+    orderItems.length > 0 &&
+    orderItems.every((item: any) => item.fulfilled === true);
 
   const handleClick = () => {
     if (!allFulfilled) {
