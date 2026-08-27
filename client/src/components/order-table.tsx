@@ -1158,7 +1158,7 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="unassigned">Unassigned</SelectItem>
-                              {staffUsers.map((staffUser) => (
+                              {staffUsers.filter((staffUser) => typeof staffUser.id === "string" && staffUser.id.trim() !== "").map((staffUser) => (
                                 <SelectItem key={staffUser.id} value={staffUser.id}>
                                   {staffUser.firstName && staffUser.lastName
                                     ? `${staffUser.firstName} ${staffUser.lastName}`

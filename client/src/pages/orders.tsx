@@ -19,7 +19,7 @@ function extractCity(shippingAddress: unknown): string {
     return "Unknown";
   }
   const parts = shippingAddress.split(",").map(p => p.trim());
-  return parts.length >= 2 ? parts[1] : "Unknown";
+  return parts.length >= 2 && parts[1] ? parts[1] : "Unknown";
 }
 
 class OrdersRenderBoundary extends Component<
