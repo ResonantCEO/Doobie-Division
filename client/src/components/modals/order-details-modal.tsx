@@ -142,7 +142,6 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     },
     onMutate: async ({ orderId, orderItemId }) => {
       await queryClient.cancelQueries({ queryKey: ["/api/orders", orderId] });
-      const previousOrder = queryClient.getQueryData<Order>(["/api/orders", orderId]);
       const previousFullOrder = fullOrder;
       const updateOrder = (current: Order): Order => {
         return {
@@ -153,8 +152,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
         } as Order;
       };
       setFullOrder(current => current ? updateOrder(current) : null);
-      queryClient.setQueryData<Order>(["/api/orders", orderId], current => current ? updateOrder(current) : undefined);
-      return { previousOrder, previousFullOrder };
+      return { previousFullOrder };
     },
     onSuccess: (_, variables) => {
       toast({
@@ -176,9 +174,6 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       stopScanning();
     },
     onError: (error: any, variables, context) => {
-      if (context?.previousOrder) {
-        queryClient.setQueryData(["/api/orders", variables.orderId], context.previousOrder);
-      }
       if (context?.previousFullOrder) {
         setFullOrder(context.previousFullOrder);
       }

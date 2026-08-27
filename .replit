@@ -43,3 +43,7 @@ integrations = ["javascript_websocket:1.0.0", "javascript_sendgrid:1.0.0", "java
 
 [objectStorage]
 defaultBucketID = "replit-objstore-0750cb0a-834f-414a-865e-564d9d94c549"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000
