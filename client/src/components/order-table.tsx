@@ -88,7 +88,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
   };
 
   const fulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number | null; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -136,7 +136,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
   });
 
   const unfulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number | null; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/unfulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -183,12 +183,12 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
     }
   });
 
-  const handleFulfillItem = (itemId: number, productId: number, quantity: number) => {
+  const handleFulfillItem = (itemId: number, productId: number | null, quantity: number) => {
     setFulfillingItems(prev => new Set(prev).add(itemId));
     fulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
 
-  const handleUnfulfillItem = (itemId: number, productId: number, quantity: number) => {
+  const handleUnfulfillItem = (itemId: number, productId: number | null, quantity: number) => {
     setFulfillingItems(prev => new Set(prev).add(itemId));
     unfulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
@@ -224,6 +224,8 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
           <div className="grid gap-2">
             {orderWithItems.items.map((item) => {
               const fulfilled = isItemFulfilled(item);
+              const isCustomItem = item.productId == null && item.productSku === "CUSTOM";
+              const canToggleFulfillment = item.productId != null || isCustomItem;
               return (
               <div 
                 key={item.id} 
@@ -236,16 +238,19 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                     <Checkbox
                       checked={fulfilled}
                       onCheckedChange={(checked) => {
-                        if (item.productId) {
+                        if (canToggleFulfillment) {
                           if (checked) {
-                            handleFulfillItem(item.id, item.productId, item.quantity);
+                            handleFulfillItem(item.id, item.productId ?? null, item.quantity);
                           } else {
-                            handleUnfulfillItem(item.id, item.productId, item.quantity);
+                            handleUnfulfillItem(item.id, item.productId ?? null, item.quantity);
                           }
                         }
                       }}
+                      disabled={!canToggleFulfillment}
                       className="h-5 w-5"
-                      title={fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory"}
+                      title={isCustomItem
+                        ? (fulfilled ? "Click to unfulfill custom item" : "Click to fulfill custom item")
+                        : (fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory")}
                     />
                   )}
                   <div>
@@ -319,7 +324,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
   };
 
   const fulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number | null; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/fulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -367,7 +372,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
   });
 
   const unfulfillItemMutation = useMutation({
-    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number; quantity: number; orderItemId: number }) => {
+    mutationFn: async ({ orderId, productId, quantity, orderItemId }: { orderId: number; productId: number | null; quantity: number; orderItemId: number }) => {
       const response = await fetch(`/api/orders/${orderId}/unfulfill-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -414,12 +419,12 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
     }
   });
 
-  const handleFulfillItem = (itemId: number, productId: number, quantity: number) => {
+  const handleFulfillItem = (itemId: number, productId: number | null, quantity: number) => {
     setFulfillingItems(prev => new Set(prev).add(itemId));
     fulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
 
-  const handleUnfulfillItem = (itemId: number, productId: number, quantity: number) => {
+  const handleUnfulfillItem = (itemId: number, productId: number | null, quantity: number) => {
     setFulfillingItems(prev => new Set(prev).add(itemId));
     unfulfillItemMutation.mutate({ orderId, productId, quantity, orderItemId: itemId });
   };
@@ -448,6 +453,8 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Order Items:</div>
       {orderWithItems.items.map((item) => {
         const fulfilled = isItemFulfilled(item);
+        const isCustomItem = item.productId == null && item.productSku === "CUSTOM";
+        const canToggleFulfillment = item.productId != null || isCustomItem;
         return (
         <div 
           key={item.id} 
@@ -459,16 +466,19 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
             <Checkbox
               checked={fulfilled}
               onCheckedChange={(checked) => {
-                if (item.productId) {
+                if (canToggleFulfillment) {
                   if (checked) {
-                    handleFulfillItem(item.id, item.productId, item.quantity);
+                    handleFulfillItem(item.id, item.productId ?? null, item.quantity);
                   } else {
-                    handleUnfulfillItem(item.id, item.productId, item.quantity);
+                    handleUnfulfillItem(item.id, item.productId ?? null, item.quantity);
                   }
                 }
               }}
+              disabled={!canToggleFulfillment}
               className="h-5 w-5 flex-shrink-0"
-              title={fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory"}
+              title={isCustomItem
+                ? (fulfilled ? "Click to unfulfill custom item" : "Click to fulfill custom item")
+                : (fulfilled ? "Click to unfulfill and restore inventory" : "Click to fulfill and adjust inventory")}
             />
           )}
           <div className="flex-1 min-w-0">
