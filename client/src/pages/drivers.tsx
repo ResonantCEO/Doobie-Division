@@ -42,10 +42,10 @@ export default function DriversPage() {
     refetch,
     isFetching,
   } = useQuery<DriverOrder[]>({
-    queryKey: ["/api/orders", "drivers"],
+    queryKey: ["/api/orders", "drivers", "shipped"],
     enabled: canViewDrivers,
     queryFn: async () => {
-      const response = await fetch("/api/orders", { credentials: "include" });
+      const response = await fetch("/api/orders?status=shipped", { credentials: "include" });
       if (!response.ok) {
         throw new Error(`Failed to fetch assigned orders: ${response.statusText}`);
       }
