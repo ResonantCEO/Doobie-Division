@@ -391,9 +391,8 @@ export default function SupportPage() {
         customerName: contactForm.customerName,
         imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
       };
-      if (user?.id) ticketData.userId = user.id;
 
-      const response = await fetch("/api/support/contact", {
+      const response = await fetch("/api/support/my-tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

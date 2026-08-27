@@ -1023,6 +1023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { status } = req.query;
       const filters: any = {};
+      const isSelfServiceOrderView = req.query.view === 'mine';
 
       if (status) {
         // Handle multiple statuses separated by comma
@@ -1034,10 +1035,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Role-based filtering
-      if (req.currentUser.role === 'customer') {
-        // Regular customers can only see their own orders
+      if (req.currentUser.role === 'customer' || (req.currentUser.role === 'driver' && isSelfServiceOrderView)) {
+        // Customers and drivers using My Orders can only see purchases placed by their own account.
         filters.customerId = req.currentUser.id;
-        // Hide delivered orders older than 48 hours for customers
+        // Match the standard customer order-history policy.
         filters.hideOldDelivered = true;
       } else if (req.currentUser.role === 'driver') {
         filters.assignedUserId = req.currentUser.id;
@@ -1074,11 +1075,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.currentUser.role === 'customer' && order.customerId !== req.currentUser.id) {
         return res.status(403).json({ message: "Access denied" });
       }
-      if (req.currentUser.role === 'driver' && order.assignedUserId !== req.currentUser.id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      if (req.currentUser.role === 'driver' && (order.status !== 'shipped' || order.archived)) {
-        return res.status(403).json({ message: "Access denied" });
+      if (req.currentUser.role === 'driver') {
+        const isOwnPurchase = order.customerId === req.currentUser.id;
+        const isAssignedDelivery =
+          order.assignedUserId === req.currentUser.id &&
+          order.status === 'shipped' &&
+          !order.archived;
+        if (!isOwnPurchase && !isAssignedDelivery) {
+          return res.status(403).json({ message: "Access denied" });
+        }
       }
 
       res.json(order);
@@ -3235,16 +3240,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/support/contact', async (req, res) => {
     try {
       const ticketData = insertSupportTicketSchema.parse(req.body);
-      const { userId, ...rest } = ticketData;
-      const linkedUser = userId ? await storage.getUser(userId) : undefined;
-      const insertData = userId
-        ? {
-            ...rest,
-            userId,
-            customerTelegram: linkedUser?.telegramUsername || null,
-          }
-        : rest;
-      const ticket = await storage.createSupportTicket(insertData);
+      const { userId: _ignoredUserId, ...publicTicketData } = ticketData;
+      const ticket = await storage.createSupportTicket(publicTicketData);
 
       // Push real-time notification to all admin/manager clients
       broadcastToClients({ type: 'new_support_ticket', ticketId: ticket.id });
@@ -3255,6 +3252,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid ticket data", errors: error.errors });
       }
       console.error("Support ticket error:", error);
+      res.status(500).json({ message: "Failed to create support ticket" });
+    }
+  });
+
+  // Authenticated self-service support: always link the ticket to the signed-in user.
+  app.post('/api/support/my-tickets', isAuthenticated, async (req: any, res) => {
+    try {
+      const ticketData = insertSupportTicketSchema.parse(req.body);
+      const { userId: _ignoredUserId, ...rest } = ticketData;
+      const ticket = await storage.createSupportTicket({
+        ...rest,
+        userId: req.currentUser.id,
+        customerTelegram: req.currentUser.telegramUsername || null,
+      });
+
+      broadcastToClients({ type: 'new_support_ticket', ticketId: ticket.id });
+      res.status(201).json(ticket);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid ticket data", errors: error.errors });
+      }
+      console.error("Authenticated support ticket error:", error);
       res.status(500).json({ message: "Failed to create support ticket" });
     }
   });

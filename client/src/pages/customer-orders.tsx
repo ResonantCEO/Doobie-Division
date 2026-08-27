@@ -21,9 +21,10 @@ export default function CustomerOrdersPage() {
 
   // Fetch customer's orders
   const { data: orders = [], isLoading: ordersLoading, refetch } = useQuery<Order[]>({
-    queryKey: ["/api/orders", statusFilter || "all"],
+    queryKey: ["/api/orders", "my-orders", statusFilter || "all"],
     queryFn: async () => {
       const params = new URLSearchParams();
+      params.set("view", "mine");
       if (statusFilter && statusFilter !== "all") {
         params.set("status", statusFilter);
       }

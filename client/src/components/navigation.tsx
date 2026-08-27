@@ -46,13 +46,14 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   const { toast } = useToast();
   const [pathname, navigate] = useLocation();
   const [notificationTab, setNotificationTab] = useState("all");
+  const hasCustomerSelfService = user.role === 'customer' || user.role === 'driver';
 
-  // Reset notification tab if customer is on users tab
+  // Customer-level accounts do not receive administrative user notifications.
   useEffect(() => {
-    if (user.role === 'customer' && notificationTab === 'users') {
+    if (hasCustomerSelfService && notificationTab === 'users') {
       setNotificationTab('all');
     }
-  }, [user.role, notificationTab]);
+  }, [hasCustomerSelfService, notificationTab]);
 
   // Fetch notifications — staleTime prevents hammering the server on every tab focus
   const { data: notifications = [], refetch } = useQuery<any[]>({
@@ -255,7 +256,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                   <div className="p-2">
                     <h3 className="font-semibold text-sm mb-3">Notifications</h3>
                     <Tabs value={notificationTab} onValueChange={setNotificationTab} className="w-full">
-                      <TabsList className={`grid w-full ${user.role === 'customer' ? 'grid-cols-3' : 'grid-cols-4'} mb-3 h-auto`}>
+                      <TabsList className={`grid w-full ${hasCustomerSelfService ? 'grid-cols-3' : 'grid-cols-4'} mb-3 h-auto`}>
                         <TabsTrigger value="all" className="text-sm py-2 px-3 flex items-center justify-center gap-1 relative font-medium">
                           All
                           {unreadCount > 0 && (
@@ -273,7 +274,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                             </Badge>
                           )}
                         </TabsTrigger>
-                        {user.role !== 'customer' && (
+                        {!hasCustomerSelfService && (
                           <TabsTrigger value="users" className="text-sm py-2 px-3 flex items-center justify-center gap-1 relative font-medium">
                             <UserPlus className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Users</span>
@@ -295,7 +296,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                         </TabsTrigger>
                       </TabsList>
 
-                      {(user.role === 'customer' ? ['all', 'orders', 'support'] : ['all', 'orders', 'users', 'support']).map((tabValue) => (
+                      {(hasCustomerSelfService ? ['all', 'orders', 'support'] : ['all', 'orders', 'users', 'support']).map((tabValue) => (
                         <TabsContent key={tabValue} value={tabValue} className="mt-0">
                           {getFilteredNotifications().length === 0 ? (
                             <p className="text-sm text-muted-foreground py-4 text-center">
@@ -466,7 +467,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                   <div className="p-3">
                     <h3 className="font-semibold text-base mb-3">Notifications</h3>
                     <Tabs value={notificationTab} onValueChange={setNotificationTab} className="w-full">
-                      <TabsList className={`grid w-full ${user.role === 'customer' ? 'grid-cols-3' : 'grid-cols-4'} mb-3 h-auto gap-0.5`}>
+                      <TabsList className={`grid w-full ${hasCustomerSelfService ? 'grid-cols-3' : 'grid-cols-4'} mb-3 h-auto gap-0.5`}>
                         <TabsTrigger value="all" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0 h-auto">
                           <span className="text-[11px] font-medium">All</span>
                           {unreadCount > 0 && (
@@ -483,7 +484,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                             </Badge>
                           )}
                         </TabsTrigger>
-                        {user.role !== 'customer' && (
+                        {!hasCustomerSelfService && (
                           <TabsTrigger value="users" className="flex flex-col items-center gap-0.5 py-1.5 px-1 min-w-0 h-auto">
                             <UserPlus className="h-3.5 w-3.5 shrink-0" />
                             {getUnreadCount('users') > 0 && (
@@ -503,7 +504,7 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                         </TabsTrigger>
                       </TabsList>
 
-                      {(user.role === 'customer' ? ['all', 'orders', 'support'] : ['all', 'orders', 'users', 'support']).map((tabValue) => (
+                      {(hasCustomerSelfService ? ['all', 'orders', 'support'] : ['all', 'orders', 'users', 'support']).map((tabValue) => (
                         <TabsContent key={tabValue} value={tabValue} className="mt-0">
                           {getFilteredNotifications().length === 0 ? (
                             <p className="text-sm text-muted-foreground py-4 text-center">
@@ -654,8 +655,8 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                   </NavigationMenuLink>
                 </NavigationMenuItem>
               ))}
-              {/* Add My Orders and Support links for customers */}
-              {user.role === 'customer' && (
+              {/* Customer self-service links are also available to drivers. */}
+              {hasCustomerSelfService && (
                 <>
                   <NavigationMenuItem>
                     <NavigationMenuLink
