@@ -2153,8 +2153,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orderId = parseInt(req.params.id);
       const { productId, quantity, orderItemId } = req.body;
+      const requestedProductId = productId === null || productId === undefined || productId === ""
+        ? null
+        : Number(productId);
+      const requestedOrderItemId = orderItemId === null || orderItemId === undefined || orderItemId === ""
+        ? null
+        : Number(orderItemId);
+      const requestedQuantity = Number(quantity);
 
-      if (!quantity || quantity <= 0 || (!productId && !orderItemId)) {
+      if (
+        !Number.isInteger(requestedQuantity) ||
+        requestedQuantity <= 0 ||
+        (requestedProductId !== null && (!Number.isInteger(requestedProductId) || requestedProductId <= 0)) ||
+        (requestedOrderItemId !== null && (!Number.isInteger(requestedOrderItemId) || requestedOrderItemId <= 0)) ||
+        (requestedProductId === null && requestedOrderItemId === null)
+      ) {
         return res.status(400).json({ message: "Order item and positive quantity are required" });
       }
 
@@ -2170,32 +2183,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify the specific order item exists (match by item ID when provided)
-      const orderItem = orderItemId
-        ? order.items?.find(item => item.id === orderItemId)
-        : order.items?.find(item => item.productId === productId && !item.fulfilled);
+      const orderItem = requestedOrderItemId !== null
+        ? order.items?.find(item => item.id === requestedOrderItemId)
+        : order.items?.find(item => item.productId === requestedProductId && !item.fulfilled);
       if (!orderItem) {
         return res.status(400).json({ message: "Product is not part of this order" });
+      }
+
+      if (requestedProductId !== null && orderItem.productId !== requestedProductId) {
+        return res.status(400).json({ message: "Product does not match order item" });
       }
 
       if (orderItem.fulfilled) {
         return res.status(400).json({ message: "This order item has already been fulfilled" });
       }
 
-      if (quantity > orderItem.quantity) {
+      if (requestedQuantity > orderItem.quantity) {
         return res.status(400).json({ message: `Order only requires ${orderItem.quantity} units` });
       }
 
-      const isCustomItem = !orderItem.productId && orderItem.productSku === 'CUSTOM';
+      const isCustomItem = orderItem.productId === null && orderItem.productSku === 'CUSTOM';
       if (isCustomItem) {
-        await storage.fulfillOrderItem(orderId, null, quantity, req.currentUser.id, orderItemId);
+        await storage.fulfillOrderItem(orderId, null, requestedQuantity, req.currentUser.id, requestedOrderItemId ?? undefined);
         return res.status(200).json({ message: "Custom order item marked as fulfilled" });
       }
 
-      if (!productId) {
+      if (requestedProductId === null || orderItem.productId === null) {
         return res.status(400).json({ message: "Product ID is required for catalog items" });
       }
 
-      const product = await storage.getProduct(productId);
+      const fulfillmentProductId = orderItem.productId;
+      const product = await storage.getProduct(fulfillmentProductId);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
@@ -2221,7 +2239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (sizeLabel.includes(key)) { gramEquivalent = val; break; }
         }
       }
-      const requestedGrams = quantity * gramEquivalent;
+      const requestedGrams = requestedQuantity * gramEquivalent;
 
       if (availablePhysicalInventory < requestedGrams) {
         return res.status(400).json({
@@ -2230,7 +2248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fulfill the item (reduce physical inventory and mark as fulfilled)
-      await storage.fulfillOrderItem(orderId, productId, quantity, req.currentUser.id, orderItemId);
+      await storage.fulfillOrderItem(orderId, fulfillmentProductId, requestedQuantity, req.currentUser.id, requestedOrderItemId ?? undefined);
 
       // Invalidate products cache so physical inventory reflects immediately
       try {
@@ -2245,6 +2263,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Insufficient physical inventory',
         'Product not found',
         'Order item not found',
+        'Product does not match order item',
+        'Order item is not a custom item',
       ];
       if (error?.message && knownErrors.some(msg => error.message.includes(msg))) {
         return res.status(400).json({ message: error.message });
@@ -2258,8 +2278,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orderId = parseInt(req.params.id);
       const { productId, quantity, orderItemId } = req.body;
+      const requestedProductId = productId === null || productId === undefined || productId === ""
+        ? null
+        : Number(productId);
+      const requestedOrderItemId = orderItemId === null || orderItemId === undefined || orderItemId === ""
+        ? null
+        : Number(orderItemId);
+      const requestedQuantity = Number(quantity);
 
-      if (!quantity || quantity <= 0 || (!productId && !orderItemId)) {
+      if (
+        !Number.isInteger(requestedQuantity) ||
+        requestedQuantity <= 0 ||
+        (requestedProductId !== null && (!Number.isInteger(requestedProductId) || requestedProductId <= 0)) ||
+        (requestedOrderItemId !== null && (!Number.isInteger(requestedOrderItemId) || requestedOrderItemId <= 0)) ||
+        (requestedProductId === null && requestedOrderItemId === null)
+      ) {
         return res.status(400).json({ message: "Order item and positive quantity are required" });
       }
 
@@ -2275,30 +2308,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify the specific order item exists (match by item ID when provided)
-      const orderItem = orderItemId
-        ? order.items?.find(item => item.id === orderItemId)
-        : order.items?.find(item => item.productId === productId && item.fulfilled);
+      const orderItem = requestedOrderItemId !== null
+        ? order.items?.find(item => item.id === requestedOrderItemId)
+        : order.items?.find(item => item.productId === requestedProductId && item.fulfilled);
       if (!orderItem) {
         return res.status(400).json({ message: "Product is not part of this order" });
+      }
+
+      if (requestedProductId !== null && orderItem.productId !== requestedProductId) {
+        return res.status(400).json({ message: "Product does not match order item" });
       }
 
       if (!orderItem.fulfilled) {
         return res.status(400).json({ message: "This order item is not fulfilled" });
       }
 
-      const isCustomItem = !orderItem.productId && orderItem.productSku === 'CUSTOM';
+      const isCustomItem = orderItem.productId === null && orderItem.productSku === 'CUSTOM';
       if (isCustomItem) {
-        await storage.unfulfillOrderItem(orderId, null, orderItem.quantity, req.currentUser.id, orderItemId);
+        await storage.unfulfillOrderItem(orderId, null, orderItem.quantity, req.currentUser.id, requestedOrderItemId ?? undefined);
         return res.status(200).json({ message: "Custom order item marked as unfulfilled" });
       }
 
-      if (!productId) {
+      if (requestedProductId === null || orderItem.productId === null) {
         return res.status(400).json({ message: "Product ID is required for catalog items" });
       }
 
       // Unfulfill the item (restore physical inventory and mark as not fulfilled)
       // Use the order item's actual quantity instead of client-supplied value for security
-      await storage.unfulfillOrderItem(orderId, productId, orderItem.quantity, req.currentUser.id, orderItemId);
+      await storage.unfulfillOrderItem(orderId, orderItem.productId, orderItem.quantity, req.currentUser.id, requestedOrderItemId ?? undefined);
 
       // Invalidate products cache so physical inventory reflects immediately
       try {
@@ -2307,8 +2344,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (_) {}
 
       res.status(200).json({ message: "Order item unfulfilled successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Order unfulfillment error:', error);
+      const knownErrors = [
+        'Product not found',
+        'Order item not found',
+        'Product does not match order item',
+        'Order item is not a custom item',
+        'Order item is not fulfilled',
+      ];
+      if (error?.message && knownErrors.some(msg => error.message.includes(msg))) {
+        return res.status(400).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to unfulfill order item" });
     }
   });

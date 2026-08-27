@@ -2203,7 +2203,10 @@ export class DatabaseStorage implements IStorage {
     // correctly handle multiple variants of the same product in one order
     const itemFilter = orderItemId
       ? and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItemId))
-      : and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId));
+      : and(
+          eq(orderItems.orderId, orderId),
+          productId === null ? isNull(orderItems.productId) : eq(orderItems.productId, productId)
+        );
 
     const [orderItem] = await db
       .select()
@@ -2213,6 +2216,13 @@ export class DatabaseStorage implements IStorage {
 
     if (!orderItem) {
       throw new Error("Order item not found");
+    }
+
+    if (productId === null && orderItem.productId !== null) {
+      throw new Error("Order item is not a custom item");
+    }
+    if (productId !== null && orderItem.productId !== productId) {
+      throw new Error("Product does not match order item");
     }
 
     // Custom order items are fulfillment checkmarks only. They have no catalog
@@ -2316,7 +2326,10 @@ export class DatabaseStorage implements IStorage {
     // Get the specific order item — prefer matching by item ID when provided
     const unfulfillItemFilter = orderItemId
       ? and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItemId))
-      : and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId));
+      : and(
+          eq(orderItems.orderId, orderId),
+          productId === null ? isNull(orderItems.productId) : eq(orderItems.productId, productId)
+        );
 
     const orderItem = await db
       .select()
@@ -2330,6 +2343,13 @@ export class DatabaseStorage implements IStorage {
 
     if (!orderItem[0].fulfilled) {
       throw new Error("Order item is not fulfilled");
+    }
+
+    if (productId === null && orderItem[0].productId !== null) {
+      throw new Error("Order item is not a custom item");
+    }
+    if (productId !== null && orderItem[0].productId !== productId) {
+      throw new Error("Product does not match order item");
     }
 
     // Custom items only track whether an employee accounted for them.

@@ -5,3 +5,4 @@
 - [Promo option targeting](promo-option-targeting.md) — item promo targets accept legacy product IDs and product-plus-size records; preserve both formats when changing promo matching.
 - [Grab bag flavor selection](grab-bag-flavor-selection.md) — an unpinned sized product means any flavor; choose randomly from currently in-stock flavors at generation time.
 - [Variant inventory totals](variant-inventory-totals.md) — flavor rows are authoritative; parent totals are cached aggregates that must be reconciled.
+- [Custom item fulfillment](custom-item-fulfillment.md) — null-product order items must be addressed by item ID and must never enter catalog inventory paths.
