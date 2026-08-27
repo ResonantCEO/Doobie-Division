@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { Component, useState, useMemo, type ErrorInfo, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,9 +14,44 @@ import { apiRequest } from "@/lib/api";
 import OrderDetailsModal from "@/components/modals/order-details-modal";
 import RouteManagementModal from "@/components/route-management-modal";
 
-function extractCity(shippingAddress: string): string {
+function extractCity(shippingAddress: unknown): string {
+  if (typeof shippingAddress !== "string" || shippingAddress.trim() === "") {
+    return "Unknown";
+  }
   const parts = shippingAddress.split(",").map(p => p.trim());
   return parts.length >= 2 ? parts[1] : "Unknown";
+}
+
+class OrdersRenderBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[OrdersPage] Order list render failed", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="rounded-lg border border-red-300 bg-white p-6 text-gray-900 shadow-sm dark:border-red-800 dark:bg-gray-900 dark:text-gray-100">
+          <h3 className="text-lg font-semibold">Order list could not be displayed</h3>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            A malformed order record was prevented from crashing the entire page.
+          </p>
+          <Button className="mt-4" onClick={() => window.location.reload()}>
+            Reload orders
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export default function OrdersPage() {
@@ -56,7 +91,8 @@ export default function OrdersPage() {
         throw new Error(`Failed to fetch orders: ${response.statusText}`);
       }
 
-      return response.json();
+      const payload = await response.json();
+      return Array.isArray(payload) ? payload : [];
     },
     staleTime: 0,
     gcTime: 0,
@@ -70,14 +106,20 @@ export default function OrdersPage() {
   });
 
   // Derive unique cities from all orders
+  const safeOrders = Array.isArray(orders) ? orders.filter(
+    (order): order is Order => !!order && typeof order === "object"
+  ) : [];
+
+  const safeStaffUsers = Array.isArray(staffUsers) ? staffUsers : [];
+
   const uniqueCities = useMemo(() => {
-    const cities = new Set(orders.map(o => extractCity(o.shippingAddress)));
+    const cities = new Set(safeOrders.map(o => extractCity(o.shippingAddress)));
     return Array.from(cities).sort();
-  }, [orders]);
+  }, [safeOrders]);
 
   // Filter and sort orders by city
   const processedOrders = useMemo(() => {
-    let result = [...orders];
+    let result = [...safeOrders];
     if (cityFilter !== "all") {
       result = result.filter(o => extractCity(o.shippingAddress) === cityFilter);
     }
@@ -87,7 +129,7 @@ export default function OrdersPage() {
       result.sort((a, b) => extractCity(b.shippingAddress).localeCompare(extractCity(a.shippingAddress)));
     }
     return result;
-  }, [orders, cityFilter, citySort]);
+  }, [safeOrders, cityFilter, citySort]);
 
   const handleExportOrders = () => {
     const tabOrders = processedOrders.filter(o => {
@@ -277,7 +319,9 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders Table */}
-      <OrderTable orders={processedOrders} user={user} staffUsers={staffUsers} activeTab={activeTab} onActiveTabChange={setActiveTab} />
+      <OrdersRenderBoundary>
+        <OrderTable orders={processedOrders} user={user} staffUsers={safeStaffUsers} activeTab={activeTab} onActiveTabChange={setActiveTab} />
+      </OrdersRenderBoundary>
 
       {isOrderDetailsOpen && selectedOrder && (
         <OrderDetailsModal
@@ -294,7 +338,7 @@ export default function OrdersPage() {
       <RouteManagementModal
         isOpen={isRouteManagementOpen}
         onClose={() => setIsRouteManagementOpen(false)}
-        orders={orders.filter(o =>
+        orders={safeOrders.filter(o =>
           (o.status === "pending" || o.status === "processing" || o.status === "packed") &&
           !o.archived
         )}

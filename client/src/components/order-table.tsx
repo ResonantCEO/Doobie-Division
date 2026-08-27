@@ -45,6 +45,12 @@ const formatOrderItemName = (name?: string | null) => {
   return name.replace("(Size:", "(Option:");
 };
 
+const formatOrderDate = (value: unknown, pattern: string) => {
+  if (!value) return "N/A";
+  const date = new Date(value as string | number | Date);
+  return Number.isNaN(date.getTime()) ? "N/A" : format(date, pattern);
+};
+
 function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number }) {
   const { toast } = useToast();
   const [fulfillingItems, setFulfillingItems] = useState<Set<number>>(new Set());
@@ -928,7 +934,7 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
                         </button>
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">
-                        {format(new Date(order.createdAt!), "MMM d, yyyy")}
+                        {formatOrderDate(order.createdAt, "MMM d, yyyy")}
                       </div>
                     </div>
                     <div className="text-right">
@@ -1138,7 +1144,7 @@ export default function OrderTable({ orders, user, staffUsers, activeTab, onActi
                     </TableCell>
                     <TableCell>{getPaymentBadge(order.paymentMethod || "cod")}</TableCell>
                     <TableCell className="text-gray-900 dark:text-white">
-                      {order.createdAt ? format(new Date(order.createdAt), "MMM dd, yyyy") : "N/A"}
+                      {formatOrderDate(order.createdAt, "MMM dd, yyyy")}
                     </TableCell>
                     {(user?.role === 'admin' || user?.role === 'manager') && (
                       <TableCell>
