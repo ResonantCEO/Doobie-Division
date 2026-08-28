@@ -626,9 +626,9 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
 
       {/* Tab Navigation */}
       <div className="bg-background border-b border-border">
-        <div className="max-w-7xl mx-auto">
-          <NavigationMenu className="w-full justify-start">
-            <NavigationMenuList className="-mb-px overflow-x-auto scrollbar-hide">
+        <div className="max-w-7xl mx-auto overflow-x-auto scrollbar-hide">
+          <NavigationMenu className="w-max min-w-full max-w-none justify-start">
+            <NavigationMenuList className="-mb-px w-max min-w-full flex-nowrap justify-start overflow-visible scrollbar-hide">
               {visibleTabs.map((tab) => (
                 <NavigationMenuItem key={tab.id}>
                   <NavigationMenuLink
