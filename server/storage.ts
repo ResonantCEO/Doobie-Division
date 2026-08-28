@@ -53,6 +53,8 @@ import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, 
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
+type SnapshotDb = Pick<typeof db, "select" | "insert" | "delete">;
+
 async function retryQuery<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -2832,28 +2834,100 @@ export class DatabaseStorage implements IStorage {
 
   // Snapshot orders and their items before deletion so analytics data is preserved.
   // Processes in batches of 100 so very large order sets never exceed DB parameter limits.
-  private async snapshotOrdersBeforeDeletion(orderIds: number[]): Promise<void> {
+  private async snapshotOrdersBeforeDeletion(
+    orderIds: number[],
+    snapshotDb: SnapshotDb = db,
+    replaceExistingSnapshots = false,
+  ): Promise<void> {
     if (orderIds.length === 0) return;
 
     const BATCH = 100;
 
-    // Avoid double-snapshotting: check all existing snapshots in batches
     const alreadySnappedIds = new Set<number>();
-    for (let i = 0; i < orderIds.length; i += BATCH) {
-      const chunk = orderIds.slice(i, i + BATCH);
-      const rows = await db
-        .select({ originalOrderId: analyticsOrdersSnapshot.originalOrderId })
-        .from(analyticsOrdersSnapshot)
-        .where(inArray(analyticsOrdersSnapshot.originalOrderId, chunk));
-      rows.forEach(r => alreadySnappedIds.add(r.originalOrderId));
+    if (replaceExistingSnapshots) {
+      // Rebuild both halves of any older partial snapshot. These deletes and
+      // the replacement inserts are part of the caller's transaction.
+      for (let i = 0; i < orderIds.length; i += BATCH) {
+        const chunk = orderIds.slice(i, i + BATCH);
+        await snapshotDb
+          .delete(analyticsOrderItemsSnapshot)
+          .where(inArray(analyticsOrderItemsSnapshot.originalOrderId, chunk));
+        await snapshotDb
+          .delete(analyticsOrdersSnapshot)
+          .where(inArray(analyticsOrdersSnapshot.originalOrderId, chunk));
+      }
+    } else {
+      // Avoid duplicate order snapshots for the non-archive deletion paths.
+      for (let i = 0; i < orderIds.length; i += BATCH) {
+        const chunk = orderIds.slice(i, i + BATCH);
+        const rows = await snapshotDb
+          .select({ originalOrderId: analyticsOrdersSnapshot.originalOrderId })
+          .from(analyticsOrdersSnapshot)
+          .where(inArray(analyticsOrdersSnapshot.originalOrderId, chunk));
+        rows.forEach(r => alreadySnappedIds.add(r.originalOrderId));
+      }
     }
-    const toSnapshot = orderIds.filter(id => !alreadySnappedIds.has(id));
-    if (toSnapshot.length === 0) return;
+
+    const toSnapshot = replaceExistingSnapshots
+      ? orderIds
+      : orderIds.filter(id => !alreadySnappedIds.has(id));
+
+    // Compare item counts separately so a retry repairs an incomplete item
+    // snapshot even when the parent order snapshot already exists.
+    const existingItemCounts = new Map<number, number>();
+    const sourceItemCounts = new Map<number, number>();
+    if (!replaceExistingSnapshots) {
+      for (let i = 0; i < orderIds.length; i += BATCH) {
+        const chunk = orderIds.slice(i, i + BATCH);
+        const existingItems = await snapshotDb
+          .select({
+            originalOrderId: analyticsOrderItemsSnapshot.originalOrderId,
+            count: sql<number>`count(*)`,
+          })
+          .from(analyticsOrderItemsSnapshot)
+          .where(inArray(analyticsOrderItemsSnapshot.originalOrderId, chunk))
+          .groupBy(analyticsOrderItemsSnapshot.originalOrderId);
+        existingItems.forEach(item => {
+          existingItemCounts.set(item.originalOrderId, Number(item.count));
+        });
+
+        const sourceItems = await snapshotDb
+          .select({
+            orderId: orderItems.orderId,
+            count: sql<number>`count(*)`,
+          })
+          .from(orderItems)
+          .where(inArray(orderItems.orderId, chunk))
+          .groupBy(orderItems.orderId);
+        sourceItems.forEach(item => {
+          if (item.orderId !== null) {
+            sourceItemCounts.set(item.orderId, Number(item.count));
+          }
+        });
+      }
+    }
+
+    const itemOrderIdsToReplace = replaceExistingSnapshots
+      ? orderIds
+      : orderIds.filter(orderId =>
+          (existingItemCounts.get(orderId) || 0) !== (sourceItemCounts.get(orderId) || 0)
+        );
+
+    // If a prior non-atomic attempt left a partial item snapshot, replace it
+    // inside this transaction before writing the complete set.
+    if (!replaceExistingSnapshots && itemOrderIdsToReplace.length > 0) {
+      for (let i = 0; i < itemOrderIdsToReplace.length; i += BATCH) {
+        const chunk = itemOrderIdsToReplace.slice(i, i + BATCH);
+        await snapshotDb
+          .delete(analyticsOrderItemsSnapshot)
+          .where(inArray(analyticsOrderItemsSnapshot.originalOrderId, chunk));
+      }
+    }
 
     // Snapshot orders in batches
     for (let i = 0; i < toSnapshot.length; i += BATCH) {
       const chunk = toSnapshot.slice(i, i + BATCH);
-      const ordersToSnap = await db
+      const ordersToSnap = await snapshotDb
         .select({
           id: orders.id,
           customerId: orders.customerId,
@@ -2868,7 +2942,7 @@ export class DatabaseStorage implements IStorage {
         .where(inArray(orders.id, chunk));
 
       if (ordersToSnap.length > 0) {
-        await db.insert(analyticsOrdersSnapshot).values(
+        await snapshotDb.insert(analyticsOrdersSnapshot).values(
           ordersToSnap.map(o => ({
             originalOrderId: o.id,
             customerId: o.customerId,
@@ -2882,10 +2956,11 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // Snapshot order items in batches
-    for (let i = 0; i < toSnapshot.length; i += BATCH) {
-      const chunk = toSnapshot.slice(i, i + BATCH);
-      const itemsToSnap = await db
+    // Snapshot order items in batches. This is based on item completeness,
+    // rather than only on whether the parent order was already snapshotted.
+    for (let i = 0; i < itemOrderIdsToReplace.length; i += BATCH) {
+      const chunk = itemOrderIdsToReplace.slice(i, i + BATCH);
+      const itemsToSnap = await snapshotDb
         .select({
           orderId: orderItems.orderId,
           productId: orderItems.productId,
@@ -2907,7 +2982,7 @@ export class DatabaseStorage implements IStorage {
         .where(inArray(orderItems.orderId, chunk));
 
       if (itemsToSnap.length > 0) {
-        await db.insert(analyticsOrderItemsSnapshot).values(
+        await snapshotDb.insert(analyticsOrderItemsSnapshot).values(
           itemsToSnap.map(item => {
             const subtotal = parseFloat(item.subtotal || '0');
             let purchaseCost = subtotal * 0.7;
@@ -2964,27 +3039,51 @@ export class DatabaseStorage implements IStorage {
   }
 
   async clearArchivedOrders(): Promise<number> {
-    const archived = await retryQuery(() =>
-      db.select({ id: orders.id }).from(orders).where(eq(orders.archived, true))
-    );
-    if (archived.length === 0) return 0;
+    const deletedCount = await db.transaction(async (tx) => {
+      const archived = await tx
+        .select({ id: orders.id })
+        .from(orders)
+        .where(eq(orders.archived, true))
+        .for("update");
+      if (archived.length === 0) return 0;
 
-    const orderIds = archived.map(order => order.id);
+      const orderIds = archived.map(order => order.id);
 
-    // Archived orders have already been accounted for in inventory. Clearing
-    // the archive permanently removes order history only; it must not reverse
-    // stock or physical inventory for shipped/fulfilled items.
-    try {
-      await this.snapshotOrdersBeforeDeletion(orderIds);
-    } catch (e) {
-      console.warn('[clearArchivedOrders] Failed to snapshot orders for analytics:', e);
-    }
-    await retryQuery(() => db.delete(orderItems).where(inArray(orderItems.orderId, orderIds)));
-    const deleted = await retryQuery(() =>
-      db.delete(orders).where(inArray(orders.id, orderIds)).returning({ id: orders.id })
-    );
+      // Archived orders have already been accounted for in inventory.
+      // Snapshotting and deleting only history inside one transaction keeps
+      // current stock and physical inventory exactly unchanged.
+      const BATCH = 100;
+      for (let i = 0; i < orderIds.length; i += BATCH) {
+        const chunk = orderIds.slice(i, i + BATCH);
+        await tx
+          .select({ id: orderItems.id })
+          .from(orderItems)
+          .where(inArray(orderItems.orderId, chunk))
+          .for("update");
+      }
+
+      await this.snapshotOrdersBeforeDeletion(orderIds, tx, true);
+
+      let deletedCount = 0;
+      for (let i = 0; i < orderIds.length; i += BATCH) {
+        const chunk = orderIds.slice(i, i + BATCH);
+        await tx.delete(orderItems).where(inArray(orderItems.orderId, chunk));
+        const deleted = await tx
+          .delete(orders)
+          .where(and(
+            inArray(orders.id, chunk),
+            eq(orders.archived, true),
+          ))
+          .returning({ id: orders.id });
+        deletedCount += deleted.length;
+      }
+      return deletedCount;
+    });
+
+    if (deletedCount === 0) return 0;
+
     try { invalidateCache.analytics(); } catch (e) { console.warn('Cache invalidation error:', e); }
-    return deleted.length;
+    return deletedCount;
   }
 
   async clearAllOrders(statuses?: string[]): Promise<number> {
