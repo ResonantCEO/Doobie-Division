@@ -153,6 +153,8 @@ export default function DriversPage() {
         <div className="space-y-3">
           {shippedOrders.map((order) => {
             const items = (order.orderItems ?? []).filter((item) => !item.removed);
+            const paymentPhotoUrl =
+              order.paymentPhotoUrl || (order as any).payment_photo_url;
             return (
               <Card
                 key={order.id}
@@ -246,16 +248,35 @@ export default function DriversPage() {
                           ${Number(order.total).toFixed(2)}
                         </div>
                       </div>
-                      <Button
-                        variant="secondary"
-                        className="shrink-0 md:w-full"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setSelectedOrder(order);
-                        }}
-                      >
-                        View details
-                      </Button>
+                      <div className="flex shrink-0 items-center gap-2 md:w-full">
+                        {order.paymentMethod === "prepay" && paymentPhotoUrl && (
+                          <Button
+                            asChild
+                            variant="outline"
+                            className="md:hidden"
+                          >
+                            <a
+                              href={paymentPhotoUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <CreditCard className="h-4 w-4" />
+                              Payment photo
+                            </a>
+                          </Button>
+                        )}
+                        <Button
+                          variant="secondary"
+                          className="shrink-0 md:w-full"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedOrder(order);
+                          }}
+                        >
+                          View details
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
