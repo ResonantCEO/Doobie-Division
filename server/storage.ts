@@ -2970,15 +2970,10 @@ export class DatabaseStorage implements IStorage {
     if (archived.length === 0) return 0;
 
     const orderIds = archived.map(order => order.id);
-    const items = await db
-      .select()
-      .from(orderItems)
-      .where(inArray(orderItems.orderId, orderIds));
 
-    for (const item of items) {
-      await this.restoreInventoryForDeletedOrderItem(item, null, Boolean(item.fulfilled));
-    }
-
+    // Archived orders have already been accounted for in inventory. Clearing
+    // the archive permanently removes order history only; it must not reverse
+    // stock or physical inventory for shipped/fulfilled items.
     try {
       await this.snapshotOrdersBeforeDeletion(orderIds);
     } catch (e) {

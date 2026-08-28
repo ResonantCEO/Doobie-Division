@@ -8,3 +8,4 @@
 - [Custom item fulfillment](custom-item-fulfillment.md) — null-product order items must be addressed by item ID and must never enter catalog inventory paths.
 - [Order list request fan-out](order-list-request-fanout.md) — do not mount per-row detail queries just to calculate list actions; include compact action state in the list response.
 - [Assignees and notifications](assignee-notification-boundaries.md) — assignment eligibility and new-order notification recipients must be filtered separately.
+- [Archived order purges](archived-order-purges.md) — clearing fulfilled order history must preserve current inventory instead of reversing prior deductions.
