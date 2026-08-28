@@ -593,7 +593,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
         ref={dialogContentRef}
-        className="top-4 max-h-[calc(100dvh-2rem)] w-[calc(100%-1rem)] min-w-0 translate-y-0 overflow-x-hidden overflow-y-auto sm:top-[50%] sm:max-h-[90vh] sm:w-full sm:translate-y-[-50%]"
+        className="!left-2 !right-2 !top-2 !w-auto !max-w-none !translate-x-0 !translate-y-0 !max-h-[calc(100dvh-1rem)] min-w-0 overflow-x-hidden overflow-y-auto sm:!left-[50%] sm:!right-auto sm:!top-[50%] sm:!w-full sm:!max-w-2xl sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:!max-h-[90vh]"
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
