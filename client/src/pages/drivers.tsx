@@ -5,8 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, Truck, MapPin, Calendar, CreditCard, Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { RefreshCw, Truck, MapPin, FileText, CreditCard, Loader2 } from "lucide-react";
 import type { Order } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +29,7 @@ type DriverOrder = Order & {
     fulfilled: boolean;
     removed: boolean;
   }>;
+  customerTelegramUsername?: string | null;
 };
 
 type DriverOption = {
@@ -38,12 +38,6 @@ type DriverOption = {
   lastName: string | null;
   email: string | null;
 };
-
-function formatDate(value: unknown) {
-  if (!value) return "Date unavailable";
-  const date = new Date(value as string);
-  return Number.isNaN(date.getTime()) ? "Date unavailable" : format(date, "MMM d, yyyy 'at' h:mm a");
-}
 
 export default function DriversPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -169,7 +163,11 @@ export default function DriversPage() {
                           <h3 className="font-semibold text-gray-900 dark:text-white">
                             {order.customerName}
                           </h3>
-                          <p className="mt-1 text-sm text-muted-foreground">Order {order.orderNumber}</p>
+                          <p className="mt-1 truncate text-sm text-muted-foreground">
+                            Telegram: {order.customerTelegramUsername
+                              ? `@${order.customerTelegramUsername.replace(/^@+/, "")}`
+                              : "Unavailable"}
+                          </p>
                         </div>
                         <Badge
                           variant="secondary"
@@ -186,10 +184,10 @@ export default function DriversPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-5 text-sm text-muted-foreground">
+                    <div className="flex min-w-0 items-center gap-5 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 shrink-0" />
-                        <span>{formatDate(order.createdAt)}</span>
+                        <FileText className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{order.notes || "No order notes"}</span>
                       </div>
                       <Badge
                         variant="secondary"
