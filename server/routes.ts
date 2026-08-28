@@ -2461,7 +2461,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cannot add items to shipped or cancelled orders" });
       }
 
-      await storage.addOrderItem(orderId, productId, quantity, req.currentUser.id, unitPrice != null ? Number(unitPrice) : undefined, unitLabel);
+      await storage.addOrderItem(
+        orderId,
+        Number(productId),
+        Number(quantity),
+        req.currentUser.id,
+        unitPrice != null ? Number(unitPrice) : undefined,
+        typeof unitLabel === "string" && unitLabel.trim() ? unitLabel.trim() : undefined,
+      );
       syncGrabBagAvailability().catch(() => {});
       const updatedOrder = await storage.getOrder(orderId);
       res.status(200).json(updatedOrder);
@@ -2505,7 +2512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders/:id/substitute-item', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
     try {
       const orderId = parseInt(req.params.id);
-      const { oldItemId, newProductId, quantity } = req.body;
+      const { oldItemId, newProductId, quantity, unitLabel, unitPrice } = req.body;
 
       if (!oldItemId || !newProductId || !quantity || quantity <= 0) {
         return res.status(400).json({ message: "oldItemId, newProductId, and positive quantity are required" });
@@ -2525,9 +2532,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newProduct = await storage.getProduct(newProductId);
       if (!newProduct) return res.status(404).json({ message: "Replacement product not found" });
       if (!newProduct.isActive) return res.status(400).json({ message: "Replacement product is not active" });
-      if (newProduct.stock < quantity) return res.status(400).json({ message: `Insufficient stock. Available: ${newProduct.stock}` });
-
-      await storage.substituteOrderItem(orderId, oldItemId, newProductId, quantity, req.currentUser.id);
+      await storage.substituteOrderItem(
+        orderId,
+        oldItemId,
+        newProductId,
+        Number(quantity),
+        req.currentUser.id,
+        typeof unitLabel === "string" && unitLabel.trim() ? unitLabel.trim() : undefined,
+        unitPrice != null ? Number(unitPrice) : undefined,
+      );
       syncGrabBagAvailability().catch(() => {});
 
       res.status(200).json({ message: "Item substituted successfully" });

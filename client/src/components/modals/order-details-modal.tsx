@@ -349,12 +349,26 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
   // Substitute item mutation
   const substituteMutation = useMutation({
-    mutationFn: async ({ orderId, oldItemId, newProductId, quantity }: { orderId: number; oldItemId: number; newProductId: number; quantity: number }) => {
+    mutationFn: async ({
+      orderId,
+      oldItemId,
+      newProductId,
+      quantity,
+      unitLabel,
+      unitPrice,
+    }: {
+      orderId: number;
+      oldItemId: number;
+      newProductId: number;
+      quantity: number;
+      unitLabel?: string;
+      unitPrice?: number;
+    }) => {
       const response = await fetch(`/api/orders/${orderId}/substitute-item`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ oldItemId, newProductId, quantity })
+        body: JSON.stringify({ oldItemId, newProductId, quantity, unitLabel, unitPrice })
       });
       if (!response.ok) {
         const err = await response.json();
@@ -1143,26 +1157,62 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                       <div className="max-h-48 overflow-y-auto border rounded-lg divide-y dark:divide-gray-700">
                         {filteredProducts.length === 0 ? (
                           <p className="text-sm text-gray-500 text-center py-4">No products found</p>
-                        ) : filteredProducts.map((p: Product) => (
-                          <button
-                            key={p.id}
-                            className="w-full text-left px-3 py-2 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
-                            onClick={() => {
-                              const oldItem = displayOrder.items?.find((i: any) => i.id === substituteItemId);
-                              const qty = parseInt(substituteQuantity) || oldItem?.quantity || 1;
-                              substituteMutation.mutate({ orderId: displayOrder.id, oldItemId: substituteItemId!, newProductId: p.id, quantity: qty });
-                            }}
-                            disabled={substituteMutation.isPending}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{p.name}</p>
-                                <p className="text-xs text-gray-500">SKU: {p.sku} · Stock: {p.stock}</p>
-                              </div>
-                              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">${p.price ? parseFloat(p.price).toFixed(2) : "—"}</span>
+                        ) : filteredProducts.map((p: Product) => {
+                          const productSizes = ((p as any).sizes || []) as Array<{ id?: number; size: string; quantity: number }>;
+                          const availableSizes = productSizes.filter((size) => size.quantity > 0);
+                          const submitSubstitution = (unitLabel?: string) => {
+                            const oldItem = displayOrder.items?.find((item: any) => item.id === substituteItemId);
+                            const qty = parseInt(substituteQuantity) || oldItem?.quantity || 1;
+                            substituteMutation.mutate({
+                              orderId: displayOrder.id,
+                              oldItemId: substituteItemId!,
+                              newProductId: p.id,
+                              quantity: qty,
+                              unitLabel,
+                              unitPrice: p.price ? parseFloat(p.price) : undefined,
+                            });
+                          };
+
+                          return (
+                            <div key={p.id} className="px-3 py-2">
+                              <button
+                                type="button"
+                                className={`w-full text-left transition-colors ${productSizes.length === 0 ? "hover:text-amber-700 dark:hover:text-amber-300" : "cursor-default"}`}
+                                onClick={() => {
+                                  if (productSizes.length === 0) submitSubstitution();
+                                }}
+                                disabled={substituteMutation.isPending || productSizes.length > 0}
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{p.name}</p>
+                                    <p className="text-xs text-gray-500">SKU: {p.sku} · Stock: {p.stock}</p>
+                                  </div>
+                                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">${p.price ? parseFloat(p.price).toFixed(2) : "—"}</span>
+                                </div>
+                              </button>
+                              {productSizes.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {availableSizes.length > 0 ? availableSizes.map((size) => (
+                                    <Button
+                                      key={size.id ?? size.size}
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 text-xs"
+                                      onClick={() => submitSubstitution(size.size)}
+                                      disabled={substituteMutation.isPending || size.quantity < (parseInt(substituteQuantity) || 1)}
+                                    >
+                                      {size.size} ({size.quantity})
+                                    </Button>
+                                  )) : (
+                                    <span className="text-xs font-medium text-red-500">All options out of stock</span>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                          </button>
-                        ))}
+                          );
+                        })}
                       </div>
                       <div className="flex items-center gap-2">
                         <label className="text-sm text-gray-600 dark:text-gray-400 shrink-0">Quantity:</label>
@@ -1258,13 +1308,29 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                       toast({ title: "No quantity selected", description: "Please add at least one item.", variant: "destructive" });
                       return;
                     }
-                    for (const [sizeName, sizeQty] of entries) {
-                      await fetch(`/api/orders/${displayOrder.id}/add-item`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ productId: selectedAddProduct.id, quantity: sizeQty, unitPrice: resolvedUnitPrice, unitLabel: sizeName }),
+                    try {
+                      for (const [sizeName, sizeQty] of entries) {
+                        const response = await fetch(`/api/orders/${displayOrder.id}/add-item`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({ productId: selectedAddProduct.id, quantity: sizeQty, unitPrice: resolvedUnitPrice, unitLabel: sizeName }),
+                        });
+                        if (!response.ok) {
+                          const error = await response.json().catch(() => ({}));
+                          throw new Error(error.message || `Failed to add ${sizeName}`);
+                        }
+                      }
+                    } catch (error: any) {
+                      toast({
+                        title: "Failed to Add Items",
+                        description: error.message || "One of the selected options could not be added.",
+                        variant: "destructive",
                       });
+                      queryClient.invalidateQueries({ queryKey: ["/api/orders", order?.id] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+                      return;
                     }
                     toast({ title: "Items Added", description: `${totalSizeQty} item${totalSizeQty !== 1 ? 's' : ''} added to order.` });
                     setAddingItem(false);

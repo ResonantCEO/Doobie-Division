@@ -114,7 +114,7 @@ export interface IStorage {
   updateOrderPaymentMethod(id: number, paymentMethod: string, photoUrl?: string | null): Promise<Order>;
   fulfillOrderItem(orderId: number, productId: number | null, quantity: number, userId: string, orderItemId?: number): Promise<void>;
   unfulfillOrderItem(orderId: number, productId: number | null, quantity: number, userId: string, orderItemId?: number): Promise<void>;
-  substituteOrderItem(orderId: number, oldItemId: number, newProductId: number, quantity: number, userId: string): Promise<void>;
+  substituteOrderItem(orderId: number, oldItemId: number, newProductId: number, quantity: number, userId: string, unitLabel?: string, unitPrice?: number): Promise<void>;
   removeOrderItem(orderId: number, itemId: number, userId: string): Promise<void>;
   addOrderItem(orderId: number, productId: number, quantity: number, userId: string, unitPrice?: number, unitLabel?: string): Promise<void>;
   addCustomOrderItem(orderId: number, customName: string, price: number, quantity: number, userId: string): Promise<void>;
@@ -2450,73 +2450,193 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async substituteOrderItem(orderId: number, oldItemId: number, newProductId: number, quantity: number, userId: string): Promise<void> {
-    // Fetch the old item
-    const [oldItem] = await db.select().from(orderItems).where(and(eq(orderItems.id, oldItemId), eq(orderItems.orderId, orderId))).limit(1);
-    if (!oldItem) throw new Error("Order item not found");
-
-    // Fetch the replacement product
-    const [newProduct] = await db.select().from(products).where(eq(products.id, newProductId)).limit(1);
-    if (!newProduct) throw new Error("Replacement product not found");
-
-    const unitPrice = newProduct.price ? parseFloat(newProduct.price) : 0;
-    const newSubtotal = unitPrice * quantity;
-
-    // Mark old item as removed
-    await db.update(orderItems).set({ removed: true }).where(eq(orderItems.id, oldItemId));
-
-    // Insert the new replacement item
-    const [newItem] = await db.insert(orderItems).values({
-      orderId,
-      productId: newProductId,
-      productName: newProduct.name,
-      productSku: newProduct.sku,
-      productPrice: String(unitPrice),
-      quantity,
-      subtotal: String(newSubtotal),
-      fulfilled: false,
-      removed: false,
-      substitutedForItemId: oldItemId,
-    }).returning();
-
-    // Recalculate order total: sum all non-removed items
-    const activeItems = await db.select().from(orderItems).where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
-    const newTotal = activeItems.reduce((sum, item) => sum + parseFloat(item.subtotal), 0);
-    await db.update(orders).set({ total: String(newTotal), updatedAt: new Date() }).where(eq(orders.id, orderId));
-
-    // Restore stock for old product (since it was reserved when order was placed)
-    await db.update(products).set({ stock: sql`${products.stock} + ${oldItem.quantity}`, updatedAt: new Date() }).where(eq(products.id, oldItem.productId!));
-    // Deduct stock for new product
-    await db.update(products).set({ stock: sql`${products.stock} - ${quantity}`, updatedAt: new Date() }).where(eq(products.id, newProductId));
-
-    // Inventory log for old product restore
-    const [oldProduct] = await db.select().from(products).where(eq(products.id, oldItem.productId!)).limit(1);
-    if (oldProduct) {
-      await db.insert(inventoryLogs).values({
-        productId: oldItem.productId!,
-        userId,
-        type: 'stock_in',
-        quantity: oldItem.quantity,
-        previousStock: oldProduct.stock - oldItem.quantity,
-        newStock: oldProduct.stock,
-        reason: `Item substituted out of Order #${orderId} - stock restored`,
-        createdAt: new Date()
-      });
+  async substituteOrderItem(
+    orderId: number,
+    oldItemId: number,
+    newProductId: number,
+    quantity: number,
+    userId: string,
+    unitLabel?: string,
+    unitPrice?: number,
+  ): Promise<void> {
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new Error("Replacement quantity must be a positive whole number");
     }
-    // Inventory log for new product deduction
-    const [newProductUpdated] = await db.select().from(products).where(eq(products.id, newProductId)).limit(1);
-    if (newProductUpdated) {
-      await db.insert(inventoryLogs).values({
+
+    await db.transaction(async (tx) => {
+      const [oldItem] = await tx
+        .select()
+        .from(orderItems)
+        .where(and(eq(orderItems.id, oldItemId), eq(orderItems.orderId, orderId)))
+        .for("update")
+        .limit(1);
+      if (!oldItem) throw new Error("Order item not found");
+      if (oldItem.removed) throw new Error("Order item has already been removed");
+      if (oldItem.fulfilled) throw new Error("Fulfilled items cannot be substituted");
+
+      const [newProduct] = await tx
+        .select()
+        .from(products)
+        .where(eq(products.id, newProductId))
+        .for("update")
+        .limit(1);
+      if (!newProduct) throw new Error("Replacement product not found");
+      if (!newProduct.isActive) throw new Error("Replacement product is not active");
+
+      const newSizeRows = await tx
+        .select()
+        .from(productSizes)
+        .where(eq(productSizes.productId, newProductId))
+        .for("update");
+      const selectedNewSize = unitLabel
+        ? newSizeRows.find((row) => row.size === unitLabel)
+        : undefined;
+
+      if (newSizeRows.length > 0 && !selectedNewSize) {
+        throw new Error("Choose a valid size or flavor for the replacement product");
+      }
+
+      const newStockDelta = selectedNewSize
+        ? quantity
+        : Math.round(quantity * (unitLabel ? this.getGramEquivalentFromSize(unitLabel) : 1));
+      const availableStock = selectedNewSize ? selectedNewSize.quantity : newProduct.stock;
+      if (availableStock < (selectedNewSize ? quantity : newStockDelta)) {
+        const suffix = unitLabel ? ` for ${unitLabel}` : "";
+        throw new Error(`Insufficient stock${suffix}. Available: ${availableStock}`);
+      }
+
+      let oldStockDelta = 0;
+      let oldSizeLabel: string | undefined;
+      let oldProductBefore: Product | undefined;
+      if (oldItem.productId) {
+        [oldProductBefore] = await tx
+          .select()
+          .from(products)
+          .where(eq(products.id, oldItem.productId))
+          .for("update")
+          .limit(1);
+
+        if (oldProductBefore) {
+          const oldSizeRows = await tx
+            .select()
+            .from(productSizes)
+            .where(eq(productSizes.productId, oldItem.productId))
+            .for("update");
+          const recordedOldSize =
+            oldItem.size ||
+            this.extractWeightOptionFromProductName(oldItem.productName) ||
+            this.extractSizeFromProductName(oldItem.productName);
+          const selectedOldSize = recordedOldSize
+            ? oldSizeRows.find((row) => row.size === recordedOldSize)
+            : undefined;
+
+          oldSizeLabel = selectedOldSize?.size;
+          oldStockDelta = selectedOldSize
+            ? oldItem.quantity
+            : Math.round(
+                oldItem.quantity *
+                  (recordedOldSize ? this.getGramEquivalentFromSize(recordedOldSize) : 1),
+              );
+
+          await tx
+            .update(products)
+            .set({
+              stock: sql`${products.stock} + ${oldStockDelta}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(products.id, oldItem.productId));
+
+          if (selectedOldSize) {
+            await tx
+              .update(productSizes)
+              .set({
+                quantity: sql`${productSizes.quantity} + ${oldItem.quantity}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(productSizes.id, selectedOldSize.id));
+          }
+        }
+      }
+
+      await tx
+        .update(products)
+        .set({
+          stock: sql`${products.stock} - ${newStockDelta}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(products.id, newProductId));
+
+      if (selectedNewSize) {
+        await tx
+          .update(productSizes)
+          .set({
+            quantity: sql`${productSizes.quantity} - ${quantity}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(productSizes.id, selectedNewSize.id));
+      }
+
+      const resolvedUnitPrice =
+        unitPrice != null && Number.isFinite(unitPrice)
+          ? unitPrice
+          : newProduct.price
+            ? parseFloat(newProduct.price)
+            : 0;
+      const newSubtotal = resolvedUnitPrice * quantity;
+
+      await tx
+        .update(orderItems)
+        .set({ removed: true })
+        .where(eq(orderItems.id, oldItemId));
+
+      await tx.insert(orderItems).values({
+        orderId,
+        productId: newProductId,
+        productName: newProduct.name,
+        productSku: newProduct.sku,
+        productPrice: String(resolvedUnitPrice),
+        quantity,
+        subtotal: String(newSubtotal),
+        size: unitLabel || null,
+        fulfilled: false,
+        removed: false,
+        substitutedForItemId: oldItemId,
+      });
+
+      const activeItems = await tx
+        .select()
+        .from(orderItems)
+        .where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
+      const newTotal = activeItems.reduce((sum, item) => sum + parseFloat(item.subtotal), 0);
+      await tx
+        .update(orders)
+        .set({ total: String(newTotal), updatedAt: new Date() })
+        .where(eq(orders.id, orderId));
+
+      if (oldProductBefore && oldItem.productId) {
+        await tx.insert(inventoryLogs).values({
+          productId: oldItem.productId,
+          userId,
+          type: "stock_in",
+          quantity: oldStockDelta,
+          previousStock: oldProductBefore.stock,
+          newStock: oldProductBefore.stock + oldStockDelta,
+          reason: `${oldSizeLabel ? `[${oldSizeLabel}] ` : ""}Item substituted out of Order #${orderId} - stock restored`,
+          createdAt: new Date(),
+        });
+      }
+
+      await tx.insert(inventoryLogs).values({
         productId: newProductId,
         userId,
-        type: 'stock_out',
-        quantity,
-        previousStock: newProductUpdated.stock + quantity,
-        newStock: newProductUpdated.stock,
-        reason: `Item substituted into Order #${orderId}`,
-        createdAt: new Date()
+        type: "stock_out",
+        quantity: newStockDelta,
+        previousStock: newProduct.stock,
+        newStock: newProduct.stock - newStockDelta,
+        reason: `${unitLabel ? `[${unitLabel}] ` : ""}Item substituted into Order #${orderId}`,
+        createdAt: new Date(),
       });
-    }
+    });
   }
 
   private async restoreInventoryForDeletedOrderItem(
@@ -2633,55 +2753,110 @@ export class DatabaseStorage implements IStorage {
   }
 
   async addOrderItem(orderId: number, productId: number, quantity: number, userId: string, unitPrice?: number, unitLabel?: string): Promise<void> {
-    const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
-    if (!order) throw new Error("Order not found");
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new Error("Quantity must be a positive whole number");
+    }
 
-    const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-    if (!product) throw new Error("Product not found");
-    if (product.stock < quantity) throw new Error(`Insufficient stock. Available: ${product.stock}`);
+    await db.transaction(async (tx) => {
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .for("update")
+        .limit(1);
+      if (!order) throw new Error("Order not found");
 
-    // Use provided unitPrice, or fall back to product's unit price
-    const resolvedUnitPrice = unitPrice != null ? unitPrice : (product.price ? parseFloat(product.price) : 0);
-    const subtotal = resolvedUnitPrice * quantity;
+      const [product] = await tx
+        .select()
+        .from(products)
+        .where(eq(products.id, productId))
+        .for("update")
+        .limit(1);
+      if (!product) throw new Error("Product not found");
+      if (!product.isActive) throw new Error("Product is not active");
 
-    // Append unit label to product name if provided (e.g. "Blue Dream - 1/8 oz")
-    const itemName = unitLabel ? `${product.name} - ${unitLabel}` : product.name;
+      const sizeRows = await tx
+        .select()
+        .from(productSizes)
+        .where(eq(productSizes.productId, productId))
+        .for("update");
+      const selectedSize = unitLabel
+        ? sizeRows.find((row) => row.size === unitLabel)
+        : undefined;
 
-    // Insert new order item
-    await db.insert(orderItems).values({
-      orderId,
-      productId,
-      productName: itemName,
-      productSku: product.sku,
-      productPrice: String(resolvedUnitPrice),
-      quantity,
-      subtotal: String(subtotal),
-      fulfilled: false,
-      removed: false,
-    });
+      if (sizeRows.length > 0 && !selectedSize) {
+        throw new Error("Choose a valid size or flavor for this product");
+      }
 
-    // Deduct stock
-    await db.update(products).set({ stock: sql`${products.stock} - ${quantity}`, updatedAt: new Date() }).where(eq(products.id, productId));
+      const stockDelta = selectedSize
+        ? quantity
+        : Math.round(quantity * (unitLabel ? this.getGramEquivalentFromSize(unitLabel) : 1));
+      const availableStock = selectedSize ? selectedSize.quantity : product.stock;
+      if (availableStock < (selectedSize ? quantity : stockDelta)) {
+        const suffix = unitLabel ? ` for ${unitLabel}` : "";
+        throw new Error(`Insufficient stock${suffix}. Available: ${availableStock}`);
+      }
 
-    // Recalculate order total
-    const activeItems = await db.select().from(orderItems).where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
-    const newTotal = activeItems.reduce((sum, i) => sum + parseFloat(i.subtotal), 0);
-    await db.update(orders).set({ total: String(newTotal), updatedAt: new Date() }).where(eq(orders.id, orderId));
+      const resolvedUnitPrice =
+        unitPrice != null && Number.isFinite(unitPrice)
+          ? unitPrice
+          : product.price
+            ? parseFloat(product.price)
+            : 0;
+      const subtotal = resolvedUnitPrice * quantity;
 
-    // Log inventory change
-    const [updatedProduct] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-    if (updatedProduct) {
-      await db.insert(inventoryLogs).values({
+      await tx.insert(orderItems).values({
+        orderId,
+        productId,
+        productName: product.name,
+        productSku: product.sku,
+        productPrice: String(resolvedUnitPrice),
+        quantity,
+        subtotal: String(subtotal),
+        size: unitLabel || null,
+        fulfilled: false,
+        removed: false,
+      });
+
+      await tx
+        .update(products)
+        .set({
+          stock: sql`${products.stock} - ${stockDelta}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(products.id, productId));
+
+      if (selectedSize) {
+        await tx
+          .update(productSizes)
+          .set({
+            quantity: sql`${productSizes.quantity} - ${quantity}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(productSizes.id, selectedSize.id));
+      }
+
+      const activeItems = await tx
+        .select()
+        .from(orderItems)
+        .where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
+      const newTotal = activeItems.reduce((sum, item) => sum + parseFloat(item.subtotal), 0);
+      await tx
+        .update(orders)
+        .set({ total: String(newTotal), updatedAt: new Date() })
+        .where(eq(orders.id, orderId));
+
+      await tx.insert(inventoryLogs).values({
         productId,
         userId,
-        type: 'stock_out',
-        quantity,
-        previousStock: updatedProduct.stock + quantity,
-        newStock: updatedProduct.stock,
-        reason: `Item added to Order #${orderId}`,
-        createdAt: new Date()
+        type: "stock_out",
+        quantity: stockDelta,
+        previousStock: product.stock,
+        newStock: product.stock - stockDelta,
+        reason: `${unitLabel ? `[${unitLabel}] ` : ""}Item added to Order #${orderId}`,
+        createdAt: new Date(),
       });
-    }
+    });
   }
 
   async addCustomOrderItem(orderId: number, customName: string, price: number, quantity: number, userId: string): Promise<void> {
