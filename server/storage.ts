@@ -1791,6 +1791,7 @@ export class DatabaseStorage implements IStorage {
           status: orders.status,
           archived: orders.archived,
           paymentMethod: orders.paymentMethod,
+           paymentPhotoUrl: orders.paymentPhotoUrl,
           assignedUserId: orders.assignedUserId,
           notes: orders.notes,
           createdAt: orders.createdAt,

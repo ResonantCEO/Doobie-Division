@@ -88,6 +88,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const [pendingPaymentPhotoPreview, setPendingPaymentPhotoPreview] = useState<string | null>(null);
   const [paymentMethodSaving, setPaymentMethodSaving] = useState(false);
   const pendingPaymentPhotoInputRef = useRef<HTMLInputElement>(null);
+  const dialogContentRef = useRef<HTMLDivElement>(null);
 
   const isFulfillingRef = useRef(false);
   const isScanningRef = useRef(false);
@@ -137,6 +138,12 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
       });
     }
   }, [orderDetails, order]);
+
+  useEffect(() => {
+    if (isOpen) {
+      dialogContentRef.current?.scrollTo({ top: 0 });
+    }
+  }, [isOpen, order?.id]);
 
   // Products query for substitution picker
   const { data: allProducts } = useQuery<Product[]>({
@@ -584,7 +591,10 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        ref={dialogContentRef}
+        className="top-4 max-h-[calc(100dvh-2rem)] w-[calc(100%-1rem)] min-w-0 translate-y-0 overflow-x-hidden overflow-y-auto sm:top-[50%] sm:max-h-[90vh] sm:w-full sm:translate-y-[-50%]"
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
