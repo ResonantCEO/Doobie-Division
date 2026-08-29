@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Download, Route, Plus, CheckCircle2, MapPin, Package, Trash2, Info, X, FileText, Phone, Mail, CreditCard, StickyNote, Send } from "lucide-react";
+import { Download, Route, Plus, CheckCircle2, MapPin, Package, Trash2, Info, X, FileText, Phone, Mail, CreditCard, StickyNote, Send, ImageIcon } from "lucide-react";
 import type { Order, OrderItem } from "@shared/schema";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -271,6 +271,43 @@ function OrderInfoDialog({ order, onClose }: OrderInfoDialogProps) {
   );
 }
 
+interface PaymentPhotoDialogProps {
+  order: Order | null;
+  onClose: () => void;
+}
+
+function PaymentPhotoDialog({ order, onClose }: PaymentPhotoDialogProps) {
+  if (!order) return null;
+
+  const photoUrl = order.paymentPhotoUrl || (order as Order & { payment_photo_url?: string | null }).payment_photo_url;
+
+  return (
+    <Dialog open={!!order} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl w-full">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ImageIcon className="h-5 w-5 text-primary" />
+            Payment Photo — {order.orderNumber}
+          </DialogTitle>
+        </DialogHeader>
+        {photoUrl ? (
+          <div className="flex max-h-[70vh] items-center justify-center overflow-auto rounded-lg bg-muted/30 p-2">
+            <img
+              src={photoUrl}
+              alt={`Payment photo for order ${order.orderNumber}`}
+              className="max-h-[68vh] max-w-full rounded-md object-contain"
+            />
+          </div>
+        ) : (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            No payment photo has been uploaded for this order.
+          </p>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 interface RouteManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -293,6 +330,7 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
     loadFromStorage<RoutedExport[]>(ROUTED_STORAGE_KEY, [])
   );
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedPaymentPhotoOrder, setSelectedPaymentPhotoOrder] = useState<Order | null>(null);
 
   const routingOrders = useMemo(
     () => orders.filter((o) => routingIds.includes(o.id)),
@@ -406,6 +444,7 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                       const inRouting = routingIds.includes(order.id);
                       const alreadyRouted = routedOrderIds.has(order.id);
                       const addr = parseAddress(order.shippingAddress);
+                      const paymentPhotoUrl = order.paymentPhotoUrl || (order as Order & { payment_photo_url?: string | null }).payment_photo_url;
 
                       return (
                         <div
@@ -453,16 +492,17 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                                 </div>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="flex flex-col items-stretch gap-2 flex-shrink-0">
                               <span className="font-semibold text-sm">${Number(order.total).toFixed(2)}</span>
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-8 w-8 p-0"
+                                className="h-8 w-full"
                                 onClick={() => setSelectedOrder(order)}
                                 title="Order Info"
                               >
-                                <Info className="h-3.5 w-3.5" />
+                                <Info className="h-3.5 w-3.5 mr-1" />
+                                Order Info
                               </Button>
                               <Button
                                 size="sm"
@@ -483,6 +523,19 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                                   </>
                                 )}
                               </Button>
+                              {order.paymentMethod === "prepay" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={!paymentPhotoUrl}
+                                  onClick={() => setSelectedPaymentPhotoOrder(order)}
+                                  title={paymentPhotoUrl ? "View payment photo" : "No payment photo attached"}
+                                  className="whitespace-nowrap"
+                                >
+                                  <ImageIcon className="h-3.5 w-3.5 mr-1" />
+                                  Payment Photo
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -672,6 +725,10 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
       <OrderInfoDialog
         order={selectedOrder}
         onClose={() => setSelectedOrder(null)}
+      />
+      <PaymentPhotoDialog
+        order={selectedPaymentPhotoOrder}
+        onClose={() => setSelectedPaymentPhotoOrder(null)}
       />
     </>
   );
