@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, Truck, MapPin, FileText, CreditCard, Loader2 } from "lucide-react";
+import { RefreshCw, Truck, MapPin, FileText, CreditCard, Loader2, Search, X } from "lucide-react";
 import type { Order } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import OrderDetailsModal from "@/components/modals/order-details-modal";
+import { Input } from "@/components/ui/input";
 
 type DriverOrder = Order & {
   assignedUser?: {
@@ -39,11 +40,45 @@ type DriverOption = {
   email: string | null;
 };
 
+type CityOrderGroup = {
+  city: string;
+  orders: DriverOrder[];
+};
+
+const getCityFromAddress = (shippingAddress: string | null | undefined): string => {
+  if (!shippingAddress) return "Unknown city";
+
+  const addressParts = shippingAddress
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  // Support the current street, city, state, ZIP format and older
+  // street, city, state ZIP addresses.
+  if (addressParts.length >= 4) {
+    return addressParts[addressParts.length - 3] || "Unknown city";
+  }
+  if (addressParts.length >= 3) {
+    return addressParts[addressParts.length - 2] || "Unknown city";
+  }
+
+  return "Unknown city";
+};
+
+const getAssignedDriverName = (order: DriverOrder): string => {
+  const assignedUser = order.assignedUser;
+  if (!assignedUser) return "Unassigned";
+
+  const name = `${assignedUser.firstName || ""} ${assignedUser.lastName || ""}`.trim();
+  return name || assignedUser.email || "Assigned driver";
+};
+
 export default function DriversPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const canViewDrivers = user?.role === "admin" || user?.role === "manager" || user?.role === "driver";
   const canAssignDrivers = user?.role === "admin" || user?.role === "manager";
@@ -91,9 +126,36 @@ export default function DriversPage() {
     },
   });
 
-  const shippedOrders = orders.filter(
-    (order) => order.status === "shipped" && !order.archived
+  const shippedOrders = useMemo(
+    () => orders.filter((order) => order.status === "shipped" && !order.archived),
+    [orders]
   );
+
+  const filteredOrders = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
+    if (!normalizedQuery) return shippedOrders;
+
+    return shippedOrders.filter((order) => [
+      getCityFromAddress(order.shippingAddress),
+      order.customerName || "",
+      getAssignedDriverName(order),
+    ].some((field) => field.toLocaleLowerCase().includes(normalizedQuery)));
+  }, [searchQuery, shippedOrders]);
+
+  const cityGroups = useMemo<CityOrderGroup[]>(() => {
+    const groups = new Map<string, DriverOrder[]>();
+
+    filteredOrders.forEach((order) => {
+      const city = getCityFromAddress(order.shippingAddress);
+      groups.set(city, [...(groups.get(city) || []), order]);
+    });
+
+    return Array.from(groups.entries())
+      .sort(([firstCity], [secondCity]) =>
+        firstCity.localeCompare(secondCity, undefined, { sensitivity: "base" })
+      )
+      .map(([city, ordersInCity]) => ({ city, orders: ordersInCity }));
+  }, [filteredOrders]);
 
   if (authLoading || (canViewDrivers && ordersLoading) || (canAssignDrivers && driversLoading)) {
     return (
@@ -144,8 +206,77 @@ export default function DriversPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {shippedOrders.map((order) => {
+        <div className="space-y-5">
+          <Card>
+            <CardContent className="p-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search by city, customer, or assigned driver"
+                  aria-label="Search driver orders"
+                  className="pl-9 pr-10"
+                />
+                {searchQuery && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Clear order search"
+                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                    onClick={() => setSearchQuery("")}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {searchQuery.trim()
+                  ? `Showing ${filteredOrders.length} of ${shippedOrders.length} shipped ${shippedOrders.length === 1 ? "order" : "orders"}`
+                  : `${shippedOrders.length} shipped ${shippedOrders.length === 1 ? "order" : "orders"} organized by city`}
+              </p>
+            </CardContent>
+          </Card>
+
+          {cityGroups.length === 0 ? (
+            <Card>
+              <CardContent className="flex min-h-[220px] flex-col items-center justify-center p-6 text-center">
+                <Search className="mb-3 h-10 w-10 text-muted-foreground" />
+                <h3 className="text-lg font-semibold">No matching orders</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Try a different city, customer name, or assigned driver.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => setSearchQuery("")}
+                >
+                  Clear search
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-5">
+              {cityGroups.map(({ city, orders: cityOrders }) => (
+                <section key={city} aria-labelledby={`city-heading-${city}`}>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <MapPin className="h-5 w-5 shrink-0 text-primary" />
+                      <h3
+                        id={`city-heading-${city}`}
+                        className="truncate text-lg font-semibold text-gray-900 dark:text-white"
+                      >
+                        {city}
+                      </h3>
+                    </div>
+                    <span className="shrink-0 text-sm text-muted-foreground">
+                      {cityOrders.length} {cityOrders.length === 1 ? "order" : "orders"}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {cityOrders.map((order) => {
             const items = (order.orderItems ?? []).filter((item) => !item.removed);
             const paymentPhotoUrl =
               order.paymentPhotoUrl || (order as any).payment_photo_url;
@@ -160,9 +291,9 @@ export default function DriversPage() {
                     <div className="min-w-0">
                       <div className="flex items-start justify-between gap-3 md:block">
                         <div>
-                          <h3 className="font-semibold text-gray-900 dark:text-white">
+                          <h4 className="font-semibold text-gray-900 dark:text-white">
                             {order.customerName}
-                          </h3>
+                          </h4>
                           <p className="mt-1 truncate text-sm text-muted-foreground">
                             Telegram: {order.customerTelegramUsername
                               ? `@${order.customerTelegramUsername.replace(/^@+/, "")}`
@@ -280,7 +411,12 @@ export default function DriversPage() {
                 </CardContent>
               </Card>
             );
-          })}
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
