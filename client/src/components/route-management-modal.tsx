@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Download, Route, Plus, CheckCircle2, MapPin, Package, Trash2, Info, X, FileText, Phone, Mail, CreditCard, StickyNote, Send, ImageIcon } from "lucide-react";
+import { Download, Route, Plus, CheckCircle2, MapPin, Package, Trash2, X, FileText, Phone, Mail, CreditCard, StickyNote, Send, ImageIcon } from "lucide-react";
 import type { Order, OrderItem } from "@shared/schema";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -454,7 +454,14 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-semibold text-sm">{order.orderNumber}</span>
+                                <button
+                                  type="button"
+                                  className="font-semibold text-sm hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                                  onClick={() => setSelectedOrder(order)}
+                                  title="View order info"
+                                >
+                                  {order.orderNumber}
+                                </button>
                                 <Badge
                                   variant="outline"
                                   className={
@@ -494,16 +501,6 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                             </div>
                             <div className="flex flex-col items-stretch gap-2 flex-shrink-0">
                               <span className="font-semibold text-sm">${Number(order.total).toFixed(2)}</span>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 w-full"
-                                onClick={() => setSelectedOrder(order)}
-                                title="Order Info"
-                              >
-                                <Info className="h-3.5 w-3.5 mr-1" />
-                                Order Info
-                              </Button>
                               <Button
                                 size="sm"
                                 variant={inRouting ? "secondary" : "default"}
@@ -581,7 +578,14 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-semibold text-sm">{order.orderNumber}</span>
+                                <button
+                                  type="button"
+                                  className="font-semibold text-sm hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                                  onClick={() => setSelectedOrder(order)}
+                                  title="View order info"
+                                >
+                                  {order.orderNumber}
+                                </button>
                                 <Badge
                                   variant="outline"
                                   className={
@@ -616,15 +620,6 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <span className="font-semibold text-sm">${Number(order.total).toFixed(2)}</span>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 w-8 p-0"
-                                onClick={() => setSelectedOrder(order)}
-                                title="Order Info"
-                              >
-                                <Info className="h-3.5 w-3.5" />
-                              </Button>
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -674,7 +669,14 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                                 <div className="flex items-start gap-3">
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-medium text-sm">{order.orderNumber}</span>
+                                      <button
+                                        type="button"
+                                        className="font-medium text-sm hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                                        onClick={() => setSelectedOrder(order)}
+                                        title="View order info"
+                                      >
+                                        {order.orderNumber}
+                                      </button>
                                       <PaymentBadge paymentMethod={order.paymentMethod} />
                                     </div>
                                     <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{order.customerName}</p>
@@ -697,15 +699,6 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                                   </div>
                                   <div className="flex items-center gap-2 flex-shrink-0">
                                     <span className="text-sm font-semibold">${Number(order.total).toFixed(2)}</span>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 w-7 p-0"
-                                      onClick={() => setSelectedOrder(order)}
-                                      title="Order Info"
-                                    >
-                                      <Info className="h-3 w-3" />
-                                    </Button>
                                   </div>
                                 </div>
                               </div>
