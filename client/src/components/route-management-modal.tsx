@@ -506,7 +506,7 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                                 variant={inRouting ? "secondary" : "default"}
                                 disabled={inRouting}
                                 onClick={() => addToRoute(order)}
-                                className="whitespace-nowrap"
+                                  className={`whitespace-nowrap ${!inRouting ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:text-white" : ""}`}
                               >
                                 {inRouting ? (
                                   <>
@@ -527,7 +527,7 @@ export default function RouteManagementModal({ isOpen, onClose, orders }: RouteM
                                   disabled={!paymentPhotoUrl}
                                   onClick={() => setSelectedPaymentPhotoOrder(order)}
                                   title={paymentPhotoUrl ? "View payment photo" : "No payment photo attached"}
-                                  className="whitespace-nowrap"
+                                  className="whitespace-nowrap bg-green-600 text-white border-green-600 hover:bg-green-700 hover:text-white disabled:bg-green-600/50 disabled:text-white/70"
                                 >
                                   <ImageIcon className="h-3.5 w-3.5 mr-1" />
                                   Payment Photo
