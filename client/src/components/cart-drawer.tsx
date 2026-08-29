@@ -1109,6 +1109,51 @@ export default function CartDrawer({ children }: CartDrawerProps) {
               )}
             </div>
 
+            {/* Run Preference Selection */}
+            {deliveryRunsEnabled && (
+              <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                <p className="text-sm font-medium">Delivery Run</p>
+                {isAfter5pm ? (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-center space-y-1">
+                    <p className="text-sm font-medium text-amber-600 dark:text-amber-400">5:00pm Cutoff Passed</p>
+                    <p className="text-xs text-muted-foreground">Your order will be queued for the next day's <span className="font-medium">1st Run</span> (12:30pm dispatch).</p>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    {isBeforeNoon && (
+                      <button
+                        type="button"
+                        onClick={() => setRunPreference("1st")}
+                        className={`flex-1 rounded-md border py-2.5 px-3 text-left transition-colors ${
+                          runPreference === "1st"
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background text-foreground border-border hover:border-primary"
+                        }`}
+                      >
+                        <p className="text-sm font-semibold leading-tight">1st Run</p>
+                        <p className={`text-xs leading-tight mt-0.5 ${runPreference === "1st" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>12:00pm Cutoff · 12:30pm Dispatch</p>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setRunPreference("2nd")}
+                      className={`flex-1 rounded-md border py-2.5 px-3 text-left transition-colors ${
+                        runPreference === "2nd"
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-foreground border-border hover:border-primary"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold leading-tight">2nd Run</p>
+                      <p className={`text-xs leading-tight mt-0.5 ${runPreference === "2nd" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>5:00pm Cutoff · 5:30pm Dispatch</p>
+                    </button>
+                  </div>
+                )}
+                {!isBeforeNoon && !isAfter5pm && (
+                  <p className="text-xs text-muted-foreground">1st run orders are only available before 12:00 PM.</p>
+                )}
+              </div>
+            )}
+
             {/* Shipping Information Form */}
             <div className="space-y-3">
               <div>
@@ -1224,51 +1269,6 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                 />
               </div>
             </div>
-
-            {/* Run Preference Selection */}
-            {deliveryRunsEnabled && (
-              <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
-                <p className="text-sm font-medium">Delivery Run</p>
-                {isAfter5pm ? (
-                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-center space-y-1">
-                    <p className="text-sm font-medium text-amber-600 dark:text-amber-400">5:00pm Cutoff Passed</p>
-                    <p className="text-xs text-muted-foreground">Your order will be queued for the next day's <span className="font-medium">1st Run</span> (12:30pm dispatch).</p>
-                  </div>
-                ) : (
-                  <div className="flex gap-3">
-                    {isBeforeNoon && (
-                      <button
-                        type="button"
-                        onClick={() => setRunPreference("1st")}
-                        className={`flex-1 rounded-md border py-2.5 px-3 text-left transition-colors ${
-                          runPreference === "1st"
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background text-foreground border-border hover:border-primary"
-                        }`}
-                      >
-                        <p className="text-sm font-semibold leading-tight">1st Run</p>
-                        <p className={`text-xs leading-tight mt-0.5 ${runPreference === "1st" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>12:00pm Cutoff · 12:30pm Dispatch</p>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setRunPreference("2nd")}
-                      className={`flex-1 rounded-md border py-2.5 px-3 text-left transition-colors ${
-                        runPreference === "2nd"
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-background text-foreground border-border hover:border-primary"
-                      }`}
-                    >
-                      <p className="text-sm font-semibold leading-tight">2nd Run</p>
-                      <p className={`text-xs leading-tight mt-0.5 ${runPreference === "2nd" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>5:00pm Cutoff · 5:30pm Dispatch</p>
-                    </button>
-                  </div>
-                )}
-                {!isBeforeNoon && !isAfter5pm && (
-                  <p className="text-xs text-muted-foreground">1st run orders are only available before 12:00 PM.</p>
-                )}
-              </div>
-            )}
 
             {/* Pre-Pay Photo Upload Section */}
             <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
