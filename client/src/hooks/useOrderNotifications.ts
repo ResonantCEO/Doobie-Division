@@ -1,10 +1,8 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from './use-toast';
 
 export function useOrderNotifications() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   useEffect(() => {
     // Check for notifications only on initial load
@@ -21,12 +19,6 @@ export function useOrderNotifications() {
           );
 
           for (const notification of newOrderNotifications) {
-            toast({
-              title: "New Order Received!",
-              description: notification.message,
-              duration: 5000,
-            });
-
             // Mark notification as read
             await fetch(`/api/notifications/${notification.id}/read`, {
               method: 'PUT',
@@ -46,5 +38,5 @@ export function useOrderNotifications() {
 
     // Check only once on component mount - no interval polling
     checkForNewOrders();
-  }, [queryClient, toast]);
+  }, [queryClient]);
 }

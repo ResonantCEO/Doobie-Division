@@ -1845,7 +1845,6 @@ export default function StorefrontPage() {
                   };
                   addCgBag(cartItem);
                   setCgBagModalOpen(false);
-                  toast({ title: "Added to cart!", description: `${cgBagModalTemplate.name} — ${selectedCategoryNames.join(', ')}` });
                   setTimeout(() => { setCgBagModalTemplate(null); setCgBagSelectedCatIds([]); }, 300);
                 }}
                 className="w-full py-2.5 rounded-lg font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
