@@ -377,12 +377,21 @@ export default function DriversPage() {
                           ${Number(order.total).toFixed(2)}
                         </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2 md:w-full">
+                      <div className="flex shrink-0 flex-col items-stretch gap-2 md:w-full">
+                        <Button
+                          variant="secondary"
+                          className="shrink-0 w-full"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedOrder(order);
+                          }}
+                        >
+                          View details
+                        </Button>
                         {order.paymentMethod === "prepay" && paymentPhotoUrl && (
                           <Button
                             asChild
-                            variant="outline"
-                            className="md:hidden"
+                            className="w-full bg-green-600 text-white hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600"
                           >
                             <a
                               href={paymentPhotoUrl}
@@ -395,16 +404,17 @@ export default function DriversPage() {
                             </a>
                           </Button>
                         )}
-                        <Button
-                          variant="secondary"
-                          className="shrink-0 md:w-full"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSelectedOrder(order);
-                          }}
-                        >
-                          View details
-                        </Button>
+                        {order.paymentMethod === "prepay" && !paymentPhotoUrl && (
+                          <Button
+                            type="button"
+                            disabled
+                            className="w-full bg-green-600 text-white opacity-50 dark:bg-green-700"
+                            title="No payment photo attached"
+                          >
+                            <CreditCard className="h-4 w-4" />
+                            Payment photo
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
