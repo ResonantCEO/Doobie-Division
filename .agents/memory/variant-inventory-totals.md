@@ -8,3 +8,9 @@ For products with size or flavor rows, calculate the parent product's sellable a
 **Why:** A stale cached parent sellable total can hide a product that still has an in-stock flavor, while parent physical inventory can likewise drift from the summed physical row quantities.
 
 **How to apply:** Preserve the distinction between sellable and physical quantities. Reconcile parent sellable stock from row sellable quantities and parent physical inventory from row physical quantities; do not change physical inventory merely because sellable stock changes.
+
+An empty variant list must not be treated as an authoritative total of zero for a product that has no variant rows. Ordinary product edits should omit variant data entirely; intentionally disabling existing variants may delete their rows but must preserve the submitted parent stock and existing parent physical count.
+
+**Why:** Recalculating parent inventory from an empty variant set can overwrite a valid stock count with zero during an unrelated product edit.
+
+**How to apply:** Rebuild and total variant inventory only when a non-empty variant list is submitted. Use an explicit empty list solely to disable variants, and never derive parent stock or physical inventory from that empty list.

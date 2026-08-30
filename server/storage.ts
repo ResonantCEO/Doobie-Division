@@ -1215,7 +1215,10 @@ export class DatabaseStorage implements IStorage {
 
     const updateData: Record<string, any> = { ...dataWithoutSizes };
     delete updateData.enableSizes;
-    if (sizes !== undefined) delete updateData.stock;
+    // A non-empty sizes array replaces authoritative variant inventory.
+    // An empty array only means existing variants are being disabled, so
+    // preserve the explicitly submitted parent stock in that case.
+    if (Array.isArray(sizes) && sizes.length > 0) delete updateData.stock;
 
     // Physical inventory is never inferred from sellable edits. It is only
     // changed through the verified physical-count workflow.
@@ -1489,17 +1492,17 @@ export class DatabaseStorage implements IStorage {
 
     console.log('[updateProduct] Product updated successfully, id:', product.id);
 
-    if (sizes !== undefined) {
+    if (Array.isArray(sizes)) {
       await db.transaction(async (tx) => {
         const locked = await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
         if (!locked.rows[0]) throw new Error("Product not found");
         const existing = await tx.select().from(productSizes)
           .where(eq(productSizes.productId, id)).for("update");
-        const physicalBySize = new Map(
-          existing.map(row => [row.size, row.physicalQuantity ?? 0]),
-        );
-        await tx.delete(productSizes).where(eq(productSizes.productId, id));
-        if (sizes?.length) {
+        if (sizes.length > 0) {
+          const physicalBySize = new Map(
+            existing.map(row => [row.size, row.physicalQuantity ?? 0]),
+          );
+          await tx.delete(productSizes).where(eq(productSizes.productId, id));
           const seen = new Set<string>();
           const sizeRecords: InsertProductSize[] = sizes.map((size: any) => {
             const name = String(size.size).trim();
@@ -1517,17 +1520,21 @@ export class DatabaseStorage implements IStorage {
             };
           });
           await tx.insert(productSizes).values(sizeRecords);
+          await tx.execute(sql`
+            UPDATE products
+            SET stock = totals.sellable, physical_inventory = totals.physical, updated_at = NOW()
+            FROM (
+              SELECT COALESCE(SUM(quantity), 0)::integer AS sellable,
+                     COALESCE(SUM(physical_quantity), 0)::integer AS physical
+              FROM product_sizes WHERE product_id = ${id}
+            ) totals
+            WHERE products.id = ${id}
+          `);
+        } else if (existing.length > 0) {
+          // Disabling variants removes their rows, but keeps the parent stock
+          // submitted by the edit form and never recalculates it as zero.
+          await tx.delete(productSizes).where(eq(productSizes.productId, id));
         }
-        await tx.execute(sql`
-          UPDATE products
-          SET stock = totals.sellable, physical_inventory = totals.physical, updated_at = NOW()
-          FROM (
-            SELECT COALESCE(SUM(quantity), 0)::integer AS sellable,
-                   COALESCE(SUM(physical_quantity), 0)::integer AS physical
-            FROM product_sizes WHERE product_id = ${id}
-          ) totals
-          WHERE products.id = ${id}
-        `);
       });
     }
 

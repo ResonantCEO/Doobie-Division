@@ -360,6 +360,12 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         return isNaN(num) ? null : num.toFixed(decimals);
       };
 
+      const updatedSizes = data.enableSizes && data.sizes
+        ? data.sizes.map(s => ({ size: s.size, quantity: parseInt(s.quantity || "0") }))
+        : hasSizes
+          ? []
+          : undefined;
+
       const productData: any = {
         name: data.name,
         company: data.company || null,
@@ -386,9 +392,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         purchasePricePerOunce: formatPrice(data.purchasePricePerOunce, 2),
         adminNotes: data.adminNotes || null,
         isActive: data.isActive,
-        sizes: data.enableSizes && data.sizes && data.sizes.length > 0
-          ? data.sizes.map(s => ({ size: s.size, quantity: parseInt(s.quantity || "0") }))
-          : [],
+        ...(updatedSizes !== undefined ? { sizes: updatedSizes } : {}),
         quantityPricing: enableQuantityPricing
           ? quantityTiers
               .filter(t => t.minQuantity && t.pricePerItem)
