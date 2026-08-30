@@ -373,6 +373,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         sku: data.sku,
         categoryId: data.categoryId ? parseInt(data.categoryId) : null,
         stock: totalStock,
+        physicalInventory: totalStock,
         minStockThreshold: minStockValue,
         sellingMethod: data.sellingMethod,
         weightUnit: data.weightUnit,

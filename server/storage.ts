@@ -1206,6 +1206,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateProduct(id: number, productData: Partial<InsertProduct>): Promise<Product> {
     const { sizes, ...dataWithoutSizes } = productData as any;
+    const syncPhysicalInventory = productData.physicalInventory !== undefined;
 
     const toNumericStr = (val: any): string | undefined => {
       if (val === null || val === undefined || val === '') return undefined;
@@ -1219,10 +1220,6 @@ export class DatabaseStorage implements IStorage {
     // An empty array only means existing variants are being disabled, so
     // preserve the explicitly submitted parent stock in that case.
     if (Array.isArray(sizes) && sizes.length > 0) delete updateData.stock;
-
-    // Physical inventory is never inferred from sellable edits. It is only
-    // changed through the verified physical-count workflow.
-    delete updateData.physicalInventory;
 
     const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'discountAmount', 'bogoDiscountValue', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
     for (const field of numericFields) {
@@ -1514,7 +1511,9 @@ export class DatabaseStorage implements IStorage {
               productId: id,
               size: name,
               quantity,
-              physicalQuantity: physicalBySize.get(name) ?? 0,
+              physicalQuantity: syncPhysicalInventory
+                ? quantity
+                : physicalBySize.get(name) ?? 0,
               createdAt: new Date(),
               updatedAt: new Date(),
             };

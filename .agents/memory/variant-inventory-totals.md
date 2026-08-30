@@ -3,14 +3,14 @@ name: Variant inventory totals
 description: Source-of-truth rule for products that have size or flavor inventory rows.
 ---
 
-For products with size or flavor rows, calculate the parent product's sellable and physical totals from those rows. Storefront availability must use the row-level quantities whenever rows exist.
+For products with size or flavor rows, calculate the parent product's sellable and physical totals from those rows. Storefront availability must use the row-level quantities whenever rows exist. A full product edit intentionally synchronizes physical quantities to the entered sellable quantities.
 
-**Why:** A stale cached parent sellable total can hide a product that still has an in-stock flavor, while parent physical inventory can likewise drift from the summed physical row quantities.
+**Why:** A stale cached parent sellable total can hide a product that still has an in-stock flavor, while product edits are used to establish both current sellable and physical inventory. Independent physical discrepancies can still be recorded through the stock-adjustment workflow.
 
-**How to apply:** Preserve the distinction between sellable and physical quantities. Reconcile parent sellable stock from row sellable quantities and parent physical inventory from row physical quantities; do not change physical inventory merely because sellable stock changes.
+**How to apply:** Reconcile parent sellable stock from row sellable quantities and parent physical inventory from row physical quantities. Product-edit payloads include an explicit physical count equal to the entered stock; stock adjustments, fulfillment, and unfulfillment may continue to move the ledgers independently.
 
-An empty variant list must not be treated as an authoritative total of zero for a product that has no variant rows. Ordinary product edits should omit variant data entirely; intentionally disabling existing variants may delete their rows but must preserve the submitted parent stock and existing parent physical count.
+An empty variant list must not be treated as an authoritative total of zero for a product that has no variant rows. Ordinary product edits should omit variant data entirely; intentionally disabling existing variants may delete their rows but must preserve the submitted parent stock and synchronized physical count.
 
 **Why:** Recalculating parent inventory from an empty variant set can overwrite a valid stock count with zero during an unrelated product edit.
 
-**How to apply:** Rebuild and total variant inventory only when a non-empty variant list is submitted. Use an explicit empty list solely to disable variants, and never derive parent stock or physical inventory from that empty list.
+**How to apply:** Rebuild and total variant inventory only when a non-empty variant list is submitted. Use an explicit empty list solely to disable variants, and use the explicit parent values submitted by the product edit rather than deriving either ledger from that empty list.

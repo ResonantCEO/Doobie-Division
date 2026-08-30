@@ -151,7 +151,7 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
             Adjust sellable availability or record a verified warehouse count.
           </DialogDescription>
             <p className="text-xs text-muted-foreground mt-1">
-              Sellable and physical ledgers are separate. Physical counts are never inferred from sellable stock.
+              Product edits can intentionally sync physical counts to the entered stock. Use this screen for independent verified counts or adjustments.
             </p>
         </DialogHeader>
 
