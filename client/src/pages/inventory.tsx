@@ -21,8 +21,23 @@ import BulkQRModal from "@/components/modals/bulk-qr-modal";
 import PriceTemplatesModal from "@/components/modals/price-templates-modal";
 import { Plus, QrCode, AlertTriangle, Settings, FileText, Download } from "lucide-react";
 import type { Product, Category, ProductSize } from "@shared/schema";
+import { getSellableStock, isLowStock, isOutOfStock } from "@shared/inventory";
 import BagsTab from "@/components/BagsTab";
 import DiscountsTab from "@/components/DiscountsTab";
+
+type InventoryIntegrityRow = {
+  id: number;
+  name: string;
+  sku: string;
+  parent_sellable: number;
+  parent_physical: number;
+  sellable: number;
+  physical: number;
+  sellable_drift: number;
+  physical_drift: number;
+  variance: number;
+  variants: Array<{ id: number; size: string; sellable: number; physical: number; variance: number }>;
+};
 
 function openInventoryPrintSheet(
   products: (Product & { category: Category | null; sizes?: ProductSize[] })[],
@@ -66,10 +81,11 @@ function openInventoryPrintSheet(
           ? `$${Number(product.pricePerGram).toFixed(2)}/g`
           : ""
         : `$${Number(product.price ?? 0).toFixed(2)}`;
+    const sellable = getSellableStock(product);
     const status =
-      product.stock === 0
+      isOutOfStock(product)
         ? "Out of Stock"
-        : product.stock <= product.minStockThreshold
+        : isLowStock(product)
         ? "Low Stock"
         : "In Stock";
 
@@ -96,11 +112,11 @@ function openInventoryPrintSheet(
       }
     } else {
       // In low inventory mode only include products with 1–3 units
-      if (lowInventoryMode && !(product.stock > 0 && product.stock < 4)) continue;
+      if (lowInventoryMode && !(sellable > 0 && sellable < 4)) continue;
       const stockDisplay =
         product.sellingMethod === "weight"
-          ? `${product.stock}g`
-          : String(product.stock);
+          ? `${sellable}g`
+          : String(sellable);
       rows.push({
         sku: product.sku,
         name: product.name,
@@ -538,6 +554,17 @@ export default function InventoryPage() {
     placeholderData: (previousData) => previousData,
   });
 
+  const { data: integrityRows = [] } = useQuery<InventoryIntegrityRow[]>({
+    queryKey: ["/api/admin/inventory-integrity"],
+    queryFn: async () => {
+      const response = await fetch("/api/admin/inventory-integrity", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load inventory integrity data");
+      return response.json();
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+
   // Unique category names present in the current product list
   const allPrintCategories = useMemo(() => {
     const names = new Set<string>();
@@ -558,7 +585,8 @@ export default function InventoryPage() {
     if (product.sizes && product.sizes.length > 0) {
       return product.sizes.some(s => s.quantity > 0 && s.quantity < 4);
     }
-    return product.stock > 0 && product.stock < 4;
+    const sellable = getSellableStock(product);
+    return sellable > 0 && sellable < 4;
   }
 
   function selectLowInventory() {
@@ -817,6 +845,12 @@ export default function InventoryPage() {
               {products.filter(p => !p.isActive && !p.sku?.startsWith('GRAB-BAG-')).length}
             </Badge>
           </TabsTrigger>
+          <TabsTrigger value="integrity">
+            Reconciliation
+            <Badge variant="secondary" className="ml-2">
+              {integrityRows.filter(row => row.variance !== 0 || row.sellable_drift !== 0 || row.physical_drift !== 0).length}
+            </Badge>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="active">
@@ -837,6 +871,51 @@ export default function InventoryPage() {
             onSelectionChange={setSelectedProducts}
             categories={categories}
           />
+        </TabsContent>
+
+        <TabsContent value="integrity">
+          <Card>
+            <CardContent className="pt-6 space-y-3">
+              <div>
+                <h3 className="font-semibold">Inventory reconciliation</h3>
+                <p className="text-sm text-muted-foreground">
+                  Parent drift is repaired from authoritative variant rows. Warehouse variance is only corrected from a verified physical count.
+                </p>
+              </div>
+              {integrityRows
+                .filter(row => row.variance !== 0 || row.sellable_drift !== 0 || row.physical_drift !== 0)
+                .map(row => (
+                  <div key={row.id} className="rounded-md border p-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="font-medium">{row.name} <span className="text-xs text-muted-foreground">({row.sku})</span></div>
+                      <div className="text-sm">
+                        Sellable {row.sellable} · Physical {row.physical} · Variance {row.variance > 0 ? "+" : ""}{row.variance}
+                      </div>
+                      {(row.sellable_drift !== 0 || row.physical_drift !== 0) && (
+                        <div className="text-xs text-orange-600">
+                          Parent drift: sellable {row.sellable_drift > 0 ? "+" : ""}{row.sellable_drift}, physical {row.physical_drift > 0 ? "+" : ""}{row.physical_drift}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const product = products.find(item => item.id === row.id);
+                        if (product) {
+                          setSelectedProduct(product);
+                          setShowStockModal(true);
+                        }
+                      }}
+                    >
+                      Record verified count
+                    </Button>
+                  </div>
+                ))}
+              {integrityRows.every(row => row.variance === 0 && row.sellable_drift === 0 && row.physical_drift === 0) && (
+                <p className="text-sm text-muted-foreground">No inventory discrepancies detected.</p>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

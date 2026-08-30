@@ -195,7 +195,7 @@ app.use((req, res, next) => {
         SELECT
           product_id,
           SUM(quantity)::integer AS sellable_stock,
-          SUM(COALESCE(physical_quantity, quantity))::integer AS physical_stock
+          SUM(COALESCE(physical_quantity, 0))::integer AS physical_stock
         FROM product_sizes
         GROUP BY product_id
       ) AS totals
@@ -354,19 +354,27 @@ app.use((req, res, next) => {
     console.warn("⚠ Could not verify order_items columns:", error?.message);
   }
 
-  // Clamp any existing negative stock / physical values to zero
+  // Inventory constraints reject future negative writes. Existing discrepancies
+  // are deliberately left visible for an administrator to verify and reconcile;
+  // startup must never guess the warehouse truth.
   try {
     const { sql } = await import("./db");
-    await sql.query(`UPDATE products SET stock = GREATEST(0, stock) WHERE stock < 0`);
-    await sql.query(`UPDATE products SET physical_inventory = GREATEST(0, physical_inventory) WHERE physical_inventory < 0`);
-    await sql.query(`UPDATE product_sizes SET quantity = GREATEST(0, quantity) WHERE quantity < 0`);
-    await sql.query(`UPDATE product_sizes SET physical_quantity = GREATEST(0, physical_quantity) WHERE physical_quantity < 0`);
-    // Physical must always be >= stock — correct any existing violations
-    await sql.query(`UPDATE products SET physical_inventory = stock WHERE physical_inventory < stock`);
-    await sql.query(`UPDATE product_sizes SET physical_quantity = quantity WHERE COALESCE(physical_quantity, quantity) < quantity`);
-    console.log("✓ Clamped any negative stock/physical values to zero and enforced physical >= stock");
+    await sql.query(`ALTER TABLE inventory_logs ADD COLUMN IF NOT EXISTS ledger VARCHAR NOT NULL DEFAULT 'sellable'`);
+    await sql.query(`ALTER TABLE inventory_logs ADD COLUMN IF NOT EXISTS variant_id INTEGER`);
+    await sql.query(`ALTER TABLE inventory_logs ADD COLUMN IF NOT EXISTS order_id INTEGER`);
+    await sql.query(`ALTER TABLE inventory_logs ADD COLUMN IF NOT EXISTS order_item_id INTEGER`);
+    await sql.query(`ALTER TABLE inventory_logs ADD COLUMN IF NOT EXISTS direction VARCHAR NOT NULL DEFAULT 'adjustment'`);
+    await sql.query(`ALTER TABLE inventory_logs ADD COLUMN IF NOT EXISTS source_action VARCHAR NOT NULL DEFAULT 'legacy'`);
+    await sql.query(`ALTER TABLE inventory_logs DROP CONSTRAINT IF EXISTS inventory_logs_variant_id_product_sizes_id_fk`);
+    await sql.query(`ALTER TABLE inventory_logs DROP CONSTRAINT IF EXISTS inventory_logs_order_id_orders_id_fk`);
+    await sql.query(`ALTER TABLE inventory_logs DROP CONSTRAINT IF EXISTS inventory_logs_order_item_id_order_items_id_fk`);
+    await sql.query(`ALTER TABLE inventory_logs ADD CONSTRAINT inventory_logs_variant_id_product_sizes_id_fk FOREIGN KEY (variant_id) REFERENCES product_sizes(id) ON DELETE SET NULL`);
+    await sql.query(`ALTER TABLE inventory_logs ADD CONSTRAINT inventory_logs_order_id_orders_id_fk FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL`);
+    await sql.query(`ALTER TABLE inventory_logs ADD CONSTRAINT inventory_logs_order_item_id_order_items_id_fk FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE SET NULL`);
+    await sql.query(`CREATE UNIQUE INDEX IF NOT EXISTS UQ_product_sizes_product_size ON product_sizes(product_id, size)`);
+    console.log("✓ Verified inventory integrity columns and constraints");
   } catch (error: any) {
-    console.warn("⚠ Could not clamp negative stock values:", error?.message);
+    console.warn("⚠ Could not verify inventory integrity schema:", error?.message);
   }
 
   // Fix user_activity_logs sequence if it has fallen behind actual data

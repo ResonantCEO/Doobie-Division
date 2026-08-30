@@ -800,29 +800,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return component.stock ?? 0;
   }
 
-  function componentPhysical(component: any, selectedSize?: string): number {
-    if (component.sizes && component.sizes.length > 0) {
-      if (selectedSize) {
-        const sz = component.sizes.find((s: any) => s.size === selectedSize);
-        return sz ? (sz.physicalQuantity ?? sz.quantity ?? 0) : 0;
-      }
-      return component.sizes.reduce((sum: number, s: any) => sum + (sz => sz ? (sz.physicalQuantity ?? sz.quantity ?? 0) : 0)(s), 0);
-    }
-    return (component.physicalInventory ?? component.stock ?? 0);
-  }
-
-  // Returns true if a product (or a specific size of it) has both stock > 0 and physical > 0
+  // Sellable stock is the purchasing contract. Physical variance is surfaced to
+  // administrators, not silently used to manufacture storefront availability.
   function componentAvailable(component: any, selectedSize?: string): boolean {
     if (component.sizes && component.sizes.length > 0) {
       if (selectedSize) {
         const sz = component.sizes.find((s: any) => s.size === selectedSize);
         if (!sz) return false;
-        return (sz.quantity ?? 0) > 0 && (sz.physicalQuantity ?? sz.quantity ?? 0) > 0;
+        return (sz.quantity ?? 0) > 0;
       }
       // At least one size must be fully available
-      return component.sizes.some((s: any) => (s.quantity ?? 0) > 0 && (s.physicalQuantity ?? s.quantity ?? 0) > 0);
+      return component.sizes.some((s: any) => (s.quantity ?? 0) > 0);
     }
-    return (component.stock ?? 0) > 0 && (component.physicalInventory ?? component.stock ?? 0) > 0;
+    return (component.stock ?? 0) > 0;
   }
 
   // Helper: scan all grab-bag products and sync their stock to the minimum available across components.
@@ -846,13 +836,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         let minStock = Infinity;
         let anyUnavailable = false;
+        const requirements = new Map<string, { productId: number; selectedSize?: string; count: number }>();
         for (const item of items) {
+          if (!item.productId) continue;
+          const key = `${item.productId}:${item.selectedSize ?? "*"}`;
+          const requirement = requirements.get(key);
+          if (requirement) requirement.count += 1;
+          else requirements.set(key, { productId: item.productId, selectedSize: item.selectedSize, count: 1 });
+        }
+        for (const item of Array.from(requirements.values())) {
           if (!item.productId) continue;
           const component = await storage.getProduct(item.productId);
           // Components may be inactive in the storefront (sold only via grab bags) — just check they exist and have stock
           if (!component) { anyUnavailable = true; break; }
           if (!componentAvailable(component, item.selectedSize)) { anyUnavailable = true; break; }
-          minStock = Math.min(minStock, componentStock(component, item.selectedSize));
+          minStock = Math.min(minStock, Math.floor(componentStock(component, item.selectedSize) / item.count));
         }
 
         const newStock = anyUnavailable ? 0 : (isFinite(minStock) ? minStock : 0);
@@ -862,7 +860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (newStock !== currentStock || shouldBeActive !== currentActive) {
           await rawPool.query(
-            `UPDATE products SET stock = $1, physical_inventory = GREATEST(physical_inventory, $1), is_active = $2, updated_at = NOW() WHERE id = $3`,
+            `UPDATE products SET stock = $1, is_active = $2, updated_at = NOW() WHERE id = $3`,
             [newStock, shouldBeActive, bag.id]
           );
           console.log(`[syncGrabBagAvailability] Bag #${bag.id} (${bag.name}): stock ${currentStock} → ${newStock}, active ${currentActive} → ${shouldBeActive}`);
@@ -879,6 +877,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Stock adjustment route
+  app.get('/api/admin/inventory-integrity', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (_req, res) => {
+    try {
+      res.json(await storage.getInventoryIntegrity());
+    } catch (error) {
+      console.error("Inventory integrity scan failed:", error);
+      res.status(500).json({ message: "Failed to scan inventory integrity" });
+    }
+  });
+
   app.post('/api/products/:id/adjust-stock', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
     try {
       const productId = parseInt(req.params.id);
@@ -903,6 +910,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Stock adjustment error:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to adjust stock";
       res.status(500).json({ message: errorMessage });
+    }
+  });
+
+  app.post('/api/products/:id/physical-count', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req: any, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const { count, reason, sizeName } = req.body;
+      if (!Number.isInteger(count) || count < 0 || count > 1000000) {
+        return res.status(400).json({ message: "Count must be a non-negative whole number" });
+      }
+      if (!reason || typeof reason !== "string" || reason.trim().length < 3 || reason.length > 200) {
+        return res.status(400).json({ message: "Reason must be between 3 and 200 characters" });
+      }
+      await storage.setPhysicalCount(productId, count, req.currentUser.id, reason.trim(), sizeName || undefined);
+      res.json({ message: "Verified physical count recorded" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to record physical count";
+      res.status(message.includes("not found") ? 404 : 409).json({ message });
     }
   });
 
@@ -1438,8 +1463,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Expand grab bag products into individual line items + a discount line
       const finalItems: any[] = [];
-      const grabBagProductIdsToDeduct: number[] = [];
-      const cgStockDeductions: { productId: number; qty: number }[] = [];
 
       for (const item of enrichedItems) {
         const product = await storage.getProduct(item.productId);
@@ -1511,7 +1534,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             }
 
-            grabBagProductIdsToDeduct.push(product.id);
             continue; // skip the bag container item itself
           }
         }
@@ -1660,11 +1682,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
 
-          // Stock deductions collected here — applied AFTER createOrder succeeds
-          // (deducting before createOrder causes createOrder's re-check to see 0 and fail)
-          for (const { item, qty } of cgPickMap.values()) {
-            cgStockDeductions.push({ productId: item.id, qty });
-          }
         } catch (cgErr) {
           console.error("[createOrder] CG bag expansion error:", cgErr);
           stockErrors.push(`Failed to process customer-generated bag.`);
@@ -1690,50 +1707,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[CG-ORDER] Creating order with ${itemsData.length} items (cgBags: ${cgBagsInput_typed.length})`);
       const newOrder = await storage.createOrder(orderData, itemsData);
-
-      // Deduct stock for expanded grab bag container products (not in order items, createOrder won't handle them)
-      for (const bagProductId of grabBagProductIdsToDeduct) {
-        try {
-          await db.execute(sql`UPDATE products SET stock = GREATEST(0, stock - 1), updated_at = NOW() WHERE id = ${bagProductId}`);
-        } catch (err) {
-          console.warn("[createOrder] Failed to deduct grab bag product stock:", err);
-        }
-      }
-
-      // Deduct stock for CG bag components (done here, after order is confirmed, to avoid
-      // createOrder's stock re-check seeing 0 and failing).
-      // We decrement stock, physical_inventory, and — for size-variant products —
-      // product_sizes.quantity/physical_quantity so the inventory manager shows the
-      // reservation immediately. fulfillOrderItem skips its own physicalInventory
-      // decrement for fromCgBag items to avoid double-deducting.
-      for (const { productId, qty } of cgStockDeductions) {
-        try {
-          // Product-level: reduce stock (prevents overselling); physical_inventory is
-          // reduced later when the admin fulfils the item.
-          await db.execute(
-            sql`UPDATE products SET stock = GREATEST(0, stock - ${qty}), updated_at = NOW() WHERE id = ${productId}`
-          );
-          // Size-variant: deduct from the most-stocked size's quantity so inventory
-          // manager totals reflect the reservation. physical_quantity is left alone
-          // here and decremented at fulfilment time via fulfillOrderItem.
-          const sizeResult = await db.execute(
-            sql`SELECT size, quantity FROM product_sizes WHERE product_id = ${productId} AND quantity > 0 ORDER BY quantity DESC LIMIT 1`
-          );
-          const topSize = sizeResult?.rows?.[0] as any;
-          if (topSize?.size) {
-            await db.execute(
-              sql`UPDATE product_sizes SET quantity = GREATEST(0, quantity - ${qty}), updated_at = NOW() WHERE product_id = ${productId} AND size = ${topSize.size}`
-            );
-            // Write the chosen size back to the order item so the fulfillment screen
-            // shows exactly which flavour/variant to pull from the shelf.
-            await db.execute(
-              sql`UPDATE order_items SET size = ${topSize.size} WHERE order_id = ${newOrder.id} AND product_id = ${productId} AND (metadata->>'fromCgBag')::boolean = true`
-            );
-          }
-        } catch (err) {
-          console.warn("[createOrder] Failed to deduct CG bag component stock:", err);
-        }
-      }
 
       // Sync grab bag availability — disables any bag products whose component items are now out of stock
       syncGrabBagAvailability().catch(() => {});
@@ -4537,7 +4510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Unpinned specific products mean “any flavor.” Choose at generation time
           // from the currently available options so a sold-out flavor is skipped.
           const withStock = p.sizes.filter((s: any) =>
-            (s.quantity ?? 0) > 0 && (s.physicalQuantity ?? s.quantity ?? 0) > 0
+            (s.quantity ?? 0) > 0 && (s.physicalQuantity ?? 0) > 0
           );
           const chosen = withStock.length > 0
             ? withStock[Math.floor(Math.random() * withStock.length)]

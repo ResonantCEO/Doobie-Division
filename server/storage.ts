@@ -100,6 +100,8 @@ export interface IStorage {
   updateProductSortOrders(orders: { id: number; sortOrder: number }[]): Promise<void>;
   deleteProduct(id: number): Promise<void>;
   adjustStock(productId: number, quantity: number, userId: string, reason: string, sizeName?: string): Promise<void>;
+  setPhysicalCount(productId: number, count: number, userId: string, reason: string, sizeName?: string): Promise<void>;
+  getInventoryIntegrity(): Promise<any[]>;
   getLowStockProducts(): Promise<Product[]>;
 
   // Order operations
@@ -918,7 +920,7 @@ export class DatabaseStorage implements IStorage {
       ...productDataWithoutSizes,
       stock: stockValue,
       price: productData.price || "0",
-      physicalInventory: stockValue,
+      physicalInventory: 0,
       updatedAt: new Date()
     };
 
@@ -1172,7 +1174,7 @@ export class DatabaseStorage implements IStorage {
         productId: newProduct!.id,
         size: size.size,
         quantity: size.quantity,
-        physicalQuantity: size.quantity,
+        physicalQuantity: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       }));
@@ -1213,11 +1215,11 @@ export class DatabaseStorage implements IStorage {
 
     const updateData: Record<string, any> = { ...dataWithoutSizes };
     delete updateData.enableSizes;
+    if (sizes !== undefined) delete updateData.stock;
 
-    if (dataWithoutSizes.stock !== undefined) {
-      // When stock is explicitly set via edit product, sync physical inventory to match exactly.
-      updateData.physicalInventory = dataWithoutSizes.stock as number;
-    }
+    // Physical inventory is never inferred from sellable edits. It is only
+    // changed through the verified physical-count workflow.
+    delete updateData.physicalInventory;
 
     const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'discountAmount', 'bogoDiscountValue', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
     for (const field of numericFields) {
@@ -1336,7 +1338,10 @@ export class DatabaseStorage implements IStorage {
 
         await rawSql`UPDATE products SET name = ${d.name}, sku = ${d.sku}, selling_method = ${d.sellingMethod}, updated_at = NOW() WHERE id = ${id}`;
         await rawSql`UPDATE products SET company = ${d.company ?? null}, description = ${d.description ?? null}, image_url = ${d.imageUrl ?? null}, image_urls = ${d.imageUrls ?? null}, weight_unit = ${d.weightUnit ?? null}, purchase_price_method = ${d.purchasePriceMethod ?? null}, admin_notes = ${d.adminNotes ?? null}, is_active = ${d.isActive ?? true} WHERE id = ${id}`;
-        await rawSql`UPDATE products SET stock = ${toSafeNum(d.stock) ?? 0}, physical_inventory = ${toSafeNum(d.physicalInventory) ?? 0}, min_stock_threshold = ${toSafeNum(d.minStockThreshold) ?? 0}, category_id = ${toSafeNum(d.categoryId)} WHERE id = ${id}`;
+        if (d.hasOwnProperty("stock")) {
+          await rawSql`UPDATE products SET stock = ${toSafeNum(d.stock) ?? 0} WHERE id = ${id}`;
+        }
+        await rawSql`UPDATE products SET min_stock_threshold = ${toSafeNum(d.minStockThreshold) ?? 0}, category_id = ${toSafeNum(d.categoryId)} WHERE id = ${id}`;
 
         const priceVal = toSafeNum(d.price);
         if (priceVal !== null) {
@@ -1485,45 +1490,45 @@ export class DatabaseStorage implements IStorage {
     console.log('[updateProduct] Product updated successfully, id:', product.id);
 
     if (sizes !== undefined) {
-      // Preserve existing physical_quantity values before deleting rows
-      let existingPhysicalBySize: Record<string, number> = {};
-      try {
-        const existing = await db.select().from(productSizes).where(eq(productSizes.productId, id));
-        for (const row of existing) {
-          existingPhysicalBySize[row.size] = row.physicalQuantity ?? row.quantity ?? 0;
-        }
-      } catch (e: any) {
-        console.log('[updateProduct] Could not fetch existing sizes for physical preservation:', e?.message);
-      }
-
-      try {
-        await retryQuery(() =>
-          db.delete(productSizes).where(eq(productSizes.productId, id))
+      await db.transaction(async (tx) => {
+        const locked = await tx.execute(sql`SELECT id FROM products WHERE id = ${id} FOR UPDATE`);
+        if (!locked.rows[0]) throw new Error("Product not found");
+        const existing = await tx.select().from(productSizes)
+          .where(eq(productSizes.productId, id)).for("update");
+        const physicalBySize = new Map(
+          existing.map(row => [row.size, row.physicalQuantity ?? 0]),
         );
-      } catch (e: any) {
-        console.log('[updateProduct] Could not delete old product sizes:', e?.message);
-      }
-
-      if (sizes && sizes.length > 0) {
-        const sizeRecords: InsertProductSize[] = sizes.map((size: any) => ({
-          productId: id,
-          size: size.size,
-          quantity: size.quantity,
-          // When an admin explicitly edits quantities, physical syncs to the new stock value.
-          // The fulfillment path separately enforces physical >= stock during order processing.
-          physicalQuantity: size.quantity,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }));
-
-        try {
-          await retryQuery(() =>
-            db.insert(productSizes).values(sizeRecords)
-          );
-        } catch (sizeError: any) {
-          console.log('[updateProduct] Error creating product sizes:', sizeError?.message);
+        await tx.delete(productSizes).where(eq(productSizes.productId, id));
+        if (sizes?.length) {
+          const seen = new Set<string>();
+          const sizeRecords: InsertProductSize[] = sizes.map((size: any) => {
+            const name = String(size.size).trim();
+            if (!name || seen.has(name)) throw new Error("Variant names must be unique and non-empty");
+            seen.add(name);
+            const quantity = Number(size.quantity);
+            if (!Number.isInteger(quantity) || quantity < 0) throw new Error(`Invalid sellable quantity for ${name}`);
+            return {
+              productId: id,
+              size: name,
+              quantity,
+              physicalQuantity: physicalBySize.get(name) ?? 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+          });
+          await tx.insert(productSizes).values(sizeRecords);
         }
-      }
+        await tx.execute(sql`
+          UPDATE products
+          SET stock = totals.sellable, physical_inventory = totals.physical, updated_at = NOW()
+          FROM (
+            SELECT COALESCE(SUM(quantity), 0)::integer AS sellable,
+                   COALESCE(SUM(physical_quantity), 0)::integer AS physical
+            FROM product_sizes WHERE product_id = ${id}
+          ) totals
+          WHERE products.id = ${id}
+        `);
+      });
     }
 
     // Save quantity pricing tiers (always replace on update)
@@ -1628,96 +1633,151 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Reason is required");
     }
 
-    const [product] = await db
-      .select()
-      .from(products)
-      .where(eq(products.id, productId));
+    await db.transaction(async (tx) => {
+      const productResult = await tx.execute(
+        sql`SELECT id, name, stock, min_stock_threshold FROM products WHERE id = ${productId} FOR UPDATE`
+      );
+      const product = productResult.rows[0] as any;
+      if (!product) throw new Error("Product not found");
 
-    if (!product) {
-      throw new Error("Product not found");
-    }
+      const variantsResult = await tx.execute(
+        sql`SELECT id, size, quantity FROM product_sizes WHERE product_id = ${productId} ORDER BY id FOR UPDATE`
+      );
+      const variants = variantsResult.rows as any[];
+      let variantId: number | null = null;
+      let before = Number(product.stock);
+      let after: number;
 
-    if (sizeName) {
-      const sizeRows = await db.select().from(productSizes)
-        .where(and(eq(productSizes.productId, productId), eq(productSizes.size, sizeName)));
-
-      if (!sizeRows || sizeRows.length === 0) {
-        throw new Error(`Size "${sizeName}" not found for this product`);
-      }
-
-      const sizeRow = sizeRows[0];
-      const newSizeQty = sizeRow.quantity + quantity;
-      if (newSizeQty < 0) {
-        throw new Error("Insufficient stock for this size");
-      }
-
-      await db.update(productSizes)
-        .set({ quantity: newSizeQty, updatedAt: new Date() })
-        .where(and(eq(productSizes.productId, productId), eq(productSizes.size, sizeName)));
-
-      const newTotalStock = product.stock + quantity;
-      await db.update(products)
-        .set({ stock: newTotalStock, updatedAt: new Date() })
-        .where(eq(products.id, productId));
-
-      await db.insert(inventoryLogs).values({
-        productId,
-        type: quantity > 0 ? 'stock_in' : 'stock_out',
-        quantity: Math.abs(quantity),
-        previousStock: product.stock,
-        newStock: newTotalStock,
-        reason: `[${sizeName}] ${reason}`,
-        userId
-      });
-
-      if (newTotalStock <= product.minStockThreshold && product.stock > product.minStockThreshold) {
-        const adminUsers = await this.getUsersWithRole('admin');
-        for (const admin of adminUsers) {
-          await this.createNotification({
-            userId: admin.id,
-            type: 'low_stock',
-            title: 'Low Stock Alert',
-            message: `${product.name} is running low on stock (${newTotalStock} remaining)`,
-            data: { productId, currentStock: newTotalStock, threshold: product.minStockThreshold },
-          });
+      if (variants.length > 0) {
+        if (!sizeName) {
+          throw new Error("A specific size or flavor is required for variant products");
         }
-      }
-    } else {
-      const newStock = product.stock + quantity;
-      if (newStock < 0) {
-        throw new Error("Insufficient stock");
+        const variant = variants.find((row) => row.size === sizeName);
+        if (!variant) throw new Error(`Size "${sizeName}" not found for this product`);
+        variantId = Number(variant.id);
+        before = Number(variant.quantity);
+        after = before + quantity;
+        if (after < 0) throw new Error("Insufficient sellable stock for this size");
+        await tx.execute(
+          sql`UPDATE product_sizes SET quantity = ${after}, updated_at = NOW() WHERE id = ${variantId}`
+        );
+        await tx.execute(sql`
+          UPDATE products
+          SET stock = totals.sellable, physical_inventory = totals.physical, updated_at = NOW()
+          FROM (
+            SELECT COALESCE(SUM(quantity), 0)::integer AS sellable,
+                   COALESCE(SUM(physical_quantity), 0)::integer AS physical
+            FROM product_sizes WHERE product_id = ${productId}
+          ) totals
+          WHERE products.id = ${productId}
+        `);
+      } else {
+        after = before + quantity;
+        if (after < 0) throw new Error("Insufficient sellable stock");
+        await tx.execute(
+          sql`UPDATE products SET stock = ${after}, updated_at = NOW() WHERE id = ${productId}`
+        );
       }
 
-      await db.update(products)
-        .set({
-          stock: newStock,
-          updatedAt: new Date()
-        })
-        .where(eq(products.id, productId));
-
-      await db.insert(inventoryLogs).values({
+      await tx.insert(inventoryLogs).values({
         productId,
-        type: quantity > 0 ? 'stock_in' : 'stock_out',
+        variantId,
+        type: quantity > 0 ? "stock_in" : "stock_out",
+        ledger: "sellable",
+        direction: quantity > 0 ? "in" : "out",
+        sourceAction: "manual_adjustment",
         quantity: Math.abs(quantity),
-        previousStock: product.stock,
-        newStock,
+        previousStock: before,
+        newStock: after,
         reason,
-        userId
+        userId,
       });
+    });
+    invalidateCache.products();
+  }
 
-      if (newStock <= product.minStockThreshold && product.stock > product.minStockThreshold) {
-        const adminUsers = await this.getUsersWithRole('admin');
-        for (const admin of adminUsers) {
-          await this.createNotification({
-            userId: admin.id,
-            type: 'low_stock',
-            title: 'Low Stock Alert',
-            message: `${product.name} is running low on stock (${newStock} remaining)`,
-            data: { productId, currentStock: newStock, threshold: product.minStockThreshold },
-          });
-        }
+  async setPhysicalCount(productId: number, count: number, userId: string, reason: string, sizeName?: string): Promise<void> {
+    if (!Number.isInteger(count) || count < 0) throw new Error("Verified physical count must be a non-negative whole number");
+    if (!reason?.trim()) throw new Error("A reconciliation reason is required");
+
+    await db.transaction(async (tx) => {
+      const productResult = await tx.execute(
+        sql`SELECT id, physical_inventory FROM products WHERE id = ${productId} FOR UPDATE`
+      );
+      const product = productResult.rows[0] as any;
+      if (!product) throw new Error("Product not found");
+      const variantsResult = await tx.execute(
+        sql`SELECT id, size, physical_quantity FROM product_sizes WHERE product_id = ${productId} ORDER BY id FOR UPDATE`
+      );
+      const variants = variantsResult.rows as any[];
+      let variantId: number | null = null;
+      let before: number;
+
+      if (variants.length > 0) {
+        if (!sizeName) throw new Error("A specific size or flavor is required for variant products");
+        const variant = variants.find((row) => row.size === sizeName);
+        if (!variant) throw new Error(`Size "${sizeName}" not found for this product`);
+        variantId = Number(variant.id);
+        before = Number(variant.physical_quantity ?? 0);
+        await tx.execute(
+          sql`UPDATE product_sizes SET physical_quantity = ${count}, updated_at = NOW() WHERE id = ${variantId}`
+        );
+        await tx.execute(sql`
+          UPDATE products
+          SET stock = totals.sellable, physical_inventory = totals.physical, updated_at = NOW()
+          FROM (
+            SELECT COALESCE(SUM(quantity), 0)::integer AS sellable,
+                   COALESCE(SUM(physical_quantity), 0)::integer AS physical
+            FROM product_sizes WHERE product_id = ${productId}
+          ) totals
+          WHERE products.id = ${productId}
+        `);
+      } else {
+        before = Number(product.physical_inventory ?? 0);
+        await tx.execute(
+          sql`UPDATE products SET physical_inventory = ${count}, updated_at = NOW() WHERE id = ${productId}`
+        );
       }
-    }
+
+      await tx.insert(inventoryLogs).values({
+        productId,
+        variantId,
+        userId,
+        type: "physical_reconciliation",
+        ledger: "physical",
+        direction: count > before ? "in" : count < before ? "out" : "adjustment",
+        sourceAction: "verified_physical_count",
+        quantity: Math.abs(count - before),
+        previousStock: before,
+        newStock: count,
+        reason,
+      });
+    });
+    invalidateCache.products();
+  }
+
+  async getInventoryIntegrity(): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT p.id, p.name, p.sku, p.selling_method,
+             p.stock AS parent_sellable, p.physical_inventory AS parent_physical,
+             COALESCE(SUM(ps.quantity), p.stock)::integer AS sellable,
+             COALESCE(SUM(ps.physical_quantity), p.physical_inventory)::integer AS physical,
+             (COALESCE(SUM(ps.quantity), p.stock) - p.stock)::integer AS sellable_drift,
+             (COALESCE(SUM(ps.physical_quantity), p.physical_inventory) - p.physical_inventory)::integer AS physical_drift,
+             (COALESCE(SUM(ps.physical_quantity), p.physical_inventory) - COALESCE(SUM(ps.quantity), p.stock))::integer AS variance,
+             COALESCE(
+               json_agg(json_build_object(
+                 'id', ps.id, 'size', ps.size, 'sellable', ps.quantity,
+                 'physical', ps.physical_quantity, 'variance', ps.physical_quantity - ps.quantity
+               ) ORDER BY ps.size) FILTER (WHERE ps.id IS NOT NULL),
+               '[]'::json
+             ) AS variants
+      FROM products p
+      LEFT JOIN product_sizes ps ON ps.product_id = p.id
+      GROUP BY p.id
+      ORDER BY ABS(COALESCE(SUM(ps.physical_quantity), p.physical_inventory) - COALESCE(SUM(ps.quantity), p.stock)) DESC, p.name
+    `);
+    return result.rows;
   }
 
   async getLowStockProducts(): Promise<Product[]> {
@@ -1942,156 +2002,110 @@ export class DatabaseStorage implements IStorage {
 
     const orderNumber = `${datePrefix}-${nextSequential}`;
 
-    for (const item of items) {
-      if (!item.productId) continue; // discount/virtual items have no product — skip stock check
-      if ((item as any).metadata?.fromCgBag) continue; // CG bag items: stock validated & deducted separately in routes.ts
-      if ((item as any).metadata?.fromStandardBag) continue; // Standard bag components: pre-checked in routes.ts; product.stock may be 0 for size-tracked items
-      try {
-        const stockResult = await retryQuery(() =>
-          db.execute(sql`SELECT stock, name FROM products WHERE id = ${item.productId}`)
-        );
-        const product = stockResult?.rows?.[0];
-        if (!product) {
-          throw new Error(`Product with ID ${item.productId} not found`);
-        }
-
-        const itemSize = (item as any).size;
-        if (itemSize) {
-          // Check if this is a size-based product (has a matching product_sizes record)
-          const sizeResult = await retryQuery(() =>
-            db.execute(sql`SELECT quantity FROM product_sizes WHERE product_id = ${item.productId} AND size = ${itemSize}`)
-          );
-          const sizeRow = sizeResult?.rows?.[0];
-          if (sizeRow) {
-            // Size-based product — validate against size-specific quantity
-            if (Number(sizeRow.quantity) < item.quantity) {
-              throw new Error(`Insufficient stock for ${product.name} (${itemSize}). Available: ${sizeRow.quantity}, Requested: ${item.quantity}`);
-            }
-          } else {
-            // Weight-based product — must account for gram conversion
-            const gramsNeeded = item.quantity * this.getGramEquivalentFromSize(itemSize);
-            if (Number(product.stock) < gramsNeeded) {
-              throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}g, Requested: ${gramsNeeded}g`);
-            }
-          }
-        } else if (Number(product.stock) < item.quantity) {
-          throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`);
-        }
-      } catch (stockErr: any) {
-        if (stockErr?.message?.includes('Insufficient stock') || stockErr?.message?.includes('not found')) {
-          throw stockErr;
-        }
-        console.warn('[createOrder] Stock check warning:', stockErr);
-      }
-    }
-
-    let order: any;
-    try {
-      const insertResult = await db.insert(orders).values({
+    const order = await db.transaction(async (tx) => {
+      const [createdOrder] = await tx.insert(orders).values({
         ...orderData,
         orderNumber,
       }).returning();
-      order = insertResult?.[0];
-    } catch (insertErr: any) {
-      const isParseError = insertErr?.cause?.message?.includes("Cannot read properties of null");
-      if (!isParseError) {
-        throw insertErr;
-      }
-      console.warn('[createOrder] Insert returning() parse failed, looking up by order number');
-    }
+      if (!createdOrder) throw new Error("Failed to create order");
 
-    if (!order) {
-      try {
-        const found = await retryQuery(() =>
-          db.execute(sql`SELECT * FROM orders WHERE order_number = ${orderNumber}`)
-        );
-        const row = found?.rows?.[0];
-        if (row) {
-          order = {
-            id: row.id,
-            orderNumber: row.order_number,
-            customerId: row.customer_id,
-            customerName: row.customer_name,
-            customerEmail: row.customer_email,
-            customerPhone: row.customer_phone,
-            shippingAddress: row.shipping_address,
-            total: row.total,
-            status: row.status,
-            paymentMethod: row.payment_method,
-            notes: row.notes,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at,
-          };
-        }
-      } catch (lookupErr) {
-        console.error('[createOrder] Could not look up order:', lookupErr);
-        throw lookupErr;
-      }
-    }
+      for (const sourceItem of items) {
+        const item: any = { ...sourceItem };
+        let variant: any = null;
+        let stockToDeduct = Number(item.quantity);
+        let before = 0;
+        let after = 0;
 
-    if (!order) {
-      throw new Error("Order was created but could not be retrieved");
-    }
+        if (item.productId) {
+          const productResult = await tx.execute(sql`
+            SELECT id, name, stock, selling_method
+            FROM products WHERE id = ${item.productId} FOR UPDATE
+          `);
+          const product = productResult.rows[0] as any;
+          if (!product) throw new Error(`Product with ID ${item.productId} not found`);
 
-    const orderItemsData = items.map(item => ({
-      ...item,
-      orderId: order.id,
-    }));
-
-    try {
-      await retryQuery(() => db.insert(orderItems).values(orderItemsData));
-    } catch (itemsErr) {
-      console.warn('[createOrder] Order items insert via ORM failed, using raw SQL:', itemsErr);
-      for (const item of orderItemsData) {
-        await db.execute(sql`INSERT INTO order_items (order_id, product_id, product_name, product_sku, product_price, quantity, subtotal, size, fulfilled, removed, metadata) VALUES (${item.orderId}, ${item.productId ?? null}, ${item.productName}, ${(item as any).productSku ?? null}, ${item.productPrice}, ${item.quantity}, ${item.subtotal}, ${(item as any).size || null}, ${(item as any).fulfilled ?? false}, ${(item as any).removed ?? false}, ${(item as any).metadata ? JSON.stringify((item as any).metadata) : null})`);
-      }
-    }
-
-    for (const item of items) {
-      try {
-        if (!item.productId) {
-          console.warn('[createOrder] Skipping stock update for item without productId');
-          continue;
-        }
-        // CG bag items have their stock deducted separately in routes.ts after createOrder —
-        // skip here to prevent double-deduction.
-        if ((item as any).metadata?.fromCgBag) continue;
-
-        // Parse size label from the item or product name
-        // This supports both unit-based "Size: Large" and weight-based options like "1 oz"
-        const sizeLabel =
-          (item as any).size ||
-          this.extractWeightOptionFromProductName(item.productName) ||
-          this.extractSizeFromProductName(item.productName);
-
-        // Default stock deduction is the item quantity (non-weight items or unknown labels)
-        let stockToDeduct = item.quantity;
-
-        if (sizeLabel) {
-          // Convert known weight options to their gram equivalent for stock deduction
-          const gramEquivalent = this.getGramEquivalentFromSize(sizeLabel);
-          // Stock is tracked in grams for weight-based items, so multiply the quantity by the gram equivalent.
-          // Round to integer — the stock column is INTEGER and fractional values (e.g. 3.5g for an eighth)
-          // would cause "invalid input syntax for type integer" errors.
-          stockToDeduct = Math.round(item.quantity * gramEquivalent);
+          const variantsResult = await tx.execute(sql`
+            SELECT id, size, quantity
+            FROM product_sizes WHERE product_id = ${item.productId}
+            ORDER BY id FOR UPDATE
+          `);
+          const variants = variantsResult.rows as any[];
+          if (variants.length > 0) {
+            if (item.size) variant = variants.find((row) => row.size === item.size);
+            if (!variant && (item.metadata?.fromCgBag || item.metadata?.fromStandardBag)) {
+              const available = variants.filter((row) => Number(row.quantity) >= Number(item.quantity));
+              variant = available[Math.floor(Math.random() * available.length)];
+              if (variant) item.size = variant.size;
+            }
+            if (!variant) {
+              throw new Error(`A valid size or flavor is required for ${product.name}`);
+            }
+            before = Number(variant.quantity);
+            after = before - Number(item.quantity);
+            if (after < 0) {
+              throw new Error(`Insufficient stock for ${product.name} (${variant.size}). Available: ${before}, Requested: ${item.quantity}`);
+            }
+            await tx.execute(sql`
+              UPDATE product_sizes SET quantity = ${after}, updated_at = NOW()
+              WHERE id = ${variant.id}
+            `);
+            await tx.execute(sql`
+              UPDATE products
+              SET stock = totals.sellable, physical_inventory = totals.physical, updated_at = NOW()
+              FROM (
+                SELECT COALESCE(SUM(quantity), 0)::integer AS sellable,
+                       COALESCE(SUM(physical_quantity), 0)::integer AS physical
+                FROM product_sizes WHERE product_id = ${item.productId}
+              ) totals
+              WHERE products.id = ${item.productId}
+            `);
+          } else {
+            if (product.selling_method === "weight") {
+              const sizeLabel = item.size || this.extractWeightOptionFromProductName(item.productName);
+              stockToDeduct = Math.ceil(Number(item.quantity) * this.getGramEquivalentFromSize(sizeLabel));
+            }
+            before = Number(product.stock);
+            after = before - stockToDeduct;
+            if (after < 0) {
+              throw new Error(`Insufficient stock for ${product.name}. Available: ${before}, Requested: ${stockToDeduct}`);
+            }
+            await tx.execute(sql`
+              UPDATE products SET stock = ${after}, updated_at = NOW() WHERE id = ${item.productId}
+            `);
+          }
         }
 
-        await db.execute(
-          sql`UPDATE products SET stock = GREATEST(0, stock - ${stockToDeduct}), updated_at = NOW() WHERE id = ${item.productId}`
-        );
+        const [createdItem] = await tx.insert(orderItems).values({
+          ...item,
+          orderId: createdOrder.id,
+        }).returning();
 
-        // Use item.size directly (preferred) or fall back to extracting from product name
-        const sizeName = (item as any).size || this.extractSizeFromProductName(item.productName);
-        if (sizeName) {
-          await db.execute(
-            sql`UPDATE product_sizes SET quantity = GREATEST(0, quantity - ${item.quantity}), updated_at = NOW() WHERE product_id = ${item.productId} AND size = ${sizeName}`
-          );
+        if (item.productId && createdItem) {
+          await tx.insert(inventoryLogs).values({
+            productId: item.productId,
+            variantId: variant?.id ?? null,
+            orderId: createdOrder.id,
+            orderItemId: createdItem.id,
+            userId: orderData.customerId ?? null,
+            type: "order_reservation",
+            ledger: "sellable",
+            direction: "out",
+            sourceAction: item.metadata?.fromCgBag
+              ? "cg_bag_reservation"
+              : item.metadata?.fromStandardBag
+                ? "standard_bag_reservation"
+                : "order_reservation",
+            quantity: variant ? Number(item.quantity) : stockToDeduct,
+            previousStock: before,
+            newStock: after,
+            reason: `Reserved for order ${orderNumber}`,
+          });
         }
-      } catch (stockErr) {
-        console.warn('[createOrder] Stock update error:', stockErr);
       }
-    }
+      return createdOrder;
+    });
 
+    invalidateCache.products();
     try {
       const fullOrder = await this.getOrder(order.id);
       return fullOrder!;
@@ -2101,42 +2115,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateOrderStatus(orderId: number, status: string): Promise<Order> {
-    try {
-      const [updatedOrder] = await retryQuery(() =>
-        db
-          .update(orders)
-          .set({
-            status,
-            archived: false,
-            updatedAt: new Date()
-          })
-          .where(eq(orders.id, orderId))
-          .returning()
-      );
-
-      if (updatedOrder) {
-        return updatedOrder;
+    const updated = await db.transaction(async (tx) => {
+      const [order] = await tx.select().from(orders)
+        .where(eq(orders.id, orderId)).for("update").limit(1);
+      if (!order) throw new Error("Order not found");
+      if (order.status === status) return order;
+      if (order.status === "cancelled") {
+        throw new Error("Cancelled orders cannot be reopened; create a new order instead");
       }
-
-      console.warn('[updateOrderStatus] Update returned empty, falling back to direct fetch');
-    } catch (error: any) {
-      console.warn('[updateOrderStatus] Retry failed, fetching order directly:', error?.message);
-    }
-
-    {
-      const [order] = await retryQuery(() => db.select().from(orders).where(eq(orders.id, orderId)));
-      if (!order) {
-        throw new Error("Order not found");
+      if (status === "cancelled") {
+        const items = await tx.select().from(orderItems)
+          .where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)))
+          .for("update");
+        for (const item of items) {
+          await this.restoreInventoryForDeletedOrderItem(item, null, Boolean(item.fulfilled), tx);
+        }
       }
-      if (order.status !== status) {
-        await retryQuery(() =>
-          db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, orderId))
-        );
-        const [refreshed] = await retryQuery(() => db.select().from(orders).where(eq(orders.id, orderId)));
-        return refreshed || order;
-      }
-      return order;
-    }
+      const [result] = await tx.update(orders).set({
+        status,
+        archived: false,
+        updatedAt: new Date(),
+      }).where(eq(orders.id, orderId)).returning();
+      return result;
+    });
+    invalidateCache.products();
+    return updated;
   }
 
   async updateOrderTotal(orderId: number, total: number): Promise<Order> {
@@ -2212,242 +2215,100 @@ export class DatabaseStorage implements IStorage {
   }
 
   async fulfillOrderItem(orderId: number, productId: number | null, quantity: number, userId: string, orderItemId?: number): Promise<void> {
-    // Get the specific order item — prefer matching by item ID when provided to
-    // correctly handle multiple variants of the same product in one order
-    const itemFilter = orderItemId
-      ? and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItemId))
-      : and(
-          eq(orderItems.orderId, orderId),
-          productId === null ? isNull(orderItems.productId) : eq(orderItems.productId, productId)
-        );
-
-    const [orderItem] = await db
-      .select()
-      .from(orderItems)
-      .where(itemFilter)
-      .limit(1);
-
-    if (!orderItem) {
-      throw new Error("Order item not found");
-    }
-
-    if (productId === null && orderItem.productId !== null) {
-      throw new Error("Order item is not a custom item");
-    }
-    if (productId !== null && orderItem.productId !== productId) {
-      throw new Error("Product does not match order item");
-    }
-
-    // Custom order items are fulfillment checkmarks only. They have no catalog
-    // product and must never affect product or physical inventory.
-    if (productId === null) {
-      await db
-        .update(orderItems)
-        .set({ fulfilled: true })
-        .where(and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItem.id)));
-      return;
-    }
-
-    const productRows = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-    if (productRows.length === 0) {
-      throw new Error("Product not found");
-    }
-    const product = productRows[0];
-
-    const sizeLabel =
-      (orderItem as any).size ||
-      this.extractWeightOptionFromProductName(orderItem.productName) ||
-      this.extractSizeFromProductName(orderItem.productName);
-
-    // Default to raw quantity; for weight options convert to grams
-    let physicalDelta = quantity;
-    if (sizeLabel) {
-      const gramEquivalent = this.getGramEquivalentFromSize(sizeLabel);
-      physicalDelta = quantity * gramEquivalent;
-    }
-
-    const currentPhysicalInventory = product.physicalInventory || 0;
-    const newPhysicalInventory = currentPhysicalInventory - physicalDelta;
-
-    if (newPhysicalInventory < 0) {
-      throw new Error("Insufficient physical inventory");
-    }
-
-    // Round to integer before writing to integer DB columns
-    const newPhysicalInventoryInt = Math.round(newPhysicalInventory);
-    const physicalDeltaInt = Math.round(physicalDelta);
-
-    // Update only physical inventory (stock is reduced when order is placed, not when fulfilled)
-    await db
-      .update(products)
-      .set({
-        physicalInventory: newPhysicalInventoryInt,
-        updatedAt: new Date()
-      })
-      .where(eq(products.id, productId));
-
-    // Mark the specific order item as fulfilled
-    const fulfillFilter = orderItemId
-      ? and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItemId))
-      : and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId));
-
-    await db
-      .update(orderItems)
-      .set({ fulfilled: true })
-      .where(fulfillFilter);
-
-    // Update per-size physical quantity if applicable.
-    // Prefer the dedicated size column on the order item; fall back to parsing the product name.
-    // For CG bag items no size is recorded at order time — fall back to the size with the
-    // most physical stock so the inventory manager totals stay accurate.
-    const sizeName = (orderItem as any).size || this.extractSizeFromProductName(orderItem.productName);
-    if (sizeName) {
-      await db.execute(
-        // Clamp so physical_quantity never drops below quantity (stock) — physical must always >= stock
-        sql`UPDATE product_sizes SET physical_quantity = GREATEST(quantity, COALESCE(physical_quantity, quantity) - ${physicalDeltaInt}), updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
-      );
-    } else {
-      // No explicit size — check whether this product has size rows at all and deduct
-      // from the one with the highest physical_quantity (CG bag fallback).
-      const fallbackResult = await db.execute(
-        sql`SELECT size FROM product_sizes WHERE product_id = ${productId} AND COALESCE(physical_quantity, quantity) > 0 ORDER BY COALESCE(physical_quantity, quantity) DESC LIMIT 1`
-      );
-      const fallbackSize = (fallbackResult?.rows?.[0] as any)?.size;
-      if (fallbackSize) {
-        await db.execute(
-          // Use GREATEST(quantity, ...) — same clamp as the explicit-size path — so
-          // physical_quantity can never drop below quantity (stock) even via the fallback.
-          sql`UPDATE product_sizes SET physical_quantity = GREATEST(quantity, COALESCE(physical_quantity, quantity) - ${physicalDeltaInt}), updated_at = NOW() WHERE product_id = ${productId} AND size = ${fallbackSize}`
-        );
-      }
-    }
-
-    // Log the physical inventory change
-    await db.insert(inventoryLogs).values({
-      productId,
-      userId,
-      type: 'physical_out',
-      quantity: -physicalDeltaInt,
-      previousStock: Math.round(currentPhysicalInventory),
-      newStock: newPhysicalInventoryInt,
-      reason: `Order fulfillment - Order #${orderId} (Physical inventory reduced)`,
-      createdAt: new Date()
-    });
+    await this.setOrderItemFulfillment(orderId, productId, userId, orderItemId, true);
   }
 
   async unfulfillOrderItem(orderId: number, productId: number | null, quantity: number, userId: string, orderItemId?: number): Promise<void> {
-    // Get the specific order item — prefer matching by item ID when provided
-    const unfulfillItemFilter = orderItemId
-      ? and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItemId))
-      : and(
-          eq(orderItems.orderId, orderId),
-          productId === null ? isNull(orderItems.productId) : eq(orderItems.productId, productId)
-        );
+    await this.setOrderItemFulfillment(orderId, productId, userId, orderItemId, false);
+  }
 
-    const orderItem = await db
-      .select()
-      .from(orderItems)
-      .where(unfulfillItemFilter)
-      .limit(1);
-
-    if (orderItem.length === 0) {
-      throw new Error("Order item not found");
-    }
-
-    if (!orderItem[0].fulfilled) {
-      throw new Error("Order item is not fulfilled");
-    }
-
-    if (productId === null && orderItem[0].productId !== null) {
-      throw new Error("Order item is not a custom item");
-    }
-    if (productId !== null && orderItem[0].productId !== productId) {
-      throw new Error("Product does not match order item");
-    }
-
-    // Custom items only track whether an employee accounted for them.
-    if (productId === null) {
-      await db
-        .update(orderItems)
-        .set({ fulfilled: false })
-        .where(and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItem[0].id)));
-      return;
-    }
-
-    const product = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-    if (product.length === 0) {
-      throw new Error("Product not found");
-    }
-
-    const sizeLabel =
-      (orderItem[0] as any).size ||
-      this.extractWeightOptionFromProductName(orderItem[0].productName) ||
-      this.extractSizeFromProductName(orderItem[0].productName);
-
-    let physicalDelta = quantity;
-    if (sizeLabel) {
-      const gramEquivalent = this.getGramEquivalentFromSize(sizeLabel);
-      physicalDelta = quantity * gramEquivalent;
-    }
-
-    const currentPhysicalInventory = product[0].physicalInventory || 0;
-    const newPhysicalInventory = currentPhysicalInventory + physicalDelta;
-
-    // Round to integer before writing to integer DB columns
-    const newPhysicalInventoryInt = Math.round(newPhysicalInventory);
-    const physicalDeltaInt = Math.round(physicalDelta);
-
-    // Update only physical inventory (add back)
-    await db
-      .update(products)
-      .set({
-        physicalInventory: newPhysicalInventoryInt,
-        updatedAt: new Date()
-      })
-      .where(eq(products.id, productId));
-
-    // Use the already-fetched orderItem[0] for size info
-    const unfulfillItem = orderItem[0];
-
-    // Mark the specific order item as not fulfilled
-    await db
-      .update(orderItems)
-      .set({ fulfilled: false })
-      .where(unfulfillItemFilter);
-
-    if (unfulfillItem) {
-      // Prefer the dedicated size column; fall back to parsing the product name.
-      // For CG bag items with no recorded size, reverse from the size with the least
-      // physical stock (mirrors the fulfil deduction heuristic).
-      const sizeName = (unfulfillItem as any).size || this.extractSizeFromProductName(unfulfillItem.productName);
-      if (sizeName) {
-        await db.execute(
-          sql`UPDATE product_sizes SET physical_quantity = physical_quantity + ${physicalDeltaInt}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${sizeName}`
-        );
-      } else {
-        const fallbackResult = await db.execute(
-          sql`SELECT size FROM product_sizes WHERE product_id = ${productId} ORDER BY COALESCE(physical_quantity, quantity) ASC LIMIT 1`
-        );
-        const fallbackSize = (fallbackResult?.rows?.[0] as any)?.size;
-        if (fallbackSize) {
-          await db.execute(
-            sql`UPDATE product_sizes SET physical_quantity = COALESCE(physical_quantity, quantity) + ${physicalDeltaInt}, updated_at = NOW() WHERE product_id = ${productId} AND size = ${fallbackSize}`
-          );
-        }
+  private async setOrderItemFulfillment(
+    orderId: number,
+    productId: number | null,
+    userId: string,
+    orderItemId: number | undefined,
+    fulfilled: boolean,
+  ): Promise<void> {
+    await db.transaction(async (tx) => {
+      const itemResult = orderItemId
+        ? await tx.execute(sql`SELECT * FROM order_items WHERE order_id = ${orderId} AND id = ${orderItemId} FOR UPDATE`)
+        : productId === null
+          ? await tx.execute(sql`SELECT * FROM order_items WHERE order_id = ${orderId} AND product_id IS NULL AND removed = false ORDER BY id LIMIT 1 FOR UPDATE`)
+          : await tx.execute(sql`SELECT * FROM order_items WHERE order_id = ${orderId} AND product_id = ${productId} AND removed = false ORDER BY id LIMIT 1 FOR UPDATE`);
+      const item = itemResult.rows[0] as any;
+      if (!item) throw new Error("Order item not found");
+      if ((item.product_id ?? null) !== productId) throw new Error("Product does not match order item");
+      if (Boolean(item.fulfilled) === fulfilled) {
+        throw new Error(fulfilled ? "Order item is already fulfilled" : "Order item is not fulfilled");
       }
-    }
 
-    // Log the physical inventory change
-    await db.insert(inventoryLogs).values({
-      productId,
-      userId,
-      type: 'physical_in',
-      quantity: physicalDeltaInt,
-      previousStock: Math.round(currentPhysicalInventory),
-      newStock: newPhysicalInventoryInt,
-      reason: `Order unfulfillment - Order #${orderId} (Physical inventory restored)`,
-      createdAt: new Date()
+      if (productId === null) {
+        await tx.execute(sql`UPDATE order_items SET fulfilled = ${fulfilled} WHERE id = ${item.id}`);
+        return;
+      }
+
+      const productResult = await tx.execute(
+        sql`SELECT id, physical_inventory, selling_method FROM products WHERE id = ${productId} FOR UPDATE`
+      );
+      const product = productResult.rows[0] as any;
+      if (!product) throw new Error("Product not found");
+      const variantsResult = await tx.execute(
+        sql`SELECT id, size, quantity, physical_quantity FROM product_sizes WHERE product_id = ${productId} ORDER BY id FOR UPDATE`
+      );
+      const variants = variantsResult.rows as any[];
+      const sign = fulfilled ? -1 : 1;
+      let delta = Number(item.quantity);
+      let variant: any = null;
+      let before: number;
+      let after: number;
+
+      if (variants.length > 0) {
+        variant = variants.find((row) => row.size === item.size);
+        if (!variant) throw new Error("The exact reserved size or flavor is missing");
+        before = Number(variant.physical_quantity ?? 0);
+        after = before + sign * delta;
+        if (after < 0) throw new Error(`Insufficient physical inventory for ${variant.size}`);
+        await tx.execute(
+          sql`UPDATE product_sizes SET physical_quantity = ${after}, updated_at = NOW() WHERE id = ${variant.id}`
+        );
+        await tx.execute(sql`
+          UPDATE products SET stock = totals.sellable, physical_inventory = totals.physical, updated_at = NOW()
+          FROM (
+            SELECT COALESCE(SUM(quantity), 0)::integer AS sellable,
+                   COALESCE(SUM(physical_quantity), 0)::integer AS physical
+            FROM product_sizes WHERE product_id = ${productId}
+          ) totals WHERE products.id = ${productId}
+        `);
+      } else {
+        if (product.selling_method === "weight") {
+          delta = Math.ceil(delta * this.getGramEquivalentFromSize(item.size || this.extractWeightOptionFromProductName(item.product_name)));
+        }
+        before = Number(product.physical_inventory ?? 0);
+        after = before + sign * delta;
+        if (after < 0) throw new Error("Insufficient physical inventory");
+        await tx.execute(
+          sql`UPDATE products SET physical_inventory = ${after}, updated_at = NOW() WHERE id = ${productId}`
+        );
+      }
+
+      await tx.execute(sql`UPDATE order_items SET fulfilled = ${fulfilled} WHERE id = ${item.id}`);
+      await tx.insert(inventoryLogs).values({
+        productId,
+        variantId: variant?.id ?? null,
+        orderId,
+        orderItemId: Number(item.id),
+        userId,
+        type: fulfilled ? "physical_out" : "physical_in",
+        ledger: "physical",
+        direction: fulfilled ? "out" : "in",
+        sourceAction: fulfilled ? "fulfillment" : "fulfillment_reversal",
+        quantity: delta,
+        previousStock: before,
+        newStock: after,
+        reason: fulfilled ? "Order item fulfilled" : "Order item fulfillment reversed",
+      });
     });
+    invalidateCache.products();
   }
 
   async substituteOrderItem(
@@ -2589,7 +2450,7 @@ export class DatabaseStorage implements IStorage {
         .set({ removed: true })
         .where(eq(orderItems.id, oldItemId));
 
-      await tx.insert(orderItems).values({
+      const [createdItem] = await tx.insert(orderItems).values({
         orderId,
         productId: newProductId,
         productName: newProduct.name,
@@ -2601,7 +2462,7 @@ export class DatabaseStorage implements IStorage {
         fulfilled: false,
         removed: false,
         substitutedForItemId: oldItemId,
-      });
+      }).returning();
 
       const activeItems = await tx
         .select()
@@ -2642,7 +2503,8 @@ export class DatabaseStorage implements IStorage {
   private async restoreInventoryForDeletedOrderItem(
     item: any,
     userId: string | null,
-    restorePhysical: boolean
+    restorePhysical: boolean,
+    executor: any = db,
   ): Promise<void> {
     if (!item.productId || item.removed) return;
 
@@ -2656,86 +2518,95 @@ export class DatabaseStorage implements IStorage {
     const stockDelta = Math.round(item.quantity * gramEquivalent);
     const physicalDelta = stockDelta;
 
-    await db.transaction(async (tx) => {
-      const [productBefore] = await tx
-        .select({ stock: products.stock, physicalInventory: products.physicalInventory })
-        .from(products)
-        .where(eq(products.id, item.productId))
-        .limit(1);
-      if (!productBefore) return;
+    const productResult = await executor.execute(
+      sql`SELECT stock, physical_inventory FROM products WHERE id = ${item.productId} FOR UPDATE`
+    );
+    const productBefore = productResult.rows[0] as any;
+    if (!productBefore) return;
+    const variantsResult = await executor.execute(
+      sql`SELECT id, size, quantity, physical_quantity FROM product_sizes WHERE product_id = ${item.productId} ORDER BY id FOR UPDATE`
+    );
+    const variants = variantsResult.rows as any[];
+    const variant = variants.find((row) => row.size === sizeLabel);
+    if (variants.length > 0 && !variant) throw new Error("Cannot reverse inventory: exact variant is missing");
 
-      await tx
-        .update(products)
-        .set({
-          stock: sql`${products.stock} + ${stockDelta}`,
-          ...(restorePhysical
-            ? { physicalInventory: sql`${products.physicalInventory} + ${physicalDelta}` }
-            : {}),
-          updatedAt: new Date(),
-        })
-        .where(eq(products.id, item.productId));
+    if (variant) {
+      await executor.execute(sql`
+        UPDATE product_sizes
+        SET quantity = quantity + ${item.quantity},
+            physical_quantity = physical_quantity + ${restorePhysical ? item.quantity : 0},
+            updated_at = NOW()
+        WHERE id = ${variant.id}
+      `);
+      await executor.execute(sql`
+        UPDATE products SET stock = totals.sellable, physical_inventory = totals.physical, updated_at = NOW()
+        FROM (
+          SELECT COALESCE(SUM(quantity), 0)::integer AS sellable,
+                 COALESCE(SUM(physical_quantity), 0)::integer AS physical
+          FROM product_sizes WHERE product_id = ${item.productId}
+        ) totals WHERE products.id = ${item.productId}
+      `);
+    } else {
+      await executor.execute(sql`
+        UPDATE products
+        SET stock = stock + ${stockDelta},
+            physical_inventory = physical_inventory + ${restorePhysical ? physicalDelta : 0},
+            updated_at = NOW()
+        WHERE id = ${item.productId}
+      `);
+    }
 
-      // Stock reservations for sized products are stored both on the product
-      // aggregate and on the selected size row.
-      if (sizeLabel) {
-        if (restorePhysical) {
-          await tx.execute(
-            sql`UPDATE product_sizes
-                SET quantity = quantity + ${item.quantity},
-                    physical_quantity = COALESCE(physical_quantity, quantity) + ${physicalDelta},
-                    updated_at = NOW()
-                WHERE product_id = ${item.productId} AND size = ${sizeLabel}`
-          );
-        } else {
-          await tx.execute(
-            sql`UPDATE product_sizes
-                SET quantity = quantity + ${item.quantity},
-                    updated_at = NOW()
-                WHERE product_id = ${item.productId} AND size = ${sizeLabel}`
-          );
-        }
-      }
-
-      await tx.insert(inventoryLogs).values({
+      await executor.insert(inventoryLogs).values({
         productId: item.productId,
+        variantId: variant?.id ?? null,
+        orderId: item.orderId,
+        orderItemId: item.id,
         userId,
         type: 'stock_in',
+        ledger: "sellable",
+        direction: "in",
+        sourceAction: "order_item_reversal",
         quantity: stockDelta,
-        previousStock: productBefore.stock,
-        newStock: productBefore.stock + stockDelta,
+        previousStock: variant ? Number(variant.quantity) : Number(productBefore.stock),
+        newStock: (variant ? Number(variant.quantity) + item.quantity : Number(productBefore.stock) + stockDelta),
         reason: `Order item removed/deleted - Order #${item.orderId} (stock restored)`,
         createdAt: new Date(),
       });
 
       if (restorePhysical && item.fulfilled) {
-        await tx.insert(inventoryLogs).values({
+        await executor.insert(inventoryLogs).values({
           productId: item.productId,
+          variantId: variant?.id ?? null,
+          orderId: item.orderId,
+          orderItemId: item.id,
           userId,
           type: 'physical_in',
+          ledger: "physical",
+          direction: "in",
+          sourceAction: "fulfilled_item_reversal",
           quantity: physicalDelta,
-          previousStock: productBefore.physicalInventory ?? 0,
-          newStock: (productBefore.physicalInventory ?? 0) + physicalDelta,
+          previousStock: variant ? Number(variant.physical_quantity) : Number(productBefore.physical_inventory ?? 0),
+          newStock: variant ? Number(variant.physical_quantity) + item.quantity : Number(productBefore.physical_inventory ?? 0) + physicalDelta,
           reason: `Deleted fulfilled order item - Order #${item.orderId} (physical inventory restored)`,
           createdAt: new Date(),
         });
       }
-    });
   }
 
   async removeOrderItem(orderId: number, itemId: number, userId: string): Promise<void> {
-    const [item] = await db.select().from(orderItems).where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId))).limit(1);
-    if (!item) throw new Error("Order item not found");
-
-    // Removing an item from the details screen restores reserved stock only.
-    // Physical inventory is intentionally unchanged here, even if the item
-    // had been fulfilled.
-    await this.restoreInventoryForDeletedOrderItem(item, userId, false);
-    await db.delete(orderItems).where(eq(orderItems.id, itemId));
-
-    // Recalculate order total from remaining items
-    const remainingItems = await db.select().from(orderItems).where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
-    const newTotal = remainingItems.reduce((sum, i) => sum + parseFloat(i.subtotal), 0);
-    await db.update(orders).set({ total: String(newTotal), updatedAt: new Date() }).where(eq(orders.id, orderId));
+    await db.transaction(async (tx) => {
+      const [item] = await tx.select().from(orderItems)
+        .where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId))).for("update").limit(1);
+      if (!item) throw new Error("Order item not found");
+      if (item.fulfilled) throw new Error("Unfulfill the item before removing it");
+      await this.restoreInventoryForDeletedOrderItem(item, userId, false, tx);
+      await tx.delete(orderItems).where(eq(orderItems.id, itemId));
+      const remainingItems = await tx.select().from(orderItems)
+        .where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)));
+      const newTotal = remainingItems.reduce((sum, i) => sum + parseFloat(i.subtotal), 0);
+      await tx.update(orders).set({ total: String(newTotal), updatedAt: new Date() }).where(eq(orders.id, orderId));
+    });
+    invalidateCache.products();
   }
 
   async updateOrderItemPrice(orderId: number, itemId: number, newPrice: number): Promise<Order> {
@@ -2805,7 +2676,7 @@ export class DatabaseStorage implements IStorage {
             : 0;
       const subtotal = resolvedUnitPrice * quantity;
 
-      await tx.insert(orderItems).values({
+      const [createdItem] = await tx.insert(orderItems).values({
         orderId,
         productId,
         productName: product.name,
@@ -2816,7 +2687,7 @@ export class DatabaseStorage implements IStorage {
         size: unitLabel || null,
         fulfilled: false,
         removed: false,
-      });
+      }).returning();
 
       await tx
         .update(products)
@@ -2848,11 +2719,17 @@ export class DatabaseStorage implements IStorage {
 
       await tx.insert(inventoryLogs).values({
         productId,
+        variantId: selectedSize?.id ?? null,
+        orderId,
+        orderItemId: createdItem?.id ?? null,
         userId,
         type: "stock_out",
+        ledger: "sellable",
+        direction: "out",
+        sourceAction: "order_item_addition",
         quantity: stockDelta,
-        previousStock: product.stock,
-        newStock: product.stock - stockDelta,
+        previousStock: selectedSize?.quantity ?? product.stock,
+        newStock: selectedSize ? selectedSize.quantity - quantity : product.stock - stockDelta,
         reason: `${unitLabel ? `[${unitLabel}] ` : ""}Item added to Order #${orderId}`,
         createdAt: new Date(),
       });
@@ -2884,83 +2761,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async markOrderItemAsPacked(orderId: number, productId: number, userId: string, orderItemId?: number): Promise<{ success: boolean; allPacked: boolean }> {
-    // Get the product and order item
-    const product = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-    if (product.length === 0) {
-      throw new Error("Product not found");
-    }
-
-    // Prefer matching by item ID when provided to handle variant products sharing the same productId
-    const packItemFilter = orderItemId
-      ? and(eq(orderItems.orderId, orderId), eq(orderItems.id, orderItemId))
-      : and(eq(orderItems.orderId, orderId), eq(orderItems.productId, productId));
-
-    const orderItem = await db
-      .select()
-      .from(orderItems)
-      .where(packItemFilter)
-      .limit(1);
-
-    if (orderItem.length === 0) {
-      throw new Error("Order item not found");
-    }
-
-    if (orderItem[0].fulfilled) {
-      throw new Error("Order item already packed");
-    }
-
-    const packedQuantity = orderItem[0].quantity;
-
-    const sizeLabel =
-      (orderItem[0] as any).size ||
-      this.extractWeightOptionFromProductName(orderItem[0].productName) ||
-      this.extractSizeFromProductName(orderItem[0].productName);
-
-    let physicalDelta = packedQuantity;
-    if (sizeLabel) {
-      const gramEquivalent = this.getGramEquivalentFromSize(sizeLabel);
-      physicalDelta = packedQuantity * gramEquivalent;
-    }
-
-    const currentPhysicalInventory = product[0].physicalInventory || 0;
-    const newPhysicalInventory = currentPhysicalInventory - physicalDelta;
-
-    // Check if there's enough physical inventory
-    if (newPhysicalInventory < 0) {
-      throw new Error(
-        `Insufficient physical inventory. Available: ${currentPhysicalInventory}, Required: ${physicalDelta}`
-      );
-    }
-
-    // Mark the order item as packed (fulfilled = true) and update physical inventory
-    await db.transaction(async (tx) => {
-      // Mark the specific order item as packed
-      await tx
-        .update(orderItems)
-        .set({ fulfilled: true })
-        .where(packItemFilter);
-
-      // Update physical inventory (reduce by packed quantity)
-      await tx
-        .update(products)
-        .set({
-          physicalInventory: newPhysicalInventory,
-          updatedAt: new Date()
-        })
-        .where(eq(products.id, productId));
-
-      // Log the packing activity with physical inventory change
-      await tx.insert(inventoryLogs).values({
-        productId,
-        userId,
-        type: 'packing',
-        quantity: -physicalDelta, // Negative because we're reducing physical inventory
-        previousStock: currentPhysicalInventory,
-        newStock: newPhysicalInventory,
-        reason: `Order item packed - Order #${orderId} (Physical inventory reduced)`,
-        createdAt: new Date()
-      });
-    });
+    await this.setOrderItemFulfillment(orderId, productId, userId, orderItemId, true);
 
     // Check if all items in the order are packed
     const orderItemsResult = await db
@@ -3186,31 +2987,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteOrder(id: number): Promise<void> {
-    const existing = await retryQuery(() => db.select({ id: orders.id }).from(orders).where(eq(orders.id, id)));
-    if (existing.length === 0) {
-      throw new Error("Order not found");
-    }
-    const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id));
-    for (const item of items) {
-      // A fulfilled item consumed physical inventory, so deleting the order
-      // restores both the reservation and the physical count.
-      await this.restoreInventoryForDeletedOrderItem(item, null, Boolean(item.fulfilled));
-    }
-    try {
-      await this.snapshotOrdersBeforeDeletion([id]);
-    } catch (e) {
-      console.warn('[deleteOrder] Failed to snapshot order for analytics:', e);
-    }
-    try {
-      await retryQuery(() => db.delete(orderItems).where(eq(orderItems.orderId, id)));
-    } catch (e) {
-      console.warn('[deleteOrder] Failed to delete order items:', e);
-    }
-    try {
-      await retryQuery(() => db.delete(orders).where(eq(orders.id, id)));
-    } catch (e) {
-      console.warn('[deleteOrder] Failed to delete order:', e);
-    }
+    await db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(orders).where(eq(orders.id, id)).for("update").limit(1);
+      if (!existing) throw new Error("Order not found");
+      const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, id)).for("update");
+      for (const item of items) {
+        await this.restoreInventoryForDeletedOrderItem(item, null, Boolean(item.fulfilled), tx);
+      }
+      await this.snapshotOrdersBeforeDeletion([id], tx, true);
+      await tx.delete(orderItems).where(eq(orderItems.orderId, id));
+      await tx.delete(orders).where(eq(orders.id, id));
+    });
+    invalidateCache.products();
     try { invalidateCache.analytics(); } catch (e) { console.warn('Cache invalidation error:', e); }
   }
 

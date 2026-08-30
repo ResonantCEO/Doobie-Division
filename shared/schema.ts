@@ -5,6 +5,7 @@ import {
   timestamp,
   jsonb,
   index,
+  uniqueIndex,
   serial,
   integer,
   decimal,
@@ -126,6 +127,7 @@ export const productSizes = pgTable("product_sizes", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   productIdIdx: index("IDX_product_sizes_product_id").on(table.productId),
+  productSizeUnique: uniqueIndex("UQ_product_sizes_product_size").on(table.productId, table.size),
 }));
 
 export const productQuantityPricing = pgTable("product_quantity_pricing", {
@@ -179,6 +181,12 @@ export const inventoryLogs = pgTable("inventory_logs", {
   quantity: integer("quantity").notNull(),
   previousStock: integer("previous_stock").notNull(),
   newStock: integer("new_stock").notNull(),
+  ledger: varchar("ledger").notNull().default("sellable"), // sellable or physical
+  variantId: integer("variant_id").references(() => productSizes.id, { onDelete: "set null" }),
+  orderId: integer("order_id").references(() => orders.id, { onDelete: "set null" }),
+  orderItemId: integer("order_item_id").references(() => orderItems.id, { onDelete: "set null" }),
+  direction: varchar("direction").notNull().default("adjustment"), // in, out, adjustment
+  sourceAction: varchar("source_action").notNull().default("legacy"),
   reason: text("reason"),
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),

@@ -711,10 +711,10 @@ export default function InventoryTable({
                   {/* Table header */}
                   <div className="grid grid-cols-[1fr_72px_72px] mb-1">
                     <span className="font-semibold text-gray-400 uppercase tracking-wide text-[10px]">
-                      Stock / Physical
+                       Sellable / Physical
                     </span>
                     <span className="font-semibold text-gray-400 uppercase tracking-wide text-[10px] text-right">
-                      Stock
+                       Sellable
                     </span>
                     <span className="font-semibold text-gray-400 uppercase tracking-wide text-[10px] text-right">
                       Physical
@@ -854,7 +854,7 @@ export default function InventoryTable({
                     onClick={() => handleSort("stock")}
                     className="h-auto p-0 font-semibold hover:bg-transparent"
                   >
-                    Stock / Physical
+                     Sellable / Physical
                     {getSortIcon("stock")}
                   </Button>
                 </div>

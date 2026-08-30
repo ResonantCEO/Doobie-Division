@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatWeight } from "@/lib/weightUtils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -34,22 +34,36 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
   const [selectedSize, setSelectedSize] = useState<string>("all");
+  const [ledger, setLedger] = useState<"sellable" | "physical">("sellable");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const hasSizes = !!(product?.sizes && product.sizes.length > 0);
 
+  useEffect(() => {
+    if (open && product?.sizes?.length) setSelectedSize(product.sizes[0].size);
+    if (!product?.sizes?.length) setSelectedSize("all");
+  }, [open, product]);
+
   const adjustStockMutation = useMutation({
     mutationFn: async (data: { quantity: number; reason: string; sizeName?: string }) => {
       if (!product || !product.id) throw new Error("No product selected");
-      await apiRequest("POST", `/api/products/${product.id}/adjust-stock`, data);
+      if (ledger === "physical") {
+        await apiRequest("POST", `/api/products/${product.id}/physical-count`, {
+          count: data.quantity,
+          reason: data.reason,
+          sizeName: data.sizeName,
+        });
+      } else {
+        await apiRequest("POST", `/api/products/${product.id}/adjust-stock`, data);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products/low-stock"] });
       toast({
         title: "Success",
-        description: "Stock adjusted successfully",
+        description: ledger === "physical" ? "Verified physical count recorded" : "Sellable stock adjusted",
       });
       onOpenChange(false);
       setQuantity("");
@@ -92,10 +106,12 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
     }
 
     const qty = parseInt(quantity);
-    if (isNaN(qty) || qty === 0 || !reason.trim()) {
+    if (isNaN(qty) || (ledger === "sellable" && qty === 0) || qty < (ledger === "physical" ? 0 : -1000000) || !reason.trim()) {
       toast({
         title: "Invalid Input",
-        description: "Please provide a valid non-zero quantity and reason",
+        description: ledger === "physical"
+          ? "Enter the verified non-negative physical count and a reason"
+          : "Please provide a valid non-zero quantity and reason",
         variant: "destructive",
       });
       return;
@@ -118,24 +134,24 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
   const getCurrentStock = () => {
     if (hasSizes && selectedSize !== "all") {
       const size = product.sizes!.find(s => s.size === selectedSize);
-      return size ? size.quantity : 0;
+      return size ? (ledger === "physical" ? (size.physicalQuantity ?? 0) : size.quantity) : 0;
     }
-    return product.stock;
+    return ledger === "physical" ? (product.physicalInventory ?? 0) : product.stock;
   };
 
   const currentStock = getCurrentStock();
-  const newStock = currentStock + parseInt(quantity || "0");
+  const newStock = ledger === "physical" ? parseInt(quantity || "0") : currentStock + parseInt(quantity || "0");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[400px] max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Adjust Stock - {product?.name}</DialogTitle>
+          <DialogTitle>Inventory Update - {product?.name}</DialogTitle>
           <DialogDescription>
-            Adjust the stock level for this product. Current stock: {product?.sellingMethod === "weight" ? formatWeight(product?.stock || 0) : `${product?.stock || 0} units`}
+            Adjust sellable availability or record a verified warehouse count.
           </DialogDescription>
             <p className="text-xs text-muted-foreground mt-1">
-              This changes sellable stock only; physical inventory will not change.
+              Sellable and physical ledgers are separate. Physical counts are never inferred from sellable stock.
             </p>
         </DialogHeader>
 
@@ -155,6 +171,17 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
             )}
           </div>
 
+          <div>
+            <Label>Inventory ledger</Label>
+            <Select value={ledger} onValueChange={(value) => setLedger(value as "sellable" | "physical")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sellable">Sellable stock adjustment</SelectItem>
+                <SelectItem value="physical">Verified physical count</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {hasSizes && (
             <div>
               <Label>Adjust For</Label>
@@ -163,7 +190,6 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
                   <SelectValue placeholder="Select option" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All (Total Stock)</SelectItem>
                   {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map(s => (
                     <SelectItem key={s.id} value={s.size}>
                       {s.size} (Current: {s.quantity})
@@ -175,21 +201,24 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
           )}
 
           <div>
-            <Label htmlFor="quantity">Adjustment Quantity</Label>
+            <Label htmlFor="quantity">{ledger === "physical" ? "Verified Physical Count" : "Adjustment Quantity"}</Label>
             <Input
               id="quantity"
               type="number"
-              placeholder="Enter positive or negative number"
+              min={ledger === "physical" ? 0 : undefined}
+              placeholder={ledger === "physical" ? "Enter counted quantity" : "Enter positive or negative number"}
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               required
             />
             <p className="text-xs text-gray-500 mt-1">
-              Use positive numbers to add stock, negative to remove
+              {ledger === "physical"
+                ? "Enter the quantity physically counted in the warehouse."
+                : "Use positive numbers to add sellable stock, negative to remove."}
             </p>
             {quantity && !isNaN(parseInt(quantity)) && (
               <p className="text-sm mt-2">
-                New stock{hasSizes && selectedSize !== "all" ? ` for ${selectedSize}` : ""} will be: <span className="font-medium">{newStock}</span>
+                New {ledger} value{hasSizes && selectedSize !== "all" ? ` for ${selectedSize}` : ""}: <span className="font-medium">{newStock}</span>
               </p>
             )}
           </div>
@@ -210,7 +239,7 @@ export default function StockAdjustmentModal({ open, onOpenChange, product }: St
               Cancel
             </Button>
             <Button type="submit" disabled={adjustStockMutation.isPending}>
-              {adjustStockMutation.isPending ? "Adjusting..." : "Adjust Stock"}
+              {adjustStockMutation.isPending ? "Saving..." : ledger === "physical" ? "Record Verified Count" : "Adjust Sellable Stock"}
             </Button>
           </div>
         </form>

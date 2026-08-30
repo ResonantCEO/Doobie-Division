@@ -7,6 +7,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import AddToCartModal from "./add-to-cart-modal";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, Category, ProductSize } from "@shared/schema";
+import { getSellableStock, isLowStock, isOutOfStock as productIsOutOfStock } from "@shared/inventory";
 
 interface ProductCardProps {
   product: Product & { category: Category | null; sizes?: ProductSize[]; quantityPricing?: Array<{ minQuantity: number; pricePerItem: string }> };
@@ -157,11 +158,8 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   const hasSizes = product.sizes && product.sizes.length > 0;
-  const allSizesOutOfStock = hasSizes && product.sizes!.every(s => s.quantity <= 0);
-  // Size-level inventory is authoritative for products with flavors/options.
-  // This keeps an in-stock flavor purchasable even if a cached parent stock total
-  // has not yet caught up.
-  const isOutOfStock = hasSizes ? allSizesOutOfStock : product.stock === 0;
+  const sellableStock = getSellableStock(product);
+  const isOutOfStock = productIsOutOfStock(product);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -174,8 +172,8 @@ export default function ProductCard({ product }: ProductCardProps) {
     if (isOutOfStock) {
       return { label: "Out of Stock", variant: "destructive" as const };
     }
-    if (product.stock <= product.minStockThreshold) {
-      return { label: "Low Stock", variant: "secondary" as const };
+    if (isLowStock(product)) {
+      return { label: `Low Stock (${sellableStock})`, variant: "secondary" as const };
     }
     return null;
   };
