@@ -596,6 +596,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Product routes
   app.get('/api/products', async (req, res) => {
     try {
+      // Inventory changes must never be served from the browser's HTTP cache.
+      // A stale product list can advertise variant rows that no longer exist,
+      // while order mutations correctly validate against the current database.
+      res.set('Cache-Control', 'no-store');
       const { categoryId, categoryIds, search, status, includeInactive } = req.query;
       const filters: any = {};
 
@@ -661,6 +665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/products/:id', async (req, res) => {
     try {
+      res.set('Cache-Control', 'no-store');
       const id = parseInt(req.params.id);
       const product = await storage.getProduct(id);
 

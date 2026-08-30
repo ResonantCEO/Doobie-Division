@@ -1506,7 +1506,6 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                               ) : searchResults.map((p: Product) => {
                                 const pa = p as any;
                                 const isWB = pa.sellingMethod === "weight";
-                                const pHasSizes = pa.sizes && pa.sizes.length > 0;
                                 const displayPrice = isWB
                                   ? (pa.pricePerGram ? `$${Number(pa.pricePerGram).toFixed(2)}/g` : pa.pricePerOunce ? `$${Number(pa.pricePerOunce).toFixed(2)}/oz` : "—")
                                   : (p.price ? `$${parseFloat(p.price).toFixed(2)}` : "—");
@@ -1514,23 +1513,39 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                                   <button
                                     key={p.id}
                                     className="w-full text-left px-3 py-2 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
-                                    onClick={() => {
-                                      setSelectedAddProduct(p);
-                                      if (pHasSizes) {
-                                        const init: Record<string, number> = {};
-                                        pa.sizes.forEach((s: any) => { init[s.size] = 0; });
-                                        setAddItemSizeQuantities(init);
-                                        setSelectedAddUnit("units");
-                                      } else {
-                                        setAddItemSizeQuantities({});
-                                        const opts = [
-                                          { key: "grams", price: Number(pa.pricePerGram) || 0 },
-                                          { key: "eighth", price: Number(pa.pricePerEighth) || 0 },
-                                          { key: "quarter", price: Number(pa.pricePerQuarter) || 0 },
-                                          { key: "half", price: Number(pa.pricePerHalf) || 0 },
-                                          { key: "ounce", price: Number(pa.pricePerOunce) || 0 },
-                                        ].filter(o => o.price > 0);
-                                        setSelectedAddUnit(pa.sellingMethod === "weight" && opts.length > 0 ? opts[0].key : "units");
+                                    onClick={async () => {
+                                      try {
+                                        const response = await fetch(`/api/products/${p.id}?fresh=${Date.now()}`, {
+                                          credentials: 'include',
+                                          cache: 'no-store',
+                                        });
+                                        if (!response.ok) throw new Error("Could not refresh this product");
+                                        const currentProduct = await response.json() as Product;
+                                        const current = currentProduct as any;
+                                        const currentHasSizes = current.sizes && current.sizes.length > 0;
+                                        setSelectedAddProduct(currentProduct);
+                                        if (currentHasSizes) {
+                                          const init: Record<string, number> = {};
+                                          current.sizes.forEach((s: any) => { init[s.size] = 0; });
+                                          setAddItemSizeQuantities(init);
+                                          setSelectedAddUnit("units");
+                                        } else {
+                                          setAddItemSizeQuantities({});
+                                          const opts = [
+                                            { key: "grams", price: Number(current.pricePerGram) || 0 },
+                                            { key: "eighth", price: Number(current.pricePerEighth) || 0 },
+                                            { key: "quarter", price: Number(current.pricePerQuarter) || 0 },
+                                            { key: "half", price: Number(current.pricePerHalf) || 0 },
+                                            { key: "ounce", price: Number(current.pricePerOunce) || 0 },
+                                          ].filter(o => o.price > 0);
+                                          setSelectedAddUnit(current.sellingMethod === "weight" && opts.length > 0 ? opts[0].key : "units");
+                                        }
+                                      } catch (error: any) {
+                                        toast({
+                                          title: "Unable to Load Current Inventory",
+                                          description: error.message || "Please try selecting the product again.",
+                                          variant: "destructive",
+                                        });
                                       }
                                     }}
                                   >
