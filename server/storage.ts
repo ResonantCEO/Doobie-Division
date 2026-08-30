@@ -2543,7 +2543,11 @@ export class DatabaseStorage implements IStorage {
       sql`SELECT id, size, quantity, physical_quantity FROM product_sizes WHERE product_id = ${item.productId} ORDER BY id FOR UPDATE`
     );
     const variants = variantsResult.rows as any[];
-    const variant = variants.find((row) => row.size === sizeLabel);
+    const variant = sizeLabel
+      ? variants.find(
+          (row) => normalizeVariantLabel(row.size) === normalizeVariantLabel(sizeLabel),
+        )
+      : undefined;
     if (variants.length > 0 && !variant) throw new Error("Cannot reverse inventory: exact variant is missing");
 
     if (variant) {
