@@ -149,7 +149,35 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   const { data: allProducts } = useQuery<Product[]>({
     queryKey: ["/api/products"],
     enabled: isOpen && userRole === 'admin',
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: isOpen && userRole === 'admin' ? 10000 : false,
   });
+
+  useEffect(() => {
+    if (!selectedAddProduct || !allProducts) return;
+
+    const currentProduct = allProducts.find((product) => product.id === selectedAddProduct.id);
+    if (!currentProduct) {
+      setSelectedAddProduct(null);
+      setAddItemSizeQuantities({});
+      return;
+    }
+
+    if (currentProduct !== selectedAddProduct) {
+      const currentSizes = ((currentProduct as any).sizes || []) as Array<{ size: string; quantity: number }>;
+      setSelectedAddProduct(currentProduct);
+      setAddItemSizeQuantities((previous) =>
+        Object.fromEntries(
+          currentSizes.map((size) => [
+            size.size,
+            Math.min(previous[size.size] || 0, Math.max(0, size.quantity)),
+          ]),
+        ),
+      );
+    }
+  }, [allProducts, selectedAddProduct]);
 
   // Fulfill order item mutation
   const fulfillItemMutation = useMutation({

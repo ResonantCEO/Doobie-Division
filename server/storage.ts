@@ -2664,7 +2664,11 @@ export class DatabaseStorage implements IStorage {
         : undefined;
 
       if (sizeRows.length > 0 && !selectedSize) {
-        throw new Error("Choose a valid size or flavor for this product");
+        throw new Error(
+          unitLabel
+            ? `"${unitLabel}" is no longer a current option for ${product.name}. Please choose an available size or flavor.`
+            : `Choose a valid size or flavor for ${product.name}`,
+        );
       }
 
       const stockDelta = selectedSize
