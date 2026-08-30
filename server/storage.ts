@@ -55,6 +55,10 @@ import { queryCache, categoriesCache, productsCache, analyticsCache, generateCac
 
 type SnapshotDb = Pick<typeof db, "select" | "insert" | "delete">;
 
+function normalizeVariantLabel(value: unknown): string {
+  return String(value ?? "").trim().toLocaleLowerCase();
+}
+
 async function retryQuery<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -2358,7 +2362,9 @@ export class DatabaseStorage implements IStorage {
         .where(eq(productSizes.productId, newProductId))
         .for("update");
       const selectedNewSize = unitLabel
-        ? newSizeRows.find((row) => row.size === unitLabel)
+        ? newSizeRows.find(
+            (row) => normalizeVariantLabel(row.size) === normalizeVariantLabel(unitLabel),
+          )
         : undefined;
 
       if (newSizeRows.length > 0 && !selectedNewSize) {
@@ -2396,7 +2402,9 @@ export class DatabaseStorage implements IStorage {
             this.extractWeightOptionFromProductName(oldItem.productName) ||
             this.extractSizeFromProductName(oldItem.productName);
           const selectedOldSize = recordedOldSize
-            ? oldSizeRows.find((row) => row.size === recordedOldSize)
+            ? oldSizeRows.find(
+                (row) => normalizeVariantLabel(row.size) === normalizeVariantLabel(recordedOldSize),
+              )
             : undefined;
 
           oldSizeLabel = selectedOldSize?.size;
@@ -2660,7 +2668,9 @@ export class DatabaseStorage implements IStorage {
         .where(eq(productSizes.productId, productId))
         .for("update");
       const selectedSize = unitLabel
-        ? sizeRows.find((row) => row.size === unitLabel)
+        ? sizeRows.find(
+            (row) => normalizeVariantLabel(row.size) === normalizeVariantLabel(unitLabel),
+          )
         : undefined;
 
       if (sizeRows.length > 0 && !selectedSize) {
@@ -2696,7 +2706,7 @@ export class DatabaseStorage implements IStorage {
         productPrice: String(resolvedUnitPrice),
         quantity,
         subtotal: String(subtotal),
-        size: unitLabel || null,
+        size: selectedSize ? selectedSize.size.trim() : unitLabel?.trim() || null,
         fulfilled: false,
         removed: false,
       }).returning();
