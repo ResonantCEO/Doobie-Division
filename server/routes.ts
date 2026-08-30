@@ -2998,14 +2998,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/admin/attention-counts', isAuthenticated, requireRole(['admin']), async (_req, res) => {
+  app.get('/api/admin/attention-counts', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (_req, res) => {
     try {
-      const [pendingSupportTickets, pendingUserApprovals] = await Promise.all([
+      const [pendingSupportTickets, pendingUserApprovals, newOrders] = await Promise.all([
         storage.getPendingSupportTicketCount(),
         storage.getPendingUserCount(),
+        storage.getNewOrderCount(),
       ]);
       res.set('Cache-Control', 'no-store');
-      res.json({ pendingSupportTickets, pendingUserApprovals });
+      res.json({ pendingSupportTickets, pendingUserApprovals, newOrders });
     } catch (error) {
       console.error('Failed to fetch admin attention counts:', error);
       res.status(500).json({ message: 'Failed to fetch admin attention counts' });
