@@ -179,6 +179,7 @@ export interface IStorage {
     pendingCount: number;
     adminCount: number;
   }>;
+  getPendingUserCount(): Promise<number>;
   updateUserStatus(id: string, status: string): Promise<User>;
   updateUserRole(id: string, role: string): Promise<User>;
   updateUserIdVerification(id: string, status: string): Promise<User>;
@@ -197,6 +198,7 @@ export interface IStorage {
 
   // Support ticket operations
   createSupportTicket(data: any): Promise<any>;
+  getPendingSupportTicketCount(): Promise<number>;
   getSupportTickets(filters?: any): Promise<any[]>;
   getCustomerTickets(userId: string): Promise<any[]>;
   updateSupportTicketStatus(id: number, status: string): Promise<any>;
@@ -3900,6 +3902,14 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  async getPendingUserCount(): Promise<number> {
+    const [{ count }] = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(users)
+      .where(eq(users.status, 'pending'));
+    return Number(count);
+  }
+
   async updateUserStatus(id: string, status: string): Promise<User> {
     const setData: Record<string, any> = { status, updatedAt: new Date() };
     if (status === 'active') {
@@ -4061,6 +4071,17 @@ export class DatabaseStorage implements IStorage {
     }
 
     return ticket;
+  }
+
+  async getPendingSupportTicketCount(): Promise<number> {
+    const [{ count }] = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(supportTickets)
+      .where(and(
+        eq(supportTickets.status, 'open'),
+        eq(supportTickets.adminCleared, false),
+      ));
+    return Number(count);
   }
 
   async getSupportTickets(filters: any = {}) {

@@ -61,7 +61,20 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
     staleTime: 30 * 1000,
   });
 
+  const { data: attentionCounts } = useQuery<{
+    pendingSupportTickets: number;
+    pendingUserApprovals: number;
+  }>({
+    queryKey: ["/api/admin/attention-counts"],
+    enabled: user.role === "admin",
+    staleTime: 5 * 1000,
+    refetchInterval: 10 * 1000,
+    refetchOnWindowFocus: true,
+  });
+
   const unreadCount = notifications.filter((n: any) => !n.isRead).length;
+  const hasPendingSupportTickets = (attentionCounts?.pendingSupportTickets ?? 0) > 0;
+  const hasPendingUserApprovals = (attentionCounts?.pendingUserApprovals ?? 0) > 0;
 
   const queryClient = useQueryClient();
 
@@ -95,6 +108,9 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
   ];
 
   const visibleTabs = tabs.filter(tab => !tab.roles || tab.roles.includes(user.role));
+  const tabNeedsAttention = (tabId: string) =>
+    (tabId === "admin" && hasPendingSupportTickets) ||
+    (tabId === "users" && hasPendingUserApprovals);
 
   const getUnreadCount = (type: string) => {
     if (type === 'all') {
@@ -634,7 +650,9 @@ export default function Navigation({ user, currentTab }: NavigationProps) {
                   <NavigationMenuLink
                     asChild
                     className={`block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground ${
-                      currentTab === tab.id ? 'bg-accent text-accent-foreground' : ''
+                      tabNeedsAttention(tab.id)
+                        ? 'bg-yellow-100 text-yellow-950 dark:bg-yellow-900/40 dark:text-yellow-100'
+                        : currentTab === tab.id ? 'bg-accent text-accent-foreground' : ''
                     }`}
                   >
                     <Link href={tab.path}>

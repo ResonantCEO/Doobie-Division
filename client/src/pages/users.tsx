@@ -121,6 +121,7 @@ export default function UsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users", currentPage, debouncedSearch] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/attention-counts"] });
       toast({
         title: "Success",
         description: "User status updated successfully",
@@ -153,6 +154,7 @@ export default function UsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users", currentPage, debouncedSearch] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/attention-counts"] });
       toast({
         title: "Success",
         description: "User role updated successfully",
@@ -185,6 +187,7 @@ export default function UsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users", currentPage, debouncedSearch] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/attention-counts"] });
       setEditModalOpen(false);
       setEditingUser(null);
       toast({
@@ -218,6 +221,7 @@ export default function UsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users", currentPage, debouncedSearch] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/attention-counts"] });
       setDeleteConfirmOpen(false);
       setUserToDelete(null);
       toast({

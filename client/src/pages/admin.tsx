@@ -1105,6 +1105,7 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/attention-counts"] });
       toast({ title: "Ticket status updated successfully" });
     },
     onError: () => {
@@ -1166,6 +1167,7 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/attention-counts"] });
       toast({ title: "Support ticket closed successfully. It will be automatically deleted after 24 hours." });
     },
     onError: (error: any) => {
@@ -1188,6 +1190,7 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/attention-counts"] });
       toast({ title: "Ticket archived. It will not be auto-deleted." });
     },
     onError: () => {
@@ -1206,6 +1209,7 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/attention-counts"] });
       toast({ title: "Ticket unarchived." });
     },
     onError: () => {
@@ -1224,6 +1228,7 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/support/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/attention-counts"] });
       setClearAllConfirmOpen(false);
       toast({ title: "All non-archived tickets cleared." });
     },
