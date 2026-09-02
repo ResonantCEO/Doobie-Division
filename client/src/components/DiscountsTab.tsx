@@ -12,30 +12,64 @@ import { Tag, Plus, Pencil, Trash2, Package, ArrowUp, ArrowDown, X } from "lucid
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
-import type { Product, PromoCode } from "@shared/schema";
+import type { Category, Product, PromoCode } from "@shared/schema";
 
 type PromoTarget = {
   productId: number;
   sizes?: string[];
 };
 
-function parsePromoTargets(value: string | null | undefined): PromoTarget[] {
+type CategoryWithChildren = Category & {
+  children?: CategoryWithChildren[];
+};
+
+function parsePromoTargetData(value: string | null | undefined): { products: PromoTarget[]; categoryIds: number[] } {
   try {
     const parsed = JSON.parse(value || "[]");
-    if (!Array.isArray(parsed)) return [];
-    const seen = new Set<number>();
-    return parsed.flatMap((target): PromoTarget[] => {
+    if (!Array.isArray(parsed)) return { products: [], categoryIds: [] };
+    const seenProducts = new Set<number>();
+    const seenCategories = new Set<number>();
+    const products: PromoTarget[] = [];
+    const categoryIds: number[] = [];
+    parsed.forEach((target) => {
+      const categoryId = Number(target?.categoryId);
+      if (Number.isInteger(categoryId) && categoryId > 0 && !seenCategories.has(categoryId)) {
+        seenCategories.add(categoryId);
+        categoryIds.push(categoryId);
+        return;
+      }
       const productId = Number(typeof target === "number" ? target : target?.productId);
-      if (!Number.isInteger(productId) || productId <= 0 || seen.has(productId)) return [];
-      seen.add(productId);
+      if (!Number.isInteger(productId) || productId <= 0 || seenProducts.has(productId)) return;
+      seenProducts.add(productId);
       const sizes = Array.isArray(target?.sizes)
         ? [...new Set(target.sizes.map(String).map(size => size.trim()).filter(Boolean))]
         : undefined;
-      return [{ productId, ...(sizes?.length ? { sizes } : {}) }];
+      products.push({ productId, ...(sizes?.length ? { sizes } : {}) });
     });
+    return { products, categoryIds };
   } catch {
-    return [];
+    return { products: [], categoryIds: [] };
   }
+}
+
+function parsePromoTargets(value: string | null | undefined): PromoTarget[] {
+  return parsePromoTargetData(value).products;
+}
+
+function parsePromoCategoryIds(value: string | null | undefined): number[] {
+  return parsePromoTargetData(value).categoryIds;
+}
+
+function serializePromoTargets(products: PromoTarget[], categoryIds: number[]): string | null {
+  const targets = [
+    ...categoryIds.map(categoryId => ({ categoryId })),
+    ...products,
+  ];
+  return targets.length ? JSON.stringify(targets) : null;
+}
+
+function flattenCategories(categories: CategoryWithChildren[]): CategoryWithChildren[] {
+  return categories.flatMap(category => [category, ...flattenCategories(category.children || [])]);
 }
 
 export default function DiscountsTab() {
@@ -49,6 +83,7 @@ export default function DiscountsTab() {
     discountValue: "",
     specificItemsOnly: false,
     targetProducts: [] as PromoTarget[],
+    targetCategoryIds: [] as number[],
     itemDealQuantity: "1",
     minOrderAmount: "",
     bypassPurchaseMinimum: false,
@@ -69,6 +104,7 @@ export default function DiscountsTab() {
     discountValue: "",
     specificItemsOnly: false,
     targetProducts: [],
+    targetCategoryIds: [],
     itemDealQuantity: "1",
     minOrderAmount: "",
     bypassPurchaseMinimum: false,
@@ -85,8 +121,9 @@ export default function DiscountsTab() {
       description: p.description || "",
       discountType: (p.discountType as "percent" | "fixed" | "item_free" | "item_price") || "percent",
       discountValue: p.discountValue?.toString() || "",
-      specificItemsOnly: parsePromoTargets(p.targetProductIds).length > 0,
+      specificItemsOnly: parsePromoTargets(p.targetProductIds).length > 0 || parsePromoCategoryIds(p.targetProductIds).length > 0,
       targetProducts: parsePromoTargets(p.targetProductIds),
+      targetCategoryIds: parsePromoCategoryIds(p.targetProductIds),
       itemDealQuantity: String(p.itemDealQuantity || 1),
       minOrderAmount: p.minOrderAmount?.toString() || "",
       bypassPurchaseMinimum: p.bypassPurchaseMinimum || false,
@@ -118,6 +155,10 @@ export default function DiscountsTab() {
   const { data: allProducts = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
+  const { data: categoryTree = [] } = useQuery<CategoryWithChildren[]>({
+    queryKey: ["/api/categories"],
+  });
+  const allCategories = flattenCategories(categoryTree).filter(category => category.isActive);
   const isItemDeal = promoCodeForm.discountType === "item_free" || promoCodeForm.discountType === "item_price";
   const selectedDealProducts = promoCodeForm.targetProducts
     .map(target => ({
@@ -154,8 +195,8 @@ export default function DiscountsTab() {
         description: data.description || null,
         discountType: data.discountType,
         discountValue: data.discountType === "item_free" ? "0" : data.discountValue,
-        targetProductIds: (data.specificItemsOnly || data.discountType === "item_free" || data.discountType === "item_price") && data.targetProducts.length
-          ? JSON.stringify(data.targetProducts)
+        targetProductIds: (data.specificItemsOnly || data.discountType === "item_free" || data.discountType === "item_price")
+          ? serializePromoTargets(data.targetProducts, data.targetCategoryIds)
           : null,
         itemDealQuantity: parseInt(data.itemDealQuantity) || 1,
         minOrderAmount: data.minOrderAmount || null,
@@ -186,8 +227,8 @@ export default function DiscountsTab() {
         description: data.description || null,
         discountType: data.discountType,
         discountValue: data.discountType === "item_free" ? "0" : data.discountValue,
-        targetProductIds: (data.specificItemsOnly || data.discountType === "item_free" || data.discountType === "item_price") && data.targetProducts.length
-          ? JSON.stringify(data.targetProducts)
+        targetProductIds: (data.specificItemsOnly || data.discountType === "item_free" || data.discountType === "item_price")
+          ? serializePromoTargets(data.targetProducts, data.targetCategoryIds)
           : null,
         itemDealQuantity: parseInt(data.itemDealQuantity) || 1,
         minOrderAmount: data.minOrderAmount || null,
@@ -317,7 +358,7 @@ export default function DiscountsTab() {
                         {p.bypassPurchaseMinimum && (
                           <Badge variant="outline" className="text-xs text-blue-600 border-blue-400">Bypasses min. purchase</Badge>
                         )}
-                        {parsePromoTargets(p.targetProductIds).length > 0 && (
+                        {(parsePromoTargets(p.targetProductIds).length > 0 || parsePromoCategoryIds(p.targetProductIds).length > 0) && (
                           <Badge variant="outline" className="text-xs">Specific items</Badge>
                         )}
                       </div>
@@ -375,7 +416,7 @@ export default function DiscountsTab() {
                           {p.bypassPurchaseMinimum && (
                             <Badge variant="outline" className="text-xs text-blue-600 border-blue-400">Bypasses min. purchase</Badge>
                           )}
-                          {parsePromoTargets(p.targetProductIds).length > 0 && (
+                          {(parsePromoTargets(p.targetProductIds).length > 0 || parsePromoCategoryIds(p.targetProductIds).length > 0) && (
                             <Badge variant="outline" className="text-xs">Specific items</Badge>
                           )}
                         </div>
@@ -460,6 +501,7 @@ export default function DiscountsTab() {
                     ...f,
                     specificItemsOnly: enabled,
                     targetProducts: enabled ? f.targetProducts : [],
+                    targetCategoryIds: enabled ? f.targetCategoryIds : [],
                   }))}
                 />
                 <div>
@@ -472,19 +514,75 @@ export default function DiscountsTab() {
               {(isItemDeal || promoCodeForm.specificItemsOnly) && (
                 <div className="space-y-3 border-t pt-3">
                   <div>
-                    <Label>{isItemDeal ? "Eligible Items (priority order) *" : "Specific Items *"}</Label>
+                    <Label>{isItemDeal ? "Eligible Products or Categories *" : "Specific Products or Categories *"}</Label>
                     <p className="text-xs text-muted-foreground mt-1">
                       {isItemDeal
-                        ? "The deal is applied to eligible cart items in this order."
-                        : "This discount will affect only the products and options selected here."}
+                        ? "The deal is applied to cart items matching a selected product or category."
+                        : "This discount will affect only the products, categories, and options selected here."}
                     </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Categories</Label>
+                    {promoCodeForm.targetCategoryIds.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {promoCodeForm.targetCategoryIds.map(categoryId => {
+                          const category = allCategories.find(candidate => candidate.id === categoryId);
+                          return (
+                            <Badge key={categoryId} variant="secondary" className="gap-1 pr-1">
+                              {category?.name || `Category ${categoryId}`}
+                              <button
+                                type="button"
+                                className="rounded p-0.5 hover:bg-muted"
+                                aria-label={`Remove ${category?.name || "category"}`}
+                                onClick={() => setPromoCodeForm(f => ({
+                                  ...f,
+                                  targetCategoryIds: f.targetCategoryIds.filter(id => id !== categoryId),
+                                }))}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <Select
+                      key={promoCodeForm.targetCategoryIds.join(",")}
+                      onValueChange={value => setPromoCodeForm(f => ({
+                        ...f,
+                        targetCategoryIds: [...f.targetCategoryIds, Number(value)],
+                      }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Add a category…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allCategories
+                          .filter(category => !promoCodeForm.targetCategoryIds.includes(category.id))
+                          .map(category => (
+                            <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">All products and options in a selected category are eligible.</p>
+                  </div>
+                  <div className="border-t pt-3">
+                    <Label className="text-xs">Individual Products</Label>
                   </div>
                   {selectedDealProducts.length > 0 && (
                     <div className="space-y-2">
                       {selectedDealProducts.map(({ product, target }, index) => {
-                        const productOptions = Array.isArray((product as any).sizes)
-                          ? (product as any).sizes.map((size: any) => String(size.size)).filter(Boolean)
-                          : [];
+                        const productOptions = product.sellingMethod === "weight"
+                          ? [
+                              { label: "Grams", price: product.pricePerGram },
+                              { label: "1/8 oz", price: product.pricePerEighth },
+                              { label: "1/4 oz", price: product.pricePerQuarter },
+                              { label: "1/2 oz", price: product.pricePerHalf },
+                              { label: "1 oz", price: product.pricePerOunce },
+                            ].filter(option => Number(option.price) > 0).map(option => option.label)
+                          : Array.isArray((product as any).sizes)
+                            ? (product as any).sizes.map((size: any) => String(size.size)).filter(Boolean)
+                            : [];
                         const selectedSizes = target.sizes || [];
                         const updateTargetSizes = (sizes?: string[]) => setPromoCodeForm(f => ({
                           ...f,
@@ -513,14 +611,14 @@ export default function DiscountsTab() {
                             </div>
                             {productOptions.length > 0 && (
                               <div className="mt-2 border-t pt-2">
-                                <p className="text-xs font-medium">Applies to</p>
+                                <p className="text-xs font-medium">{product.sellingMethod === "weight" ? "Eligible weights" : "Applies to"}</p>
                                 <label className="mt-1 flex cursor-pointer items-center gap-2 text-xs">
                                   <input
                                     type="checkbox"
                                     checked={selectedSizes.length === 0}
                                     onChange={() => updateTargetSizes(undefined)}
                                   />
-                                  Any size / option for this product
+                                  {product.sellingMethod === "weight" ? "Any weight for this product" : "Any size / option for this product"}
                                 </label>
                                 <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
                                   {productOptions.map((size: string) => (
@@ -637,7 +735,7 @@ export default function DiscountsTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowPromoCodeModal(false); setEditingPromoCode(null); resetPromoCodeForm(); }}>Cancel</Button>
             <Button
-               disabled={!promoCodeForm.code || (promoCodeForm.discountType !== "item_free" && !promoCodeForm.discountValue) || ((isItemDeal || promoCodeForm.specificItemsOnly) && promoCodeForm.targetProducts.length === 0) || createPromoCodeMutation.isPending || updatePromoCodeMutation.isPending}
+               disabled={!promoCodeForm.code || (promoCodeForm.discountType !== "item_free" && !promoCodeForm.discountValue) || ((isItemDeal || promoCodeForm.specificItemsOnly) && promoCodeForm.targetProducts.length === 0 && promoCodeForm.targetCategoryIds.length === 0) || createPromoCodeMutation.isPending || updatePromoCodeMutation.isPending}
               onClick={() => {
                 if (editingPromoCode) {
                   updatePromoCodeMutation.mutate({ id: editingPromoCode.id, data: promoCodeForm });

@@ -334,6 +334,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       const effectiveTotal = combinedTotal - (discountResult?.totalSavings || 0);
       const promoCartItems = state.items.map(item => ({
         productId: item.product.id,
+        categoryId: item.product.categoryId,
         quantity: item.quantity,
         size: item.size,
         productPrice: getEffectivePrice(item.product.id, item.size).toFixed(2),

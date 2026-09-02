@@ -1144,6 +1144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   type PromoCartItem = {
     productId: number;
+    categoryId?: number | null;
     quantity: number;
     size?: string;
     productPrice?: string | number;
@@ -1151,7 +1152,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   type ItemPromoTarget = {
-    productId: number;
+    productId?: number;
+    categoryId?: number;
     sizes?: string[];
   };
 
@@ -1162,11 +1164,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const rawTargets = JSON.parse(promo.targetProductIds || "[]");
       if (!Array.isArray(rawTargets)) return [];
-      const seen = new Set<number>();
+      const seen = new Set<string>();
       return rawTargets.flatMap((rawTarget: any): ItemPromoTarget[] => {
+        const categoryId = Number(rawTarget?.categoryId);
+        if (Number.isInteger(categoryId) && categoryId > 0) {
+          const key = `category:${categoryId}`;
+          if (seen.has(key)) return [];
+          seen.add(key);
+          return [{ categoryId }];
+        }
         const id = Number(typeof rawTarget === "number" ? rawTarget : rawTarget?.productId);
-        if (!Number.isInteger(id) || id <= 0 || seen.has(id)) return [];
-        seen.add(id);
+        const key = `product:${id}`;
+        if (!Number.isInteger(id) || id <= 0 || seen.has(key)) return [];
+        seen.add(key);
         const sizes = Array.isArray(rawTarget?.sizes)
           ? [...new Set(rawTarget.sizes.map(String).map((size: string) => size.trim()).filter(Boolean))]
           : undefined;
@@ -1178,7 +1188,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   function getItemPromoTargetIds(promo: any): number[] {
-    return getItemPromoTargets(promo).map(target => target.productId);
+    return getItemPromoTargets(promo)
+      .map(target => target.productId)
+      .filter((productId): productId is number => productId !== undefined);
+  }
+
+  function promoTargetMatchesItem(target: ItemPromoTarget, item: PromoCartItem): boolean {
+    const productMatches = target.productId !== undefined && target.productId === Number(item.productId);
+    const categoryMatches = target.categoryId !== undefined && target.categoryId === Number(item.categoryId);
+    return (productMatches || categoryMatches) && promoOptionMatches(target, item.size);
   }
 
   function promoOptionMatches(target: ItemPromoTarget, itemSize: string | undefined): boolean {
@@ -1193,8 +1211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (targets.length === 0) return 0;
 
     return items.reduce((subtotal, item) => {
-      const target = targets.find(candidate => candidate.productId === Number(item.productId));
-      if (!target || !promoOptionMatches(target, item.size)) return subtotal;
+      if (!targets.some(target => promoTargetMatchesItem(target, item))) return subtotal;
       const quantity = Math.max(0, Number(item.quantity) || 0);
       const unitPrice = Math.max(0, Number(item.productPrice ?? item.unitPrice) || 0);
       return subtotal + (quantity * unitPrice);
@@ -1208,17 +1225,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ? 0
       : Math.max(0, Number(promo.discountValue) || 0);
     const allocations: Array<PromoCartItem & { itemIndex: number; quantity: number; promoPrice: number; normalUnitPrice: number }> = [];
+    const allocatedQuantities = new Map<number, number>();
     let remaining = maxQuantity;
 
     for (const target of targets) {
       for (let itemIndex = 0; itemIndex < items.length && remaining > 0; itemIndex++) {
         const item = items[itemIndex];
-        if (Number(item.productId) !== target.productId) continue;
-        if (!promoOptionMatches(target, item.size)) continue;
-        const quantity = Math.min(Math.max(0, Number(item.quantity) || 0), remaining);
+        if (!promoTargetMatchesItem(target, item)) continue;
+        const availableQuantity = Math.max(0, Number(item.quantity) || 0) - (allocatedQuantities.get(itemIndex) || 0);
+        const quantity = Math.min(availableQuantity, remaining);
         if (quantity <= 0) continue;
         const normalUnitPrice = Math.max(0, Number(item.productPrice ?? item.unitPrice) || 0);
         allocations.push({ ...item, itemIndex, quantity, promoPrice, normalUnitPrice });
+        allocatedQuantities.set(itemIndex, (allocatedQuantities.get(itemIndex) || 0) + quantity);
         remaining -= quantity;
       }
     }
@@ -1244,7 +1263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (uses > 0) return "You've already used this code";
     }
     if (promo.discountType === "item_free" || promo.discountType === "item_price") {
-      if (getItemPromoTargetIds(promo).length === 0) return "This item deal is not configured correctly";
+      if (getItemPromoTargets(promo).length === 0) return "This item deal is not configured correctly";
       if (promo.discountType === "item_price" && (!Number.isFinite(Number(promo.discountValue)) || Number(promo.discountValue) < 0)) {
         return "This item deal has an invalid promotional price";
       }
@@ -1416,7 +1435,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         enrichedItems.push({
           ...item,
-          productSku: product.sku
+          productSku: product.sku,
+          categoryId: product.categoryId,
         });
       }
 
@@ -1484,7 +1504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           0,
           Number(orderData.total || 0) + requestedPromoSavings - serverPromoSavings,
         ).toFixed(2);
-      } else if (verifiedPromo && getItemPromoTargetIds(verifiedPromo).length > 0) {
+      } else if (verifiedPromo && getItemPromoTargets(verifiedPromo).length > 0) {
         const eligibleSubtotal = getTargetedPromoSubtotal(verifiedPromo, enrichedItems);
         if (eligibleSubtotal <= 0) {
           return res.status(400).json({
