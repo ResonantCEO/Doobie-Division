@@ -10,3 +10,4 @@
 - [Order list request fan-out](order-list-request-fanout.md) — do not mount per-row detail queries just to calculate list actions; include compact action state in the list response.
 - [Assignees and notifications](assignee-notification-boundaries.md) — assignment eligibility and new-order notification recipients must be filtered separately.
 - [Archived order purges](archived-order-purges.md) — clearing fulfilled order history must preserve current inventory instead of reversing prior deductions.
+- [Product discount expiration](product-discount-expiration.md) — percentage, amount, and BOGO share one expiry and must clear together without changing price or inventory.

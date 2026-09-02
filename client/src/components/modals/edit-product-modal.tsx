@@ -66,6 +66,7 @@ const formSchema = z.object({
   pricePerHalf: z.string().optional(),
   discountPercentage: z.string().nullable().optional(),
   discountAmount: z.string().nullable().optional(),
+  discountDurationHours: z.string().optional(),
   isActive: z.boolean(),
   purchasePrice: z.string().optional(),
   purchasePriceMethod: z.enum(["units", "weight"]).default("units"),
@@ -257,6 +258,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       );
       setBogoDiscountType((product as any).bogoDiscountType || "free");
       setBogoDiscountValue((product as any).bogoDiscountValue || "0");
+      setDiscountDurationHours("");
 
       // Pre-populate lb/oz/g fields from grams for weight-based products
       if (product.sellingMethod === "weight") {
@@ -352,6 +354,17 @@ export default function EditProductModal({ open, onOpenChange, product, categori
           discountValue = trimmed;
         }
       }
+
+      const hasProductDiscount =
+        parseFloat(discountValue) > 0 ||
+        parseFloat(data.discountAmount || "0") > 0 ||
+        bogoEnabled;
+      const requestedDurationHours = parseFloat(discountDurationHours);
+      const discountExpiresAt = !hasProductDiscount
+        ? null
+        : Number.isFinite(requestedDurationHours) && requestedDurationHours > 0
+          ? new Date(Date.now() + requestedDurationHours * 60 * 60 * 1000).toISOString()
+          : (product as any).discountExpiresAt || null;
       
       // Helper to safely parse and format price values
       const formatPrice = (value: any, decimals: number = 2): string | null => {
@@ -387,6 +400,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         pricePerHalf: data.sellingMethod === "weight" ? formatPrice(data.pricePerHalf, 2) : null,
         discountPercentage: discountValue,
         discountAmount: data.discountAmount ? parseFloat(data.discountAmount).toFixed(2) : "0",
+        discountExpiresAt,
         purchasePrice: formatPrice(data.purchasePrice, 2),
         purchasePriceMethod: data.purchasePriceMethod || "units",
         purchasePricePerGram: formatPrice(data.purchasePricePerGram, 4),
@@ -526,6 +540,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   });
   const [bogoDiscountType, setBogoDiscountType] = useState<string>((product as any).bogoDiscountType || "free");
   const [bogoDiscountValue, setBogoDiscountValue] = useState<string>((product as any).bogoDiscountValue || "0");
+  const [discountDurationHours, setDiscountDurationHours] = useState("");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1109,10 +1124,9 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                   </FormItem>
                 )}
               />
-            </div>
 
-            {/* BOGO Toggle */}
-            <div className="rounded-lg border p-4 space-y-3">
+              {/* BOGO Toggle */}
+              <div className="border-t pt-4 space-y-3">
               <div className="flex flex-row items-center justify-between">
                 <div className="space-y-0.5">
                   <Label className="text-base">Buy One Get One (BOGO)</Label>
@@ -1191,33 +1205,57 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                   )}
                 </div>
               )}
-            </div>
-
-            {bogoEnabled && bogoDiscountType === "free" && enableSizes && form.watch("sizes") && (form.watch("sizes") || []).length > 0 && (
-              <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
-                <Label className="text-sm font-medium">Free Item Option</Label>
-                <p className="text-xs text-muted-foreground">
-                  Which option does the customer receive for free?
-                </p>
-                <Select
-                  value={bogoFreeOptionIndex}
-                  onValueChange={setBogoFreeOptionIndex}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select free option" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__same__">Same as purchased option</SelectItem>
-                    <SelectItem value="__any__">Customer's choice (any option)</SelectItem>
-                    {(form.watch("sizes") || []).map((s, i) => (
-                      <SelectItem key={i} value={String(i)}>
-                        {s.size || `Option ${i + 1}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
-            )}
+
+              {bogoEnabled && bogoDiscountType === "free" && enableSizes && form.watch("sizes") && (form.watch("sizes") || []).length > 0 && (
+                <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
+                  <Label className="text-sm font-medium">Free Item Option</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Which option does the customer receive for free?
+                  </p>
+                  <Select
+                    value={bogoFreeOptionIndex}
+                    onValueChange={setBogoFreeOptionIndex}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select free option" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__same__">Same as purchased option</SelectItem>
+                      <SelectItem value="__any__">Customer's choice (any option)</SelectItem>
+                      {(form.watch("sizes") || []).map((s, i) => (
+                        <SelectItem key={i} value={String(i)}>
+                          {s.size || `Option ${i + 1}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="border-t pt-4 space-y-2">
+                <Label htmlFor="discount-duration-hours">Discount Duration (Hours)</Label>
+                <Input
+                  id="discount-duration-hours"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="Leave blank for no expiration"
+                  value={discountDurationHours}
+                  onChange={(event) => setDiscountDurationHours(event.target.value)}
+                  onWheel={(event) => event.currentTarget.blur()}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Entering a duration starts a new countdown when you save. When it ends, percentage, amount, and BOGO discounts are cleared automatically.
+                </p>
+                {(product as any).discountExpiresAt && !discountDurationHours && (
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                    Current discounts expire {new Date((product as any).discountExpiresAt).toLocaleString()}.
+                    Leave this blank to keep that expiration.
+                  </p>
+                )}
+              </div>
+            </div>
 
             {!enableSizes && (
               sellingMethod === "weight" ? (

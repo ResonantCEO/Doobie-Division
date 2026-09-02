@@ -291,6 +291,19 @@ app.use((req, res, next) => {
     }
   }
 
+  // Ensure product discount expiration exists (migration)
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_expires_at TIMESTAMP`);
+    console.log("✓ Verified discount_expires_at column exists");
+  } catch (error: any) {
+    if (error?.message?.includes("already exists") || error?.message?.includes("duplicate")) {
+      console.log("✓ discount_expires_at column already exists");
+    } else {
+      console.warn("⚠ Could not verify discount_expires_at column:", error?.message);
+    }
+  }
+
   // Ensure archived column exists on orders table
   try {
     const { sql } = await import("./db");
@@ -474,6 +487,18 @@ app.use((req, res, next) => {
       console.error("Error cleaning up expired tokens:", error);
     }
   }, 3600000); // 1 hour
+
+  // Clear expired product discounts promptly, and catch any missed expirations at startup.
+  const runProductDiscountCleanup = async () => {
+    try {
+      const { storage } = await import("./storage");
+      await storage.clearExpiredProductDiscounts();
+    } catch (error) {
+      console.error("Error clearing expired product discounts:", error);
+    }
+  };
+  runProductDiscountCleanup();
+  setInterval(runProductDiscountCleanup, 60 * 1000);
 
   // Cleanup old closed support tickets every hour
   setInterval(async () => {

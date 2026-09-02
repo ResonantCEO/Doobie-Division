@@ -49,7 +49,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, like, gt } from "drizzle-orm";
+import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, isNotNull, like, gt } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
@@ -566,6 +566,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Product operations
+  async clearExpiredProductDiscounts(): Promise<void> {
+    await retryQuery(() =>
+      db.update(products)
+        .set({
+          discountPercentage: "0",
+          discountAmount: "0",
+          discountExpiresAt: null,
+          bogoEnabled: false,
+          bogoFreeOptionIndex: null,
+          bogoDiscountType: "free",
+          bogoDiscountValue: "0",
+        })
+        .where(and(isNotNull(products.discountExpiresAt), lte(products.discountExpiresAt, new Date())))
+    );
+  }
+
   async getProducts(filters?: {
     categoryId?: number;
     categoryIds?: number[];
@@ -573,6 +589,10 @@ export class DatabaseStorage implements IStorage {
     status?: string;
     isActive?: boolean;
   }): Promise<(Product & { category: Category | null; sizes?: ProductSize[] })[]> {
+    await this.clearExpiredProductDiscounts().catch((error) => {
+      console.warn("[getProducts] Could not clear expired product discounts:", error?.message);
+    });
+
     let query = db
       .select({
         id: products.id,
@@ -596,6 +616,7 @@ export class DatabaseStorage implements IStorage {
         pricePerHalf: products.pricePerHalf,
         discountPercentage: products.discountPercentage,
         discountAmount: products.discountAmount,
+        discountExpiresAt: products.discountExpiresAt,
         bogoEnabled: products.bogoEnabled,
         bogoFreeOptionIndex: products.bogoFreeOptionIndex,
         purchasePrice: products.purchasePrice,
@@ -790,6 +811,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProductBySku(sku: string): Promise<(Product & { category: Category | null }) | undefined> {
+    await this.clearExpiredProductDiscounts().catch(() => {});
     const results = await retryQuery(() =>
       db.select().from(products).where(eq(products.sku, sku))
     );
@@ -798,10 +820,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProduct(id: number): Promise<(Product & { category: Category | null; sizes?: ProductSize[] }) | undefined> {
+    await this.clearExpiredProductDiscounts().catch((error) => {
+      console.warn("[getProduct] Could not clear expired product discounts:", error?.message);
+    });
     let product: any;
     try {
       const rawResult = await retryQuery(() =>
-        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
+        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, discount_expires_at, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
       );
       
       const row = rawResult?.rows?.[0];
@@ -828,6 +853,7 @@ export class DatabaseStorage implements IStorage {
           pricePerHalf: row.price_per_half,
           discountPercentage: row.discount_percentage,
           discountAmount: row.discount_amount,
+          discountExpiresAt: row.discount_expires_at,
           bogoEnabled: row.bogo_enabled === true || row.bogo_enabled === 't' || row.bogo_enabled === 'true',
           bogoFreeOptionIndex: row.bogo_free_option_index != null ? parseInt(String(row.bogo_free_option_index)) : null,
           bogoDiscountType: String(row.bogo_discount_type || 'free'),
@@ -1413,6 +1439,10 @@ export class DatabaseStorage implements IStorage {
           const value = toSafeNum(d.bogoDiscountValue) ?? 0;
           await rawSql`UPDATE products SET bogo_discount_value = ${value} WHERE id = ${id}`;
         }
+        if (d.hasOwnProperty('discountExpiresAt')) {
+          const expiration = d.discountExpiresAt ? new Date(d.discountExpiresAt) : null;
+          await rawSql`UPDATE products SET discount_expires_at = ${expiration} WHERE id = ${id}`;
+        }
 
         console.log('[updateProduct] Successfully updated all fields via direct SQL fallback');
         updateError = null;
@@ -1467,6 +1497,10 @@ export class DatabaseStorage implements IStorage {
         if (updateData.hasOwnProperty('bogoDiscountValue')) {
           const value = parseFloat(String(updateData.bogoDiscountValue));
           await rawSql`UPDATE products SET bogo_discount_value = ${isNaN(value) ? 0 : value} WHERE id = ${id}`;
+        }
+        if (updateData.hasOwnProperty('discountExpiresAt')) {
+          const expiration = updateData.discountExpiresAt ? new Date(updateData.discountExpiresAt) : null;
+          await rawSql`UPDATE products SET discount_expires_at = ${expiration} WHERE id = ${id}`;
         }
 
         console.log('[updateProduct] Successfully updated supplemental fields via direct SQL');

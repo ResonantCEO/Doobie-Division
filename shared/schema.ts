@@ -98,6 +98,7 @@ export const products = pgTable("products", {
   pricePerHalf: decimal("price_per_half", { precision: 10, scale: 2 }), // price per 1/2 ounce
   discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default("0"), // discount percentage (0-100)
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"), // flat dollar amount off
+  discountExpiresAt: timestamp("discount_expires_at"), // clears product discounts and BOGO when reached
   bogoEnabled: boolean("bogo_enabled").notNull().default(false), // buy one get one free
   bogoFreeOptionIndex: integer("bogo_free_option_index"), // which option index is free (null = same as purchased)
   bogoDiscountType: varchar("bogo_discount_type").default("free"), // 'free', 'percentage', 'amount'
@@ -574,6 +575,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
   description: z.string().nullable().optional(),
   discountPercentage: z.string().nullable().optional(),
   discountAmount: z.string().nullable().optional(),
+  discountExpiresAt: z.coerce.date().nullable().optional(),
   stock: z.number().int().min(0).optional().default(0),
   physicalInventory: z.number().optional(),
   purchasePrice: z.string().nullable().optional(),
