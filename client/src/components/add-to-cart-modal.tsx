@@ -256,7 +256,27 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
     }
 
     if (hasSizes) {
-      product.sizes!.forEach(size => {
+      const configuredOptionIndex = (product as any).bogoFreeOptionIndex;
+      const invalidSelection = product.sizes!.find((size, sizeIndex) => {
+        const qty = freeQuantities[size.size] || 0;
+        const paidForSize = sizeQuantities[size.size] || 0;
+        const allowedByConfiguration = configuredOptionIndex === -1
+          ? paidQtyForBogo
+          : configuredOptionIndex == null
+            ? paidForSize
+            : sizeIndex === configuredOptionIndex ? paidQtyForBogo : 0;
+        const remainingStock = Math.max(0, size.quantity - paidForSize);
+        return qty > Math.min(allowedByConfiguration, remainingStock);
+      });
+      if (invalidSelection) {
+        toast({
+          title: "BOGO option unavailable",
+          description: `${invalidSelection.size} does not have enough eligible stock for that BOGO selection.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      product.sizes!.forEach((size, sizeIndex) => {
         const qty = freeQuantities[size.size] || 0;
         if (isFreeType) {
           for (let i = 0; i < qty; i++) addFreeItem(product, size.size);
@@ -442,8 +462,16 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
               </span>
             </div>
             <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-              {[...product.sizes!].sort((a, b) => a.size.localeCompare(b.size)).map((size) => {
-                const isOutOfStock = size.quantity <= 0;
+              {[...product.sizes!].map((size, sizeIndex) => ({ size, sizeIndex })).sort((a, b) => a.size.size.localeCompare(b.size.size)).map(({ size, sizeIndex }) => {
+                const configuredOptionIndex = (product as any).bogoFreeOptionIndex;
+                const paidForSize = sizeQuantities[size.size] || 0;
+                const allowedByConfiguration = configuredOptionIndex === -1
+                  ? paidQtyForBogo
+                  : configuredOptionIndex == null
+                    ? paidForSize
+                    : sizeIndex === configuredOptionIndex ? paidQtyForBogo : 0;
+                const maxSelectable = Math.min(allowedByConfiguration, Math.max(0, size.quantity - paidForSize));
+                const isOutOfStock = maxSelectable <= 0;
                 const currentFree = freeQuantities[size.size] || 0;
                 return (
                   <div key={size.id} className={`flex items-center justify-between ${isOutOfStock ? 'opacity-40' : ''}`}>
@@ -472,7 +500,7 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
                             if (freeTotal >= paidQtyForBogo) return;
                             setFreeQuantities({ ...freeQuantities, [size.size]: currentFree + 1 });
                           }}
-                          disabled={freeTotal >= paidQtyForBogo}
+                          disabled={freeTotal >= paidQtyForBogo || currentFree >= maxSelectable}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>

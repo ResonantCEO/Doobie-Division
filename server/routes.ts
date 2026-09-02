@@ -1285,7 +1285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const promoError = await getPromoValidationError(
           verifiedPromo,
           orderData.customerId || req.user?.claims?.sub,
-          Number(orderData.originalTotal || orderData.total || 0),
+          Number((order as any).originalTotal || orderData.total || 0),
         );
         if (promoError) return res.status(400).json({ message: promoError });
       }
@@ -1318,7 +1318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let minimumAmount: number | null = null;
 
             // Use the pre-promo original total for city minimum check (rounded to cents to avoid float precision issues)
-            const checkTotal = Math.round(parseFloat(orderData.originalTotal || orderData.total || "0") * 100) / 100;
+            const checkTotal = Math.round(parseFloat((order as any).originalTotal || orderData.total || "0") * 100) / 100;
 
             if (orderData.customerId) {
               const { rows: userRows } = await rawPool.query(`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = $1`, [orderData.customerId]);

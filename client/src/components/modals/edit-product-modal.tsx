@@ -185,8 +185,8 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       pricePerEighth: (product as any).standardPricePerEighth ?? (product as any).pricePerEighth ?? "",
       pricePerQuarter: (product as any).standardPricePerQuarter ?? (product as any).pricePerQuarter ?? "",
       pricePerHalf: (product as any).standardPricePerHalf ?? (product as any).pricePerHalf ?? "",
-      discountPercentage: product.discountPercentage || "0",
-      discountAmount: (product as any).discountAmount || "0",
+      discountPercentage: (product as any).configuredDiscountPercentage ?? product.discountPercentage ?? "0",
+      discountAmount: (product as any).configuredDiscountAmount ?? (product as any).discountAmount ?? "0",
       discountPriceOverride: (product as any).discountPriceOverride || "",
       discountPricePerGram: (product as any).discountPricePerGram || "",
       discountPricePerOunce: (product as any).discountPricePerOunce || "",
@@ -208,6 +208,18 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   const enableSizes = form.watch("enableSizes");
 
   useEffect(() => {
+    if (sellingMethod === "units") {
+      form.setValue("discountPricePerGram", "");
+      form.setValue("discountPricePerOunce", "");
+      form.setValue("discountPricePerEighth", "");
+      form.setValue("discountPricePerQuarter", "");
+      form.setValue("discountPricePerHalf", "");
+    } else {
+      form.setValue("discountPriceOverride", "");
+    }
+  }, [sellingMethod, form]);
+
+  useEffect(() => {
     if (product && open) {
       const productHasSizes = !!(product.sizes && product.sizes.length > 0);
       form.reset({
@@ -226,8 +238,8 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         pricePerEighth: (product as any).standardPricePerEighth ?? (product as any).pricePerEighth ?? "",
         pricePerQuarter: (product as any).standardPricePerQuarter ?? (product as any).pricePerQuarter ?? "",
         pricePerHalf: (product as any).standardPricePerHalf ?? (product as any).pricePerHalf ?? "",
-        discountPercentage: product.discountPercentage || "0",
-        discountAmount: (product as any).discountAmount || "0",
+        discountPercentage: (product as any).configuredDiscountPercentage ?? product.discountPercentage ?? "0",
+        discountAmount: (product as any).configuredDiscountAmount ?? (product as any).discountAmount ?? "0",
         discountPriceOverride: (product as any).discountPriceOverride || "",
         discountPricePerGram: (product as any).discountPricePerGram || "",
         discountPricePerOunce: (product as any).discountPricePerOunce || "",
@@ -399,14 +411,15 @@ export default function EditProductModal({ open, onOpenChange, product, categori
               pricePerItem: parseFloat(t.pricePerItem).toFixed(4),
             }))
         : [];
-      const temporaryPriceValues = [
-        data.discountPriceOverride,
-        data.discountPricePerGram,
-        data.discountPricePerOunce,
-        data.discountPricePerEighth,
-        data.discountPricePerQuarter,
-        data.discountPricePerHalf,
-      ];
+      const temporaryPriceValues = data.sellingMethod === "weight"
+        ? [
+            data.discountPricePerGram,
+            data.discountPricePerOunce,
+            data.discountPricePerEighth,
+            data.discountPricePerQuarter,
+            data.discountPricePerHalf,
+          ]
+        : [data.discountPriceOverride];
       const hasProductDiscount =
         parseFloat(discountValue) > 0 ||
         parseFloat(data.discountAmount || "0") > 0 ||

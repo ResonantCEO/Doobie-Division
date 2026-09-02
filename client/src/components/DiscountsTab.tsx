@@ -62,8 +62,8 @@ function parsePromoCategoryIds(value: string | null | undefined): number[] {
 
 function serializePromoTargets(products: PromoTarget[], categoryIds: number[]): string | null {
   const targets = [
-    ...categoryIds.map(categoryId => ({ categoryId })),
     ...products,
+    ...categoryIds.map(categoryId => ({ categoryId })),
   ];
   return targets.length ? JSON.stringify(targets) : null;
 }

@@ -809,9 +809,19 @@ export class DatabaseStorage implements IStorage {
         const temporaryQuantityPricing = Array.isArray(product.discountQuantityPricing)
           ? product.discountQuantityPricing
           : [];
+        const hasTemporaryPricing =
+          product.discountPriceOverride != null ||
+          product.discountPricePerGram != null ||
+          product.discountPricePerOunce != null ||
+          product.discountPricePerEighth != null ||
+          product.discountPricePerQuarter != null ||
+          product.discountPricePerHalf != null ||
+          temporaryQuantityPricing.length > 0;
         return {
           ...product,
           ...bogoByProductId.get(product.id),
+          configuredDiscountPercentage: product.discountPercentage,
+          configuredDiscountAmount: product.discountAmount,
           standardPrice: product.price,
           standardPricePerGram: product.pricePerGram,
           standardPricePerOunce: product.pricePerOunce,
@@ -825,6 +835,8 @@ export class DatabaseStorage implements IStorage {
           pricePerEighth: product.discountPricePerEighth ?? product.pricePerEighth,
           pricePerQuarter: product.discountPricePerQuarter ?? product.pricePerQuarter,
           pricePerHalf: product.discountPricePerHalf ?? product.pricePerHalf,
+          discountPercentage: hasTemporaryPricing ? "0" : product.discountPercentage,
+          discountAmount: hasTemporaryPricing ? "0" : product.discountAmount,
           sizes: sizesByProductId.get(product.id) || [],
           quantityPricing: temporaryQuantityPricing.length > 0
             ? temporaryQuantityPricing
@@ -971,8 +983,18 @@ export class DatabaseStorage implements IStorage {
       const temporaryQuantityPricing = Array.isArray(product.discountQuantityPricing)
         ? product.discountQuantityPricing
         : [];
+      const hasTemporaryPricing =
+        product.discountPriceOverride != null ||
+        product.discountPricePerGram != null ||
+        product.discountPricePerOunce != null ||
+        product.discountPricePerEighth != null ||
+        product.discountPricePerQuarter != null ||
+        product.discountPricePerHalf != null ||
+        temporaryQuantityPricing.length > 0;
       return {
         ...product,
+        configuredDiscountPercentage: product.discountPercentage,
+        configuredDiscountAmount: product.discountAmount,
         standardPrice: product.price,
         standardPricePerGram: product.pricePerGram,
         standardPricePerOunce: product.pricePerOunce,
@@ -986,6 +1008,8 @@ export class DatabaseStorage implements IStorage {
         pricePerEighth: product.discountPricePerEighth ?? product.pricePerEighth,
         pricePerQuarter: product.discountPricePerQuarter ?? product.pricePerQuarter,
         pricePerHalf: product.discountPricePerHalf ?? product.pricePerHalf,
+        discountPercentage: hasTemporaryPricing ? "0" : product.discountPercentage,
+        discountAmount: hasTemporaryPricing ? "0" : product.discountAmount,
         sizes: sizes.length > 0 ? sizes : undefined,
         quantityPricing: temporaryQuantityPricing.length > 0
           ? temporaryQuantityPricing
