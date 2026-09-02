@@ -451,22 +451,121 @@ export default function DiscountsTab() {
               <Label>Description (optional)</Label>
               <Input placeholder="e.g. 20% off for VIP customers" value={promoCodeForm.description} onChange={e => setPromoCodeForm(f => ({ ...f, description: e.target.value }))} />
             </div>
-            <div className="flex items-center gap-3 rounded-lg border p-3">
-              <Switch
-                checked={isItemDeal || promoCodeForm.specificItemsOnly}
-                disabled={isItemDeal}
-                onCheckedChange={enabled => setPromoCodeForm(f => ({
-                  ...f,
-                  specificItemsOnly: enabled,
-                  targetProducts: enabled ? f.targetProducts : [],
-                }))}
-              />
-              <div>
-                <Label>Apply only to specific items</Label>
-                <p className="text-xs text-muted-foreground">
-                  When enabled, this code affects only the products and options selected below.
-                </p>
+            <div className="space-y-3 rounded-lg border p-3">
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={isItemDeal || promoCodeForm.specificItemsOnly}
+                  disabled={isItemDeal}
+                  onCheckedChange={enabled => setPromoCodeForm(f => ({
+                    ...f,
+                    specificItemsOnly: enabled,
+                    targetProducts: enabled ? f.targetProducts : [],
+                  }))}
+                />
+                <div>
+                  <Label>Apply only to specific items</Label>
+                  <p className="text-xs text-muted-foreground">
+                    When enabled, this code affects only the products and options selected below.
+                  </p>
+                </div>
               </div>
+              {(isItemDeal || promoCodeForm.specificItemsOnly) && (
+                <div className="space-y-3 border-t pt-3">
+                  <div>
+                    <Label>{isItemDeal ? "Eligible Items (priority order) *" : "Specific Items *"}</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {isItemDeal
+                        ? "The deal is applied to eligible cart items in this order."
+                        : "This discount will affect only the products and options selected here."}
+                    </p>
+                  </div>
+                  {selectedDealProducts.length > 0 && (
+                    <div className="space-y-2">
+                      {selectedDealProducts.map(({ product, target }, index) => {
+                        const productOptions = Array.isArray((product as any).sizes)
+                          ? (product as any).sizes.map((size: any) => String(size.size)).filter(Boolean)
+                          : [];
+                        const selectedSizes = target.sizes || [];
+                        const updateTargetSizes = (sizes?: string[]) => setPromoCodeForm(f => ({
+                          ...f,
+                          targetProducts: f.targetProducts.map(existing =>
+                            existing.productId === product.id
+                              ? { ...existing, ...(sizes?.length ? { sizes } : { sizes: undefined }) }
+                              : existing,
+                          ),
+                        }));
+                        return (
+                          <div key={product.id} className="rounded border bg-background p-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 text-muted-foreground">{index + 1}.</span>
+                              <span className="min-w-0 flex-1 truncate">{product.name}{product.sku ? <span className="ml-1 text-xs text-muted-foreground">({product.sku})</span> : null}</span>
+                              {isItemDeal && <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === 0} onClick={() => setPromoCodeForm(f => {
+                                const targets = [...f.targetProducts];
+                                [targets[index - 1], targets[index]] = [targets[index], targets[index - 1]];
+                                return { ...f, targetProducts: targets };
+                              })}><ArrowUp className="h-3.5 w-3.5" /></Button>}
+                              {isItemDeal && <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === selectedDealProducts.length - 1} onClick={() => setPromoCodeForm(f => {
+                                const targets = [...f.targetProducts];
+                                [targets[index], targets[index + 1]] = [targets[index + 1], targets[index]];
+                                return { ...f, targetProducts: targets };
+                              })}><ArrowDown className="h-3.5 w-3.5" /></Button>}
+                              <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setPromoCodeForm(f => ({ ...f, targetProducts: f.targetProducts.filter(existing => existing.productId !== product.id) }))}><X className="h-3.5 w-3.5" /></Button>
+                            </div>
+                            {productOptions.length > 0 && (
+                              <div className="mt-2 border-t pt-2">
+                                <p className="text-xs font-medium">Applies to</p>
+                                <label className="mt-1 flex cursor-pointer items-center gap-2 text-xs">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedSizes.length === 0}
+                                    onChange={() => updateTargetSizes(undefined)}
+                                  />
+                                  Any size / option for this product
+                                </label>
+                                <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
+                                  {productOptions.map((size: string) => (
+                                    <label key={size} className="flex cursor-pointer items-center gap-2 text-xs">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedSizes.includes(size)}
+                                        onChange={(event) => {
+                                          const next = event.target.checked
+                                            ? [...selectedSizes, size]
+                                            : selectedSizes.filter(selectedSize => selectedSize !== size);
+                                          updateTargetSizes(next);
+                                        }}
+                                      />
+                                      {size}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <Input value={productSearch} onChange={e => setProductSearch(e.target.value)} placeholder="Search products to add…" />
+                  {productSearch && (
+                    <div className="max-h-40 overflow-y-auto rounded border bg-background">
+                      {matchingProducts.length ? matchingProducts.map(product => (
+                        <button type="button" key={product.id} className="w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => {
+                          setPromoCodeForm(f => ({ ...f, targetProducts: [...f.targetProducts, { productId: product.id }] }));
+                          setProductSearch("");
+                        }}>
+                          {product.name}{product.sku ? <span className="ml-1 text-xs text-muted-foreground">({product.sku})</span> : null}
+                        </button>
+                      )) : <p className="px-3 py-2 text-sm text-muted-foreground">No matching available products.</p>}
+                    </div>
+                  )}
+                  {isItemDeal && <div className="max-w-[220px] space-y-2">
+                    <Label>Deal applies to up to</Label>
+                    <Input type="number" min="1" step="1" value={promoCodeForm.itemDealQuantity} onChange={e => setPromoCodeForm(f => ({ ...f, itemDealQuantity: e.target.value }))} />
+                    <p className="text-xs text-muted-foreground">eligible item(s) per order.</p>
+                  </div>}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -491,103 +590,6 @@ export default function DiscountsTab() {
                 />
               </div>}
             </div>
-            {(isItemDeal || promoCodeForm.specificItemsOnly) && (
-              <div className="space-y-3 rounded-lg border p-3 bg-muted/20">
-                <div>
-                  <Label>{isItemDeal ? "Eligible Items (priority order) *" : "Specific Items *"}</Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {isItemDeal
-                      ? "The deal is applied to eligible cart items in this order."
-                      : "This discount will affect only the products and options selected here."}
-                  </p>
-                </div>
-                {selectedDealProducts.length > 0 && (
-                  <div className="space-y-2">
-                    {selectedDealProducts.map(({ product, target }, index) => {
-                      const productOptions = Array.isArray((product as any).sizes)
-                        ? (product as any).sizes.map((size: any) => String(size.size)).filter(Boolean)
-                        : [];
-                      const selectedSizes = target.sizes || [];
-                      const updateTargetSizes = (sizes?: string[]) => setPromoCodeForm(f => ({
-                        ...f,
-                        targetProducts: f.targetProducts.map(existing =>
-                          existing.productId === product.id
-                            ? { ...existing, ...(sizes?.length ? { sizes } : { sizes: undefined }) }
-                            : existing,
-                        ),
-                      }));
-                      return (
-                      <div key={product.id} className="rounded border bg-background p-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 text-muted-foreground">{index + 1}.</span>
-                          <span className="min-w-0 flex-1 truncate">{product.name}{product.sku ? <span className="ml-1 text-xs text-muted-foreground">({product.sku})</span> : null}</span>
-                          {isItemDeal && <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === 0} onClick={() => setPromoCodeForm(f => {
-                            const targets = [...f.targetProducts];
-                            [targets[index - 1], targets[index]] = [targets[index], targets[index - 1]];
-                            return { ...f, targetProducts: targets };
-                          })}><ArrowUp className="h-3.5 w-3.5" /></Button>}
-                          {isItemDeal && <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === selectedDealProducts.length - 1} onClick={() => setPromoCodeForm(f => {
-                            const targets = [...f.targetProducts];
-                            [targets[index], targets[index + 1]] = [targets[index + 1], targets[index]];
-                            return { ...f, targetProducts: targets };
-                          })}><ArrowDown className="h-3.5 w-3.5" /></Button>}
-                          <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setPromoCodeForm(f => ({ ...f, targetProducts: f.targetProducts.filter(existing => existing.productId !== product.id) }))}><X className="h-3.5 w-3.5" /></Button>
-                        </div>
-                        {productOptions.length > 0 && (
-                          <div className="mt-2 border-t pt-2">
-                            <p className="text-xs font-medium">Applies to</p>
-                            <label className="mt-1 flex cursor-pointer items-center gap-2 text-xs">
-                              <input
-                                type="checkbox"
-                                checked={selectedSizes.length === 0}
-                                onChange={() => updateTargetSizes(undefined)}
-                              />
-                              Any size / option for this product
-                            </label>
-                            <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
-                              {productOptions.map((size: string) => (
-                                <label key={size} className="flex cursor-pointer items-center gap-2 text-xs">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedSizes.includes(size)}
-                                    onChange={(event) => {
-                                      const next = event.target.checked
-                                        ? [...selectedSizes, size]
-                                        : selectedSizes.filter(selectedSize => selectedSize !== size);
-                                      updateTargetSizes(next);
-                                    }}
-                                  />
-                                  {size}
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      );
-                    })}
-                  </div>
-                )}
-                <Input value={productSearch} onChange={e => setProductSearch(e.target.value)} placeholder="Search products to add…" />
-                {productSearch && (
-                  <div className="max-h-40 overflow-y-auto rounded border bg-background">
-                    {matchingProducts.length ? matchingProducts.map(product => (
-                      <button type="button" key={product.id} className="w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => {
-                        setPromoCodeForm(f => ({ ...f, targetProducts: [...f.targetProducts, { productId: product.id }] }));
-                        setProductSearch("");
-                      }}>
-                        {product.name}{product.sku ? <span className="ml-1 text-xs text-muted-foreground">({product.sku})</span> : null}
-                      </button>
-                    )) : <p className="px-3 py-2 text-sm text-muted-foreground">No matching available products.</p>}
-                  </div>
-                )}
-                {isItemDeal && <div className="max-w-[220px] space-y-2">
-                  <Label>Deal applies to up to</Label>
-                  <Input type="number" min="1" step="1" value={promoCodeForm.itemDealQuantity} onChange={e => setPromoCodeForm(f => ({ ...f, itemDealQuantity: e.target.value }))} />
-                  <p className="text-xs text-muted-foreground">eligible item(s) per order.</p>
-                </div>}
-              </div>
-            )}
             <div className="space-y-2">
               <Label>Usage Limit</Label>
               <Select value={promoCodeForm.usageLimitType} onValueChange={v => setPromoCodeForm(f => ({ ...f, usageLimitType: v as any }))}>
