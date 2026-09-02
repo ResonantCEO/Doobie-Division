@@ -572,6 +572,13 @@ export class DatabaseStorage implements IStorage {
         .set({
           discountPercentage: "0",
           discountAmount: "0",
+          discountPriceOverride: null,
+          discountPricePerGram: null,
+          discountPricePerOunce: null,
+          discountPricePerEighth: null,
+          discountPricePerQuarter: null,
+          discountPricePerHalf: null,
+          discountQuantityPricing: null,
           discountExpiresAt: null,
           bogoEnabled: false,
           bogoFreeOptionIndex: null,
@@ -616,6 +623,13 @@ export class DatabaseStorage implements IStorage {
         pricePerHalf: products.pricePerHalf,
         discountPercentage: products.discountPercentage,
         discountAmount: products.discountAmount,
+        discountPriceOverride: products.discountPriceOverride,
+        discountPricePerGram: products.discountPricePerGram,
+        discountPricePerOunce: products.discountPricePerOunce,
+        discountPricePerEighth: products.discountPricePerEighth,
+        discountPricePerQuarter: products.discountPricePerQuarter,
+        discountPricePerHalf: products.discountPricePerHalf,
+        discountQuantityPricing: products.discountQuantityPricing,
         discountExpiresAt: products.discountExpiresAt,
         bogoEnabled: products.bogoEnabled,
         bogoFreeOptionIndex: products.bogoFreeOptionIndex,
@@ -790,12 +804,33 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Attach sizes, tiers, and bogo to each product
-      const result = productsList.map(product => ({
-        ...product,
-        ...bogoByProductId.get(product.id),
-        sizes: sizesByProductId.get(product.id) || [],
-        quantityPricing: tiersByProductId.get(product.id) || [],
-      }));
+      const result = productsList.map(product => {
+        const standardQuantityPricing = tiersByProductId.get(product.id) || [];
+        const temporaryQuantityPricing = Array.isArray(product.discountQuantityPricing)
+          ? product.discountQuantityPricing
+          : [];
+        return {
+          ...product,
+          ...bogoByProductId.get(product.id),
+          standardPrice: product.price,
+          standardPricePerGram: product.pricePerGram,
+          standardPricePerOunce: product.pricePerOunce,
+          standardPricePerEighth: product.pricePerEighth,
+          standardPricePerQuarter: product.pricePerQuarter,
+          standardPricePerHalf: product.pricePerHalf,
+          standardQuantityPricing,
+          price: product.discountPriceOverride ?? product.price,
+          pricePerGram: product.discountPricePerGram ?? product.pricePerGram,
+          pricePerOunce: product.discountPricePerOunce ?? product.pricePerOunce,
+          pricePerEighth: product.discountPricePerEighth ?? product.pricePerEighth,
+          pricePerQuarter: product.discountPricePerQuarter ?? product.pricePerQuarter,
+          pricePerHalf: product.discountPricePerHalf ?? product.pricePerHalf,
+          sizes: sizesByProductId.get(product.id) || [],
+          quantityPricing: temporaryQuantityPricing.length > 0
+            ? temporaryQuantityPricing
+            : standardQuantityPricing,
+        };
+      });
       
       return result;
     } catch (error) {
@@ -826,7 +861,7 @@ export class DatabaseStorage implements IStorage {
     let product: any;
     try {
       const rawResult = await retryQuery(() =>
-        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, discount_expires_at, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
+        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, discount_price_override, discount_price_per_gram, discount_price_per_ounce, discount_price_per_eighth, discount_price_per_quarter, discount_price_per_half, discount_quantity_pricing, discount_expires_at, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
       );
       
       const row = rawResult?.rows?.[0];
@@ -853,6 +888,13 @@ export class DatabaseStorage implements IStorage {
           pricePerHalf: row.price_per_half,
           discountPercentage: row.discount_percentage,
           discountAmount: row.discount_amount,
+          discountPriceOverride: row.discount_price_override,
+          discountPricePerGram: row.discount_price_per_gram,
+          discountPricePerOunce: row.discount_price_per_ounce,
+          discountPricePerEighth: row.discount_price_per_eighth,
+          discountPricePerQuarter: row.discount_price_per_quarter,
+          discountPricePerHalf: row.discount_price_per_half,
+          discountQuantityPricing: row.discount_quantity_pricing,
           discountExpiresAt: row.discount_expires_at,
           bogoEnabled: row.bogo_enabled === true || row.bogo_enabled === 't' || row.bogo_enabled === 'true',
           bogoFreeOptionIndex: row.bogo_free_option_index != null ? parseInt(String(row.bogo_free_option_index)) : null,
@@ -926,10 +968,28 @@ export class DatabaseStorage implements IStorage {
         // table may not exist yet
       }
 
+      const temporaryQuantityPricing = Array.isArray(product.discountQuantityPricing)
+        ? product.discountQuantityPricing
+        : [];
       return {
         ...product,
+        standardPrice: product.price,
+        standardPricePerGram: product.pricePerGram,
+        standardPricePerOunce: product.pricePerOunce,
+        standardPricePerEighth: product.pricePerEighth,
+        standardPricePerQuarter: product.pricePerQuarter,
+        standardPricePerHalf: product.pricePerHalf,
+        standardQuantityPricing: quantityPricingTiers,
+        price: product.discountPriceOverride ?? product.price,
+        pricePerGram: product.discountPricePerGram ?? product.pricePerGram,
+        pricePerOunce: product.discountPricePerOunce ?? product.pricePerOunce,
+        pricePerEighth: product.discountPricePerEighth ?? product.pricePerEighth,
+        pricePerQuarter: product.discountPricePerQuarter ?? product.pricePerQuarter,
+        pricePerHalf: product.discountPricePerHalf ?? product.pricePerHalf,
         sizes: sizes.length > 0 ? sizes : undefined,
-        quantityPricing: quantityPricingTiers,
+        quantityPricing: temporaryQuantityPricing.length > 0
+          ? temporaryQuantityPricing
+          : quantityPricingTiers,
       };
     } catch (error) {
       console.error('[getProduct] Error fetching product sizes:', error);
@@ -960,7 +1020,7 @@ export class DatabaseStorage implements IStorage {
     console.log('[createProduct] productDataWithoutSizes:', JSON.stringify(productDataWithoutSizes, null, 2));
     console.log('[createProduct] processedProduct before insert:', JSON.stringify(processedProduct, null, 2));
 
-    const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'] as const;
+    const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'discountPriceOverride', 'discountPricePerGram', 'discountPricePerOunce', 'discountPricePerEighth', 'discountPricePerQuarter', 'discountPricePerHalf', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'] as const;
     for (const field of numericFields) {
       const val = toNumericStr(productData[field]);
       if (val !== undefined) {
@@ -1035,7 +1095,7 @@ export class DatabaseStorage implements IStorage {
       // Clean up insertData - remove undefined values but keep null for numeric fields
       // Important: For numeric fields, explicitly set null (not empty string) so PostgreSQL gets NULL
       cleanedInsertData = {};
-      const numericFieldNames = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
+      const numericFieldNames = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'discountPriceOverride', 'discountPricePerGram', 'discountPricePerOunce', 'discountPricePerEighth', 'discountPricePerQuarter', 'discountPricePerHalf', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
       
       for (const [key, value] of Object.entries(insertData)) {
         // Skip undefined values
@@ -1254,7 +1314,7 @@ export class DatabaseStorage implements IStorage {
     // preserve the explicitly submitted parent stock in that case.
     if (Array.isArray(sizes) && sizes.length > 0) delete updateData.stock;
 
-    const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'discountAmount', 'bogoDiscountValue', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
+    const numericFields = ['pricePerGram', 'pricePerOunce', 'pricePerEighth', 'pricePerQuarter', 'pricePerHalf', 'discountPercentage', 'discountAmount', 'discountPriceOverride', 'discountPricePerGram', 'discountPricePerOunce', 'discountPricePerEighth', 'discountPricePerQuarter', 'discountPricePerHalf', 'bogoDiscountValue', 'purchasePrice', 'purchasePricePerGram', 'purchasePricePerOunce'];
     for (const field of numericFields) {
       if (field in updateData) {
         // For fractional pricing fields, preserve the value as-is (string or null) to ensure they're always updated
@@ -1443,6 +1503,16 @@ export class DatabaseStorage implements IStorage {
           const expiration = d.discountExpiresAt ? new Date(d.discountExpiresAt) : null;
           await rawSql`UPDATE products SET discount_expires_at = ${expiration} WHERE id = ${id}`;
         }
+        if (d.hasOwnProperty('discountPriceOverride')) await rawSql`UPDATE products SET discount_price_override = ${toSafeNum(d.discountPriceOverride)} WHERE id = ${id}`;
+        if (d.hasOwnProperty('discountPricePerGram')) await rawSql`UPDATE products SET discount_price_per_gram = ${toSafeNum(d.discountPricePerGram)} WHERE id = ${id}`;
+        if (d.hasOwnProperty('discountPricePerOunce')) await rawSql`UPDATE products SET discount_price_per_ounce = ${toSafeNum(d.discountPricePerOunce)} WHERE id = ${id}`;
+        if (d.hasOwnProperty('discountPricePerEighth')) await rawSql`UPDATE products SET discount_price_per_eighth = ${toSafeNum(d.discountPricePerEighth)} WHERE id = ${id}`;
+        if (d.hasOwnProperty('discountPricePerQuarter')) await rawSql`UPDATE products SET discount_price_per_quarter = ${toSafeNum(d.discountPricePerQuarter)} WHERE id = ${id}`;
+        if (d.hasOwnProperty('discountPricePerHalf')) await rawSql`UPDATE products SET discount_price_per_half = ${toSafeNum(d.discountPricePerHalf)} WHERE id = ${id}`;
+        if (d.hasOwnProperty('discountQuantityPricing')) {
+          const pricingJson = d.discountQuantityPricing ? JSON.stringify(d.discountQuantityPricing) : null;
+          await rawSql`UPDATE products SET discount_quantity_pricing = ${pricingJson}::jsonb WHERE id = ${id}`;
+        }
 
         console.log('[updateProduct] Successfully updated all fields via direct SQL fallback');
         updateError = null;
@@ -1501,6 +1571,21 @@ export class DatabaseStorage implements IStorage {
         if (updateData.hasOwnProperty('discountExpiresAt')) {
           const expiration = updateData.discountExpiresAt ? new Date(updateData.discountExpiresAt) : null;
           await rawSql`UPDATE products SET discount_expires_at = ${expiration} WHERE id = ${id}`;
+        }
+        const toTemporaryPrice = (value: any) => {
+          if (value === null || value === undefined || value === '') return null;
+          const parsed = parseFloat(String(value));
+          return Number.isFinite(parsed) ? parsed : null;
+        };
+        if (updateData.hasOwnProperty('discountPriceOverride')) await rawSql`UPDATE products SET discount_price_override = ${toTemporaryPrice(updateData.discountPriceOverride)} WHERE id = ${id}`;
+        if (updateData.hasOwnProperty('discountPricePerGram')) await rawSql`UPDATE products SET discount_price_per_gram = ${toTemporaryPrice(updateData.discountPricePerGram)} WHERE id = ${id}`;
+        if (updateData.hasOwnProperty('discountPricePerOunce')) await rawSql`UPDATE products SET discount_price_per_ounce = ${toTemporaryPrice(updateData.discountPricePerOunce)} WHERE id = ${id}`;
+        if (updateData.hasOwnProperty('discountPricePerEighth')) await rawSql`UPDATE products SET discount_price_per_eighth = ${toTemporaryPrice(updateData.discountPricePerEighth)} WHERE id = ${id}`;
+        if (updateData.hasOwnProperty('discountPricePerQuarter')) await rawSql`UPDATE products SET discount_price_per_quarter = ${toTemporaryPrice(updateData.discountPricePerQuarter)} WHERE id = ${id}`;
+        if (updateData.hasOwnProperty('discountPricePerHalf')) await rawSql`UPDATE products SET discount_price_per_half = ${toTemporaryPrice(updateData.discountPricePerHalf)} WHERE id = ${id}`;
+        if (updateData.hasOwnProperty('discountQuantityPricing')) {
+          const pricingJson = updateData.discountQuantityPricing ? JSON.stringify(updateData.discountQuantityPricing) : null;
+          await rawSql`UPDATE products SET discount_quantity_pricing = ${pricingJson}::jsonb WHERE id = ${id}`;
         }
 
         console.log('[updateProduct] Successfully updated supplemental fields via direct SQL');

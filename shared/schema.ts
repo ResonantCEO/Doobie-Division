@@ -98,6 +98,13 @@ export const products = pgTable("products", {
   pricePerHalf: decimal("price_per_half", { precision: 10, scale: 2 }), // price per 1/2 ounce
   discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }).default("0"), // discount percentage (0-100)
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"), // flat dollar amount off
+  discountPriceOverride: decimal("discount_price_override", { precision: 10, scale: 2 }),
+  discountPricePerGram: decimal("discount_price_per_gram", { precision: 10, scale: 4 }),
+  discountPricePerOunce: decimal("discount_price_per_ounce", { precision: 10, scale: 2 }),
+  discountPricePerEighth: decimal("discount_price_per_eighth", { precision: 10, scale: 2 }),
+  discountPricePerQuarter: decimal("discount_price_per_quarter", { precision: 10, scale: 2 }),
+  discountPricePerHalf: decimal("discount_price_per_half", { precision: 10, scale: 2 }),
+  discountQuantityPricing: jsonb("discount_quantity_pricing").$type<Array<{ minQuantity: number; pricePerItem: string }>>(),
   discountExpiresAt: timestamp("discount_expires_at"), // clears product discounts and BOGO when reached
   bogoEnabled: boolean("bogo_enabled").notNull().default(false), // buy one get one free
   bogoFreeOptionIndex: integer("bogo_free_option_index"), // which option index is free (null = same as purchased)
@@ -575,6 +582,16 @@ export const insertProductSchema = createInsertSchema(products).omit({
   description: z.string().nullable().optional(),
   discountPercentage: z.string().nullable().optional(),
   discountAmount: z.string().nullable().optional(),
+  discountPriceOverride: z.string().nullable().optional(),
+  discountPricePerGram: z.string().nullable().optional(),
+  discountPricePerOunce: z.string().nullable().optional(),
+  discountPricePerEighth: z.string().nullable().optional(),
+  discountPricePerQuarter: z.string().nullable().optional(),
+  discountPricePerHalf: z.string().nullable().optional(),
+  discountQuantityPricing: z.array(z.object({
+    minQuantity: z.number().int().min(1),
+    pricePerItem: z.string().or(z.number()).transform(val => String(val)),
+  })).nullable().optional(),
   discountExpiresAt: z.coerce.date().nullable().optional(),
   stock: z.number().int().min(0).optional().default(0),
   physicalInventory: z.number().optional(),

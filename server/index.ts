@@ -294,13 +294,23 @@ app.use((req, res, next) => {
   // Ensure product discount expiration exists (migration)
   try {
     const { sql } = await import("./db");
-    await sql.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_expires_at TIMESTAMP`);
-    console.log("✓ Verified discount_expires_at column exists");
+    await sql.query(`
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS discount_expires_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS discount_price_override DECIMAL(10,2),
+      ADD COLUMN IF NOT EXISTS discount_price_per_gram DECIMAL(10,4),
+      ADD COLUMN IF NOT EXISTS discount_price_per_ounce DECIMAL(10,2),
+      ADD COLUMN IF NOT EXISTS discount_price_per_eighth DECIMAL(10,2),
+      ADD COLUMN IF NOT EXISTS discount_price_per_quarter DECIMAL(10,2),
+      ADD COLUMN IF NOT EXISTS discount_price_per_half DECIMAL(10,2),
+      ADD COLUMN IF NOT EXISTS discount_quantity_pricing JSONB
+    `);
+    console.log("✓ Verified temporary product pricing columns exist");
   } catch (error: any) {
     if (error?.message?.includes("already exists") || error?.message?.includes("duplicate")) {
-      console.log("✓ discount_expires_at column already exists");
+      console.log("✓ temporary product pricing columns already exist");
     } else {
-      console.warn("⚠ Could not verify discount_expires_at column:", error?.message);
+      console.warn("⚠ Could not verify temporary product pricing columns:", error?.message);
     }
   }
 

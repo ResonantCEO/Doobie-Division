@@ -66,6 +66,12 @@ const formSchema = z.object({
   pricePerHalf: z.string().optional(),
   discountPercentage: z.string().nullable().optional(),
   discountAmount: z.string().nullable().optional(),
+  discountPriceOverride: z.string().optional(),
+  discountPricePerGram: z.string().optional(),
+  discountPricePerOunce: z.string().optional(),
+  discountPricePerEighth: z.string().optional(),
+  discountPricePerQuarter: z.string().optional(),
+  discountPricePerHalf: z.string().optional(),
   discountDurationHours: z.string().optional(),
   isActive: z.boolean(),
   purchasePrice: z.string().optional(),
@@ -116,6 +122,8 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   const [minStockG, setMinStockG] = useState("");
   const [enableQuantityPricing, setEnableQuantityPricing] = useState(false);
   const [quantityTiers, setQuantityTiers] = useState<Array<{minQuantity: string; pricePerItem: string; totalPrice?: string}>>([]);
+  const [enableDiscountQuantityPricing, setEnableDiscountQuantityPricing] = useState(false);
+  const [discountQuantityTiers, setDiscountQuantityTiers] = useState<Array<{minQuantity: string; pricePerItem: string; totalPrice?: string}>>([]);
 
   const isAdmin = user?.role === "admin";
 
@@ -165,17 +173,26 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       name: product.name,
       company: (product as any).company || "",
       description: product.description || "",
-      price: product.price || "",
+      price: (product as any).standardPrice ?? product.price ?? "",
       sku: product.sku,
       categoryId: product.categoryId?.toString() || "",
       stock: product.stock.toString(),
       minStockThreshold: product.minStockThreshold.toString(),
       sellingMethod: product.sellingMethod as "units" | "weight",
       weightUnit: (product.weightUnit as "grams" | "ounces") || "grams",
-      pricePerGram: product.pricePerGram || "",
-      pricePerOunce: product.pricePerOunce || "",
+      pricePerGram: (product as any).standardPricePerGram ?? product.pricePerGram ?? "",
+      pricePerOunce: (product as any).standardPricePerOunce ?? product.pricePerOunce ?? "",
+      pricePerEighth: (product as any).standardPricePerEighth ?? (product as any).pricePerEighth ?? "",
+      pricePerQuarter: (product as any).standardPricePerQuarter ?? (product as any).pricePerQuarter ?? "",
+      pricePerHalf: (product as any).standardPricePerHalf ?? (product as any).pricePerHalf ?? "",
       discountPercentage: product.discountPercentage || "0",
       discountAmount: (product as any).discountAmount || "0",
+      discountPriceOverride: (product as any).discountPriceOverride || "",
+      discountPricePerGram: (product as any).discountPricePerGram || "",
+      discountPricePerOunce: (product as any).discountPricePerOunce || "",
+      discountPricePerEighth: (product as any).discountPricePerEighth || "",
+      discountPricePerQuarter: (product as any).discountPricePerQuarter || "",
+      discountPricePerHalf: (product as any).discountPricePerHalf || "",
       isActive: product.isActive,
       purchasePrice: (product as any).purchasePrice || "",
       purchasePriceMethod: ((product as any).purchasePriceMethod as "units" | "weight") || "units",
@@ -197,20 +214,26 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         name: product.name,
         company: (product as any).company || "",
         description: product.description || "",
-        price: product.price || "",
+        price: (product as any).standardPrice ?? product.price ?? "",
         sku: product.sku,
         categoryId: product.categoryId?.toString() || "",
         stock: product.stock.toString(),
         minStockThreshold: product.minStockThreshold.toString(),
         sellingMethod: product.sellingMethod as "units" | "weight",
         weightUnit: (product.weightUnit as "grams" | "ounces") || "grams",
-        pricePerGram: product.pricePerGram || "",
-        pricePerOunce: product.pricePerOunce || "",
-        pricePerEighth: (product as any).pricePerEighth || "",
-        pricePerQuarter: (product as any).pricePerQuarter || "",
-        pricePerHalf: (product as any).pricePerHalf || "",
+        pricePerGram: (product as any).standardPricePerGram ?? product.pricePerGram ?? "",
+        pricePerOunce: (product as any).standardPricePerOunce ?? product.pricePerOunce ?? "",
+        pricePerEighth: (product as any).standardPricePerEighth ?? (product as any).pricePerEighth ?? "",
+        pricePerQuarter: (product as any).standardPricePerQuarter ?? (product as any).pricePerQuarter ?? "",
+        pricePerHalf: (product as any).standardPricePerHalf ?? (product as any).pricePerHalf ?? "",
         discountPercentage: product.discountPercentage || "0",
         discountAmount: (product as any).discountAmount || "0",
+        discountPriceOverride: (product as any).discountPriceOverride || "",
+        discountPricePerGram: (product as any).discountPricePerGram || "",
+        discountPricePerOunce: (product as any).discountPricePerOunce || "",
+        discountPricePerEighth: (product as any).discountPricePerEighth || "",
+        discountPricePerQuarter: (product as any).discountPricePerQuarter || "",
+        discountPricePerHalf: (product as any).discountPricePerHalf || "",
         isActive: product.isActive,
         purchasePrice: (product as any).purchasePrice || "",
         purchasePriceMethod: ((product as any).purchasePriceMethod as "units" | "weight") || "units",
@@ -237,7 +260,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       setSelectedFiles([]);
 
       // Initialize quantity pricing tiers
-      const existingTiers = (product as any).quantityPricing as Array<{minQuantity: number; pricePerItem: string}> | undefined;
+      const existingTiers = ((product as any).standardQuantityPricing ?? (product as any).quantityPricing) as Array<{minQuantity: number; pricePerItem: string}> | undefined;
       if (existingTiers && existingTiers.length > 0) {
         setEnableQuantityPricing(true);
         setQuantityTiers(existingTiers.map(t => ({
@@ -248,6 +271,19 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       } else {
         setEnableQuantityPricing(false);
         setQuantityTiers([]);
+      }
+
+      const existingDiscountTiers = (product as any).discountQuantityPricing as Array<{minQuantity: number; pricePerItem: string}> | undefined;
+      if (existingDiscountTiers && existingDiscountTiers.length > 0) {
+        setEnableDiscountQuantityPricing(true);
+        setDiscountQuantityTiers(existingDiscountTiers.map(t => ({
+          minQuantity: t.minQuantity.toString(),
+          pricePerItem: t.pricePerItem,
+          totalPrice: (parseFloat(t.pricePerItem) * t.minQuantity).toFixed(2),
+        })));
+      } else {
+        setEnableDiscountQuantityPricing(false);
+        setDiscountQuantityTiers([]);
       }
 
       // Reset BOGO state
@@ -355,9 +391,27 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         }
       }
 
+      const discountQuantityPricing = enableDiscountQuantityPricing
+        ? discountQuantityTiers
+            .filter(t => t.minQuantity && t.pricePerItem)
+            .map(t => ({
+              minQuantity: parseInt(t.minQuantity),
+              pricePerItem: parseFloat(t.pricePerItem).toFixed(4),
+            }))
+        : [];
+      const temporaryPriceValues = [
+        data.discountPriceOverride,
+        data.discountPricePerGram,
+        data.discountPricePerOunce,
+        data.discountPricePerEighth,
+        data.discountPricePerQuarter,
+        data.discountPricePerHalf,
+      ];
       const hasProductDiscount =
         parseFloat(discountValue) > 0 ||
         parseFloat(data.discountAmount || "0") > 0 ||
+        temporaryPriceValues.some(value => value !== undefined && value !== "" && Number.isFinite(parseFloat(value))) ||
+        discountQuantityPricing.length > 0 ||
         bogoEnabled;
       const requestedDurationHours = parseFloat(discountDurationHours);
       const discountExpiresAt = !hasProductDiscount
@@ -400,6 +454,13 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         pricePerHalf: data.sellingMethod === "weight" ? formatPrice(data.pricePerHalf, 2) : null,
         discountPercentage: discountValue,
         discountAmount: data.discountAmount ? parseFloat(data.discountAmount).toFixed(2) : "0",
+        discountPriceOverride: formatPrice(data.discountPriceOverride, 2),
+        discountPricePerGram: formatPrice(data.discountPricePerGram, 4),
+        discountPricePerOunce: formatPrice(data.discountPricePerOunce, 2),
+        discountPricePerEighth: formatPrice(data.discountPricePerEighth, 2),
+        discountPricePerQuarter: formatPrice(data.discountPricePerQuarter, 2),
+        discountPricePerHalf: formatPrice(data.discountPricePerHalf, 2),
+        discountQuantityPricing: discountQuantityPricing.length > 0 ? discountQuantityPricing : null,
         discountExpiresAt,
         purchasePrice: formatPrice(data.purchasePrice, 2),
         purchasePriceMethod: data.purchasePriceMethod || "units",
@@ -1049,13 +1110,184 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                   onWheel={(event) => event.currentTarget.blur()}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Entering a duration starts a new countdown when you save. When it ends, percentage, amount, and BOGO discounts are cleared automatically.
+                  Entering a duration starts a new countdown when you save. When it ends, percentage, amount, temporary price, temporary quantity-tier, and BOGO discounts are cleared automatically.
                 </p>
                 {(product as any).discountExpiresAt && !discountDurationHours && (
                   <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
                     Current discounts expire {new Date((product as any).discountExpiresAt).toLocaleString()}.
                     Leave this blank to keep that expiration.
                   </p>
+                )}
+              </div>
+
+              <div className="border-t pt-4 space-y-3">
+                <div>
+                  <Label className="text-sm font-semibold">Temporary Price Override</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    These prices temporarily replace the standard prices and clear when the discount duration ends.
+                  </p>
+                </div>
+
+                {sellingMethod === "units" ? (
+                  <FormField
+                    control={form.control}
+                    name="discountPriceOverride"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Temporary Unit Price</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder={`Standard: $${parseFloat(form.watch("price") || "0").toFixed(2)}`}
+                              className="pl-7"
+                              {...field}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {([
+                      ["discountPricePerGram", "Per Gram", "pricePerGram", 4],
+                      ["discountPricePerEighth", "Per 1/8 oz", "pricePerEighth", 2],
+                      ["discountPricePerQuarter", "Per 1/4 oz", "pricePerQuarter", 2],
+                      ["discountPricePerHalf", "Per 1/2 oz", "pricePerHalf", 2],
+                      ["discountPricePerOunce", "Per 1 oz", "pricePerOunce", 2],
+                    ] as const).map(([name, label, standardField, decimals]) => (
+                      <FormField
+                        key={name}
+                        control={form.control}
+                        name={name}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">{label}</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step={decimals === 4 ? "0.0001" : "0.01"}
+                                  placeholder={`Std. ${parseFloat(form.watch(standardField) || "0").toFixed(decimals)}`}
+                                  className="pl-7"
+                                  {...field}
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t pt-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <Label className="text-sm font-semibold">Temporary Quantity Pricing</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Overrides standard quantity tiers while active.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={enableDiscountQuantityPricing}
+                    onCheckedChange={(checked) => {
+                      setEnableDiscountQuantityPricing(checked);
+                      if (checked && discountQuantityTiers.length === 0) {
+                        setDiscountQuantityTiers([{ minQuantity: "2", pricePerItem: "", totalPrice: "" }]);
+                      }
+                    }}
+                  />
+                </div>
+
+                {enableDiscountQuantityPricing && (
+                  <div className="space-y-3">
+                    {discountQuantityTiers.map((tier, index) => (
+                      <div key={index} className="flex gap-2 items-end">
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs text-muted-foreground">Min Qty</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            placeholder="e.g. 3"
+                            value={tier.minQuantity}
+                            onChange={(event) => {
+                              const updated = [...discountQuantityTiers];
+                              const minQuantity = event.target.value;
+                              const qty = parseFloat(minQuantity);
+                              const total = parseFloat(updated[index].totalPrice || "");
+                              updated[index] = {
+                                ...updated[index],
+                                minQuantity,
+                                pricePerItem: qty > 0 && Number.isFinite(total)
+                                  ? (total / qty).toFixed(4)
+                                  : updated[index].pricePerItem,
+                              };
+                              setDiscountQuantityTiers(updated);
+                            }}
+                          />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs text-muted-foreground">Total Price</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={tier.totalPrice || ""}
+                            onChange={(event) => {
+                              const updated = [...discountQuantityTiers];
+                              const totalPrice = event.target.value;
+                              const qty = parseFloat(updated[index].minQuantity);
+                              const total = parseFloat(totalPrice);
+                              updated[index] = {
+                                ...updated[index],
+                                totalPrice,
+                                pricePerItem: qty > 0 && Number.isFinite(total)
+                                  ? (total / qty).toFixed(4)
+                                  : "",
+                              };
+                              setDiscountQuantityTiers(updated);
+                            }}
+                          />
+                          {tier.pricePerItem && (
+                            <p className="text-xs text-muted-foreground">
+                              ${parseFloat(tier.pricePerItem).toFixed(2)} each
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDiscountQuantityTiers(discountQuantityTiers.filter((_, i) => i !== index))}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDiscountQuantityTiers([
+                        ...discountQuantityTiers,
+                        { minQuantity: "", pricePerItem: "", totalPrice: "" },
+                      ])}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Temporary Tier
+                    </Button>
+                  </div>
                 )}
               </div>
 
