@@ -1036,6 +1036,29 @@ export default function EditProductModal({ open, onOpenChange, product, categori
             <div className="rounded-lg border p-4 space-y-4">
               <Label className="text-base font-semibold">Discounts</Label>
 
+              <div className="space-y-2">
+                <Label htmlFor="discount-duration-hours">Discount Duration (Hours)</Label>
+                <Input
+                  id="discount-duration-hours"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="Leave blank for no expiration"
+                  value={discountDurationHours}
+                  onChange={(event) => setDiscountDurationHours(event.target.value)}
+                  onWheel={(event) => event.currentTarget.blur()}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Entering a duration starts a new countdown when you save. When it ends, percentage, amount, and BOGO discounts are cleared automatically.
+                </p>
+                {(product as any).discountExpiresAt && !discountDurationHours && (
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                    Current discounts expire {new Date((product as any).discountExpiresAt).toLocaleString()}.
+                    Leave this blank to keep that expiration.
+                  </p>
+                )}
+              </div>
+
               <FormField
                 control={form.control}
                 name="discountPercentage"
@@ -1233,28 +1256,6 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                 </div>
               )}
 
-              <div className="border-t pt-4 space-y-2">
-                <Label htmlFor="discount-duration-hours">Discount Duration (Hours)</Label>
-                <Input
-                  id="discount-duration-hours"
-                  type="number"
-                  min="1"
-                  step="1"
-                  placeholder="Leave blank for no expiration"
-                  value={discountDurationHours}
-                  onChange={(event) => setDiscountDurationHours(event.target.value)}
-                  onWheel={(event) => event.currentTarget.blur()}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Entering a duration starts a new countdown when you save. When it ends, percentage, amount, and BOGO discounts are cleared automatically.
-                </p>
-                {(product as any).discountExpiresAt && !discountDurationHours && (
-                  <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                    Current discounts expire {new Date((product as any).discountExpiresAt).toLocaleString()}.
-                    Leave this blank to keep that expiration.
-                  </p>
-                )}
-              </div>
             </div>
 
             {!enableSizes && (
