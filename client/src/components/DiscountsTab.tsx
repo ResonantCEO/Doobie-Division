@@ -47,6 +47,7 @@ export default function DiscountsTab() {
     code: "", description: "",
     discountType: "percent" as "percent" | "fixed" | "item_free" | "item_price",
     discountValue: "",
+    specificItemsOnly: false,
     targetProducts: [] as PromoTarget[],
     itemDealQuantity: "1",
     minOrderAmount: "",
@@ -66,6 +67,7 @@ export default function DiscountsTab() {
     code: "", description: "",
     discountType: "percent",
     discountValue: "",
+    specificItemsOnly: false,
     targetProducts: [],
     itemDealQuantity: "1",
     minOrderAmount: "",
@@ -83,6 +85,7 @@ export default function DiscountsTab() {
       description: p.description || "",
       discountType: (p.discountType as "percent" | "fixed" | "item_free" | "item_price") || "percent",
       discountValue: p.discountValue?.toString() || "",
+      specificItemsOnly: parsePromoTargets(p.targetProductIds).length > 0,
       targetProducts: parsePromoTargets(p.targetProductIds),
       itemDealQuantity: String(p.itemDealQuantity || 1),
       minOrderAmount: p.minOrderAmount?.toString() || "",
@@ -151,7 +154,9 @@ export default function DiscountsTab() {
         description: data.description || null,
         discountType: data.discountType,
         discountValue: data.discountType === "item_free" ? "0" : data.discountValue,
-        targetProductIds: data.targetProducts.length ? JSON.stringify(data.targetProducts) : null,
+        targetProductIds: (data.specificItemsOnly || data.discountType === "item_free" || data.discountType === "item_price") && data.targetProducts.length
+          ? JSON.stringify(data.targetProducts)
+          : null,
         itemDealQuantity: parseInt(data.itemDealQuantity) || 1,
         minOrderAmount: data.minOrderAmount || null,
         bypassPurchaseMinimum: data.bypassPurchaseMinimum,
@@ -181,7 +186,9 @@ export default function DiscountsTab() {
         description: data.description || null,
         discountType: data.discountType,
         discountValue: data.discountType === "item_free" ? "0" : data.discountValue,
-        targetProductIds: data.targetProducts.length ? JSON.stringify(data.targetProducts) : null,
+        targetProductIds: (data.specificItemsOnly || data.discountType === "item_free" || data.discountType === "item_price") && data.targetProducts.length
+          ? JSON.stringify(data.targetProducts)
+          : null,
         itemDealQuantity: parseInt(data.itemDealQuantity) || 1,
         minOrderAmount: data.minOrderAmount || null,
         bypassPurchaseMinimum: data.bypassPurchaseMinimum,
@@ -310,6 +317,9 @@ export default function DiscountsTab() {
                         {p.bypassPurchaseMinimum && (
                           <Badge variant="outline" className="text-xs text-blue-600 border-blue-400">Bypasses min. purchase</Badge>
                         )}
+                        {parsePromoTargets(p.targetProductIds).length > 0 && (
+                          <Badge variant="outline" className="text-xs">Specific items</Badge>
+                        )}
                       </div>
                       {p.description && (
                         <p className="text-sm text-gray-500 dark:text-gray-400">{p.description}</p>
@@ -364,6 +374,9 @@ export default function DiscountsTab() {
                           )}
                           {p.bypassPurchaseMinimum && (
                             <Badge variant="outline" className="text-xs text-blue-600 border-blue-400">Bypasses min. purchase</Badge>
+                          )}
+                          {parsePromoTargets(p.targetProductIds).length > 0 && (
+                            <Badge variant="outline" className="text-xs">Specific items</Badge>
                           )}
                         </div>
                         {p.description && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{p.description}</p>}
@@ -438,6 +451,23 @@ export default function DiscountsTab() {
               <Label>Description (optional)</Label>
               <Input placeholder="e.g. 20% off for VIP customers" value={promoCodeForm.description} onChange={e => setPromoCodeForm(f => ({ ...f, description: e.target.value }))} />
             </div>
+            <div className="flex items-center gap-3 rounded-lg border p-3">
+              <Switch
+                checked={isItemDeal || promoCodeForm.specificItemsOnly}
+                disabled={isItemDeal}
+                onCheckedChange={enabled => setPromoCodeForm(f => ({
+                  ...f,
+                  specificItemsOnly: enabled,
+                  targetProducts: enabled ? f.targetProducts : [],
+                }))}
+              />
+              <div>
+                <Label>Apply only to specific items</Label>
+                <p className="text-xs text-muted-foreground">
+                  When enabled, this code affects only the products and options selected below.
+                </p>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Discount Type *</Label>
@@ -461,11 +491,15 @@ export default function DiscountsTab() {
                 />
               </div>}
             </div>
-            {isItemDeal && (
+            {(isItemDeal || promoCodeForm.specificItemsOnly) && (
               <div className="space-y-3 rounded-lg border p-3 bg-muted/20">
                 <div>
-                  <Label>Eligible Items (priority order) *</Label>
-                  <p className="text-xs text-muted-foreground mt-1">The deal is applied to eligible cart items in this order.</p>
+                  <Label>{isItemDeal ? "Eligible Items (priority order) *" : "Specific Items *"}</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {isItemDeal
+                      ? "The deal is applied to eligible cart items in this order."
+                      : "This discount will affect only the products and options selected here."}
+                  </p>
                 </div>
                 {selectedDealProducts.length > 0 && (
                   <div className="space-y-2">
@@ -487,16 +521,16 @@ export default function DiscountsTab() {
                         <div className="flex items-center gap-2">
                           <span className="w-5 text-muted-foreground">{index + 1}.</span>
                           <span className="min-w-0 flex-1 truncate">{product.name}{product.sku ? <span className="ml-1 text-xs text-muted-foreground">({product.sku})</span> : null}</span>
-                          <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === 0} onClick={() => setPromoCodeForm(f => {
+                          {isItemDeal && <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === 0} onClick={() => setPromoCodeForm(f => {
                             const targets = [...f.targetProducts];
                             [targets[index - 1], targets[index]] = [targets[index], targets[index - 1]];
                             return { ...f, targetProducts: targets };
-                          })}><ArrowUp className="h-3.5 w-3.5" /></Button>
-                          <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === selectedDealProducts.length - 1} onClick={() => setPromoCodeForm(f => {
+                          })}><ArrowUp className="h-3.5 w-3.5" /></Button>}
+                          {isItemDeal && <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={index === selectedDealProducts.length - 1} onClick={() => setPromoCodeForm(f => {
                             const targets = [...f.targetProducts];
                             [targets[index], targets[index + 1]] = [targets[index + 1], targets[index]];
                             return { ...f, targetProducts: targets };
-                          })}><ArrowDown className="h-3.5 w-3.5" /></Button>
+                          })}><ArrowDown className="h-3.5 w-3.5" /></Button>}
                           <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setPromoCodeForm(f => ({ ...f, targetProducts: f.targetProducts.filter(existing => existing.productId !== product.id) }))}><X className="h-3.5 w-3.5" /></Button>
                         </div>
                         {productOptions.length > 0 && (
@@ -547,11 +581,11 @@ export default function DiscountsTab() {
                     )) : <p className="px-3 py-2 text-sm text-muted-foreground">No matching available products.</p>}
                   </div>
                 )}
-                <div className="max-w-[220px] space-y-2">
+                {isItemDeal && <div className="max-w-[220px] space-y-2">
                   <Label>Deal applies to up to</Label>
                   <Input type="number" min="1" step="1" value={promoCodeForm.itemDealQuantity} onChange={e => setPromoCodeForm(f => ({ ...f, itemDealQuantity: e.target.value }))} />
                   <p className="text-xs text-muted-foreground">eligible item(s) per order.</p>
-                </div>
+                </div>}
               </div>
             )}
             <div className="space-y-2">
@@ -601,7 +635,7 @@ export default function DiscountsTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowPromoCodeModal(false); setEditingPromoCode(null); resetPromoCodeForm(); }}>Cancel</Button>
             <Button
-              disabled={!promoCodeForm.code || (promoCodeForm.discountType !== "item_free" && !promoCodeForm.discountValue) || (isItemDeal && promoCodeForm.targetProducts.length === 0) || createPromoCodeMutation.isPending || updatePromoCodeMutation.isPending}
+               disabled={!promoCodeForm.code || (promoCodeForm.discountType !== "item_free" && !promoCodeForm.discountValue) || ((isItemDeal || promoCodeForm.specificItemsOnly) && promoCodeForm.targetProducts.length === 0) || createPromoCodeMutation.isPending || updatePromoCodeMutation.isPending}
               onClick={() => {
                 if (editingPromoCode) {
                   updatePromoCodeMutation.mutate({ id: editingPromoCode.id, data: promoCodeForm });

@@ -1181,6 +1181,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return getItemPromoTargets(promo).map(target => target.productId);
   }
 
+  function promoOptionMatches(target: ItemPromoTarget, itemSize: string | undefined): boolean {
+    if (!target.sizes?.length) return true;
+    if (!itemSize) return false;
+    const normalizedItemSize = itemSize.trim().toLowerCase();
+    return target.sizes.some(size => size.trim().toLowerCase() === normalizedItemSize);
+  }
+
+  function getTargetedPromoSubtotal(promo: any, items: PromoCartItem[]): number {
+    const targets = getItemPromoTargets(promo);
+    if (targets.length === 0) return 0;
+
+    return items.reduce((subtotal, item) => {
+      const target = targets.find(candidate => candidate.productId === Number(item.productId));
+      if (!target || !promoOptionMatches(target, item.size)) return subtotal;
+      const quantity = Math.max(0, Number(item.quantity) || 0);
+      const unitPrice = Math.max(0, Number(item.productPrice ?? item.unitPrice) || 0);
+      return subtotal + (quantity * unitPrice);
+    }, 0);
+  }
+
   function getItemPromoAllocations(promo: any, items: PromoCartItem[]) {
     const targets = getItemPromoTargets(promo);
     const maxQuantity = Math.max(1, Number(promo.itemDealQuantity) || 1);
@@ -1194,7 +1214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (let itemIndex = 0; itemIndex < items.length && remaining > 0; itemIndex++) {
         const item = items[itemIndex];
         if (Number(item.productId) !== target.productId) continue;
-        if (target.sizes?.length && (!item.size || !target.sizes.includes(item.size))) continue;
+        if (!promoOptionMatches(target, item.size)) continue;
         const quantity = Math.min(Math.max(0, Number(item.quantity) || 0), remaining);
         if (quantity <= 0) continue;
         const normalUnitPrice = Math.max(0, Number(item.productPrice ?? item.unitPrice) || 0);
@@ -1457,6 +1477,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         });
         enrichedItems.splice(0, enrichedItems.length, ...promoAdjustedItems);
+
+        const mutableOrderData: any = orderData;
+        mutableOrderData.promoDiscount = serverPromoSavings.toFixed(2);
+        mutableOrderData.total = Math.max(
+          0,
+          Number(orderData.total || 0) + requestedPromoSavings - serverPromoSavings,
+        ).toFixed(2);
+      } else if (verifiedPromo && getItemPromoTargetIds(verifiedPromo).length > 0) {
+        const eligibleSubtotal = getTargetedPromoSubtotal(verifiedPromo, enrichedItems);
+        if (eligibleSubtotal <= 0) {
+          return res.status(400).json({
+            message: "This promo code requires one of its eligible items to be in your cart.",
+          });
+        }
+
+        const discountValue = Math.max(0, Number(verifiedPromo.discountValue) || 0);
+        const serverPromoSavings = verifiedPromo.discountType === "percent"
+          ? Math.min(eligibleSubtotal, eligibleSubtotal * discountValue / 100)
+          : Math.min(eligibleSubtotal, discountValue);
+        const requestedPromoSavings = Math.max(0, Number((order as any).promoDiscount) || 0);
+        if (Math.abs(serverPromoSavings - requestedPromoSavings) > 0.02) {
+          return res.status(400).json({
+            message: "Your promo discount has changed. Please apply the code again before placing your order.",
+          });
+        }
 
         const mutableOrderData: any = orderData;
         mutableOrderData.promoDiscount = serverPromoSavings.toFixed(2);
@@ -4155,11 +4200,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const promoError = await getPromoValidationError(promo, req.user?.claims?.sub, total);
       if (promoError) return res.json({ valid: false, message: promoError });
 
-      // Calculate discount amount
+      // Calculate discount amount. Percentage and fixed codes with targets only
+      // apply to matching products/options; codes without targets remain
+      // order-wide for backwards compatibility.
       const discountValue = parseFloat(promo.discountValue);
+      const targets = getItemPromoTargets(promo);
+      let discountBase = total;
+      if (targets.length > 0 && promo.discountType !== "item_free" && promo.discountType !== "item_price") {
+        discountBase = getTargetedPromoSubtotal(promo, Array.isArray(items) ? items : []);
+        if (discountBase <= 0) {
+          return res.json({
+            valid: false,
+            message: "Add one of this promo's eligible items to your cart before using the code.",
+          });
+        }
+      }
       let discountAmount = promo.discountType === "percent"
-        ? Math.min(total, total * discountValue / 100)
-        : Math.min(total, discountValue);
+        ? Math.min(discountBase, discountBase * discountValue / 100)
+        : Math.min(discountBase, discountValue);
       let itemAllocations: any[] = [];
       if (promo.discountType === "item_free" || promo.discountType === "item_price") {
         itemAllocations = getItemPromoAllocations(promo, Array.isArray(items) ? items : []);
@@ -4184,6 +4242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountValue: promo.discountValue,
         discountAmount: parseFloat(discountAmount.toFixed(2)),
         bypassPurchaseMinimum: promo.bypassPurchaseMinimum,
+        appliesToSpecificItems: targets.length > 0,
         itemAllocations: itemAllocations.map(({ productId, size, quantity, promoPrice }) => ({ productId, size, quantity, promoPrice })),
       });
     } catch (e) {

@@ -94,7 +94,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [discountResult, setDiscountResult] = useState<DiscountEvalResult | null>(null);
   const [promoInput, setPromoInput] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<{ promoId: number; code: string; description?: string; discountType: string; discountValue: string; discountAmount: number; bypassPurchaseMinimum: boolean; itemAllocations?: PromoItemAllocation[] } | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<{ promoId: number; code: string; description?: string; discountType: string; discountValue: string; discountAmount: number; bypassPurchaseMinimum: boolean; appliesToSpecificItems?: boolean; itemAllocations?: PromoItemAllocation[] } | null>(null);
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
   const [shippingForm, setShippingForm] = useState({
     customerName: "",
@@ -352,8 +352,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           : data.discountType === "item_price"
             ? `Selected item(s) are $${Number(data.discountValue).toFixed(2)} each`
             : data.discountType === 'percent'
-              ? `${data.discountValue}% off your order`
-              : `$${Number(data.discountAmount).toFixed(2)} off your order`;
+              ? `${data.discountValue}% off ${data.appliesToSpecificItems ? "eligible items" : "your order"}`
+              : `$${Number(data.discountAmount).toFixed(2)} off ${data.appliesToSpecificItems ? "eligible items" : "your order"}`;
         toast({ title: "Promo code applied!", description: itemDealText });
       } else {
         toast({ title: "Invalid code", description: data.message, variant: "destructive" });
