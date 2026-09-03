@@ -224,7 +224,7 @@ function OrderInfoDialog({ order, onClose }: OrderInfoDialogProps) {
                         return (
                       <div
                         key={item.id}
-                        className={`flex items-center justify-between gap-2 py-2 px-3 rounded-md text-sm ${hasMultipleQuantity ? "border-2 border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950/30" : "bg-muted/40"}`}
+                        className={`flex items-center justify-between gap-2 py-2 px-3 rounded-md text-sm ${hasMultipleQuantity ? "border border-l-4 border-amber-300 bg-amber-50/60 dark:border-amber-600 dark:bg-amber-950/20" : "bg-muted/40"}`}
                       >
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{item.productName}</p>
@@ -235,11 +235,11 @@ function OrderInfoDialog({ order, onClose }: OrderInfoDialogProps) {
                         <div className="flex items-center gap-3 flex-shrink-0 text-right">
                           {hasMultipleQuantity ? (
                             <span
-                              className="inline-flex items-center gap-1 rounded-md border-2 border-amber-500 bg-amber-100 px-2 py-1 text-amber-950 dark:border-amber-400 dark:bg-amber-400"
+                              className="inline-flex h-6 items-center gap-1 rounded border border-amber-500 bg-amber-100 px-1.5 text-amber-950 dark:border-amber-400 dark:bg-amber-400"
                               aria-label={`Multiple quantity: ${item.quantity}`}
                             >
-                              <span className="text-[10px] font-black uppercase tracking-wide">Qty</span>
-                              <span className="text-base font-black leading-none">{item.quantity}</span>
+                              <span className="text-[9px] font-black uppercase tracking-wide leading-none">Qty</span>
+                              <span className="text-sm font-extrabold leading-none">{item.quantity}</span>
                             </span>
                           ) : (
                             <span className="text-gray-500 text-xs">×{item.quantity}</span>

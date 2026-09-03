@@ -1084,7 +1084,7 @@ export default function ScannerPage() {
                        {selectedOrder.items?.map((item) => {
                          const hasMultipleQuantity = Number(item.quantity) > 1;
                          return (
-                    <div key={item.id} className={`flex justify-between items-center p-2 border rounded ${hasMultipleQuantity ? "border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950/30" : ""}`}>
+                    <div key={item.id} className={`flex justify-between items-center p-2 border rounded ${hasMultipleQuantity ? "border-amber-300 border-l-4 bg-amber-50/60 dark:border-amber-600 dark:bg-amber-950/20" : ""}`}>
                       <div>
                         <p className="font-medium">{item.productName}</p>
                         <p className="text-sm text-muted-foreground">
@@ -1093,9 +1093,9 @@ export default function ScannerPage() {
                       </div>
                       <div className="text-right">
                         {hasMultipleQuantity ? (
-                          <div className="mb-1 inline-flex items-center gap-1 rounded-md border-2 border-amber-500 bg-amber-100 px-2 py-1 text-amber-950 dark:border-amber-400 dark:bg-amber-400">
-                            <span className="text-[10px] font-black uppercase tracking-wide">Qty</span>
-                            <span className="text-lg font-black leading-none">{item.quantity}</span>
+                          <div className="mb-1 inline-flex h-6 items-center gap-1 rounded border border-amber-500 bg-amber-100 px-1.5 text-amber-950 dark:border-amber-400 dark:bg-amber-400">
+                            <span className="text-[9px] font-black uppercase tracking-wide leading-none">Qty</span>
+                            <span className="text-sm font-extrabold leading-none">{item.quantity}</span>
                           </div>
                         ) : (
                           <p className="font-medium">Qty: {item.quantity}</p>
