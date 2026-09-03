@@ -1084,7 +1084,7 @@ export default function ScannerPage() {
                        {selectedOrder.items?.map((item) => {
                          const hasMultipleQuantity = Number(item.quantity) > 1;
                          return (
-                    <div key={item.id} className={`flex justify-between items-center p-2 border rounded ${hasMultipleQuantity ? "border-amber-300 border-l-4 bg-amber-50/60 dark:border-amber-600 dark:bg-amber-950/20" : ""}`}>
+                    <div key={item.id} className={`flex justify-between items-center p-2 border rounded ${hasMultipleQuantity ? "border-amber-300 border-l-4 dark:border-amber-600" : ""}`}>
                       <div>
                         <p className="font-medium">{item.productName}</p>
                         <p className="text-sm text-muted-foreground">

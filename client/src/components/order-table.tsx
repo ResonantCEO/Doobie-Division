@@ -229,7 +229,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
               return (
               <div 
                 key={item.id} 
-                className={`flex items-center justify-between rounded-md px-4 py-2 border ${fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : hasMultipleQuantity ? 'border-amber-300 border-l-4 dark:border-amber-600 bg-amber-50/60 dark:bg-amber-950/20' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
+                className={`flex items-center justify-between rounded-md px-4 py-2 border ${fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : hasMultipleQuantity ? 'border-amber-300 border-l-4 dark:border-amber-600 bg-white dark:bg-gray-800' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
               >
                 <div className="flex items-center gap-3">
                   {fulfillingItems.has(item.id) ? (
@@ -469,7 +469,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
         return (
         <div 
           key={item.id} 
-          className={`flex items-center gap-3 rounded-md px-3 py-2 border ${fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : hasMultipleQuantity ? 'border-amber-300 border-l-4 dark:border-amber-600 bg-amber-50/60 dark:bg-amber-950/20' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
+          className={`flex items-center gap-3 rounded-md px-3 py-2 border ${fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : hasMultipleQuantity ? 'border-amber-300 border-l-4 dark:border-amber-600 bg-white dark:bg-gray-800' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
         >
           {fulfillingItems.has(item.id) ? (
             <Loader2 className="h-5 w-5 animate-spin text-gray-400 flex-shrink-0" />

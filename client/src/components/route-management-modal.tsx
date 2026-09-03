@@ -224,7 +224,7 @@ function OrderInfoDialog({ order, onClose }: OrderInfoDialogProps) {
                         return (
                       <div
                         key={item.id}
-                        className={`flex items-center justify-between gap-2 py-2 px-3 rounded-md text-sm ${hasMultipleQuantity ? "border border-l-4 border-amber-300 bg-amber-50/60 dark:border-amber-600 dark:bg-amber-950/20" : "bg-muted/40"}`}
+                        className={`flex items-center justify-between gap-2 py-2 px-3 rounded-md text-sm ${hasMultipleQuantity ? "border border-l-4 border-amber-300 bg-muted/40 dark:border-amber-600" : "bg-muted/40"}`}
                       >
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{item.productName}</p>
