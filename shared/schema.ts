@@ -105,6 +105,7 @@ export const products = pgTable("products", {
   discountPricePerQuarter: decimal("discount_price_per_quarter", { precision: 10, scale: 2 }),
   discountPricePerHalf: decimal("discount_price_per_half", { precision: 10, scale: 2 }),
   discountQuantityPricing: jsonb("discount_quantity_pricing").$type<Array<{ minQuantity: number; pricePerItem: string }>>(),
+  discountStartsAt: timestamp("discount_starts_at"), // optional scheduled start for product discounts
   discountExpiresAt: timestamp("discount_expires_at"), // clears product discounts and BOGO when reached
   bogoEnabled: boolean("bogo_enabled").notNull().default(false), // buy one get one free
   bogoFreeOptionIndex: integer("bogo_free_option_index"), // which option index is free (null = same as purchased)
@@ -604,6 +605,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
     minQuantity: z.number().int().min(1),
     pricePerItem: z.string().or(z.number()).transform(val => String(val)),
   })).nullable().optional(),
+  discountStartsAt: z.coerce.date().nullable().optional(),
   discountExpiresAt: z.coerce.date().nullable().optional(),
   stock: z.number().int().min(0).optional().default(0),
   physicalInventory: z.number().optional(),

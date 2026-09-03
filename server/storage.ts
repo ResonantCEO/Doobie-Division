@@ -580,6 +580,7 @@ export class DatabaseStorage implements IStorage {
           discountPricePerQuarter: null,
           discountPricePerHalf: null,
           discountQuantityPricing: null,
+           discountStartsAt: null,
           discountExpiresAt: null,
           bogoEnabled: false,
           bogoFreeOptionIndex: null,
@@ -631,6 +632,7 @@ export class DatabaseStorage implements IStorage {
         discountPricePerQuarter: products.discountPricePerQuarter,
         discountPricePerHalf: products.discountPricePerHalf,
         discountQuantityPricing: products.discountQuantityPricing,
+         discountStartsAt: products.discountStartsAt,
         discountExpiresAt: products.discountExpiresAt,
         bogoEnabled: products.bogoEnabled,
         bogoFreeOptionIndex: products.bogoFreeOptionIndex,
@@ -810,19 +812,38 @@ export class DatabaseStorage implements IStorage {
         const temporaryQuantityPricing = Array.isArray(product.discountQuantityPricing)
           ? product.discountQuantityPricing
           : [];
-        const hasTemporaryPricing =
+        const discountWindowActive =
+          (!product.discountStartsAt || new Date(product.discountStartsAt).getTime() <= Date.now()) &&
+          (!product.discountExpiresAt || new Date(product.discountExpiresAt).getTime() > Date.now());
+        const hasTemporaryPricing = discountWindowActive && (
           product.discountPriceOverride != null ||
           product.discountPricePerGram != null ||
           product.discountPricePerOunce != null ||
           product.discountPricePerEighth != null ||
           product.discountPricePerQuarter != null ||
           product.discountPricePerHalf != null ||
-          temporaryQuantityPricing.length > 0;
+          temporaryQuantityPricing.length > 0
+        );
+        const bogoConfig = bogoByProductId.get(product.id);
         return {
           ...product,
-          ...bogoByProductId.get(product.id),
+          bogoEnabled: discountWindowActive ? bogoConfig?.bogoEnabled ?? false : false,
+          bogoFreeOptionIndex: discountWindowActive ? bogoConfig?.bogoFreeOptionIndex ?? null : null,
+          bogoDiscountType: discountWindowActive ? bogoConfig?.bogoDiscountType ?? "free" : "free",
+          bogoDiscountValue: discountWindowActive ? bogoConfig?.bogoDiscountValue ?? "0" : "0",
+          configuredBogoEnabled: bogoConfig?.bogoEnabled ?? false,
+          configuredBogoFreeOptionIndex: bogoConfig?.bogoFreeOptionIndex ?? null,
+          configuredBogoDiscountType: bogoConfig?.bogoDiscountType ?? "free",
+          configuredBogoDiscountValue: bogoConfig?.bogoDiscountValue ?? "0",
           configuredDiscountPercentage: product.discountPercentage,
           configuredDiscountAmount: product.discountAmount,
+          configuredDiscountPriceOverride: product.discountPriceOverride,
+          configuredDiscountPricePerGram: product.discountPricePerGram,
+          configuredDiscountPricePerOunce: product.discountPricePerOunce,
+          configuredDiscountPricePerEighth: product.discountPricePerEighth,
+          configuredDiscountPricePerQuarter: product.discountPricePerQuarter,
+          configuredDiscountPricePerHalf: product.discountPricePerHalf,
+          configuredDiscountQuantityPricing: temporaryQuantityPricing,
           standardPrice: product.price,
           standardPricePerGram: product.pricePerGram,
           standardPricePerOunce: product.pricePerOunce,
@@ -830,16 +851,16 @@ export class DatabaseStorage implements IStorage {
           standardPricePerQuarter: product.pricePerQuarter,
           standardPricePerHalf: product.pricePerHalf,
           standardQuantityPricing,
-          price: product.discountPriceOverride ?? product.price,
-          pricePerGram: product.discountPricePerGram ?? product.pricePerGram,
-          pricePerOunce: product.discountPricePerOunce ?? product.pricePerOunce,
-          pricePerEighth: product.discountPricePerEighth ?? product.pricePerEighth,
-          pricePerQuarter: product.discountPricePerQuarter ?? product.pricePerQuarter,
-          pricePerHalf: product.discountPricePerHalf ?? product.pricePerHalf,
-          discountPercentage: hasTemporaryPricing ? "0" : product.discountPercentage,
-          discountAmount: hasTemporaryPricing ? "0" : product.discountAmount,
+          price: discountWindowActive ? product.discountPriceOverride ?? product.price : product.price,
+          pricePerGram: discountWindowActive ? product.discountPricePerGram ?? product.pricePerGram : product.pricePerGram,
+          pricePerOunce: discountWindowActive ? product.discountPricePerOunce ?? product.pricePerOunce : product.pricePerOunce,
+          pricePerEighth: discountWindowActive ? product.discountPricePerEighth ?? product.pricePerEighth : product.pricePerEighth,
+          pricePerQuarter: discountWindowActive ? product.discountPricePerQuarter ?? product.pricePerQuarter : product.pricePerQuarter,
+          pricePerHalf: discountWindowActive ? product.discountPricePerHalf ?? product.pricePerHalf : product.pricePerHalf,
+          discountPercentage: discountWindowActive ? hasTemporaryPricing ? "0" : product.discountPercentage : "0",
+          discountAmount: discountWindowActive ? hasTemporaryPricing ? "0" : product.discountAmount : "0",
           sizes: sizesByProductId.get(product.id) || [],
-          quantityPricing: temporaryQuantityPricing.length > 0
+          quantityPricing: discountWindowActive && temporaryQuantityPricing.length > 0
             ? temporaryQuantityPricing
             : standardQuantityPricing,
         };
@@ -874,7 +895,7 @@ export class DatabaseStorage implements IStorage {
     let product: any;
     try {
       const rawResult = await retryQuery(() =>
-        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, discount_price_override, discount_price_per_gram, discount_price_per_ounce, discount_price_per_eighth, discount_price_per_quarter, discount_price_per_half, discount_quantity_pricing, discount_expires_at, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
+        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, discount_price_override, discount_price_per_gram, discount_price_per_ounce, discount_price_per_eighth, discount_price_per_quarter, discount_price_per_half, discount_quantity_pricing, discount_starts_at, discount_expires_at, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
       );
       
       const row = rawResult?.rows?.[0];
@@ -908,6 +929,7 @@ export class DatabaseStorage implements IStorage {
           discountPricePerQuarter: row.discount_price_per_quarter,
           discountPricePerHalf: row.discount_price_per_half,
           discountQuantityPricing: row.discount_quantity_pricing,
+           discountStartsAt: row.discount_starts_at,
           discountExpiresAt: row.discount_expires_at,
           bogoEnabled: row.bogo_enabled === true || row.bogo_enabled === 't' || row.bogo_enabled === 'true',
           bogoFreeOptionIndex: row.bogo_free_option_index != null ? parseInt(String(row.bogo_free_option_index)) : null,
@@ -984,18 +1006,41 @@ export class DatabaseStorage implements IStorage {
       const temporaryQuantityPricing = Array.isArray(product.discountQuantityPricing)
         ? product.discountQuantityPricing
         : [];
-      const hasTemporaryPricing =
+      const discountWindowActive =
+        (!product.discountStartsAt || new Date(product.discountStartsAt).getTime() <= Date.now()) &&
+        (!product.discountExpiresAt || new Date(product.discountExpiresAt).getTime() > Date.now());
+      const hasTemporaryPricing = discountWindowActive && (
         product.discountPriceOverride != null ||
         product.discountPricePerGram != null ||
         product.discountPricePerOunce != null ||
         product.discountPricePerEighth != null ||
         product.discountPricePerQuarter != null ||
         product.discountPricePerHalf != null ||
-        temporaryQuantityPricing.length > 0;
+        temporaryQuantityPricing.length > 0
+      );
+      const configuredBogoEnabled = product.bogoEnabled;
+      const configuredBogoFreeOptionIndex = product.bogoFreeOptionIndex;
+      const configuredBogoDiscountType = product.bogoDiscountType;
+      const configuredBogoDiscountValue = product.bogoDiscountValue;
       return {
         ...product,
+        bogoEnabled: discountWindowActive ? configuredBogoEnabled : false,
+        bogoFreeOptionIndex: discountWindowActive ? configuredBogoFreeOptionIndex : null,
+        bogoDiscountType: discountWindowActive ? configuredBogoDiscountType : "free",
+        bogoDiscountValue: discountWindowActive ? configuredBogoDiscountValue : "0",
+        configuredBogoEnabled,
+        configuredBogoFreeOptionIndex,
+        configuredBogoDiscountType,
+        configuredBogoDiscountValue,
         configuredDiscountPercentage: product.discountPercentage,
         configuredDiscountAmount: product.discountAmount,
+        configuredDiscountPriceOverride: product.discountPriceOverride,
+        configuredDiscountPricePerGram: product.discountPricePerGram,
+        configuredDiscountPricePerOunce: product.discountPricePerOunce,
+        configuredDiscountPricePerEighth: product.discountPricePerEighth,
+        configuredDiscountPricePerQuarter: product.discountPricePerQuarter,
+        configuredDiscountPricePerHalf: product.discountPricePerHalf,
+        configuredDiscountQuantityPricing: temporaryQuantityPricing,
         standardPrice: product.price,
         standardPricePerGram: product.pricePerGram,
         standardPricePerOunce: product.pricePerOunce,
@@ -1003,16 +1048,16 @@ export class DatabaseStorage implements IStorage {
         standardPricePerQuarter: product.pricePerQuarter,
         standardPricePerHalf: product.pricePerHalf,
         standardQuantityPricing: quantityPricingTiers,
-        price: product.discountPriceOverride ?? product.price,
-        pricePerGram: product.discountPricePerGram ?? product.pricePerGram,
-        pricePerOunce: product.discountPricePerOunce ?? product.pricePerOunce,
-        pricePerEighth: product.discountPricePerEighth ?? product.pricePerEighth,
-        pricePerQuarter: product.discountPricePerQuarter ?? product.pricePerQuarter,
-        pricePerHalf: product.discountPricePerHalf ?? product.pricePerHalf,
-        discountPercentage: hasTemporaryPricing ? "0" : product.discountPercentage,
-        discountAmount: hasTemporaryPricing ? "0" : product.discountAmount,
+        price: discountWindowActive ? product.discountPriceOverride ?? product.price : product.price,
+        pricePerGram: discountWindowActive ? product.discountPricePerGram ?? product.pricePerGram : product.pricePerGram,
+        pricePerOunce: discountWindowActive ? product.discountPricePerOunce ?? product.pricePerOunce : product.pricePerOunce,
+        pricePerEighth: discountWindowActive ? product.discountPricePerEighth ?? product.pricePerEighth : product.pricePerEighth,
+        pricePerQuarter: discountWindowActive ? product.discountPricePerQuarter ?? product.pricePerQuarter : product.pricePerQuarter,
+        pricePerHalf: discountWindowActive ? product.discountPricePerHalf ?? product.pricePerHalf : product.pricePerHalf,
+        discountPercentage: discountWindowActive ? hasTemporaryPricing ? "0" : product.discountPercentage : "0",
+        discountAmount: discountWindowActive ? hasTemporaryPricing ? "0" : product.discountAmount : "0",
         sizes: sizes.length > 0 ? sizes : undefined,
-        quantityPricing: temporaryQuantityPricing.length > 0
+        quantityPricing: discountWindowActive && temporaryQuantityPricing.length > 0
           ? temporaryQuantityPricing
           : quantityPricingTiers,
       };
@@ -1528,6 +1573,10 @@ export class DatabaseStorage implements IStorage {
           const expiration = d.discountExpiresAt ? new Date(d.discountExpiresAt) : null;
           await rawSql`UPDATE products SET discount_expires_at = ${expiration} WHERE id = ${id}`;
         }
+        if (d.hasOwnProperty('discountStartsAt')) {
+          const start = d.discountStartsAt ? new Date(d.discountStartsAt) : null;
+          await rawSql`UPDATE products SET discount_starts_at = ${start} WHERE id = ${id}`;
+        }
         if (d.hasOwnProperty('discountPriceOverride')) await rawSql`UPDATE products SET discount_price_override = ${toSafeNum(d.discountPriceOverride)} WHERE id = ${id}`;
         if (d.hasOwnProperty('discountPricePerGram')) await rawSql`UPDATE products SET discount_price_per_gram = ${toSafeNum(d.discountPricePerGram)} WHERE id = ${id}`;
         if (d.hasOwnProperty('discountPricePerOunce')) await rawSql`UPDATE products SET discount_price_per_ounce = ${toSafeNum(d.discountPricePerOunce)} WHERE id = ${id}`;
@@ -1596,6 +1645,10 @@ export class DatabaseStorage implements IStorage {
         if (updateData.hasOwnProperty('discountExpiresAt')) {
           const expiration = updateData.discountExpiresAt ? new Date(updateData.discountExpiresAt) : null;
           await rawSql`UPDATE products SET discount_expires_at = ${expiration} WHERE id = ${id}`;
+        }
+        if (updateData.hasOwnProperty('discountStartsAt')) {
+          const start = updateData.discountStartsAt ? new Date(updateData.discountStartsAt) : null;
+          await rawSql`UPDATE products SET discount_starts_at = ${start} WHERE id = ${id}`;
         }
         const toTemporaryPrice = (value: any) => {
           if (value === null || value === undefined || value === '') return null;

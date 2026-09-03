@@ -88,6 +88,14 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+const toDateTimeLocalValue = (value: unknown): string => {
+  if (!value) return "";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "";
+  const localTime = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localTime.toISOString().slice(0, 16);
+};
+
 const renderCategoryOptions = (categories: CategoryWithChildren[], level = 0): JSX.Element[] => {
   const result: JSX.Element[] = [];
 
@@ -187,12 +195,12 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       pricePerHalf: (product as any).standardPricePerHalf ?? (product as any).pricePerHalf ?? "",
       discountPercentage: (product as any).configuredDiscountPercentage ?? product.discountPercentage ?? "0",
       discountAmount: (product as any).configuredDiscountAmount ?? (product as any).discountAmount ?? "0",
-      discountPriceOverride: (product as any).discountPriceOverride || "",
-      discountPricePerGram: (product as any).discountPricePerGram || "",
-      discountPricePerOunce: (product as any).discountPricePerOunce || "",
-      discountPricePerEighth: (product as any).discountPricePerEighth || "",
-      discountPricePerQuarter: (product as any).discountPricePerQuarter || "",
-      discountPricePerHalf: (product as any).discountPricePerHalf || "",
+      discountPriceOverride: (product as any).configuredDiscountPriceOverride ?? (product as any).discountPriceOverride ?? "",
+      discountPricePerGram: (product as any).configuredDiscountPricePerGram ?? (product as any).discountPricePerGram ?? "",
+      discountPricePerOunce: (product as any).configuredDiscountPricePerOunce ?? (product as any).discountPricePerOunce ?? "",
+      discountPricePerEighth: (product as any).configuredDiscountPricePerEighth ?? (product as any).discountPricePerEighth ?? "",
+      discountPricePerQuarter: (product as any).configuredDiscountPricePerQuarter ?? (product as any).discountPricePerQuarter ?? "",
+      discountPricePerHalf: (product as any).configuredDiscountPricePerHalf ?? (product as any).discountPricePerHalf ?? "",
       isActive: product.isActive,
       purchasePrice: (product as any).purchasePrice || "",
       purchasePriceMethod: ((product as any).purchasePriceMethod as "units" | "weight") || "units",
@@ -240,12 +248,12 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         pricePerHalf: (product as any).standardPricePerHalf ?? (product as any).pricePerHalf ?? "",
         discountPercentage: (product as any).configuredDiscountPercentage ?? product.discountPercentage ?? "0",
         discountAmount: (product as any).configuredDiscountAmount ?? (product as any).discountAmount ?? "0",
-        discountPriceOverride: (product as any).discountPriceOverride || "",
-        discountPricePerGram: (product as any).discountPricePerGram || "",
-        discountPricePerOunce: (product as any).discountPricePerOunce || "",
-        discountPricePerEighth: (product as any).discountPricePerEighth || "",
-        discountPricePerQuarter: (product as any).discountPricePerQuarter || "",
-        discountPricePerHalf: (product as any).discountPricePerHalf || "",
+        discountPriceOverride: (product as any).configuredDiscountPriceOverride ?? (product as any).discountPriceOverride ?? "",
+        discountPricePerGram: (product as any).configuredDiscountPricePerGram ?? (product as any).discountPricePerGram ?? "",
+        discountPricePerOunce: (product as any).configuredDiscountPricePerOunce ?? (product as any).discountPricePerOunce ?? "",
+        discountPricePerEighth: (product as any).configuredDiscountPricePerEighth ?? (product as any).discountPricePerEighth ?? "",
+        discountPricePerQuarter: (product as any).configuredDiscountPricePerQuarter ?? (product as any).discountPricePerQuarter ?? "",
+        discountPricePerHalf: (product as any).configuredDiscountPricePerHalf ?? (product as any).discountPricePerHalf ?? "",
         isActive: product.isActive,
         purchasePrice: (product as any).purchasePrice || "",
         purchasePriceMethod: ((product as any).purchasePriceMethod as "units" | "weight") || "units",
@@ -285,7 +293,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         setQuantityTiers([]);
       }
 
-      const existingDiscountTiers = (product as any).discountQuantityPricing as Array<{minQuantity: number; pricePerItem: string}> | undefined;
+      const existingDiscountTiers = ((product as any).configuredDiscountQuantityPricing ?? (product as any).discountQuantityPricing) as Array<{minQuantity: number; pricePerItem: string}> | undefined;
       if (existingDiscountTiers && existingDiscountTiers.length > 0) {
         setEnableDiscountQuantityPricing(true);
         setDiscountQuantityTiers(existingDiscountTiers.map(t => ({
@@ -299,14 +307,16 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       }
 
       // Reset BOGO state
-      setBogoEnabled(!!(product as any).bogoEnabled);
-      const savedIndex = (product as any).bogoFreeOptionIndex;
+      setBogoEnabled(!!((product as any).configuredBogoEnabled ?? (product as any).bogoEnabled));
+      const savedIndex = (product as any).configuredBogoFreeOptionIndex ?? (product as any).bogoFreeOptionIndex;
       setBogoFreeOptionIndex(
         savedIndex == null ? "__same__" : savedIndex === -1 ? "__any__" : String(savedIndex)
       );
-      setBogoDiscountType((product as any).bogoDiscountType || "free");
-      setBogoDiscountValue((product as any).bogoDiscountValue || "0");
+      setBogoDiscountType((product as any).configuredBogoDiscountType ?? (product as any).bogoDiscountType ?? "free");
+      setBogoDiscountValue((product as any).configuredBogoDiscountValue ?? (product as any).bogoDiscountValue ?? "0");
       setDiscountDurationHours("");
+      setDiscountScheduleStart(toDateTimeLocalValue((product as any).discountStartsAt));
+      setDiscountScheduleEnd(toDateTimeLocalValue((product as any).discountExpiresAt));
 
       // Pre-populate lb/oz/g fields from grams for weight-based products
       if (product.sellingMethod === "weight") {
@@ -427,11 +437,26 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         discountQuantityPricing.length > 0 ||
         bogoEnabled;
       const requestedDurationHours = parseFloat(discountDurationHours);
-      const discountExpiresAt = !hasProductDiscount
-        ? null
-        : Number.isFinite(requestedDurationHours) && requestedDurationHours > 0
-          ? new Date(Date.now() + requestedDurationHours * 60 * 60 * 1000).toISOString()
-          : (product as any).discountExpiresAt || null;
+      const scheduledStart = discountScheduleStart ? new Date(discountScheduleStart) : null;
+      const scheduledEnd = discountScheduleEnd ? new Date(discountScheduleEnd) : null;
+      const hasDuration = Number.isFinite(requestedDurationHours) && requestedDurationHours > 0;
+      const calculatedEnd = hasDuration
+        ? new Date((scheduledStart?.getTime() ?? Date.now()) + requestedDurationHours * 60 * 60 * 1000)
+        : scheduledEnd;
+
+      if (scheduledStart && calculatedEnd && calculatedEnd.getTime() <= scheduledStart.getTime()) {
+        throw new Error("Discount end time must be after the scheduled start time.");
+      }
+      if (!scheduledStart && calculatedEnd && calculatedEnd.getTime() <= Date.now()) {
+        throw new Error("Discount end time must be in the future.");
+      }
+
+      const discountStartsAt = hasProductDiscount && scheduledStart
+        ? scheduledStart.toISOString()
+        : null;
+      const discountExpiresAt = hasProductDiscount && calculatedEnd
+        ? calculatedEnd.toISOString()
+        : null;
       
       // Helper to safely parse and format price values
       const formatPrice = (value: any, decimals: number = 2): string | null => {
@@ -474,6 +499,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         discountPricePerQuarter: formatPrice(data.discountPricePerQuarter, 2),
         discountPricePerHalf: formatPrice(data.discountPricePerHalf, 2),
         discountQuantityPricing: discountQuantityPricing.length > 0 ? discountQuantityPricing : null,
+        discountStartsAt,
         discountExpiresAt,
         purchasePrice: formatPrice(data.purchasePrice, 2),
         purchasePriceMethod: data.purchasePriceMethod || "units",
@@ -607,14 +633,16 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   };
 
   const currentDiscountPercentage = parseFloat(form.watch("discountPercentage") || "0");
-  const [bogoEnabled, setBogoEnabled] = useState<boolean>(!!(product as any).bogoEnabled);
+  const [bogoEnabled, setBogoEnabled] = useState<boolean>(!!((product as any).configuredBogoEnabled ?? (product as any).bogoEnabled));
   const [bogoFreeOptionIndex, setBogoFreeOptionIndex] = useState<string>(() => {
-    const idx = (product as any).bogoFreeOptionIndex;
+    const idx = (product as any).configuredBogoFreeOptionIndex ?? (product as any).bogoFreeOptionIndex;
     return idx == null ? "__same__" : idx === -1 ? "__any__" : String(idx);
   });
-  const [bogoDiscountType, setBogoDiscountType] = useState<string>((product as any).bogoDiscountType || "free");
-  const [bogoDiscountValue, setBogoDiscountValue] = useState<string>((product as any).bogoDiscountValue || "0");
+  const [bogoDiscountType, setBogoDiscountType] = useState<string>((product as any).configuredBogoDiscountType ?? (product as any).bogoDiscountType ?? "free");
+  const [bogoDiscountValue, setBogoDiscountValue] = useState<string>((product as any).configuredBogoDiscountValue ?? (product as any).bogoDiscountValue ?? "0");
   const [discountDurationHours, setDiscountDurationHours] = useState("");
+  const [discountScheduleStart, setDiscountScheduleStart] = useState(() => toDateTimeLocalValue((product as any).discountStartsAt));
+  const [discountScheduleEnd, setDiscountScheduleEnd] = useState(() => toDateTimeLocalValue((product as any).discountExpiresAt));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1110,26 +1138,68 @@ export default function EditProductModal({ open, onOpenChange, product, categori
             <div className="rounded-lg border p-4 space-y-4">
               <Label className="text-base font-semibold">Discounts</Label>
 
-              <div className="space-y-2">
-                <Label htmlFor="discount-duration-hours">Discount Duration (Hours)</Label>
-                <Input
-                  id="discount-duration-hours"
-                  type="number"
-                  min="1"
-                  step="1"
-                  placeholder="Leave blank for no expiration"
-                  value={discountDurationHours}
-                  onChange={(event) => setDiscountDurationHours(event.target.value)}
-                  onWheel={(event) => event.currentTarget.blur()}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Entering a duration starts a new countdown when you save. When it ends, percentage, amount, temporary price, temporary quantity-tier, and BOGO discounts are cleared automatically.
-                </p>
-                {(product as any).discountExpiresAt && !discountDurationHours && (
-                  <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                    Current discounts expire {new Date((product as any).discountExpiresAt).toLocaleString()}.
-                    Leave this blank to keep that expiration.
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-semibold">Discount Schedule</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Leave the start blank to activate the discount immediately. You can return and edit or clear these times before or during the sale.
                   </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="discount-schedule-start">Starts</Label>
+                    <Input
+                      id="discount-schedule-start"
+                      type="datetime-local"
+                      value={discountScheduleStart}
+                      onChange={(event) => setDiscountScheduleStart(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="discount-schedule-end">Ends</Label>
+                    <Input
+                      id="discount-schedule-end"
+                      type="datetime-local"
+                      value={discountScheduleEnd}
+                      onChange={(event) => {
+                        setDiscountScheduleEnd(event.target.value);
+                        if (event.target.value) setDiscountDurationHours("");
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="discount-duration-hours">Or Set Duration (Hours)</Label>
+                  <Input
+                    id="discount-duration-hours"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="Calculated from the start time or from now"
+                    value={discountDurationHours}
+                    onChange={(event) => {
+                      setDiscountDurationHours(event.target.value);
+                      if (event.target.value) setDiscountScheduleEnd("");
+                    }}
+                    onWheel={(event) => event.currentTarget.blur()}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Duration is counted from the scheduled start, or from the moment you save if no start is selected. At the end, percentage, amount, temporary price, temporary quantity-tier, and BOGO discounts are cleared automatically.
+                  </p>
+                </div>
+                {(discountScheduleStart || discountScheduleEnd) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setDiscountScheduleStart("");
+                      setDiscountScheduleEnd("");
+                      setDiscountDurationHours("");
+                    }}
+                  >
+                    Clear Schedule
+                  </Button>
                 )}
               </div>
 

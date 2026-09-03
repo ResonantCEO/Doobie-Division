@@ -1,0 +1,2 @@
+ALTER TABLE products
+  ADD COLUMN IF NOT EXISTS discount_starts_at TIMESTAMP;
