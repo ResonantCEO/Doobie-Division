@@ -1081,8 +1081,10 @@ export default function ScannerPage() {
                   <div className="mt-4">
                     <h5 className="font-medium mb-2">Items to Fulfill:</h5>
                     <div className="space-y-2">
-                      {selectedOrder.items?.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center p-2 border rounded">
+                       {selectedOrder.items?.map((item) => {
+                         const hasMultipleQuantity = Number(item.quantity) > 1;
+                         return (
+                    <div key={item.id} className={`flex justify-between items-center p-2 border rounded ${hasMultipleQuantity ? "border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950/30" : ""}`}>
                       <div>
                         <p className="font-medium">{item.productName}</p>
                         <p className="text-sm text-muted-foreground">
@@ -1090,15 +1092,21 @@ export default function ScannerPage() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium">
-                          Qty: {item.quantity}
-                        </p>
+                        {hasMultipleQuantity ? (
+                          <div className="mb-1 inline-flex items-center gap-1 rounded-md border-2 border-amber-500 bg-amber-100 px-2 py-1 text-amber-950 dark:border-amber-400 dark:bg-amber-400">
+                            <span className="text-[10px] font-black uppercase tracking-wide">Qty</span>
+                            <span className="text-lg font-black leading-none">{item.quantity}</span>
+                          </div>
+                        ) : (
+                          <p className="font-medium">Qty: {item.quantity}</p>
+                        )}
                         <Badge variant={item.fulfilled ? "default" : "secondary"}>
                           {item.fulfilled ? "Fulfilled" : "Pending"}
                         </Badge>
                       </div>
                     </div>
-                  ))}
+                         );
+                       })}
                     </div>
                   </div>
                 </div>

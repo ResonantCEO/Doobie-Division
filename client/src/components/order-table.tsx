@@ -454,10 +454,11 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
         const fulfilled = isItemFulfilled(item);
         const isCustomItem = item.productId == null && item.productSku === "CUSTOM";
         const canToggleFulfillment = item.productId != null || isCustomItem;
+        const hasMultipleQuantity = Number(item.quantity) > 1;
         return (
         <div 
           key={item.id} 
-          className={`flex items-center gap-3 bg-white dark:bg-gray-800 rounded-md px-3 py-2 border ${fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'}`}
+          className={`flex items-center gap-3 rounded-md px-3 py-2 border ${fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : hasMultipleQuantity ? 'border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-950/35 ring-1 ring-amber-300/70 dark:ring-amber-600/60' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
         >
           {fulfillingItems.has(item.id) ? (
             <Loader2 className="h-5 w-5 animate-spin text-gray-400 flex-shrink-0" />
@@ -491,7 +492,17 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
             )}
           </div>
           <div className="text-right flex-shrink-0">
-            <div className="font-semibold text-gray-900 dark:text-white">x{item.quantity}</div>
+             {hasMultipleQuantity ? (
+               <div
+                 className="inline-flex items-center gap-1.5 rounded-md border-2 border-amber-500 bg-amber-100 px-2 py-1 text-amber-950 shadow-sm dark:border-amber-400 dark:bg-amber-400 dark:text-amber-950"
+                 aria-label={`Multiple quantity: ${item.quantity}`}
+               >
+                 <span className="text-[10px] font-black uppercase tracking-wide">Qty</span>
+                 <span className="text-lg font-black leading-none">{item.quantity}</span>
+               </div>
+             ) : (
+               <div className="font-semibold text-gray-900 dark:text-white">x{item.quantity}</div>
+             )}
             <div className="text-xs text-gray-600 dark:text-gray-400">${Number(item.subtotal).toFixed(2)}</div>
           </div>
         </div>

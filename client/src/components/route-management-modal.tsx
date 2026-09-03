@@ -219,9 +219,12 @@ function OrderInfoDialog({ order, onClose }: OrderInfoDialogProps) {
                   {data.items
                     .filter((item) => !item.removed)
                     .map((item) => (
+                      (() => {
+                        const hasMultipleQuantity = Number(item.quantity) > 1;
+                        return (
                       <div
                         key={item.id}
-                        className="flex items-center justify-between gap-2 py-2 px-3 rounded-md bg-muted/40 text-sm"
+                        className={`flex items-center justify-between gap-2 py-2 px-3 rounded-md text-sm ${hasMultipleQuantity ? "border-2 border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950/30" : "bg-muted/40"}`}
                       >
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{item.productName}</p>
@@ -230,13 +233,25 @@ function OrderInfoDialog({ order, onClose }: OrderInfoDialogProps) {
                           )}
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0 text-right">
-                          <span className="text-gray-500 text-xs">×{item.quantity}</span>
+                          {hasMultipleQuantity ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-md border-2 border-amber-500 bg-amber-100 px-2 py-1 text-amber-950 dark:border-amber-400 dark:bg-amber-400"
+                              aria-label={`Multiple quantity: ${item.quantity}`}
+                            >
+                              <span className="text-[10px] font-black uppercase tracking-wide">Qty</span>
+                              <span className="text-base font-black leading-none">{item.quantity}</span>
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 text-xs">×{item.quantity}</span>
+                          )}
                           <span className="font-semibold">${Number(item.subtotal).toFixed(2)}</span>
                           {item.fulfilled && (
                             <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                           )}
                         </div>
                       </div>
+                        );
+                      })()
                     ))}
                 </div>
               ) : (
