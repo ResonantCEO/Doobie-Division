@@ -1277,9 +1277,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const orderData = insertOrderSchema.parse(order);
 
-      // NOTE: promoCode is not in insertOrderSchema, so read from raw request body
       const promoCodeStr = (order.promoCode || (orderData as any).promoCode) as string | undefined;
       let verifiedPromo: any = null;
+      let verifiedPromoSavings = 0;
       if (promoCodeStr) {
         verifiedPromo = await storage.getPromoCodeByCode(promoCodeStr.trim());
         const promoError = await getPromoValidationError(
@@ -1463,6 +1463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           (total, allocation) => total + Math.max(0, allocation.normalUnitPrice - allocation.promoPrice) * allocation.quantity,
           0,
         );
+        verifiedPromoSavings = serverPromoSavings;
         const requestedPromoSavings = Math.max(0, Number((order as any).promoDiscount) || 0);
         if (Math.abs(serverPromoSavings - requestedPromoSavings) > 0.02) {
           return res.status(400).json({
@@ -1516,6 +1517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const serverPromoSavings = verifiedPromo.discountType === "percent"
           ? Math.min(eligibleSubtotal, eligibleSubtotal * discountValue / 100)
           : Math.min(eligibleSubtotal, discountValue);
+        verifiedPromoSavings = serverPromoSavings;
         const requestedPromoSavings = Math.max(0, Number((order as any).promoDiscount) || 0);
         if (Math.abs(serverPromoSavings - requestedPromoSavings) > 0.02) {
           return res.status(400).json({
@@ -1530,6 +1532,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
           Number(orderData.total || 0) + requestedPromoSavings - serverPromoSavings,
         ).toFixed(2);
       }
+
+      // Persist a checkout-time snapshot of every discount shown to the customer.
+      // Promo details are rebuilt from the verified server record so historical
+      // orders remain accurate even if the promo is later edited or deleted.
+      const submittedBreakdown = Array.isArray((order as any).discountBreakdown)
+        ? (order as any).discountBreakdown
+        : [];
+      const discountBreakdown = submittedBreakdown
+        .filter((entry: any) => entry?.type !== "promo")
+        .map((entry: any) => ({
+          type: entry?.type === "bogo" ? "bogo" : "automatic",
+          label: String(entry?.label || "Discount").slice(0, 160),
+          amount: Math.max(0, Number(entry?.amount) || 0),
+          ...(entry?.description ? { description: String(entry.description).slice(0, 300) } : {}),
+        }))
+        .filter((entry: any) => entry.amount > 0);
+
+      if (verifiedPromo) {
+        discountBreakdown.push({
+          type: "promo",
+          label: verifiedPromo.description || `Promo code ${verifiedPromo.code}`,
+          code: verifiedPromo.code,
+          amount: verifiedPromoSavings,
+        });
+      }
+
+      const persistedDiscountTotal = discountBreakdown.reduce(
+        (sum: number, entry: any) => sum + entry.amount,
+        0,
+      );
+      const mutableOrderData: any = orderData;
+      mutableOrderData.discountBreakdown = discountBreakdown;
+      mutableOrderData.discountTotal = persistedDiscountTotal.toFixed(2);
+      mutableOrderData.originalTotal = (
+        Math.max(0, Number(mutableOrderData.total) || 0) + persistedDiscountTotal
+      ).toFixed(2);
+      mutableOrderData.promoCodeId = verifiedPromo?.id ?? null;
+      mutableOrderData.promoCode = verifiedPromo?.code ?? null;
+      mutableOrderData.promoDiscount = verifiedPromoSavings.toFixed(2);
 
       // Expand grab bag products into individual line items + a discount line
       const finalItems: any[] = [];

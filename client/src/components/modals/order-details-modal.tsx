@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive, ImageIcon, ShoppingBag, Pencil, ArrowLeftRight, Search, Trash2, PlusCircle, Minus, Plus } from "lucide-react";
+import { Package, User, Calendar, CreditCard, MapPin, Loader2, Hash, CheckCircle, Clock, Scan, Camera, X, AlertCircle, SwitchCamera, Archive, ImageIcon, ShoppingBag, Pencil, ArrowLeftRight, Search, Trash2, PlusCircle, Minus, Plus, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import type { Order, Product } from "@shared/schema";
@@ -1931,6 +1931,56 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Order Summary</h3>
               </div>
               <div className="space-y-2">
+                {(() => {
+                  const breakdown = Array.isArray((displayOrder as any).discountBreakdown)
+                    ? (displayOrder as any).discountBreakdown.filter((entry: any) => Number(entry?.amount) > 0)
+                    : [];
+                  const finalTotal = Number(displayOrder.total || 0);
+                  const storedDiscountTotal = Number((displayOrder as any).discountTotal || 0);
+                  const originalTotal = Number((displayOrder as any).originalTotal);
+                  const resolvedOriginalTotal = Number.isFinite(originalTotal) && originalTotal >= finalTotal
+                    ? originalTotal
+                    : finalTotal + storedDiscountTotal;
+                  const promoCode = (displayOrder as any).promoCode;
+
+                  if (breakdown.length === 0 && !promoCode && storedDiscountTotal <= 0) return null;
+
+                  return (
+                    <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/20 p-3 space-y-2 mb-3">
+                      <div className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300">
+                        <span>Original total</span>
+                        <span>${resolvedOriginalTotal.toFixed(2)}</span>
+                      </div>
+                      {breakdown.map((entry: any, index: number) => (
+                        <div key={`${entry.type}-${entry.code || entry.label}-${index}`} className="flex items-start justify-between gap-3 text-sm text-emerald-700 dark:text-emerald-300">
+                          <div className="min-w-0">
+                            <span className="flex items-center gap-1.5 font-medium">
+                              <Tag className="h-3.5 w-3.5 shrink-0" />
+                              {entry.type === "promo" && entry.code ? (
+                                <>Promo <span className="font-mono font-bold">{entry.code}</span></>
+                              ) : entry.label}
+                            </span>
+                            {entry.description && (
+                              <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 pl-5 mt-0.5">
+                                {entry.description}
+                              </p>
+                            )}
+                          </div>
+                          <span className="font-medium shrink-0">−${Number(entry.amount).toFixed(2)}</span>
+                        </div>
+                      ))}
+                      {breakdown.length === 0 && promoCode && storedDiscountTotal > 0 && (
+                        <div className="flex items-center justify-between gap-3 text-sm text-emerald-700 dark:text-emerald-300">
+                          <span className="flex items-center gap-1.5 font-medium">
+                            <Tag className="h-3.5 w-3.5" />
+                            Promo <span className="font-mono font-bold">{promoCode}</span>
+                          </span>
+                          <span className="font-medium">−${storedDiscountTotal.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 {editingTotal && userRole === 'admin' ? (
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Override Total Amount</label>

@@ -117,23 +117,18 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   });
   const deliveryRunsEnabled = deliveryRunsSetting?.value !== "false";
 
-  // Compute BOGO savings: sum the full price value of all isFree items
+  // Compute BOGO savings against the normal product price. Free and partially
+  // discounted BOGO items are already represented at their reduced price in
+  // state.total, so this restores the pre-BOGO subtotal for the receipt.
   const bogoSavings = (() => {
     let total = 0;
     for (const item of state.items) {
-      if (!item.isFree) continue;
-      let unitPrice = 0;
-      if (item.product.sellingMethod === "weight") {
-        const norm = (item.size || "").toLowerCase().trim();
-        if (norm.includes("1/8") || norm.includes("⅛")) unitPrice = Number((item.product as any).pricePerEighth) || 0;
-        else if (norm.includes("1/4") || norm.includes("¼")) unitPrice = Number((item.product as any).pricePerQuarter) || 0;
-        else if (norm.includes("1/2") || norm.includes("½")) unitPrice = Number((item.product as any).pricePerHalf) || 0;
-        else if (norm.includes("1 oz") || norm === "ounce") unitPrice = Number(item.product.pricePerOunce) || 0;
-        else unitPrice = Number(item.product.pricePerGram) || 0;
-      } else {
-        unitPrice = Number(item.product.price) || 0;
-      }
-      total += item.quantity * unitPrice;
+      const isDiscountedBogo = item.isFree ||
+        (item.customPrice !== undefined && item.product.bogoEnabled === true);
+      if (!isDiscountedBogo) continue;
+      const regularUnitPrice = getEffectiveUnitPrice(item.product, item.size);
+      const chargedUnitPrice = item.isFree ? 0 : Math.max(0, item.customPrice || 0);
+      total += item.quantity * Math.max(0, regularUnitPrice - chargedUnitPrice);
     }
     return Math.round(total * 100) / 100;
   })();
@@ -441,7 +436,29 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
       // Prepare order data (apply promo discount if any)
       const promoSavings = appliedPromo?.discountAmount || 0;
-      const finalTotal = Math.max(0, combinedTotal - (discountResult?.totalSavings || 0) - promoSavings);
+      const automaticSavings = discountResult?.totalSavings || 0;
+      const finalTotal = Math.max(0, combinedTotal - automaticSavings - promoSavings);
+      const discountBreakdown = [
+        ...(bogoSavings > 0
+          ? [{ type: "bogo", label: "BOGO Discount", amount: bogoSavings }]
+          : []),
+        ...(discountResult?.applied || [])
+          .filter(applied => applied.savings > 0)
+          .map(applied => ({
+            type: "automatic",
+            label: applied.discount.name,
+            amount: applied.savings,
+            description: applied.description,
+          })),
+        ...(appliedPromo
+          ? [{
+              type: "promo",
+              label: appliedPromo.description || `Promo code ${appliedPromo.code}`,
+              code: appliedPromo.code,
+              amount: promoSavings,
+            }]
+          : []),
+      ];
       const orderData: any = {
         orderNumber,
         customerId: user?.id,
@@ -455,8 +472,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         notes: deliveryRunsEnabled
           ? [isAfter5pm ? "[Next Day 1st Run]" : `[${runPreference} Run]`, shippingForm.notes].filter(Boolean).join(" — ")
           : shippingForm.notes || null,
+        discountBreakdown,
       };
-      orderData.originalTotal = combinedTotal.toFixed(2);
+      orderData.originalTotal = (combinedTotal + bogoSavings).toFixed(2);
+      orderData.discountTotal = (bogoSavings + automaticSavings + promoSavings).toFixed(2);
       if (appliedPromo) {
         orderData.promoCodeId = appliedPromo.promoId;
         orderData.promoCode = appliedPromo.code;

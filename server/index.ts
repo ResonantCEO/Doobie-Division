@@ -318,6 +318,15 @@ app.use((req, res, next) => {
   try {
     const { sql } = await import("./db");
     await sql.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false`);
+    await sql.query(`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS original_total DECIMAL(10,2),
+      ADD COLUMN IF NOT EXISTS discount_total DECIMAL(10,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS promo_code_id INTEGER,
+      ADD COLUMN IF NOT EXISTS promo_code VARCHAR,
+      ADD COLUMN IF NOT EXISTS promo_discount DECIMAL(10,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS discount_breakdown JSONB
+    `);
     console.log("✓ Verified orders.archived column exists");
   } catch (error: any) {
     if (error?.message?.includes("already exists") || error?.message?.includes("duplicate")) {

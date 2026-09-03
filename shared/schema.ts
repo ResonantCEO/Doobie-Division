@@ -156,6 +156,18 @@ export const orders = pgTable("orders", {
   customerPhone: varchar("customer_phone").notNull(),
   shippingAddress: text("shipping_address").notNull(),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  originalTotal: decimal("original_total", { precision: 10, scale: 2 }),
+  discountTotal: decimal("discount_total", { precision: 10, scale: 2 }).notNull().default("0"),
+  promoCodeId: integer("promo_code_id"),
+  promoCode: varchar("promo_code"),
+  promoDiscount: decimal("promo_discount", { precision: 10, scale: 2 }).notNull().default("0"),
+  discountBreakdown: jsonb("discount_breakdown").$type<Array<{
+    type: "automatic" | "bogo" | "promo";
+    label: string;
+    amount: number;
+    description?: string;
+    code?: string;
+  }>>(),
   status: varchar("status").notNull().default("pending"), // pending, processing, shipped, delivered, cancelled
   paymentMethod: varchar("payment_method").notNull().default("cod"),
   paymentPhotoUrl: text("payment_photo_url"),
@@ -623,6 +635,18 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   updatedAt: true,
 }).extend({
   total: z.string().or(z.number()).transform(val => String(val)),
+  originalTotal: z.string().or(z.number()).transform(val => String(val)).nullable().optional(),
+  discountTotal: z.string().or(z.number()).transform(val => String(val)).optional(),
+  promoCodeId: z.number().int().nullable().optional(),
+  promoCode: z.string().nullable().optional(),
+  promoDiscount: z.string().or(z.number()).transform(val => String(val)).optional(),
+  discountBreakdown: z.array(z.object({
+    type: z.enum(["automatic", "bogo", "promo"]),
+    label: z.string(),
+    amount: z.number().nonnegative(),
+    description: z.string().optional(),
+    code: z.string().optional(),
+  })).nullable().optional(),
   customerId: z.string().nullable().optional(),
   customerPhone: z.string().optional().default(""),
   assignedUserId: z.string().nullable().optional(),
