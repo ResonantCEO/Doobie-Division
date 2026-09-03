@@ -225,10 +225,11 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
               const fulfilled = isItemFulfilled(item);
               const isCustomItem = item.productId == null && item.productSku === "CUSTOM";
               const canToggleFulfillment = item.productId != null || isCustomItem;
+              const hasMultipleQuantity = Number(item.quantity) > 1;
               return (
               <div 
                 key={item.id} 
-                className={`flex items-center justify-between bg-white dark:bg-gray-800 rounded-md px-4 py-2 border ${fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'}`}
+                className={`flex items-center justify-between rounded-md px-4 py-2 border ${fulfilled ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : hasMultipleQuantity ? 'border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-950/35 ring-1 ring-amber-300/70 dark:ring-amber-600/60' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
               >
                 <div className="flex items-center gap-3">
                   {fulfillingItems.has(item.id) ? (
@@ -253,6 +254,12 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                     />
                   )}
                   <div>
+                     {hasMultipleQuantity && (
+                       <div className="mb-1 inline-flex items-center gap-1.5 rounded border-2 border-amber-500 bg-amber-100 px-2 py-0.5 text-amber-950 shadow-sm dark:border-amber-400 dark:bg-amber-400">
+                         <span className="text-[10px] font-black uppercase tracking-wider">Multiple</span>
+                         <span className="text-sm font-black leading-none">×{item.quantity}</span>
+                       </div>
+                     )}
                     <span className={`font-medium ${fulfilled ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
                       {formatOrderItemName(item.productName)}
                       {(item as any).size && !(item.productName || '').includes('(Size:') && !(item.productName || '').includes('(Option:') && ` (Option: ${(item as any).size})`}
@@ -266,9 +273,19 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
-                  <div className="text-sm text-gray-600 dark:text-gray-300">
-                    Qty: <span className="font-semibold text-gray-900 dark:text-white">{item.quantity}</span>
-                  </div>
+                   {hasMultipleQuantity ? (
+                     <div
+                       className="inline-flex min-w-[78px] flex-col items-center justify-center rounded-md border-2 border-amber-500 bg-amber-100 px-2 py-1 text-amber-950 shadow-sm dark:border-amber-400 dark:bg-amber-400"
+                       aria-label={`Multiple quantity: ${item.quantity}`}
+                     >
+                       <span className="text-[10px] font-black uppercase tracking-widest leading-none">Qty</span>
+                       <span className="text-xl font-black leading-tight">{item.quantity}</span>
+                     </div>
+                   ) : (
+                     <div className="text-sm text-gray-600 dark:text-gray-300">
+                       Qty: <span className="font-semibold text-gray-900 dark:text-white">{item.quantity}</span>
+                     </div>
+                   )}
                   <div className="text-sm text-gray-600 dark:text-gray-300">
                     ${Number(item.productPrice).toFixed(2)} each
                   </div>
