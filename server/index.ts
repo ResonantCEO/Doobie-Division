@@ -296,6 +296,7 @@ app.use((req, res, next) => {
     const { sql } = await import("./db");
     await sql.query(`
       ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS discount_schedule JSONB,
       ADD COLUMN IF NOT EXISTS discount_starts_at TIMESTAMP,
       ADD COLUMN IF NOT EXISTS discount_expires_at TIMESTAMP,
       ADD COLUMN IF NOT EXISTS discount_price_override DECIMAL(10,2),

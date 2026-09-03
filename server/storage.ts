@@ -55,6 +55,27 @@ import { queryCache, categoriesCache, productsCache, analyticsCache, generateCac
 
 type SnapshotDb = Pick<typeof db, "select" | "insert" | "delete">;
 
+type DiscountScheduleWindow = { startAt: string; endAt: string };
+
+function isDiscountWindowActive(
+  discountSchedule: unknown,
+  discountStartsAt: unknown,
+  discountExpiresAt: unknown,
+): boolean {
+  const now = Date.now();
+  if (Array.isArray(discountSchedule) && discountSchedule.length > 0) {
+    return discountSchedule.some((window: DiscountScheduleWindow) => {
+      const start = new Date(window.startAt).getTime();
+      const end = new Date(window.endAt).getTime();
+      return Number.isFinite(start) && Number.isFinite(end) && start <= now && end > now;
+    });
+  }
+  return (
+    (!discountStartsAt || new Date(String(discountStartsAt)).getTime() <= now) &&
+    (!discountExpiresAt || new Date(String(discountExpiresAt)).getTime() > now)
+  );
+}
+
 function normalizeVariantLabel(value: unknown): string {
   return String(value ?? "").trim().toLocaleLowerCase();
 }
@@ -580,6 +601,7 @@ export class DatabaseStorage implements IStorage {
           discountPricePerQuarter: null,
           discountPricePerHalf: null,
           discountQuantityPricing: null,
+           discountSchedule: null,
            discountStartsAt: null,
           discountExpiresAt: null,
           bogoEnabled: false,
@@ -632,6 +654,7 @@ export class DatabaseStorage implements IStorage {
         discountPricePerQuarter: products.discountPricePerQuarter,
         discountPricePerHalf: products.discountPricePerHalf,
         discountQuantityPricing: products.discountQuantityPricing,
+         discountSchedule: products.discountSchedule,
          discountStartsAt: products.discountStartsAt,
         discountExpiresAt: products.discountExpiresAt,
         bogoEnabled: products.bogoEnabled,
@@ -812,9 +835,11 @@ export class DatabaseStorage implements IStorage {
         const temporaryQuantityPricing = Array.isArray(product.discountQuantityPricing)
           ? product.discountQuantityPricing
           : [];
-        const discountWindowActive =
-          (!product.discountStartsAt || new Date(product.discountStartsAt).getTime() <= Date.now()) &&
-          (!product.discountExpiresAt || new Date(product.discountExpiresAt).getTime() > Date.now());
+        const discountWindowActive = isDiscountWindowActive(
+          product.discountSchedule,
+          product.discountStartsAt,
+          product.discountExpiresAt,
+        );
         const hasTemporaryPricing = discountWindowActive && (
           product.discountPriceOverride != null ||
           product.discountPricePerGram != null ||
@@ -895,7 +920,7 @@ export class DatabaseStorage implements IStorage {
     let product: any;
     try {
       const rawResult = await retryQuery(() =>
-        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, discount_price_override, discount_price_per_gram, discount_price_per_ounce, discount_price_per_eighth, discount_price_per_quarter, discount_price_per_half, discount_quantity_pricing, discount_starts_at, discount_expires_at, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
+        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, discount_price_override, discount_price_per_gram, discount_price_per_ounce, discount_price_per_eighth, discount_price_per_quarter, discount_price_per_half, discount_quantity_pricing, discount_schedule, discount_starts_at, discount_expires_at, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
       );
       
       const row = rawResult?.rows?.[0];
@@ -929,6 +954,7 @@ export class DatabaseStorage implements IStorage {
           discountPricePerQuarter: row.discount_price_per_quarter,
           discountPricePerHalf: row.discount_price_per_half,
           discountQuantityPricing: row.discount_quantity_pricing,
+           discountSchedule: row.discount_schedule,
            discountStartsAt: row.discount_starts_at,
           discountExpiresAt: row.discount_expires_at,
           bogoEnabled: row.bogo_enabled === true || row.bogo_enabled === 't' || row.bogo_enabled === 'true',
@@ -1006,9 +1032,11 @@ export class DatabaseStorage implements IStorage {
       const temporaryQuantityPricing = Array.isArray(product.discountQuantityPricing)
         ? product.discountQuantityPricing
         : [];
-      const discountWindowActive =
-        (!product.discountStartsAt || new Date(product.discountStartsAt).getTime() <= Date.now()) &&
-        (!product.discountExpiresAt || new Date(product.discountExpiresAt).getTime() > Date.now());
+      const discountWindowActive = isDiscountWindowActive(
+        product.discountSchedule,
+        product.discountStartsAt,
+        product.discountExpiresAt,
+      );
       const hasTemporaryPricing = discountWindowActive && (
         product.discountPriceOverride != null ||
         product.discountPricePerGram != null ||
@@ -1577,6 +1605,10 @@ export class DatabaseStorage implements IStorage {
           const start = d.discountStartsAt ? new Date(d.discountStartsAt) : null;
           await rawSql`UPDATE products SET discount_starts_at = ${start} WHERE id = ${id}`;
         }
+        if (d.hasOwnProperty('discountSchedule')) {
+          const schedule = d.discountSchedule ? JSON.stringify(d.discountSchedule) : null;
+          await rawSql`UPDATE products SET discount_schedule = ${schedule}::jsonb WHERE id = ${id}`;
+        }
         if (d.hasOwnProperty('discountPriceOverride')) await rawSql`UPDATE products SET discount_price_override = ${toSafeNum(d.discountPriceOverride)} WHERE id = ${id}`;
         if (d.hasOwnProperty('discountPricePerGram')) await rawSql`UPDATE products SET discount_price_per_gram = ${toSafeNum(d.discountPricePerGram)} WHERE id = ${id}`;
         if (d.hasOwnProperty('discountPricePerOunce')) await rawSql`UPDATE products SET discount_price_per_ounce = ${toSafeNum(d.discountPricePerOunce)} WHERE id = ${id}`;
@@ -1649,6 +1681,10 @@ export class DatabaseStorage implements IStorage {
         if (updateData.hasOwnProperty('discountStartsAt')) {
           const start = updateData.discountStartsAt ? new Date(updateData.discountStartsAt) : null;
           await rawSql`UPDATE products SET discount_starts_at = ${start} WHERE id = ${id}`;
+        }
+        if (updateData.hasOwnProperty('discountSchedule')) {
+          const schedule = updateData.discountSchedule ? JSON.stringify(updateData.discountSchedule) : null;
+          await rawSql`UPDATE products SET discount_schedule = ${schedule}::jsonb WHERE id = ${id}`;
         }
         const toTemporaryPrice = (value: any) => {
           if (value === null || value === undefined || value === '') return null;

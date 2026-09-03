@@ -96,6 +96,24 @@ const toDateTimeLocalValue = (value: unknown): string => {
   return localTime.toISOString().slice(0, 16);
 };
 
+type DiscountScheduleWindowInput = { start: string; end: string };
+
+const getInitialDiscountWindows = (product: any): DiscountScheduleWindowInput[] => {
+  if (Array.isArray(product?.discountSchedule) && product.discountSchedule.length > 0) {
+    return product.discountSchedule.map((window: any) => ({
+      start: toDateTimeLocalValue(window.startAt),
+      end: toDateTimeLocalValue(window.endAt),
+    }));
+  }
+  if (product?.discountStartsAt || product?.discountExpiresAt) {
+    return [{
+      start: toDateTimeLocalValue(product.discountStartsAt || new Date()),
+      end: toDateTimeLocalValue(product.discountExpiresAt),
+    }];
+  }
+  return [];
+};
+
 const renderCategoryOptions = (categories: CategoryWithChildren[], level = 0): JSX.Element[] => {
   const result: JSX.Element[] = [];
 
@@ -315,8 +333,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       setBogoDiscountType((product as any).configuredBogoDiscountType ?? (product as any).bogoDiscountType ?? "free");
       setBogoDiscountValue((product as any).configuredBogoDiscountValue ?? (product as any).bogoDiscountValue ?? "0");
       setDiscountDurationHours("");
-      setDiscountScheduleStart(toDateTimeLocalValue((product as any).discountStartsAt));
-      setDiscountScheduleEnd(toDateTimeLocalValue((product as any).discountExpiresAt));
+      setDiscountScheduleWindows(getInitialDiscountWindows(product));
 
       // Pre-populate lb/oz/g fields from grams for weight-based products
       if (product.sellingMethod === "weight") {
@@ -437,25 +454,36 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         discountQuantityPricing.length > 0 ||
         bogoEnabled;
       const requestedDurationHours = parseFloat(discountDurationHours);
-      const scheduledStart = discountScheduleStart ? new Date(discountScheduleStart) : null;
-      const scheduledEnd = discountScheduleEnd ? new Date(discountScheduleEnd) : null;
       const hasDuration = Number.isFinite(requestedDurationHours) && requestedDurationHours > 0;
-      const calculatedEnd = hasDuration
-        ? new Date((scheduledStart?.getTime() ?? Date.now()) + requestedDurationHours * 60 * 60 * 1000)
-        : scheduledEnd;
-
-      if (scheduledStart && calculatedEnd && calculatedEnd.getTime() <= scheduledStart.getTime()) {
-        throw new Error("Discount end time must be after the scheduled start time.");
-      }
-      if (!scheduledStart && calculatedEnd && calculatedEnd.getTime() <= Date.now()) {
-        throw new Error("Discount end time must be in the future.");
-      }
-
-      const discountStartsAt = hasProductDiscount && scheduledStart
-        ? scheduledStart.toISOString()
+      const completedSchedule = discountScheduleWindows.map((window, index) => {
+        if (!window.start || !window.end) {
+          throw new Error(`Discount window ${index + 1} needs both a start and end time.`);
+        }
+        const start = new Date(window.start);
+        const end = new Date(window.end);
+        if (end.getTime() <= start.getTime()) {
+          throw new Error(`Discount window ${index + 1} must end after it starts.`);
+        }
+        return { startAt: start.toISOString(), endAt: end.toISOString() };
+      });
+      const durationStart = new Date();
+      const durationEnd = hasDuration
+        ? new Date(durationStart.getTime() + requestedDurationHours * 60 * 60 * 1000)
         : null;
-      const discountExpiresAt = hasProductDiscount && calculatedEnd
-        ? calculatedEnd.toISOString()
+      const scheduleStarts = completedSchedule.map(window => new Date(window.startAt).getTime());
+      const scheduleEnds = completedSchedule.map(window => new Date(window.endAt).getTime());
+      const discountStartsAt = !hasProductDiscount
+        ? null
+        : completedSchedule.length > 0
+          ? new Date(Math.min(...scheduleStarts)).toISOString()
+          : null;
+      const discountExpiresAt = !hasProductDiscount
+        ? null
+        : completedSchedule.length > 0
+          ? new Date(Math.max(...scheduleEnds)).toISOString()
+          : durationEnd?.toISOString() ?? null;
+      const discountSchedule = hasProductDiscount && completedSchedule.length > 0
+        ? completedSchedule
         : null;
       
       // Helper to safely parse and format price values
@@ -499,6 +527,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         discountPricePerQuarter: formatPrice(data.discountPricePerQuarter, 2),
         discountPricePerHalf: formatPrice(data.discountPricePerHalf, 2),
         discountQuantityPricing: discountQuantityPricing.length > 0 ? discountQuantityPricing : null,
+        discountSchedule,
         discountStartsAt,
         discountExpiresAt,
         purchasePrice: formatPrice(data.purchasePrice, 2),
@@ -641,8 +670,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   const [bogoDiscountType, setBogoDiscountType] = useState<string>((product as any).configuredBogoDiscountType ?? (product as any).bogoDiscountType ?? "free");
   const [bogoDiscountValue, setBogoDiscountValue] = useState<string>((product as any).configuredBogoDiscountValue ?? (product as any).bogoDiscountValue ?? "0");
   const [discountDurationHours, setDiscountDurationHours] = useState("");
-  const [discountScheduleStart, setDiscountScheduleStart] = useState(() => toDateTimeLocalValue((product as any).discountStartsAt));
-  const [discountScheduleEnd, setDiscountScheduleEnd] = useState(() => toDateTimeLocalValue((product as any).discountExpiresAt));
+  const [discountScheduleWindows, setDiscountScheduleWindows] = useState<DiscountScheduleWindowInput[]>(() => getInitialDiscountWindows(product));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1140,36 +1168,75 @@ export default function EditProductModal({ open, onOpenChange, product, categori
 
               <div className="space-y-3">
                 <div>
-                  <Label className="text-sm font-semibold">Discount Schedule</Label>
+                  <Label className="text-sm font-semibold">Discount Windows</Label>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Leave the start blank to activate the discount immediately. You can return and edit or clear these times before or during the sale.
+                    Add as many separate start and end times as needed. The discount is active only while one of these windows is in progress.
                   </p>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="discount-schedule-start">Starts</Label>
-                    <Input
-                      id="discount-schedule-start"
-                      type="datetime-local"
-                      value={discountScheduleStart}
-                      onChange={(event) => setDiscountScheduleStart(event.target.value)}
-                    />
+                {discountScheduleWindows.map((window, index) => (
+                  <div key={index} className="rounded-md border p-3 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-xs font-semibold">Window {index + 1}</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setDiscountScheduleWindows(
+                          discountScheduleWindows.filter((_, windowIndex) => windowIndex !== index)
+                        )}
+                        aria-label={`Remove discount window ${index + 1}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor={`discount-window-${index}-start`}>Starts</Label>
+                        <Input
+                          id={`discount-window-${index}-start`}
+                          type="datetime-local"
+                          value={window.start}
+                          onChange={(event) => {
+                            const updated = [...discountScheduleWindows];
+                            updated[index] = { ...updated[index], start: event.target.value };
+                            setDiscountScheduleWindows(updated);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`discount-window-${index}-end`}>Ends</Label>
+                        <Input
+                          id={`discount-window-${index}-end`}
+                          type="datetime-local"
+                          value={window.end}
+                          onChange={(event) => {
+                            const updated = [...discountScheduleWindows];
+                            updated[index] = { ...updated[index], end: event.target.value };
+                            setDiscountScheduleWindows(updated);
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="discount-schedule-end">Ends</Label>
-                    <Input
-                      id="discount-schedule-end"
-                      type="datetime-local"
-                      value={discountScheduleEnd}
-                      onChange={(event) => {
-                        setDiscountScheduleEnd(event.target.value);
-                        if (event.target.value) setDiscountDurationHours("");
-                      }}
-                    />
-                  </div>
-                </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDiscountScheduleWindows([
+                      ...discountScheduleWindows,
+                      { start: "", end: "" },
+                    ]);
+                    setDiscountDurationHours("");
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Discount Window
+                </Button>
                 <div className="space-y-2">
-                  <Label htmlFor="discount-duration-hours">Or Set Duration (Hours)</Label>
+                  <Label htmlFor="discount-duration-hours">Or Start Now for a Duration (Hours)</Label>
                   <Input
                     id="discount-duration-hours"
                     type="number"
@@ -1179,22 +1246,21 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                     value={discountDurationHours}
                     onChange={(event) => {
                       setDiscountDurationHours(event.target.value);
-                      if (event.target.value) setDiscountScheduleEnd("");
+                      if (event.target.value) setDiscountScheduleWindows([]);
                     }}
                     onWheel={(event) => event.currentTarget.blur()}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Duration is counted from the scheduled start, or from the moment you save if no start is selected. At the end, percentage, amount, temporary price, temporary quantity-tier, and BOGO discounts are cleared automatically.
+                    This keeps the original quick option: the discount begins when you save and ends after the entered number of hours.
                   </p>
                 </div>
-                {(discountScheduleStart || discountScheduleEnd) && (
+                {(discountScheduleWindows.length > 0 || discountDurationHours) && (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      setDiscountScheduleStart("");
-                      setDiscountScheduleEnd("");
+                      setDiscountScheduleWindows([]);
                       setDiscountDurationHours("");
                     }}
                   >
