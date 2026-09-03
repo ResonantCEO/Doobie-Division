@@ -114,6 +114,7 @@ export interface IStorage {
   getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined>;
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
+  reopenOrderIfUnfulfilled(id: number): Promise<Order>;
   updateOrderTotal(id: number, total: number): Promise<Order>;
   updateOrderShippingAddress(id: number, shippingAddress: string): Promise<Order>;
   updateOrderNotes(id: number, notes: string): Promise<Order>;
@@ -2296,6 +2297,34 @@ export class DatabaseStorage implements IStorage {
     });
     invalidateCache.products();
     return updated;
+  }
+
+  async reopenOrderIfUnfulfilled(orderId: number): Promise<Order> {
+    return await db.transaction(async (tx) => {
+      const [order] = await tx.select().from(orders)
+        .where(eq(orders.id, orderId)).for("update").limit(1);
+      if (!order) throw new Error("Order not found");
+
+      const activeItems = await tx.select({
+        fulfilled: orderItems.fulfilled,
+      }).from(orderItems).where(and(
+        eq(orderItems.orderId, orderId),
+        eq(orderItems.removed, false),
+      ));
+
+      const hasUnfulfilledItems = activeItems.some(item => !item.fulfilled);
+      const isFinalized = order.status === "shipped" || order.status === "cancelled";
+      if (!hasUnfulfilledItems || isFinalized || order.status === "pending" || order.status === "processing") {
+        return order;
+      }
+
+      const [updated] = await tx.update(orders).set({
+        status: "pending",
+        archived: false,
+        updatedAt: new Date(),
+      }).where(eq(orders.id, orderId)).returning();
+      return updated;
+    });
   }
 
   async updateOrderTotal(orderId: number, total: number): Promise<Order> {

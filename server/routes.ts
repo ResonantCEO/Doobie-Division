@@ -1921,6 +1921,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Return active orders with unchecked items to New Orders without
+  // changing any item's fulfillment state.
+  app.post('/api/orders/:id/reconcile-fulfillment', isAuthenticated, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const order = await storage.reopenOrderIfUnfulfilled(id);
+      res.json(order);
+    } catch (error: any) {
+      console.error('Failed to reconcile order fulfillment:', error);
+      if (error?.message === "Order not found") {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      res.status(500).json({ message: "Failed to reconcile order fulfillment" });
+    }
+  });
+
   // Admin: change payment method (prepay / cod), optionally uploading a photo
   app.patch('/api/orders/:id/payment-method', isAuthenticated, requireRole(['admin']), upload.single('photo'), async (req: any, res) => {
     try {
@@ -2512,6 +2528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         unitPrice != null ? Number(unitPrice) : undefined,
         typeof unitLabel === "string" && unitLabel.trim() ? unitLabel.trim() : undefined,
       );
+      await storage.reopenOrderIfUnfulfilled(orderId);
       syncGrabBagAvailability().catch(() => {});
       const updatedOrder = await storage.getOrder(orderId);
       res.status(200).json(updatedOrder);
@@ -2543,6 +2560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.addCustomOrderItem(orderId, customName.trim(), Number(price), Number(quantity), req.currentUser.id);
+      await storage.reopenOrderIfUnfulfilled(orderId);
       const updatedOrder = await storage.getOrder(orderId);
       res.status(200).json(updatedOrder);
     } catch (error: any) {
@@ -2584,6 +2602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         typeof unitLabel === "string" && unitLabel.trim() ? unitLabel.trim() : undefined,
         unitPrice != null ? Number(unitPrice) : undefined,
       );
+      await storage.reopenOrderIfUnfulfilled(orderId);
       syncGrabBagAvailability().catch(() => {});
 
       res.status(200).json({ message: "Item substituted successfully" });

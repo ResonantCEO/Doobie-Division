@@ -612,6 +612,25 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
 
   const isAlreadyPacked = displayOrder.status === 'packed';
 
+  const handleClose = async () => {
+    const canReconcile = userRole === 'admin' || userRole === 'manager' || userRole === 'staff';
+    if (canReconcile && displayOrder.id) {
+      try {
+        const response = await fetch(`/api/orders/${displayOrder.id}/reconcile-fulfillment`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (!response.ok) {
+          throw new Error(`Fulfillment reconciliation failed with status ${response.status}`);
+        }
+        await queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      } catch (error) {
+        console.error("Failed to reconcile order fulfillment on close:", error);
+      }
+    }
+    onClose();
+  };
+
   // Product search filter for substitution
   const filteredProducts = (allProducts || []).filter((p: Product) =>
     p.isActive &&
@@ -632,7 +651,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose, userRole }: 
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) void handleClose(); }}>
       <DialogContent
         ref={dialogContentRef}
         className="!left-2 !right-2 !top-2 !w-auto !max-w-none !translate-x-0 !translate-y-0 !max-h-[calc(100dvh-1rem)] min-w-0 overflow-x-hidden overflow-y-auto sm:!left-[50%] sm:!right-auto sm:!top-[50%] sm:!w-full sm:!max-w-2xl sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:!max-h-[90vh]"
