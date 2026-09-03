@@ -142,9 +142,9 @@ export function greedyOzBucketPricing(
     }
   }
 
-  // Primary: largest grams first (big items fill buckets before small ones)
-  // Secondary: cheapest own-tier price first within same gram size, so low-value
-  //   items combine into oz buckets while expensive items stay at their own tier
+  // Primary: largest grams first so exact larger buckets are formed first.
+  // Secondary: cheapest own-tier price first within the same size. This keeps
+  // allocation deterministic when different products share a bucket.
   units.sort((a, b) => {
     if (b.grams !== a.grams) return b.grams - a.grams;
     const ownTierA = getWeightItemEffectivePrice(a.product, a.size, getWeightTier(a.grams));
@@ -152,41 +152,56 @@ export function greedyOzBucketPricing(
     return ownTierA - ownTierB;
   });
 
-  // Pack into 28g buckets
+  // A promotion is valid only when the combined weight exactly reaches a
+  // named tier. A partial bucket must not promote its contents:
+  //   7g + 3.5g = 10.5g -> keep quarter and eighth pricing
+  //   7g + 7g = 14g -> price both at the half tier
+  //
+  // Work in half-grams so the 3.5g eighth-ounce tier is represented exactly.
+  // Dynamic programming finds exact combinations and avoids the old behavior
+  // of promoting any bucket that merely crossed a lower threshold.
   const OZ_GRAMS = 28;
   type Bucket = Unit[];
   const buckets: Bucket[] = [];
-  let currentBucket: Bucket = [];
-  let currentGrams = 0;
+  let remainingUnits = [...units];
+  const halfGrams = (grams: number) => Math.round(grams * 2);
 
-  for (const unit of units) {
-    if (currentGrams + unit.grams <= OZ_GRAMS) {
-      currentBucket.push(unit);
-      currentGrams += unit.grams;
-      if (currentGrams >= OZ_GRAMS) {
-        buckets.push(currentBucket);
-        currentBucket = [];
-        currentGrams = 0;
-      }
-    } else {
-      // Unit doesn't fit: close current bucket, start a new one
-      if (currentBucket.length > 0) {
-        buckets.push(currentBucket);
-      }
-      currentBucket = [unit];
-      currentGrams = unit.grams;
-      if (currentGrams >= OZ_GRAMS) {
-        buckets.push(currentBucket);
-        currentBucket = [];
-        currentGrams = 0;
+  const findExactSubset = (targetGrams: number): Unit[] | null => {
+    const target = halfGrams(targetGrams);
+    const paths: Array<number[] | null> = Array.from({ length: target + 1 }, () => null);
+    paths[0] = [];
+
+    for (let unitIndex = 0; unitIndex < remainingUnits.length; unitIndex++) {
+      const unitValue = halfGrams(remainingUnits[unitIndex].grams);
+      if (unitValue <= 0 || unitValue > target) continue;
+      for (let sum = target - unitValue; sum >= 0; sum--) {
+        if (!paths[sum] || paths[sum + unitValue]) continue;
+        paths[sum + unitValue] = [...paths[sum], unitIndex];
       }
     }
-  }
-  if (currentBucket.length > 0) {
-    buckets.push(currentBucket);
+
+    const selectedIndexes = paths[target];
+    if (!selectedIndexes || selectedIndexes.length === 0) return null;
+    const selected = new Set(selectedIndexes);
+    const subset = remainingUnits.filter((_, index) => selected.has(index));
+    remainingUnits = remainingUnits.filter((_, index) => !selected.has(index));
+    return subset;
+  };
+
+  // Resolve the largest exact tiers first, then smaller exact tiers.
+  for (const tierGrams of [OZ_GRAMS, 14, 7, 3.5]) {
+    let exactSubset: Unit[] | null;
+    while ((exactSubset = findExactSubset(tierGrams)) !== null) {
+      buckets.push(exactSubset);
+    }
   }
 
-  // Price each bucket: tier is determined by combined grams in that bucket
+  // Items which cannot form an exact higher tier retain their own tier.
+  for (const unit of remainingUnits) {
+    buckets.push([unit]);
+  }
+
+  // Price each bucket: only an exact named tier can promote its contents.
   const subtotals = new Map<string, number>();
   for (const item of weightItems) {
     subtotals.set(makeKey(item.product.id, item.size), 0);
