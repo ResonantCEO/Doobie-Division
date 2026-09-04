@@ -334,46 +334,78 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   };
 
 
+  const validatePromoSequence = async (codes: string[]): Promise<AppliedPromo[]> => {
+    const promoCartItems = state.items.map(item => ({
+      productId: item.product.id,
+      categoryId: item.product.categoryId,
+      quantity: item.quantity,
+      size: item.size,
+      productPrice: getEffectivePrice(item.product.id, item.size).toFixed(2),
+    }));
+    const validated: AppliedPromo[] = [];
+    let remainingTotal = Math.max(0, combinedTotal - (discountResult?.totalSavings || 0));
+
+    for (const code of codes) {
+      const res = await fetch('/api/promo-codes/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ code, cartTotal: remainingTotal.toString(), items: promoCartItems }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        throw new Error(data.message || `Promo code ${code} is no longer valid.`);
+      }
+      validated.push(data);
+      remainingTotal = Math.max(0, remainingTotal - data.discountAmount);
+    }
+    return validated;
+  };
+
   const applyPromoCode = async () => {
-    if (!promoInput.trim()) return;
-    if (appliedPromos.some(promo => promo.code.toLowerCase() === promoInput.trim().toLowerCase())) {
+    const nextCode = promoInput.trim();
+    if (!nextCode) return;
+    if (appliedPromos.some(promo => promo.code.toLowerCase() === nextCode.toLowerCase())) {
       toast({ title: "Code already applied", description: "Enter a different promo code.", variant: "destructive" });
       return;
     }
     setIsValidatingPromo(true);
     try {
-      const existingPromoSavings = appliedPromos.reduce((sum, promo) => sum + promo.discountAmount, 0);
-      const effectiveTotal = Math.max(0, combinedTotal - (discountResult?.totalSavings || 0) - existingPromoSavings);
-      const promoCartItems = state.items.map(item => ({
-        productId: item.product.id,
-        categoryId: item.product.categoryId,
-        quantity: item.quantity,
-        size: item.size,
-        productPrice: getEffectivePrice(item.product.id, item.size).toFixed(2),
-      }));
-      const res = await fetch('/api/promo-codes/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ code: promoInput.trim(), cartTotal: effectiveTotal.toString(), items: promoCartItems }),
+      const validated = await validatePromoSequence([...appliedPromos.map(promo => promo.code), nextCode]);
+      const data = validated[validated.length - 1];
+      setAppliedPromos(validated);
+      setPromoInput("");
+      const itemDealText = data.discountType === "item_free"
+        ? "Selected item(s) are free"
+        : data.discountType === "item_price"
+          ? `Selected item(s) are $${Number(data.discountValue).toFixed(2)} each`
+          : data.discountType === 'percent'
+            ? `${data.discountValue}% off ${data.appliesToSpecificItems ? "eligible items" : "your order"}`
+            : `$${Number(data.discountAmount).toFixed(2)} off ${data.appliesToSpecificItems ? "eligible items" : "your order"}`;
+      toast({ title: "Promo code applied!", description: itemDealText });
+    } catch (error) {
+      toast({ title: "Promo code not applied", description: error instanceof Error ? error.message : "Could not apply promo code.", variant: "destructive" });
+    } finally {
+      setIsValidatingPromo(false);
+    }
+  };
+
+  const removePromoCode = async (promoId: number) => {
+    const remainingCodes = appliedPromos.filter(promo => promo.promoId !== promoId).map(promo => promo.code);
+    if (remainingCodes.length === 0) {
+      setAppliedPromos([]);
+      return;
+    }
+    setIsValidatingPromo(true);
+    try {
+      setAppliedPromos(await validatePromoSequence(remainingCodes));
+    } catch (error) {
+      setAppliedPromos([]);
+      toast({
+        title: "Promo codes need to be applied again",
+        description: error instanceof Error ? error.message : "The remaining promo codes could not be recalculated.",
+        variant: "destructive",
       });
-      const data = await res.json();
-      if (data.valid) {
-        setAppliedPromos(current => [...current, data]);
-        setPromoInput("");
-        const itemDealText = data.discountType === "item_free"
-          ? "Selected item(s) are free"
-          : data.discountType === "item_price"
-            ? `Selected item(s) are $${Number(data.discountValue).toFixed(2)} each`
-            : data.discountType === 'percent'
-              ? `${data.discountValue}% off ${data.appliesToSpecificItems ? "eligible items" : "your order"}`
-              : `$${Number(data.discountAmount).toFixed(2)} off ${data.appliesToSpecificItems ? "eligible items" : "your order"}`;
-        toast({ title: "Promo code applied!", description: itemDealText });
-      } else {
-        toast({ title: "Invalid code", description: data.message, variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Could not apply promo code.", variant: "destructive" });
     } finally {
       setIsValidatingPromo(false);
     }
@@ -1126,7 +1158,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                     <span className="font-mono font-bold">{promo.code}</span> applied — saves ${promo.discountAmount.toFixed(2)}
                     {promo.bypassPurchaseMinimum && <span className="text-xs opacity-70">(min. bypassed)</span>}
                   </span>
-                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setAppliedPromos(current => current.filter(item => item.promoId !== promo.promoId))}>
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => removePromoCode(promo.promoId)} disabled={isValidatingPromo}>
                     Remove
                   </Button>
                 </div>

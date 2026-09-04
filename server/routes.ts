@@ -1193,6 +1193,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .filter((productId): productId is number => productId !== undefined);
   }
 
+  async function getPromoEligibilityMessage(promo: any): Promise<string> {
+    const productIds = getItemPromoTargetIds(promo);
+    const products = (await Promise.all(productIds.map(productId => storage.getProduct(productId))))
+      .filter((product): product is NonNullable<typeof product> => Boolean(product));
+    if (products.length === 0) {
+      return "Add one of this promo's eligible items to your cart before using the code.";
+    }
+    const names = products.map(product => product.name);
+    const productList = names.length === 1
+      ? names[0]
+      : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
+    return `Add ${productList} to your cart before using this promo code.`;
+  }
+
   function promoTargetMatchesItem(target: ItemPromoTarget, item: PromoCartItem): boolean {
     const productMatches = target.productId !== undefined && target.productId === Number(item.productId);
     const categoryMatches = target.categoryId !== undefined && target.categoryId === Number(item.categoryId);
@@ -1469,7 +1483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           allocations = getItemPromoAllocations(promo, enrichedItems);
           if (allocations.length === 0) {
             return res.status(400).json({
-              message: `Promo code ${promo.code} requires one of its eligible items to be in your cart.`,
+              message: await getPromoEligibilityMessage(promo),
             });
           }
           savings = allocations.reduce(
@@ -1482,7 +1496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             : remainingPromoBase;
           if (targets.length > 0 && discountBase <= 0) {
             return res.status(400).json({
-              message: `Promo code ${promo.code} requires one of its eligible items to be in your cart.`,
+              message: await getPromoEligibilityMessage(promo),
             });
           }
           const discountValue = Math.max(0, Number(promo.discountValue) || 0);
@@ -1492,9 +1506,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           savings = Math.min(discountBase, savings);
         }
 
-        savings = Math.min(remainingPromoBase, Math.max(0, savings));
+        savings = Math.round(Math.min(remainingPromoBase, Math.max(0, savings)) * 100) / 100;
         remainingPromoBase = Math.max(0, remainingPromoBase - savings);
-        verifiedPromoSavings += savings;
+        verifiedPromoSavings = Math.round((verifiedPromoSavings + savings) * 100) / 100;
         verifiedPromoResults.push({ promo, savings, allocations });
       }
 
@@ -4303,7 +4317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (discountBase <= 0) {
           return res.json({
             valid: false,
-            message: "Add one of this promo's eligible items to your cart before using the code.",
+            message: await getPromoEligibilityMessage(promo),
           });
         }
       }
@@ -4316,7 +4330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (itemAllocations.length === 0) {
           return res.json({
             valid: false,
-            message: "Add one of this promo's eligible items to your cart before using the code.",
+            message: await getPromoEligibilityMessage(promo),
           });
         }
         discountAmount = itemAllocations.reduce(
