@@ -3,6 +3,7 @@
 - [Telegram contact rollout](telegram-contact-rollout.md) — new accounts require a handle immediately; existing accounts have one persisted two-week grace period.
 - [Product BOGO reads](product-bogo-reads.md) — explicitly query BOGO fields for product lists; dynamic Pool imports and ANY-list interpolation can silently omit them.
 - [Promo option targeting](promo-option-targeting.md) — item promo targets accept legacy product IDs and product-plus-size records; preserve both formats when changing promo matching.
+- [Stacked promo codes](stacked-promo-codes.md) — apply multiple codes in entry order, cap each at the remaining total, and snapshot every code separately.
 - [Grab bag flavor selection](grab-bag-flavor-selection.md) — an unpinned sized product means any flavor; choose randomly from currently in-stock flavors at generation time.
 - [Variant inventory totals](variant-inventory-totals.md) — flavor rows are authoritative; parent totals are cached aggregates that must be reconciled.
 - [Variant label normalization](variant-label-normalization.md) — production variant labels may contain trailing spaces; inventory matching must normalize boundaries.
