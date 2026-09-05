@@ -805,6 +805,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return component.stock ?? 0;
   }
 
+  function componentPhysicalInventory(component: any, selectedSize?: string): number {
+    if (component.sizes && component.sizes.length > 0) {
+      if (selectedSize) {
+        const size = component.sizes.find((entry: any) => entry.size === selectedSize);
+        return size ? (size.physicalQuantity ?? 0) : 0;
+      }
+      return component.sizes.reduce(
+        (sum: number, size: any) => sum + (size.physicalQuantity ?? 0),
+        0,
+      );
+    }
+    return component.physicalInventory ?? 0;
+  }
+
   // Sellable stock is the purchasing contract. Physical variance is surfaced to
   // administrators, not silently used to manufacture storefront availability.
   function componentAvailable(component: any, selectedSize?: string): boolean {
@@ -840,6 +854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch { continue; }
 
         let minStock = Infinity;
+        let minPhysicalInventory = Infinity;
         let anyUnavailable = false;
         const requirements = new Map<string, { productId: number; selectedSize?: string; count: number }>();
         for (const item of items) {
@@ -853,22 +868,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!item.productId) continue;
           const component = await storage.getProduct(item.productId);
           // Components may be inactive in the storefront (sold only via grab bags) — just check they exist and have stock
-          if (!component) { anyUnavailable = true; break; }
-          if (!componentAvailable(component, item.selectedSize)) { anyUnavailable = true; break; }
+          if (!component) {
+            anyUnavailable = true;
+            minPhysicalInventory = 0;
+            continue;
+          }
+          if (!componentAvailable(component, item.selectedSize)) anyUnavailable = true;
           minStock = Math.min(minStock, Math.floor(componentStock(component, item.selectedSize) / item.count));
+          minPhysicalInventory = Math.min(
+            minPhysicalInventory,
+            Math.floor(componentPhysicalInventory(component, item.selectedSize) / item.count),
+          );
         }
 
         const newStock = anyUnavailable ? 0 : (isFinite(minStock) ? minStock : 0);
+        const newPhysicalInventory = isFinite(minPhysicalInventory) ? minPhysicalInventory : 0;
         const shouldBeActive = !anyUnavailable && newStock > 0;
         const currentStock = bag.stock ?? 0;
+        const currentPhysicalInventory = bag.physicalInventory ?? 0;
         const currentActive = bag.isActive ?? false;
 
-        if (newStock !== currentStock || shouldBeActive !== currentActive) {
+        if (
+          newStock !== currentStock ||
+          newPhysicalInventory !== currentPhysicalInventory ||
+          shouldBeActive !== currentActive
+        ) {
           await rawPool.query(
-            `UPDATE products SET stock = $1, is_active = $2, updated_at = NOW() WHERE id = $3`,
-            [newStock, shouldBeActive, bag.id]
+            `UPDATE products SET stock = $1, physical_inventory = $2, is_active = $3, updated_at = NOW() WHERE id = $4`,
+            [newStock, newPhysicalInventory, shouldBeActive, bag.id]
           );
-          console.log(`[syncGrabBagAvailability] Bag #${bag.id} (${bag.name}): stock ${currentStock} → ${newStock}, active ${currentActive} → ${shouldBeActive}`);
+          console.log(
+            `[syncGrabBagAvailability] Bag #${bag.id} (${bag.name}): ` +
+            `stock ${currentStock} → ${newStock}, physical ${currentPhysicalInventory} → ${newPhysicalInventory}, ` +
+            `active ${currentActive} → ${shouldBeActive}`,
+          );
         }
       }
 
@@ -4995,14 +5028,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate initial stock = minimum available across all component products
       // Components may be inactive in the storefront (sold only via grab bags) — just check existence and stock
       let initialStock = Infinity;
+      let initialPhysicalInventory = Infinity;
       for (const p of confirmedProducts) {
         const comp = await storage.getProduct(p.id);
-        if (!comp) { initialStock = 0; break; }
+        if (!comp) {
+          initialStock = 0;
+          initialPhysicalInventory = 0;
+          continue;
+        }
         const avail = componentStock(comp, (p as any).selectedSize);
-        if (avail <= 0) { initialStock = 0; break; }
+        if (avail <= 0) initialStock = 0;
         initialStock = Math.min(initialStock, avail);
+        initialPhysicalInventory = Math.min(
+          initialPhysicalInventory,
+          componentPhysicalInventory(comp, (p as any).selectedSize),
+        );
       }
       if (!isFinite(initialStock)) initialStock = 0;
+      if (!isFinite(initialPhysicalInventory)) initialPhysicalInventory = 0;
 
       const sku = `GRAB-BAG-${bag.id}-${Date.now()}`;
       const newProduct = await storage.createProduct({
@@ -5011,7 +5054,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         price: bag.sellingPrice,
         sku,
         stock: initialStock,
-        physicalInventory: initialStock,
+        physicalInventory: initialPhysicalInventory,
         isActive: initialStock > 0,
         sellingMethod: "units",
         categoryId: grabBagCategory.id,

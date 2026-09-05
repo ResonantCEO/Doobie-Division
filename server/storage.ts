@@ -1100,6 +1100,13 @@ export class DatabaseStorage implements IStorage {
     
     // Ensure stock is a number
     const stockValue = typeof productData.stock === 'string' ? parseInt(productData.stock, 10) : (productData.stock || 0);
+    const requestedPhysicalInventory = (productData as any).physicalInventory;
+    const parsedPhysicalInventory = requestedPhysicalInventory === null || requestedPhysicalInventory === undefined || requestedPhysicalInventory === ''
+      ? stockValue
+      : Number(requestedPhysicalInventory);
+    const physicalInventoryValue = Number.isFinite(parsedPhysicalInventory)
+      ? Math.max(0, Math.trunc(parsedPhysicalInventory))
+      : stockValue;
     
     const toNumericStr = (val: any): string | undefined => {
       if (val === null || val === undefined || val === '') return undefined;
@@ -1111,7 +1118,7 @@ export class DatabaseStorage implements IStorage {
       ...productDataWithoutSizes,
       stock: stockValue,
       price: productData.price || "0",
-      physicalInventory: 0,
+      physicalInventory: physicalInventoryValue,
       updatedAt: new Date()
     };
 
@@ -1361,14 +1368,23 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (sizes && sizes.length > 0) {
-      const sizeRecords: InsertProductSize[] = sizes.map(size => ({
-        productId: newProduct!.id,
-        size: size.size,
-        quantity: size.quantity,
-        physicalQuantity: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }));
+      const sizeRecords: InsertProductSize[] = sizes.map(size => {
+        const quantity = Math.max(0, Math.trunc(Number(size.quantity) || 0));
+        const requestedPhysicalQuantity = (size as any).physicalQuantity;
+        const parsedPhysicalQuantity = requestedPhysicalQuantity === null || requestedPhysicalQuantity === undefined || requestedPhysicalQuantity === ''
+          ? quantity
+          : Number(requestedPhysicalQuantity);
+        return {
+          productId: newProduct!.id,
+          size: size.size,
+          quantity,
+          physicalQuantity: Number.isFinite(parsedPhysicalQuantity)
+            ? Math.max(0, Math.trunc(parsedPhysicalQuantity))
+            : quantity,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      });
 
       try {
         await db.insert(productSizes).values(sizeRecords);
