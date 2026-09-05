@@ -48,6 +48,7 @@ import {
   type Notification,
   type InsertNotification,
 } from "@shared/schema";
+import { normalizeInventoryOption } from "@shared/inventory";
 import { db } from "./db";
 import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, isNotNull, like, gt } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
@@ -1914,7 +1915,10 @@ export class DatabaseStorage implements IStorage {
         if (!sizeName) {
           throw new Error("A specific size or flavor is required for variant products");
         }
-        const variant = variants.find((row) => row.size === sizeName);
+        const normalizedSize = normalizeInventoryOption(sizeName);
+        const variant = variants.find(
+          (row) => normalizeInventoryOption(row.size) === normalizedSize,
+        );
         if (!variant) throw new Error(`Size "${sizeName}" not found for this product`);
         variantId = Number(variant.id);
         before = Number(variant.quantity);
@@ -1977,7 +1981,10 @@ export class DatabaseStorage implements IStorage {
 
       if (variants.length > 0) {
         if (!sizeName) throw new Error("A specific size or flavor is required for variant products");
-        const variant = variants.find((row) => row.size === sizeName);
+        const normalizedSize = normalizeInventoryOption(sizeName);
+        const variant = variants.find(
+          (row) => normalizeInventoryOption(row.size) === normalizedSize,
+        );
         if (!variant) throw new Error(`Size "${sizeName}" not found for this product`);
         variantId = Number(variant.id);
         before = Number(variant.physical_quantity ?? 0);
@@ -2293,7 +2300,12 @@ export class DatabaseStorage implements IStorage {
           `);
           const variants = variantsResult.rows as any[];
           if (variants.length > 0) {
-            if (item.size) variant = variants.find((row) => row.size === item.size);
+            if (item.size) {
+              const normalizedSize = normalizeInventoryOption(item.size);
+              variant = variants.find(
+                (row) => normalizeInventoryOption(row.size) === normalizedSize,
+              );
+            }
             if (!variant && (item.metadata?.fromCgBag || item.metadata?.fromStandardBag)) {
               const available = variants.filter((row) => Number(row.quantity) >= Number(item.quantity));
               variant = available[Math.floor(Math.random() * available.length)];
@@ -2553,7 +2565,10 @@ export class DatabaseStorage implements IStorage {
       let after: number;
 
       if (variants.length > 0) {
-        variant = variants.find((row) => row.size === item.size);
+        const reservedOption = normalizeInventoryOption(item.size);
+        variant = variants.find(
+          (row) => normalizeInventoryOption(row.size) === reservedOption,
+        );
         if (!variant) throw new Error("The exact reserved size or flavor is missing");
         before = Number(variant.physical_quantity ?? 0);
         after = before + sign * delta;

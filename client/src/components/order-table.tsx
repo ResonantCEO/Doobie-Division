@@ -223,7 +223,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
           <div className="grid gap-2">
             {orderWithItems.items.map((item) => {
               const fulfilled = isItemFulfilled(item);
-              const isCustomItem = item.productId == null && item.productSku === "CUSTOM";
+              const isCustomItem = item.productId == null;
               const canToggleFulfillment = item.productId != null || isCustomItem;
               const hasMultipleQuantity = Number(item.quantity) > 1;
               return (
@@ -463,7 +463,7 @@ function MobileOrderItems({ orderId }: { orderId: number }) {
       <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Order Items:</div>
       {orderWithItems.items.map((item) => {
         const fulfilled = isItemFulfilled(item);
-        const isCustomItem = item.productId == null && item.productSku === "CUSTOM";
+        const isCustomItem = item.productId == null;
         const canToggleFulfillment = item.productId != null || isCustomItem;
         const hasMultipleQuantity = Number(item.quantity) > 1;
         return (

@@ -30,9 +30,16 @@ export const WEIGHT_OPTION_GRAMS: Record<string, number> = {
   ounce: 28,
 };
 
+export function normalizeInventoryOption(option?: string | null): string {
+  return String(option ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
 export function weightOptionToGrams(option?: string | null): number {
   if (!option) return 1;
-  const normalized = option.toLowerCase().trim().replace(/\s+/g, " ");
+  const normalized = normalizeInventoryOption(option);
   return WEIGHT_OPTION_GRAMS[normalized] ?? 1;
 }
 
@@ -65,7 +72,10 @@ export function getVariantSellableStock(
 ): number {
   if (!hasAuthoritativeVariants(product)) return getSellableStock(product);
   if (!size) return 0;
-  return Number(product.sizes!.find((row) => row.size === size)?.quantity ?? 0);
+  const normalizedSize = normalizeInventoryOption(size);
+  return Number(
+    product.sizes!.find((row) => normalizeInventoryOption(row.size) === normalizedSize)?.quantity ?? 0,
+  );
 }
 
 export function getSellableUnitsForSelection(

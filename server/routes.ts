@@ -15,6 +15,7 @@ import { eq, sql, desc, and, gte, lt, inArray, like } from "drizzle-orm";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import sharp from "sharp";
+import { normalizeInventoryOption } from "@shared/inventory";
 
 // WebSocket connection store
 const wsConnections = new Set<WebSocket>();
@@ -1440,7 +1441,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Check if there's enough stock
         // Size-based products store inventory in product_sizes; weight/flat products use product.stock
         if (item.size && product.sizes && product.sizes.length > 0) {
-          const sizeData = product.sizes.find((s: any) => s.size === item.size);
+          const normalizedSize = normalizeInventoryOption(item.size);
+          const sizeData = product.sizes.find(
+            (size: any) => normalizeInventoryOption(size.size) === normalizedSize,
+          );
           if (sizeData) {
             // Has a matching product_sizes record — validate against that quantity
             if (sizeData.quantity < item.quantity) {
@@ -2424,7 +2428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: `Order only requires ${orderItem.quantity} units` });
       }
 
-      const isCustomItem = orderItem.productId === null && orderItem.productSku === 'CUSTOM';
+      const isCustomItem = orderItem.productId === null;
       if (isCustomItem) {
         await storage.fulfillOrderItem(orderId, null, requestedQuantity, req.currentUser.id, requestedOrderItemId ?? undefined);
         return res.status(200).json({ message: "Custom order item marked as fulfilled" });
@@ -2435,41 +2439,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const fulfillmentProductId = orderItem.productId;
-      const product = await storage.getProduct(fulfillmentProductId);
-      if (!product) {
-        return res.status(404).json({ message: "Product not found" });
-      }
 
-      // Check physicalInventory since fulfillment reduces physical inventory, not stock.
-      // For weight products physicalInventory is stored in grams; convert the ordered
-      // quantity (in weight-option units, e.g. oz) to grams before comparing.
-      const availablePhysicalInventory = (product.physicalInventory !== null && product.physicalInventory !== undefined)
-        ? product.physicalInventory
-        : 0;
-
-      const weightOptionGrams: Array<[string, number]> = [
-        ['1/8', 3.5], ['⅛', 3.5],
-        ['1/4', 7],   ['¼', 7],
-        ['1/2', 14],  ['½', 14],
-        ['1oz', 28],  ['ounce', 28],
-        ['gram', 1],  ['grams', 1],
-      ];
-      let gramEquivalent = 1;
-      if (product.sellingMethod === 'weight') {
-        const sizeLabel = ((orderItem as any).size || '').toLowerCase().trim();
-        for (const [key, val] of weightOptionGrams) {
-          if (sizeLabel.includes(key)) { gramEquivalent = val; break; }
-        }
-      }
-      const requestedGrams = requestedQuantity * gramEquivalent;
-
-      if (availablePhysicalInventory < requestedGrams) {
-        return res.status(400).json({
-          message: `Insufficient physical inventory. Available: ${availablePhysicalInventory}${product.sellingMethod === 'weight' ? 'g' : ' units'}, requested: ${requestedGrams}${product.sellingMethod === 'weight' ? 'g' : ' units'}`
-        });
-      }
-
-      // Fulfill the item (reduce physical inventory and mark as fulfilled)
+      // The locked storage transaction is the inventory authority. It checks the
+      // selected variant when variants exist and the parent ledger otherwise.
       await storage.fulfillOrderItem(orderId, fulfillmentProductId, requestedQuantity, req.currentUser.id, requestedOrderItemId ?? undefined);
 
       // Invalidate products cache so physical inventory reflects immediately
@@ -2487,6 +2459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Order item not found',
         'Product does not match order item',
         'Order item is not a custom item',
+        'The exact reserved size or flavor is missing',
       ];
       if (error?.message && knownErrors.some(msg => error.message.includes(msg))) {
         return res.status(400).json({ message: error.message });
@@ -2545,7 +2518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "This order item is not fulfilled" });
       }
 
-      const isCustomItem = orderItem.productId === null && orderItem.productSku === 'CUSTOM';
+      const isCustomItem = orderItem.productId === null;
       if (isCustomItem) {
         await storage.unfulfillOrderItem(orderId, null, orderItem.quantity, req.currentUser.id, requestedOrderItemId ?? undefined);
         return res.status(200).json({ message: "Custom order item marked as unfulfilled" });
