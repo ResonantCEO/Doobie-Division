@@ -14,3 +14,4 @@
 - [Product discount expiration](product-discount-expiration.md) — percentage, amount, and BOGO share one expiry and must clear together without changing price or inventory.
 - [Exact weight-bucket tiers](exact-weight-bucket-tiers.md) — mixed weights keep their own prices unless an exact named tier can be formed.
 - [Historical order discounts](historical-order-discounts.md) — save the checkout-time discount snapshot on each order; never reconstruct receipts from mutable promo settings.
+- [Combo quantity expansion](combo-quantity-expansion.md) — expanded component and discount rows must inherit the purchased combo quantity.

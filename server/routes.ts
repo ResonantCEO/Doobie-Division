@@ -1677,6 +1677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const sellingPrice = parseFloat(String(product.price));
             const retailTotal = bagItems.reduce((s, bi) => s + bi.price, 0);
             const discount = sellingPrice - retailTotal; // negative = savings for customer
+            const purchasedQuantity = Math.max(1, Number(item.quantity) || 1);
 
             for (const bi of bagItems) {
               finalItems.push({
@@ -1684,8 +1685,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 productName: bi.name,
                 productSku: bi.sku ?? undefined,
                 productPrice: bi.price.toFixed(2),
-                quantity: 1,
-                subtotal: bi.price.toFixed(2),
+                quantity: purchasedQuantity,
+                subtotal: (bi.price * purchasedQuantity).toFixed(2),
                 fulfilled: false,
                 removed: false,
                 ...(bi.selectedSize ? { size: bi.selectedSize } : {}),
@@ -1702,8 +1703,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 productName: `🎁 Grab Bag Discount — ${product.name}`,
                 productSku: "GRAB-BAG-DISCOUNT",
                 productPrice: discount.toFixed(2),
-                quantity: 1,
-                subtotal: discount.toFixed(2),
+                quantity: purchasedQuantity,
+                subtotal: (discount * purchasedQuantity).toFixed(2),
                 fulfilled: true,
                 removed: false,
               });
