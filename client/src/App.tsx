@@ -1,4 +1,4 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route } from "wouter";
 import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryClient, getQueryFn } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,7 +13,6 @@ import StorefrontPage from "@/pages/storefront";
 import StorefrontWithGate from "@/components/StorefrontWithGate";
 import InventoryPage from "@/pages/inventory";
 import OrdersPage from "@/pages/orders";
-import AnalyticsPage from "@/pages/analytics";
 import UsersPage from "@/pages/users";
 import ProfilePage from "@/pages/profile";
 import ScannerPage from "./pages/scanner";
@@ -72,7 +71,7 @@ function Router() {
         <Route path="/inventory" component={InventoryPage} />
         <Route path="/orders" component={OrdersPage} />
         <Route path="/scanner" component={ScannerPage} />
-        <Route path="/analytics" component={AnalyticsPage} />
+        <Route path="/analytics" component={Dashboard} />
         <Route path="/users" component={UsersPage} />
         <Route path="/profile" component={ProfilePage} />
         <Route path="/wireframe" component={WireframePage} />

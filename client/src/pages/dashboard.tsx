@@ -9,7 +9,6 @@ import StorefrontPage from "./storefront";
 import StorefrontWithGate from "@/components/StorefrontWithGate";
 import InventoryPage from "./inventory";
 import OrdersPage from "./orders";
-import AnalyticsPage from "./analytics";
 import UsersPage from "./users";
 import AdminPage from "./admin";
 import DriversPage from "./drivers";
@@ -59,8 +58,6 @@ export default function Dashboard() {
         return user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <OrdersPage /> : <StorefrontWithGate />;
       case "drivers":
         return user.role === 'admin' || user.role === 'manager' || user.role === 'driver' ? <DriversPage /> : <StorefrontWithGate />;
-      case "analytics":
-        return user.role === 'admin' || user.role === 'manager' ? <AnalyticsPage /> : <StorefrontWithGate />;
       case "users":
         return user.role === 'admin' ? <UsersPage /> : <StorefrontWithGate />;
       case "admin":
