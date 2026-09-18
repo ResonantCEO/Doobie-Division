@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import QRCode from "qrcode";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { normalizeSubmittedPromoCodes } from "./promo-stack";
 import { setupAuth, isAuthenticated, normalizeTelegramUsername } from "./auth";
 import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema, insertSupportTicketSchema, insertCityPurchaseLimitSchema } from "@shared/schema";
 import { z } from "zod";
@@ -1329,14 +1330,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? req.body.promoCodes.map((code: unknown) => String(code).trim()).filter(Boolean)
         : [];
       const legacyPromoCode = String(order.promoCode || (orderData as any).promoCode || "").trim();
-      const promoCodeStrings = Array.from(
-        new Map(
-          (submittedPromoCodes.length > 0 ? submittedPromoCodes : legacyPromoCode.split(","))
-            .map((code: string) => code.trim())
-            .filter(Boolean)
-            .map((code: string) => [code.toLowerCase(), code]),
-        ).values(),
-      );
+      let promoCodeStrings: string[];
+      try {
+        promoCodeStrings = normalizeSubmittedPromoCodes(
+          submittedPromoCodes.length > 0 ? submittedPromoCodes : legacyPromoCode.split(","),
+        );
+      } catch (error) {
+        return res.status(400).json({
+          message: error instanceof Error ? error.message : "Duplicate promo codes are not allowed.",
+        });
+      }
       const verifiedPromos: any[] = [];
       let verifiedPromoSavings = 0;
       for (const promoCodeStr of promoCodeStrings) {
@@ -3872,9 +3875,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // =====================
+  // Access password routes
   // Access Password Routes
-  // =====================
 
   // Verify access password (customer-facing, requires auth)
   app.post("/api/access/verify", isAuthenticated, async (req: any, res) => {
