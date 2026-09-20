@@ -4750,12 +4750,13 @@ export class DatabaseStorage implements IStorage {
     await db.delete(notifications).where(eq(notifications.userId, id));
     await db.delete(inventoryLogs).where(eq(inventoryLogs.userId, id));
 
-    const userOrders = await db.select({ id: orders.id }).from(orders).where(eq(orders.customerId, id));
-    if (userOrders.length > 0) {
-      const orderIds = userOrders.map(o => o.id);
-      await db.delete(orderItems).where(inArray(orderItems.orderId, orderIds));
-      await db.delete(orders).where(eq(orders.customerId, id));
-    }
+    // Orders are historical records and must survive account deletion. The
+    // customer snapshot fields on the order preserve who placed it, while
+    // clearing the FK allows the user row to be deleted without cascading
+    // through orders or their line items.
+    await db.update(orders)
+      .set({ customerId: null })
+      .where(eq(orders.customerId, id));
 
     await db.update(orders).set({ assignedUserId: null }).where(eq(orders.assignedUserId, id));
 
