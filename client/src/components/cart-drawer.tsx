@@ -434,9 +434,11 @@ export default function CartDrawer({ children }: CartDrawerProps) {
     setIsCheckingOut(true);
 
     try {
-      // Check purchase limit for city (skipped if promo code bypasses minimum)
-      if (city.trim() && !appliedPromos.some(promo => promo.bypassPurchaseMinimum)) {
+      // Always verify delivery-area eligibility. Promos may bypass only the
+      // purchase minimum, never the configured city list or delivery blocks.
+      if (city.trim()) {
         const adjustedTotalForLimit = Math.max(0, combinedTotal - (discountResult?.totalSavings || 0));
+        const bypassMinimum = appliedPromos.some(promo => promo.bypassPurchaseMinimum);
         const limitCheck = await fetch('/api/check-purchase-limit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -445,14 +447,20 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             city: city.trim(),
             total: adjustedTotalForLimit.toString(),
             userId: user?.id,
+            bypassMinimum,
           }),
         });
         const limitResult = await limitCheck.json();
+        if (!limitCheck.ok) {
+          throw new Error(limitResult.message || "Could not verify the delivery area.");
+        }
         if (!limitResult.allowed) {
-          if (limitResult.deliveryBlocked) {
+          if (limitResult.deliveryBlocked || limitResult.outsideDeliveryArea) {
             toast({
               title: "Delivery Not Available",
-              description: `We're sorry, but we do not currently deliver to ${limitResult.cityName || city}. We apologize for the inconvenience and hope to serve your area in the future.`,
+              description: limitResult.outsideDeliveryArea
+                ? `${city.trim()} is outside our current delivery area. Please enter a city listed in our delivery area.`
+                : `We're sorry, but we do not currently deliver to ${limitResult.cityName || city}. We apologize for the inconvenience and hope to serve your area in the future.`,
               variant: "destructive",
               duration: 8000,
             });

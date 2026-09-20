@@ -4986,7 +4986,7 @@ export class DatabaseStorage implements IStorage {
   async getCityPurchaseLimitByCity(cityName: string): Promise<any | undefined> {
     const results = await retryQuery(() => db.select().from(cityPurchaseLimits)
       .where(and(
-        ilike(cityPurchaseLimits.cityName, cityName),
+        sql`lower(trim(${cityPurchaseLimits.cityName})) = lower(trim(${cityName}))`,
         eq(cityPurchaseLimits.isActive, true)
       )));
     return results[0];
@@ -4994,7 +4994,7 @@ export class DatabaseStorage implements IStorage {
 
   async getCityByNameAny(cityName: string): Promise<any | undefined> {
     const results = await retryQuery(() => db.select().from(cityPurchaseLimits)
-      .where(ilike(cityPurchaseLimits.cityName, cityName)));
+      .where(sql`lower(trim(${cityPurchaseLimits.cityName})) = lower(trim(${cityName}))`));
     return results[0];
   }
 

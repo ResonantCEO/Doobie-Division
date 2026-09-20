@@ -1353,67 +1353,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verifiedPromos.push(verifiedPromo);
       }
 
-      // Server-side delivery block and purchase limit enforcement
+      // Server-side delivery-area, delivery-block, and purchase-limit enforcement
       if (orderData.shippingAddress) {
         const addressParts = orderData.shippingAddress.split(",").map((s: string) => s.trim());
         const city = addressParts.length >= 2 ? addressParts[1] : "";
-        if (city) {
-          // Check delivery block first
-          const cityRecord = await storage.getCityByNameAny(city);
-          if (cityRecord && cityRecord.deliveryBlocked) {
-            return res.status(400).json({
-              message: `We're sorry, but we do not currently deliver to ${city}. Please contact us for more information.`,
-              deliveryBlocked: true,
-            });
-          }
+        if (!city) {
+          return res.status(400).json({
+            message: "A valid delivery city is required.",
+            outsideDeliveryArea: true,
+          });
+        }
 
-          // Check if the applied promo code bypasses the purchase minimum
-          const promoBypassesMinimum = verifiedPromos.some(promo => promo.bypassPurchaseMinimum);
+        // A city must exist on the City Purchase Limits list. Matching is
+        // case-insensitive, and the stored address uses the configured spelling.
+        const cityRecord = await storage.getCityByNameAny(city);
+        if (!cityRecord) {
+          return res.status(400).json({
+            message: `We're sorry, but we do not currently deliver to ${city}. Please choose a city from our delivery area.`,
+            outsideDeliveryArea: true,
+          });
+        }
+        addressParts[1] = cityRecord.cityName;
+        orderData.shippingAddress = addressParts.join(", ");
 
-          if (!promoBypassesMinimum) {
-            let allowed = true;
-            let minimumAmount: number | null = null;
+        if (cityRecord.deliveryBlocked) {
+          return res.status(400).json({
+            message: `We're sorry, but we do not currently deliver to ${cityRecord.cityName}. Please contact us for more information.`,
+            deliveryBlocked: true,
+          });
+        }
 
-            // Use the pre-promo original total for city minimum check (rounded to cents to avoid float precision issues)
-            const checkTotal = Math.round(parseFloat((order as any).originalTotal || orderData.total || "0") * 100) / 100;
+        // Check if the applied promo code bypasses the purchase minimum
+        const promoBypassesMinimum = verifiedPromos.some(promo => promo.bypassPurchaseMinimum);
 
-            if (orderData.customerId) {
-              const { rows: userRows } = await rawPool.query(`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = $1`, [orderData.customerId]);
-              if (userRows && userRows.length > 0) {
-                const userRow = userRows[0];
-                const isExempt = userRow.exempt_text === 'true' || userRow.exempt_text === 't';
-                if (isExempt) {
-                  allowed = true;
-                } else if (userRow.min_purchase_override !== null && userRow.min_purchase_override !== undefined) {
-                  minimumAmount = parseFloat(String(userRow.min_purchase_override));
-                  allowed = checkTotal >= minimumAmount;
-                } else {
-                  const cityLimit = await storage.getCityPurchaseLimitByCity(city);
-                  if (cityLimit) {
-                    minimumAmount = parseFloat(cityLimit.minimumAmount);
-                    allowed = checkTotal >= minimumAmount;
-                  }
-                }
+        if (!promoBypassesMinimum) {
+          let allowed = true;
+          let minimumAmount: number | null = null;
+
+          // Use the pre-promo original total for city minimum check (rounded to cents to avoid float precision issues)
+          const checkTotal = Math.round(parseFloat((order as any).originalTotal || orderData.total || "0") * 100) / 100;
+
+          if (orderData.customerId) {
+            const { rows: userRows } = await rawPool.query(`SELECT min_purchase_exempt::text as exempt_text, min_purchase_override FROM users WHERE id = $1`, [orderData.customerId]);
+            if (userRows && userRows.length > 0) {
+              const userRow = userRows[0];
+              const isExempt = userRow.exempt_text === 'true' || userRow.exempt_text === 't';
+              if (isExempt) {
+                allowed = true;
+              } else if (userRow.min_purchase_override !== null && userRow.min_purchase_override !== undefined) {
+                minimumAmount = parseFloat(String(userRow.min_purchase_override));
+                allowed = checkTotal >= minimumAmount;
               } else {
-                const cityLimit = await storage.getCityPurchaseLimitByCity(city);
+                const cityLimit = await storage.getCityPurchaseLimitByCity(cityRecord.cityName);
                 if (cityLimit) {
                   minimumAmount = parseFloat(cityLimit.minimumAmount);
                   allowed = checkTotal >= minimumAmount;
                 }
               }
             } else {
-              const cityLimit = await storage.getCityPurchaseLimitByCity(city);
+              const cityLimit = await storage.getCityPurchaseLimitByCity(cityRecord.cityName);
               if (cityLimit) {
                 minimumAmount = parseFloat(cityLimit.minimumAmount);
                 allowed = checkTotal >= minimumAmount;
               }
             }
-
-            if (!allowed && minimumAmount !== null) {
-              return res.status(400).json({
-                message: `Orders shipping to ${city} require a minimum of $${minimumAmount.toFixed(2)}. Your pre-discount order total of $${checkTotal.toFixed(2)} does not meet this minimum.`,
-              });
+          } else {
+            const cityLimit = await storage.getCityPurchaseLimitByCity(cityRecord.cityName);
+            if (cityLimit) {
+              minimumAmount = parseFloat(cityLimit.minimumAmount);
+              allowed = checkTotal >= minimumAmount;
             }
+          }
+
+          if (!allowed && minimumAmount !== null) {
+            return res.status(400).json({
+              message: `Orders shipping to ${cityRecord.cityName} require a minimum of $${minimumAmount.toFixed(2)}. Your pre-discount order total of $${checkTotal.toFixed(2)} does not meet this minimum.`,
+            });
           }
         }
       }
@@ -3815,19 +3830,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Check minimum purchase requirement and delivery eligibility for a city/user combo
   app.post('/api/check-purchase-limit', async (req, res) => {
     try {
-      const { city, total, userId } = req.body;
+      const { city, total, userId, bypassMinimum = false } = req.body;
       console.log('[check-purchase-limit] Request:', { city, total, userId });
 
-      if (!city) {
-        return res.json({ allowed: true, minimumAmount: null });
+      if (!city || !String(city).trim()) {
+        return res.status(400).json({
+          allowed: false,
+          outsideDeliveryArea: true,
+          message: "A delivery city is required.",
+        });
       }
 
-      // Check delivery block first (independent of isActive or user overrides)
-      const cityRecord = await storage.getCityByNameAny(city.trim());
-      if (cityRecord && cityRecord.deliveryBlocked) {
+      // Delivery-area eligibility is independent of minimum exemptions.
+      const cityRecord = await storage.getCityByNameAny(String(city).trim());
+      if (!cityRecord) {
+        return res.json({
+          allowed: false,
+          outsideDeliveryArea: true,
+          message: `We do not currently deliver to ${String(city).trim()}.`,
+        });
+      }
+
+      if (cityRecord.deliveryBlocked) {
         return res.json({
           allowed: false,
           deliveryBlocked: true,
+          cityName: cityRecord.cityName,
+        });
+      }
+
+      if (bypassMinimum === true) {
+        return res.json({
+          allowed: true,
+          minimumAmount: null,
+          bypassMinimum: true,
           cityName: cityRecord.cityName,
         });
       }
@@ -3856,9 +3892,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const cityLimit = await storage.getCityPurchaseLimitByCity(city.trim());
+      const cityLimit = await storage.getCityPurchaseLimitByCity(cityRecord.cityName);
       if (!cityLimit) {
-        return res.json({ allowed: true, minimumAmount: null });
+        return res.json({
+          allowed: true,
+          minimumAmount: null,
+          cityName: cityRecord.cityName,
+        });
       }
 
       const minimumAmount = parseFloat(cityLimit.minimumAmount);
@@ -3871,7 +3911,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Error checking purchase limit:', error);
-      res.json({ allowed: true, minimumAmount: null });
+      res.status(500).json({
+        allowed: false,
+        verificationFailed: true,
+        message: "Could not verify the delivery area.",
+      });
     }
   });
 
