@@ -2236,9 +2236,11 @@ export class DatabaseStorage implements IStorage {
           removed: orderItems.removed,
           metadata: orderItems.metadata,
           product: products,
+           categoryName: categories.name,
         })
         .from(orderItems)
         .leftJoin(products, eq(orderItems.productId, products.id))
+         .leftJoin(categories, eq(products.categoryId, categories.id))
         .where(eq(orderItems.orderId, id))
     );
 

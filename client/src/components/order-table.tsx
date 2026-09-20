@@ -37,7 +37,9 @@ interface OrderTableProps {
   onActiveTabChange: (tab: OrderTab) => void;
 }
 
-type OrderWithItems = Order & { items: (OrderItem & { product: Product | null })[] };
+type OrderWithItems = Order & {
+  items: (OrderItem & { product: Product | null; categoryName?: string | null })[];
+};
 
 const formatOrderItemName = (name?: string | null) => {
   if (!name) return "";
@@ -261,6 +263,9 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                     {item.productSku && (
                       <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">SKU: {item.productSku}</span>
                     )}
+                     {item.categoryName && (
+                       <span className="text-xs text-gray-900 dark:text-white ml-2">Category: {item.categoryName}</span>
+                     )}
                     {fulfilled && (
                       <span className="ml-2 text-xs text-green-600 dark:text-green-400 font-medium">(Fulfilled)</span>
                     )}
