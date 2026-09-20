@@ -456,10 +456,11 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         }
         if (!limitResult.allowed) {
           if (limitResult.deliveryBlocked || limitResult.outsideDeliveryArea) {
+            const displayCity = city.trim().replace(/\b\w/g, (character) => character.toUpperCase());
             toast({
-              title: "Delivery Not Available",
+              title: "Delivery Not Available.",
               description: limitResult.outsideDeliveryArea
-                ? `${city.trim()} is outside our current delivery area. Please enter a city listed in our delivery area.`
+                ? `${displayCity} is outside our current delivery area. Please submit a support ticket for further assistance.`
                 : `We're sorry, but we do not currently deliver to ${limitResult.cityName || city}. We apologize for the inconvenience and hope to serve your area in the future.`,
               variant: "destructive",
               duration: 8000,

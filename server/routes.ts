@@ -1368,8 +1368,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // case-insensitive, and the stored address uses the configured spelling.
         const cityRecord = await storage.getCityByNameAny(city);
         if (!cityRecord) {
+          const displayCity = city.replace(/\b\w/g, (character: string) => character.toUpperCase());
           return res.status(400).json({
-            message: `We're sorry, but we do not currently deliver to ${city}. Please choose a city from our delivery area.`,
+            message: `${displayCity} is outside our current delivery area. Please submit a support ticket for further assistance.`,
             outsideDeliveryArea: true,
           });
         }
@@ -3844,10 +3845,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Delivery-area eligibility is independent of minimum exemptions.
       const cityRecord = await storage.getCityByNameAny(String(city).trim());
       if (!cityRecord) {
+        const displayCity = String(city).trim().replace(/\b\w/g, (character) => character.toUpperCase());
         return res.json({
           allowed: false,
           outsideDeliveryArea: true,
-          message: `We do not currently deliver to ${String(city).trim()}.`,
+          message: `${displayCity} is outside our current delivery area. Please submit a support ticket for further assistance.`,
         });
       }
 
