@@ -264,7 +264,7 @@ function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number 
                       <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">SKU: {item.productSku}</span>
                     )}
                      {item.categoryName && (
-                       <span className="text-xs text-gray-900 dark:text-white ml-2">Category: {item.categoryName}</span>
+                       <div className="text-xs text-gray-900 dark:text-white mt-0.5">{item.categoryName}</div>
                      )}
                     {fulfilled && (
                       <span className="ml-2 text-xs text-green-600 dark:text-green-400 font-medium">(Fulfilled)</span>
