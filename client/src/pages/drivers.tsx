@@ -86,6 +86,7 @@ export default function DriversPage() {
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [citySearchQuery, setCitySearchQuery] = useState("");
   const [cityDrafts, setCityDrafts] = useState<Record<string, string[]>>({});
 
   const canViewDrivers = user?.role === "admin" || user?.role === "manager" || user?.role === "driver";
@@ -178,6 +179,26 @@ export default function DriversPage() {
     [orders]
   );
 
+  const cityOrderCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    shippedOrders.forEach((order) => {
+      const cityKey = getCityFromAddress(order.shippingAddress).trim().toLocaleLowerCase();
+      counts.set(cityKey, (counts.get(cityKey) || 0) + 1);
+    });
+
+    return counts;
+  }, [shippedOrders]);
+
+  const filteredDeliveryCities = useMemo(() => {
+    const normalizedQuery = citySearchQuery.trim().toLocaleLowerCase();
+    if (!normalizedQuery) return deliveryCities;
+
+    return deliveryCities.filter((city) =>
+      city.cityName.toLocaleLowerCase().includes(normalizedQuery)
+    );
+  }, [citySearchQuery, deliveryCities]);
+
   const filteredOrders = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
     if (!normalizedQuery) return shippedOrders;
@@ -257,73 +278,108 @@ export default function DriversPage() {
                 No active driver accounts found. Create or activate a driver account in User Management first.
               </div>
             ) : (
-              <div className="grid gap-4 lg:grid-cols-2">
-                {drivers.map((driver) => {
-                  const driverName = `${driver.firstName || ""} ${driver.lastName || ""}`.trim()
-                    || driver.email
-                    || driver.id;
-                  const selectedCities = cityDrafts[driver.id] || [];
-                  return (
-                    <div key={driver.id} className="rounded-lg border p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-semibold">{driverName}</p>
-                          {driver.email && <p className="truncate text-sm text-muted-foreground">{driver.email}</p>}
+              <div className="space-y-4">
+                <div className="relative max-w-xl">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={citySearchQuery}
+                    onChange={(event) => setCitySearchQuery(event.target.value)}
+                    placeholder="Search delivery cities"
+                    aria-label="Search delivery cities"
+                    className="pl-9 pr-10"
+                  />
+                  {citySearchQuery && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Clear city search"
+                      className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                      onClick={() => setCitySearchQuery("")}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {drivers.map((driver) => {
+                    const driverName = `${driver.firstName || ""} ${driver.lastName || ""}`.trim()
+                      || driver.email
+                      || driver.id;
+                    const selectedCities = cityDrafts[driver.id] || [];
+                    return (
+                      <div key={driver.id} className="rounded-lg border p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold">{driverName}</p>
+                            {driver.email && <p className="truncate text-sm text-muted-foreground">{driver.email}</p>}
+                          </div>
+                          <Badge variant={selectedCities.length ? "default" : "secondary"}>
+                            {selectedCities.length} {selectedCities.length === 1 ? "city" : "cities"}
+                          </Badge>
                         </div>
-                        <Badge variant={selectedCities.length ? "default" : "secondary"}>
-                          {selectedCities.length} {selectedCities.length === 1 ? "city" : "cities"}
-                        </Badge>
+                        <div className="mt-4 grid max-h-44 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                          {filteredDeliveryCities.length === 0 ? (
+                            <p className="col-span-full py-4 text-center text-sm text-muted-foreground">
+                              No delivery cities match your search.
+                            </p>
+                          ) : filteredDeliveryCities.map((city) => {
+                            const checked = selectedCities.includes(city.cityName);
+                            const assignedToOtherDriver = drivers.some(
+                              (otherDriver) =>
+                                otherDriver.id !== driver.id
+                                && (cityDrafts[otherDriver.id] || otherDriver.assignedCities || []).includes(city.cityName)
+                            );
+                            const orderCount = cityOrderCounts.get(city.cityName.trim().toLocaleLowerCase()) || 0;
+                            return (
+                              <label
+                                key={city.id}
+                                className={`flex cursor-pointer items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm ${
+                                  assignedToOtherDriver && !checked ? "cursor-not-allowed opacity-50" : ""
+                                }`}
+                              >
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <Checkbox
+                                    checked={checked}
+                                    disabled={assignedToOtherDriver && !checked || saveCitiesMutation.isPending}
+                                    onCheckedChange={(value) => {
+                                      setCityDrafts((current) => {
+                                        const currentCities = current[driver.id] || [];
+                                        return {
+                                          ...current,
+                                          [driver.id]: value
+                                            ? [...currentCities, city.cityName]
+                                            : currentCities.filter((name) => name !== city.cityName),
+                                        };
+                                      });
+                                    }}
+                                  />
+                                  <span className="truncate">{city.cityName}</span>
+                                </span>
+                                <span className="shrink-0 text-xs text-muted-foreground">
+                                  {orderCount} {orderCount === 1 ? "order" : "orders"}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <Button
+                          className="mt-4 w-full gap-2"
+                          size="sm"
+                          disabled={saveCitiesMutation.isPending}
+                          onClick={() => saveCitiesMutation.mutate({
+                            driverId: driver.id,
+                            cityNames: selectedCities,
+                          })}
+                        >
+                          <Save className="h-4 w-4" />
+                          Save cities for {driverName}
+                        </Button>
                       </div>
-                      <div className="mt-4 grid max-h-44 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-                        {deliveryCities.map((city) => {
-                          const checked = selectedCities.includes(city.cityName);
-                          const assignedToOtherDriver = drivers.some(
-                            (otherDriver) =>
-                              otherDriver.id !== driver.id
-                              && (cityDrafts[otherDriver.id] || otherDriver.assignedCities || []).includes(city.cityName)
-                          );
-                          return (
-                            <label
-                              key={city.id}
-                              className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${
-                                assignedToOtherDriver && !checked ? "cursor-not-allowed opacity-50" : ""
-                              }`}
-                            >
-                              <Checkbox
-                                checked={checked}
-                                disabled={assignedToOtherDriver && !checked || saveCitiesMutation.isPending}
-                                onCheckedChange={(value) => {
-                                  setCityDrafts((current) => {
-                                    const currentCities = current[driver.id] || [];
-                                    return {
-                                      ...current,
-                                      [driver.id]: value
-                                        ? [...currentCities, city.cityName]
-                                        : currentCities.filter((name) => name !== city.cityName),
-                                    };
-                                  });
-                                }}
-                              />
-                              <span>{city.cityName}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                      <Button
-                        className="mt-4 w-full gap-2"
-                        size="sm"
-                        disabled={saveCitiesMutation.isPending}
-                        onClick={() => saveCitiesMutation.mutate({
-                          driverId: driver.id,
-                          cityNames: selectedCities,
-                        })}
-                      >
-                        <Save className="h-4 w-4" />
-                        Save cities for {driverName}
-                      </Button>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </CardContent>
