@@ -1999,6 +1999,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Re-sync grab bag availability after any status change that could restore stock (e.g. cancellation)
       syncGrabBagAvailability().catch(() => {});
 
+      // Once an order enters Shipped, route it to the driver assigned to its
+      // delivery city unless staff already chose a driver manually.
+      if (status === "shipped") {
+        try {
+          const automaticAssignment = await storage.autoAssignOrderByCity(id);
+          if (automaticAssignment) {
+            await storage.createNotification({
+              userId: automaticAssignment.driver.id,
+              type: "order_assigned",
+              title: "Order Assigned",
+              message: `Order #${automaticAssignment.order.orderNumber} has been assigned to you`,
+              data: {
+                orderId: automaticAssignment.order.id,
+                orderNumber: automaticAssignment.order.orderNumber,
+              },
+            });
+          }
+        } catch (assignmentError) {
+          // A missing city mapping must not prevent the status update.
+          console.error("Failed to auto-assign shipped order:", assignmentError);
+        }
+      }
+
       // Create notification for the customer about status change
       if (existingOrder.customerId) {
         try {
@@ -3205,6 +3228,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(driverUsers);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch drivers" });
+    }
+  });
+
+  app.get('/api/driver-delivery-cities/cities', isAuthenticated, requireRole(['admin', 'manager']), async (_req, res) => {
+    try {
+      const cities = await storage.getCityPurchaseLimits();
+      res.json(cities.filter((city) => city.isActive && !city.deliveryBlocked));
+    } catch (error) {
+      console.error("Failed to fetch driver delivery cities:", error);
+      res.status(500).json({ message: "Failed to fetch delivery cities" });
+    }
+  });
+
+  app.put('/api/users/:id/delivery-cities', isAuthenticated, requireRole(['admin', 'manager']), async (req, res) => {
+    try {
+      const driverUserId = req.params.id;
+      const { cityNames } = req.body ?? {};
+      if (!Array.isArray(cityNames) || cityNames.some((city) => typeof city !== "string")) {
+        return res.status(400).json({ message: "cityNames must be an array of city names" });
+      }
+
+      const assignments = await storage.setDriverDeliveryCities(driverUserId, cityNames);
+      const autoAssignments = await storage.autoAssignUnassignedShippedOrders();
+
+      for (const assignment of autoAssignments) {
+        try {
+          await storage.createNotification({
+            userId: assignment.driver.id,
+            type: "order_assigned",
+            title: "Order Assigned",
+            message: `Order #${assignment.order.orderNumber} has been assigned to you`,
+            data: {
+              orderId: assignment.order.id,
+              orderNumber: assignment.order.orderNumber,
+            },
+          });
+        } catch (notificationError) {
+          console.error("Failed to notify driver of city assignment:", notificationError);
+        }
+      }
+
+      res.json({
+        assignments,
+        autoAssignedOrderCount: autoAssignments.length,
+      });
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({
+          message: "One or more selected cities are already assigned to another driver",
+        });
+      }
+      if (error?.message?.includes("active driver") || error?.message?.includes("active delivery city")) {
+        return res.status(400).json({ message: error.message });
+      }
+      console.error("Failed to save driver delivery cities:", error);
+      res.status(500).json({ message: "Failed to save driver delivery cities" });
     }
   });
 

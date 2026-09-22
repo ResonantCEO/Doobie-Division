@@ -14,6 +14,7 @@ import {
   supportTicketResponses,
   passwordResetTokens,
   cityPurchaseLimits,
+  driverDeliveryCities,
   accessPasswords,
   discounts,
   promotionalAds,
@@ -47,6 +48,7 @@ import {
   type InsertInventoryLog,
   type Notification,
   type InsertNotification,
+  type DriverDeliveryCity,
 } from "@shared/schema";
 import { normalizeInventoryOption } from "@shared/inventory";
 import { db } from "./db";
@@ -214,7 +216,16 @@ export interface IStorage {
   getUsersPendingVerification(): Promise<User[]>;
   updateUser(id: string, userData: any): Promise<User>;
   getStaffUsers(): Promise<User[]>;
-  getDriverUsers(): Promise<Pick<User, 'id' | 'firstName' | 'lastName' | 'email'>[]>;
+  getDriverUsers(): Promise<(Pick<User, 'id' | 'firstName' | 'lastName' | 'email'> & { assignedCities: string[] })[]>;
+  setDriverDeliveryCities(driverUserId: string, cityNames: string[]): Promise<DriverDeliveryCity[]>;
+  autoAssignOrderByCity(orderId: number): Promise<{
+    order: Order;
+    driver: Pick<User, 'id' | 'firstName' | 'lastName' | 'email'>;
+  } | null>;
+  autoAssignUnassignedShippedOrders(): Promise<Array<{
+    order: Order;
+    driver: Pick<User, 'id' | 'firstName' | 'lastName' | 'email'>;
+  }>>;
   getUsersWithRole(role: string): Promise<User[]>;
   deleteUser(id: string): Promise<void>;
 
@@ -4707,8 +4718,8 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(users.firstName), asc(users.lastName));
   }
 
-  async getDriverUsers(): Promise<Pick<User, 'id' | 'firstName' | 'lastName' | 'email'>[]> {
-    return db
+  async getDriverUsers(): Promise<(Pick<User, 'id' | 'firstName' | 'lastName' | 'email'> & { assignedCities: string[] })[]> {
+    const driverUsers = await db
       .select({
         id: users.id,
         firstName: users.firstName,
@@ -4723,6 +4734,142 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(asc(users.firstName), asc(users.lastName));
+
+    if (driverUsers.length === 0) return [];
+
+    const cityAssignments = await retryQuery(() =>
+      db
+        .select({
+          driverUserId: driverDeliveryCities.driverUserId,
+          cityName: driverDeliveryCities.cityName,
+        })
+        .from(driverDeliveryCities)
+        .where(inArray(driverDeliveryCities.driverUserId, driverUsers.map((driver) => driver.id)))
+        .orderBy(asc(driverDeliveryCities.cityName))
+    );
+
+    const citiesByDriver = new Map<string, string[]>();
+    for (const assignment of cityAssignments) {
+      const cities = citiesByDriver.get(assignment.driverUserId) || [];
+      cities.push(assignment.cityName);
+      citiesByDriver.set(assignment.driverUserId, cities);
+    }
+
+    return driverUsers.map((driver) => ({
+      ...driver,
+      assignedCities: citiesByDriver.get(driver.id) || [],
+    }));
+  }
+
+  async setDriverDeliveryCities(driverUserId: string, cityNames: string[]): Promise<DriverDeliveryCity[]> {
+    const driver = await this.getUser(driverUserId);
+    if (!driver || driver.role !== "driver" || driver.status !== "active") {
+      throw new Error("Cities can only be assigned to active driver accounts");
+    }
+
+    const requestedCities = Array.from(new Set(
+      cityNames
+        .filter((city): city is string => typeof city === "string")
+        .map((city) => city.trim())
+        .filter(Boolean)
+        .map((city) => city.toLocaleLowerCase())
+    ));
+
+    const canonicalCities: string[] = [];
+    for (const requestedCity of requestedCities) {
+      const city = await this.getCityByNameAny(requestedCity);
+      if (!city || !city.isActive || city.deliveryBlocked) {
+        throw new Error(`"${requestedCity}" is not an active delivery city`);
+      }
+      if (!canonicalCities.includes(city.cityName)) {
+        canonicalCities.push(city.cityName);
+      }
+    }
+
+    const assignments = await retryQuery(() => db.transaction(async (tx) => {
+      await tx.delete(driverDeliveryCities).where(eq(driverDeliveryCities.driverUserId, driverUserId));
+      if (canonicalCities.length === 0) return [];
+
+      return tx.insert(driverDeliveryCities).values(
+        canonicalCities.map((cityName) => ({ driverUserId, cityName }))
+      ).returning();
+    }));
+
+    return assignments;
+  }
+
+  async autoAssignOrderByCity(orderId: number): Promise<{
+    order: Order;
+    driver: Pick<User, 'id' | 'firstName' | 'lastName' | 'email'>;
+  } | null> {
+    const [match] = await retryQuery(() =>
+      db
+        .select({
+          order: orders,
+          driver: {
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+          },
+        })
+        .from(orders)
+        .innerJoin(
+          driverDeliveryCities,
+          sql`lower(trim(${driverDeliveryCities.cityName})) = lower(trim(split_part(split_part(${orders.shippingAddress}, ',', 2), ',', 1)))`
+        )
+        .innerJoin(
+          users,
+          and(
+            eq(users.id, driverDeliveryCities.driverUserId),
+            eq(users.role, "driver"),
+            eq(users.status, "active"),
+          )
+        )
+        .where(and(
+          eq(orders.id, orderId),
+          eq(orders.status, "shipped"),
+          eq(orders.archived, false),
+          isNull(orders.assignedUserId),
+        ))
+        .limit(1)
+    );
+
+    if (!match?.driver?.id) return null;
+
+    const [updatedOrder] = await retryQuery(() =>
+      db
+        .update(orders)
+        .set({ assignedUserId: match.driver.id, updatedAt: new Date() })
+        .where(and(eq(orders.id, orderId), isNull(orders.assignedUserId)))
+        .returning()
+    );
+
+    if (!updatedOrder) return null;
+    return { order: updatedOrder, driver: match.driver };
+  }
+
+  async autoAssignUnassignedShippedOrders(): Promise<Array<{
+    order: Order;
+    driver: Pick<User, 'id' | 'firstName' | 'lastName' | 'email'>;
+  }>> {
+    const pendingOrders = await retryQuery(() =>
+      db
+        .select({ id: orders.id })
+        .from(orders)
+        .where(and(
+          eq(orders.status, "shipped"),
+          eq(orders.archived, false),
+          isNull(orders.assignedUserId),
+        ))
+    );
+
+    const assignments = [];
+    for (const pendingOrder of pendingOrders) {
+      const assignment = await this.autoAssignOrderByCity(pendingOrder.id);
+      if (assignment) assignments.push(assignment);
+    }
+    return assignments;
   }
 
   async getUsersWithRole(role: string): Promise<User[]> {

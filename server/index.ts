@@ -352,6 +352,31 @@ app.use((req, res, next) => {
     console.warn("⚠ Could not verify order_sequences table:", error?.message);
   }
 
+  // Driver delivery areas are stored separately from user profiles so one
+  // driver can serve multiple cities and cities can be reassigned safely.
+  try {
+    const { sql } = await import("./db");
+    await sql.query(`
+      CREATE TABLE IF NOT EXISTS driver_delivery_cities (
+        id SERIAL PRIMARY KEY,
+        driver_user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        city_name VARCHAR NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await sql.query(`
+      CREATE INDEX IF NOT EXISTS IDX_driver_delivery_cities_driver
+      ON driver_delivery_cities(driver_user_id)
+    `);
+    await sql.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS UQ_driver_delivery_cities_city_normalized
+      ON driver_delivery_cities(LOWER(TRIM(city_name)))
+    `);
+    console.log("✓ Verified driver delivery cities table exists");
+  } catch (error: any) {
+    console.warn("⚠ Could not verify driver delivery cities table:", error?.message);
+  }
+
   // Ensure grab_bags table exists
   try {
     const { sql } = await import("./db");

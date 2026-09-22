@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, Truck, MapPin, FileText, CreditCard, Loader2, Search, X } from "lucide-react";
+import { RefreshCw, Truck, MapPin, FileText, CreditCard, Loader2, Search, X, Save, Users } from "lucide-react";
 import type { Order } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +39,12 @@ type DriverOption = {
   firstName: string | null;
   lastName: string | null;
   email: string | null;
+  assignedCities: string[];
+};
+
+type DeliveryCity = {
+  id: number;
+  cityName: string;
 };
 
 type CityOrderGroup = {
@@ -79,6 +86,7 @@ export default function DriversPage() {
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [cityDrafts, setCityDrafts] = useState<Record<string, string[]>>({});
 
   const canViewDrivers = user?.role === "admin" || user?.role === "manager" || user?.role === "driver";
   const canAssignDrivers = user?.role === "admin" || user?.role === "manager";
@@ -113,6 +121,21 @@ export default function DriversPage() {
     enabled: canAssignDrivers,
   });
 
+  const { data: deliveryCities = [], isLoading: citiesLoading } = useQuery<DeliveryCity[]>({
+    queryKey: ["/api/driver-delivery-cities/cities"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/driver-delivery-cities/cities");
+      return response.json();
+    },
+    enabled: canAssignDrivers,
+  });
+
+  useEffect(() => {
+    setCityDrafts(Object.fromEntries(
+      drivers.map((driver) => [driver.id, driver.assignedCities || []])
+    ));
+  }, [drivers]);
+
   const assignDriverMutation = useMutation({
     mutationFn: async ({ orderId, assignedUserId }: { orderId: number; assignedUserId: string | null }) => {
       await apiRequest("PUT", `/api/orders/${orderId}/assign`, { assignedUserId });
@@ -123,6 +146,30 @@ export default function DriversPage() {
     },
     onError: () => {
       toast({ title: "Assignment failed", description: "The driver assignment could not be saved.", variant: "destructive" });
+    },
+  });
+
+  const saveCitiesMutation = useMutation({
+    mutationFn: async ({ driverId, cityNames }: { driverId: string; cityNames: string[] }) => {
+      const response = await apiRequest("PUT", `/api/users/${driverId}/delivery-cities`, { cityNames });
+      return response.json();
+    },
+    onSuccess: (result: { autoAssignedOrderCount?: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/drivers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({
+        title: "Delivery cities saved",
+        description: result.autoAssignedOrderCount
+          ? `${result.autoAssignedOrderCount} matching shipped ${result.autoAssignedOrderCount === 1 ? "order was" : "orders were"} assigned automatically.`
+          : "New shipped orders for these cities will be assigned automatically.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Could not save delivery cities",
+        description: error.message || "One or more cities may already belong to another driver.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -157,7 +204,7 @@ export default function DriversPage() {
       .map(([city, ordersInCity]) => ({ city, orders: ordersInCity }));
   }, [filteredOrders]);
 
-  if (authLoading || (canViewDrivers && ordersLoading) || (canAssignDrivers && driversLoading)) {
+  if (authLoading || (canViewDrivers && ordersLoading) || (canAssignDrivers && (driversLoading || citiesLoading))) {
     return (
       <div className="flex min-h-[280px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -190,6 +237,98 @@ export default function DriversPage() {
           Refresh
         </Button>
       </div>
+
+      {canAssignDrivers && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-start gap-3">
+              <Users className="mt-1 h-5 w-5 text-primary" />
+              <div>
+                <CardTitle className="text-lg">Driver accounts</CardTitle>
+                <CardDescription>
+                  Assign each active driver one or more delivery cities. A city can belong to only one driver.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {drivers.length === 0 ? (
+              <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                No active driver accounts found. Create or activate a driver account in User Management first.
+              </div>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-2">
+                {drivers.map((driver) => {
+                  const driverName = `${driver.firstName || ""} ${driver.lastName || ""}`.trim()
+                    || driver.email
+                    || driver.id;
+                  const selectedCities = cityDrafts[driver.id] || [];
+                  return (
+                    <div key={driver.id} className="rounded-lg border p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold">{driverName}</p>
+                          {driver.email && <p className="truncate text-sm text-muted-foreground">{driver.email}</p>}
+                        </div>
+                        <Badge variant={selectedCities.length ? "default" : "secondary"}>
+                          {selectedCities.length} {selectedCities.length === 1 ? "city" : "cities"}
+                        </Badge>
+                      </div>
+                      <div className="mt-4 grid max-h-44 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                        {deliveryCities.map((city) => {
+                          const checked = selectedCities.includes(city.cityName);
+                          const assignedToOtherDriver = drivers.some(
+                            (otherDriver) =>
+                              otherDriver.id !== driver.id
+                              && (cityDrafts[otherDriver.id] || otherDriver.assignedCities || []).includes(city.cityName)
+                          );
+                          return (
+                            <label
+                              key={city.id}
+                              className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                                assignedToOtherDriver && !checked ? "cursor-not-allowed opacity-50" : ""
+                              }`}
+                            >
+                              <Checkbox
+                                checked={checked}
+                                disabled={assignedToOtherDriver && !checked || saveCitiesMutation.isPending}
+                                onCheckedChange={(value) => {
+                                  setCityDrafts((current) => {
+                                    const currentCities = current[driver.id] || [];
+                                    return {
+                                      ...current,
+                                      [driver.id]: value
+                                        ? [...currentCities, city.cityName]
+                                        : currentCities.filter((name) => name !== city.cityName),
+                                    };
+                                  });
+                                }}
+                              />
+                              <span>{city.cityName}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <Button
+                        className="mt-4 w-full gap-2"
+                        size="sm"
+                        disabled={saveCitiesMutation.isPending}
+                        onClick={() => saveCitiesMutation.mutate({
+                          driverId: driver.id,
+                          cityNames: selectedCities,
+                        })}
+                      >
+                        <Save className="h-4 w-4" />
+                        Save cities for {driverName}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {isError ? (
         <Alert variant="destructive">

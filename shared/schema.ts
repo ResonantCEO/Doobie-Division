@@ -283,6 +283,17 @@ export const cityPurchaseLimits = pgTable("city_purchase_limits", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const driverDeliveryCities = pgTable("driver_delivery_cities", {
+  id: serial("id").primaryKey(),
+  driverUserId: varchar("driver_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  cityName: varchar("city_name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  driverIdx: index("IDX_driver_delivery_cities_driver").on(table.driverUserId),
+  cityIdx: index("IDX_driver_delivery_cities_city").on(table.cityName),
+  driverCityUnique: uniqueIndex("UQ_driver_delivery_cities_driver_city").on(table.driverUserId, table.cityName),
+}));
+
 export const promotionalAds = pgTable("promotional_ads", {
   id: serial("id").primaryKey(),
   discountId: integer("discount_id").unique(), // auto-linked to a discount if set
@@ -757,6 +768,7 @@ export type InsertSupportTicketResponse = z.infer<typeof insertSupportTicketResp
 export type SupportTicketResponse = typeof supportTicketResponses.$inferSelect;
 export type InsertCityPurchaseLimit = z.infer<typeof insertCityPurchaseLimitSchema>;
 export type CityPurchaseLimit = typeof cityPurchaseLimits.$inferSelect;
+export type DriverDeliveryCity = typeof driverDeliveryCities.$inferSelect;
 
 export const insertDiscountSchema = createInsertSchema(discounts).omit({
   id: true,
