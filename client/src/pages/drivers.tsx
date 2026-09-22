@@ -190,14 +190,21 @@ export default function DriversPage() {
     return counts;
   }, [shippedOrders]);
 
+  const deliveryCitiesWithOrders = useMemo(
+    () => deliveryCities.filter(
+      (city) => (cityOrderCounts.get(city.cityName.trim().toLocaleLowerCase()) || 0) > 0
+    ),
+    [cityOrderCounts, deliveryCities]
+  );
+
   const filteredDeliveryCities = useMemo(() => {
     const normalizedQuery = citySearchQuery.trim().toLocaleLowerCase();
-    if (!normalizedQuery) return deliveryCities;
+    if (!normalizedQuery) return deliveryCitiesWithOrders;
 
-    return deliveryCities.filter((city) =>
+    return deliveryCitiesWithOrders.filter((city) =>
       city.cityName.toLocaleLowerCase().includes(normalizedQuery)
     );
-  }, [citySearchQuery, deliveryCities]);
+  }, [citySearchQuery, deliveryCitiesWithOrders]);
 
   const filteredOrders = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
@@ -322,7 +329,9 @@ export default function DriversPage() {
                         <div className="mt-4 grid max-h-44 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
                           {filteredDeliveryCities.length === 0 ? (
                             <p className="col-span-full py-4 text-center text-sm text-muted-foreground">
-                              No delivery cities match your search.
+                              {deliveryCitiesWithOrders.length === 0
+                                ? "No delivery cities currently have shipped orders."
+                                : "No delivery cities match your search."}
                             </p>
                           ) : filteredDeliveryCities.map((city) => {
                             const checked = selectedCities.includes(city.cityName);
