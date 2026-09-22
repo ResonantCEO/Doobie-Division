@@ -99,10 +99,10 @@ export default function DriversPage() {
     refetch,
     isFetching,
   } = useQuery<DriverOrder[]>({
-    queryKey: ["/api/orders", "drivers", "shipped"],
+    queryKey: ["/api/orders", "drivers", "shipped-packed"],
     enabled: canViewDrivers,
     queryFn: async () => {
-      const response = await fetch("/api/orders?status=shipped", { credentials: "include" });
+      const response = await fetch("/api/orders?status=shipped,packed", { credentials: "include" });
       if (!response.ok) {
         throw new Error(`Failed to fetch assigned orders: ${response.statusText}`);
       }
@@ -174,21 +174,23 @@ export default function DriversPage() {
     },
   });
 
-  const shippedOrders = useMemo(
-    () => orders.filter((order) => order.status === "shipped" && !order.archived),
+  const deliveryOrders = useMemo(
+    () => orders.filter(
+      (order) => (order.status === "shipped" || order.status === "packed") && !order.archived
+    ),
     [orders]
   );
 
   const cityOrderCounts = useMemo(() => {
     const counts = new Map<string, number>();
 
-    shippedOrders.forEach((order) => {
+    deliveryOrders.forEach((order) => {
       const cityKey = getCityFromAddress(order.shippingAddress).trim().toLocaleLowerCase();
       counts.set(cityKey, (counts.get(cityKey) || 0) + 1);
     });
 
     return counts;
-  }, [shippedOrders]);
+  }, [deliveryOrders]);
 
   const deliveryCitiesWithOrders = useMemo(
     () => deliveryCities.filter(
@@ -208,14 +210,14 @@ export default function DriversPage() {
 
   const filteredOrders = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
-    if (!normalizedQuery) return shippedOrders;
+    if (!normalizedQuery) return deliveryOrders;
 
-    return shippedOrders.filter((order) => [
+    return deliveryOrders.filter((order) => [
       getCityFromAddress(order.shippingAddress),
       order.customerName || "",
       getAssignedDriverName(order),
     ].some((field) => field.toLocaleLowerCase().includes(normalizedQuery)));
-  }, [searchQuery, shippedOrders]);
+  }, [searchQuery, deliveryOrders]);
 
   const cityGroups = useMemo<CityOrderGroup[]>(() => {
     const groups = new Map<string, DriverOrder[]>();
@@ -399,13 +401,15 @@ export default function DriversPage() {
         <Alert variant="destructive">
           <AlertDescription>Assigned orders could not be loaded. Please try again.</AlertDescription>
         </Alert>
-      ) : shippedOrders.length === 0 ? (
+      ) : deliveryOrders.length === 0 ? (
         <Card>
           <CardContent className="flex min-h-[220px] flex-col items-center justify-center p-6 text-center">
             <Truck className="mb-3 h-10 w-10 text-muted-foreground" />
-            <h3 className="text-lg font-semibold">No shipped orders</h3>
+            <h3 className="text-lg font-semibold">No shipped or packed orders</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {user?.role === "driver" ? "Shipped orders assigned to you will appear here." : "Orders in the Shipped column will appear here."}
+              {user?.role === "driver"
+                ? "Shipped or packed orders assigned to you will appear here."
+                : "Orders in the Shipped or Packed columns will appear here."}
             </p>
           </CardContent>
         </Card>
@@ -437,8 +441,8 @@ export default function DriversPage() {
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
                 {searchQuery.trim()
-                  ? `Showing ${filteredOrders.length} of ${shippedOrders.length} shipped ${shippedOrders.length === 1 ? "order" : "orders"}`
-                  : `${shippedOrders.length} shipped ${shippedOrders.length === 1 ? "order" : "orders"} organized by city`}
+                  ? `Showing ${filteredOrders.length} of ${deliveryOrders.length} shipped or packed ${deliveryOrders.length === 1 ? "order" : "orders"}`
+                  : `${deliveryOrders.length} shipped or packed ${deliveryOrders.length === 1 ? "order" : "orders"} organized by city`}
               </p>
             </CardContent>
           </Card>
@@ -542,28 +546,35 @@ export default function DriversPage() {
                         <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                           Assigned Driver
                         </label>
-                        <Select
-                          value={order.assignedUserId || "unassigned"}
-                          onValueChange={(driverId) => assignDriverMutation.mutate({
-                            orderId: order.id,
-                            assignedUserId: driverId === "unassigned" ? null : driverId,
-                          })}
-                          disabled={assignDriverMutation.isPending}
-                        >
-                          <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Choose a driver" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unassigned">Unassigned</SelectItem>
-                            {drivers.map((driver) => (
-                              <SelectItem key={driver.id} value={driver.id}>
-                                {driver.firstName || driver.lastName
-                                  ? `${driver.firstName || ""} ${driver.lastName || ""}`.trim()
-                                  : driver.email || driver.id}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {order.status === "packed" ? (
+                          <div className="flex h-9 items-center gap-2 rounded-md border px-3 text-sm text-muted-foreground">
+                            <Badge variant="secondary">Packed</Badge>
+                            <span>Assignment available when shipped</span>
+                          </div>
+                        ) : (
+                          <Select
+                            value={order.assignedUserId || "unassigned"}
+                            onValueChange={(driverId) => assignDriverMutation.mutate({
+                              orderId: order.id,
+                              assignedUserId: driverId === "unassigned" ? null : driverId,
+                            })}
+                            disabled={assignDriverMutation.isPending}
+                          >
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="Choose a driver" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unassigned">Unassigned</SelectItem>
+                              {drivers.map((driver) => (
+                                <SelectItem key={driver.id} value={driver.id}>
+                                  {driver.firstName || driver.lastName
+                                    ? `${driver.firstName || ""} ${driver.lastName || ""}`.trim()
+                                    : driver.email || driver.id}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
