@@ -8,8 +8,8 @@ import { storage } from "./storage";
 
 const SALT_ROUNDS = 12;
 const MAX_LOGIN_ATTEMPTS = 5;
-const LOCKOUT_TIME = 5 * 60 * 1000; // 5 minutes
-const SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
+const LOCKOUT_TIME = 5 * 60 * 1000;
+const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 const TELEGRAM_REQUIREMENT_DEADLINE_KEY = "telegram_requirement_deadline";
 const TELEGRAM_GRACE_PERIOD_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -22,10 +22,7 @@ export function normalizeTelegramUsername(value: unknown): string | null {
 async function getTelegramRequirementDeadline(): Promise<Date> {
   const savedDeadline = await storage.getSiteSetting(TELEGRAM_REQUIREMENT_DEADLINE_KEY);
   const parsedDeadline = savedDeadline ? new Date(savedDeadline) : null;
-
-  if (parsedDeadline && !Number.isNaN(parsedDeadline.getTime())) {
-    return parsedDeadline;
-  }
+  if (parsedDeadline && !Number.isNaN(parsedDeadline.getTime())) return parsedDeadline;
 
   const deadline = new Date(Date.now() + TELEGRAM_GRACE_PERIOD_MS);
   await storage.setSiteSetting(TELEGRAM_REQUIREMENT_DEADLINE_KEY, deadline.toISOString());
@@ -49,7 +46,7 @@ export function getSession() {
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: 'lax',
+      sameSite: "lax",
       maxAge: SESSION_TTL,
     },
   });
@@ -60,24 +57,18 @@ export async function setupAuth(app: Express) {
   app.use(getSession());
   await getTelegramRequirementDeadline();
 
-  // Email availability check endpoint
   app.post("/api/auth/check-email", async (req, res) => {
     try {
       const { email } = req.body;
+      if (!email) return res.status(400).json({ message: "Email is required" });
 
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
-
-      // Normalize email to lowercase for case-insensitive comparison
       const normalizedEmail = email.toLowerCase();
-
-      // Check if user already exists
       const existingUser = await storage.getUserByEmail(normalizedEmail);
       if (existingUser) {
-        return res.status(409).json({ message: "An account with this email already exists. Please use a different email or try logging in." });
+        return res.status(409).json({
+          message: "An account with this email already exists. Please use a different email or try logging in.",
+        });
       }
-
       res.json({ message: "Email is available" });
     } catch (error) {
       console.error("Email check error:", error);
@@ -85,35 +76,43 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  // Register endpoint
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { email, password, firstName, lastName, address, city, state, postalCode, country, idImageUrl, verificationPhotoUrl, telegramUsername, referralCode } = req.body;
+      const {
+        email,
+        password,
+        firstName,
+        lastName,
+        address,
+        city,
+        state,
+        postalCode,
+        country,
+        idImageUrl,
+        verificationPhotoUrl,
+        telegramUsername,
+        referralCode,
+      } = req.body;
 
-      // Only check for essential fields that are actually sent from frontend
       if (!email || !password || !firstName || !lastName) {
         return res.status(400).json({ message: "All required fields must be provided" });
       }
 
       const normalizedTelegramUsername = normalizeTelegramUsername(telegramUsername);
       if (!normalizedTelegramUsername) {
-        return res.status(400).json({ message: "A valid Telegram username is required. Use 5-32 letters, numbers, or underscores." });
+        return res.status(400).json({
+          message: "A valid Telegram username is required. Use 5-32 letters, numbers, or underscores.",
+        });
       }
-
-      // Validate photo uploads are provided and in correct format
       if (!idImageUrl || !verificationPhotoUrl) {
         return res.status(400).json({ message: "Photo ID and verification photo are required" });
       }
-
-      if (!idImageUrl.startsWith('/objects/') || !verificationPhotoUrl.startsWith('/objects/')) {
+      if (!idImageUrl.startsWith("/objects/") || !verificationPhotoUrl.startsWith("/objects/")) {
         return res.status(400).json({ message: "Invalid photo format" });
       }
-
       if (password.length < 8) {
         return res.status(400).json({ message: "Password must be at least 8 characters long" });
       }
-
-      // Validate password complexity
       if (!/[A-Z]/.test(password)) {
         return res.status(400).json({ message: "Password must contain at least one uppercase letter" });
       }
@@ -124,62 +123,47 @@ export async function setupAuth(app: Express) {
         return res.status(400).json({ message: "Password must contain at least one number" });
       }
 
-      // Normalize email to lowercase for case-insensitive comparison
       const normalizedEmail = email.toLowerCase();
-
-      // Check if user already exists
       const existingUser = await storage.getUserByEmail(normalizedEmail);
       if (existingUser) {
-        return res.status(409).json({ message: "An account with this email already exists. Please use a different email or try logging in." });
+        return res.status(409).json({
+          message: "An account with this email already exists. Please use a different email or try logging in.",
+        });
       }
 
-      // Hash password
       const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-
-      // Check if this is the first user (should become admin)
       const existingUserCount = await storage.getUserCount();
       const isFirstUser = existingUserCount === 0;
-
-      // Create user
       const userId = crypto.randomUUID();
-      
-      // Process object storage URLs and set ACL policies
       let processedIdImageUrl = idImageUrl;
       let processedVerificationPhotoUrl = verificationPhotoUrl;
-      
+
       if (idImageUrl) {
         try {
           const { ObjectStorageService } = await import("./objectStorage");
           const objectStorageService = new ObjectStorageService();
-          processedIdImageUrl = await objectStorageService.trySetObjectEntityAclPolicy(
-            idImageUrl,
-            {
-              owner: userId,
-              visibility: "private",
-            }
-          );
+          processedIdImageUrl = await objectStorageService.trySetObjectEntityAclPolicy(idImageUrl, {
+            owner: userId,
+            visibility: "private",
+          });
         } catch (error) {
           console.error("Error setting ID image ACL:", error);
         }
       }
-      
+
       if (verificationPhotoUrl) {
         try {
           const { ObjectStorageService } = await import("./objectStorage");
           const objectStorageService = new ObjectStorageService();
           processedVerificationPhotoUrl = await objectStorageService.trySetObjectEntityAclPolicy(
             verificationPhotoUrl,
-            {
-              owner: userId,
-              visibility: "private",
-            }
+            { owner: userId, visibility: "private" },
           );
         } catch (error) {
           console.error("Error setting verification photo ACL:", error);
         }
       }
 
-      // Validate referral code if provided
       let referrerId: string | null = null;
       if (referralCode && referralCode.trim()) {
         const referrer = await storage.getUserByReferralCode(referralCode.trim());
@@ -201,50 +185,39 @@ export async function setupAuth(app: Express) {
         city,
         state,
         postalCode,
-        country: country || 'USA',
+        country: country || "USA",
         telegramUsername: normalizedTelegramUsername,
-        idVerificationStatus: isFirstUser ? "verified" : (processedIdImageUrl ? "pending" : "not_provided"),
+        idVerificationStatus: isFirstUser ? "verified" : processedIdImageUrl ? "pending" : "not_provided",
         role: isFirstUser ? "admin" : "customer",
         status: isFirstUser ? "active" : "pending",
         referredBy: referrerId,
       });
 
-      // Note: referral count is incremented only when the referred user is verified/activated, not at signup
-
-      // Create session for first user only
       const user = await storage.getUser(userId);
-
       if (isFirstUser && user) {
         (req.session as any).userId = userId;
         req.session.save(async (err) => {
           if (err) {
-            console.error('Session save error:', err);
+            console.error("Session save error:", err);
             return res.status(500).json({ message: "Session error" });
           }
-
-          // Log the login activity
           try {
-            await storage.logUserActivity(
-              user.id,
-              'Login',
-              'User logged in successfully',
-              { ipAddress: req.ip, userAgent: req.get('User-Agent') }
-            );
+            await storage.logUserActivity(user.id, "Login", "User logged in successfully", {
+              ipAddress: req.ip,
+              userAgent: req.get("User-Agent"),
+            });
           } catch (error) {
-            console.error('Error logging login activity:', error);
+            console.error("Error logging login activity:", error);
           }
-
           res.status(201).json({
             user,
-            message: "Welcome! You are the first user and have been granted administrator privileges."
+            message: "Welcome! You are the first user and have been granted administrator privileges.",
           });
         });
       } else {
-        // Notification creation removed - user registration notifications are handled elsewhere
-
         res.status(201).json({
           user: null,
-          message: "Registration successful! Your account is pending approval by an administrator."
+          message: "Registration successful! Your account is pending approval by an administrator.",
         });
       }
     } catch (error) {
@@ -253,63 +226,43 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  // Login endpoint
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = req.body;
-
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      // Normalize email to lowercase for case-insensitive comparison
       const normalizedEmail = email.toLowerCase();
-
-      // Get user by email
       const user = await storage.getUserByEmail(normalizedEmail);
-      if (!user) {
-        return res.status(401).json({ message: "Invalid email or password" });
-      }
-
+      if (!user) return res.status(401).json({ message: "Invalid email or password" });
       if (user.status !== "active") {
         if (user.status === "pending") {
           return res.status(401).json({
-            message: "Account is pending approval. Please wait for an administrator to activate your account."
+            message: "Account is pending approval. Please wait for an administrator to activate your account.",
           });
         }
         return res.status(401).json({ message: "Account is inactive" });
       }
+      if (!user.password) return res.status(401).json({ message: "Invalid email or password" });
 
-      // Verify password
-      if (!user.password) {
-        return res.status(401).json({ message: "Invalid email or password" });
-      }
       const isValidPassword = await bcrypt.compare(password, user.password);
-      if (!isValidPassword) {
-        return res.status(401).json({ message: "Invalid email or password" });
-      }
+      if (!isValidPassword) return res.status(401).json({ message: "Invalid email or password" });
 
-      // Create session
       (req.session as any).userId = user.id;
       req.session.save(async (err) => {
         if (err) {
-          console.error('Session save error:', err);
+          console.error("Session save error:", err);
           return res.status(500).json({ message: "Session error" });
         }
-
-        // Log the login activity
         try {
-          await storage.logUserActivity(
-            user.id,
-            'Login',
-            'User logged in successfully',
-            { ipAddress: req.ip, userAgent: req.get('User-Agent') }
-          );
+          await storage.logUserActivity(user.id, "Login", "User logged in successfully", {
+            ipAddress: req.ip,
+            userAgent: req.get("User-Agent"),
+          });
         } catch (error) {
-          console.error('Error logging login activity:', error);
+          console.error("Error logging login activity:", error);
         }
-
-        // Remove password from response
         const { password: _, ...userResponse } = user;
         res.json({ user: userResponse, message: "Login successful" });
       });
@@ -319,26 +272,18 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  // Logout endpoint
   app.post("/api/auth/logout", (req, res) => {
     const userId = (req.session as any).userId;
     req.session.destroy(async (err) => {
       if (err) {
-        console.error('Session destroy error:', err);
+        console.error("Session destroy error:", err);
         return res.status(500).json({ message: "Logout failed" });
       }
-
-      // Log the logout activity
       if (userId) {
         try {
-          await storage.logUserActivity(
-            userId,
-            'Logout',
-            'User logged out successfully',
-            { ipAddress: req.ip }
-          );
+          await storage.logUserActivity(userId, "Logout", "User logged out successfully", { ipAddress: req.ip });
         } catch (error) {
-          console.error('Error logging logout activity:', error);
+          console.error("Error logging logout activity:", error);
         }
       }
       res.clearCookie("connect.sid");
@@ -346,58 +291,38 @@ export async function setupAuth(app: Express) {
     });
   });
 
-  // Generate password reset token
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
       const { email } = req.body;
-
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
+      if (!email) return res.status(400).json({ message: "Email is required" });
 
       const normalizedEmail = email.toLowerCase();
       const user = await storage.getUserByEmail(normalizedEmail);
-
-      // Always return success to prevent email enumeration
-      if (!user) {
+      if (!user || user.status !== "active") {
         return res.json({ message: "If the email exists, a reset link has been sent." });
       }
 
-      if (user.status !== "active") {
-        return res.json({ message: "If the email exists, a reset link has been sent." });
-      }
-
-      // Generate 6-character alphanumeric reset token
-      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-      let resetToken = '';
+      const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+      let resetToken = "";
       for (let i = 0; i < 6; i++) {
-        const randomIndex = crypto.randomInt(0, characters.length);
-        resetToken += characters[randomIndex];
+        resetToken += characters[crypto.randomInt(0, characters.length)];
       }
-      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
-
-      // Store reset token
+      const resetTokenExpiry = new Date(Date.now() + 3600000);
       await storage.createPasswordResetToken(user.id, resetToken, resetTokenExpiry);
+      await storage.logUserActivity(user.id, "Password Reset Request", "User requested password reset", {
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
 
-      // Log the reset request
-      await storage.logUserActivity(
-        user.id,
-        'Password Reset Request',
-        'User requested password reset',
-        { ipAddress: req.ip, userAgent: req.get('User-Agent') }
-      );
-
-      // Create support ticket for password reset request
-      const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
-
+      const resetUrl = `${req.protocol}://${req.get("host")}/reset-password?token=${resetToken}`;
       await storage.createSupportTicket({
         customerName: `${user.firstName} ${user.lastName}`,
         customerEmail: user.email,
-        customerPhone: user.address || 'Not provided', // Use address field or default
+        customerPhone: user.address || "Not provided",
         subject: `Password Reset Request - ${user.firstName} ${user.lastName}`,
         message: `User ${user.firstName} ${user.lastName} (${user.email}) has requested a password reset.
-- Telegram: ${user.telegramUsername ? `@${user.telegramUsername}` : 'Not provided'}
-- Phone: ${user.phoneNumber || 'Not provided'}
+- Telegram: ${user.telegramUsername ? `@${user.telegramUsername}` : "Not provided"}
+- Phone: ${user.phoneNumber || "Not provided"}
 
 RESET TOKEN: ${resetToken}
 RESET URL: ${resetUrl}
@@ -405,23 +330,21 @@ EXPIRES AT: ${resetTokenExpiry.toISOString()}
 
 Request Details:
 - IP Address: ${req.ip}
-- User Agent: ${req.get('User-Agent')}
+- User Agent: ${req.get("User-Agent")}
 - User ID: ${user.id}
 
 Please manually send this reset URL to the user via their preferred communication method.`,
-        priority: 'medium'
+        priority: "medium",
       });
 
-      // In development, log the token to console for testing
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         console.log(`Password reset token for ${email}: ${resetToken}`);
         console.log(`Reset URL: ${resetUrl}`);
-        console.log(`Support ticket created for password reset`);
+        console.log("Support ticket created for password reset");
       }
-
       res.json({
         message: "Your password reset request has been submitted to our support team. They will contact you shortly with reset instructions.",
-        ...(process.env.NODE_ENV === 'development' && { resetToken }) // Include token in dev mode for testing
+        ...(process.env.NODE_ENV === "development" && { resetToken }),
       });
     } catch (error) {
       console.error("Forgot password error:", error);
@@ -429,24 +352,18 @@ Please manually send this reset URL to the user via their preferred communicatio
     }
   });
 
-  // Reset password with token
   app.post("/api/auth/reset-password", async (req, res) => {
     try {
       const { email, token, password, confirmPassword } = req.body;
-
       if (!email || !token || !password) {
         return res.status(400).json({ message: "Email, token, and password are required" });
       }
-
       if (confirmPassword && password !== confirmPassword) {
         return res.status(400).json({ message: "Passwords do not match" });
       }
-
       if (password.length < 8) {
         return res.status(400).json({ message: "Password must be at least 8 characters long" });
       }
-
-      // Validate password complexity
       if (!/[A-Z]/.test(password)) {
         return res.status(400).json({ message: "Password must contain at least one uppercase letter" });
       }
@@ -456,49 +373,30 @@ Please manually send this reset URL to the user via their preferred communicatio
       if (!/\d/.test(password)) {
         return res.status(400).json({ message: "Password must contain at least one number" });
       }
-
       if (password !== confirmPassword) {
         return res.status(400).json({ message: "Passwords do not match" });
       }
 
-      // Verify reset token
       const resetData = await storage.getPasswordResetToken(token);
       if (!resetData || resetData.expiresAt < new Date()) {
         return res.status(400).json({ message: "Invalid or expired reset token" });
       }
-
-      // Get user
       const user = await storage.getUser(resetData.userId);
       if (!user || user.status !== "active") {
         return res.status(400).json({ message: "Invalid reset token" });
       }
-
-      // Verify email matches the user associated with the token
-      const normalizedEmail = email.toLowerCase();
-      if (user.email.toLowerCase() !== normalizedEmail) {
+      if (user.email.toLowerCase() !== email.toLowerCase()) {
         return res.status(400).json({ message: "Email does not match the user associated with this reset token" });
       }
 
-      // Hash new password
       const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-
-      // Update password
       await storage.updateUserPassword(user.id, hashedPassword);
-
-      // Delete used reset token
       await storage.deletePasswordResetToken(token);
-
-      // Log successful password reset
-      await storage.logUserActivity(
-        user.id,
-        'Password Reset',
-        'User successfully reset password',
-        { ipAddress: req.ip, userAgent: req.get('User-Agent') }
-      );
-
-      // Close and clear the password reset support ticket now that it's resolved
+      await storage.logUserActivity(user.id, "Password Reset", "User successfully reset password", {
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
       await storage.closePasswordResetTicket(user.id);
-
       res.json({ message: "Password reset successful" });
     } catch (error) {
       console.error("Reset password error:", error);
@@ -506,21 +404,15 @@ Please manually send this reset URL to the user via their preferred communicatio
     }
   });
 
-  // Get current user endpoint
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
       let user = await storage.getUser(req.userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
+      if (!user) return res.status(404).json({ message: "User not found" });
 
-      // Auto-correct: active accounts should always have verified status
-      if (user.status === 'active' && user.idVerificationStatus === 'pending') {
-        await storage.updateUserIdVerification(req.userId, 'verified');
-        user = { ...user, idVerificationStatus: 'verified' };
+      if (user.status === "active" && user.idVerificationStatus === "pending") {
+        await storage.updateUserIdVerification(req.userId, "verified");
+        user = { ...user, idVerificationStatus: "verified" };
       }
-
-      // Auto-generate a referral code for existing users who don't have one
       if (!user.referralCode) {
         let code = storage.generateReferralCode();
         let codeExists = await storage.getUserByReferralCode(code);
@@ -531,7 +423,6 @@ Please manually send this reset URL to the user via their preferred communicatio
         await storage.updateUser(req.userId, { referralCode: code });
         user = { ...user, referralCode: code };
       }
-
       const { password: _, ...userResponse } = user;
       res.json(userResponse);
     } catch (error) {
@@ -540,19 +431,14 @@ Please manually send this reset URL to the user via their preferred communicatio
     }
   });
 
-  // Telegram contact rollout status for signed-in users. The deadline is stored
-  // in site settings so it remains the same across server restarts.
   app.get("/api/auth/telegram-requirement", isAuthenticated, async (req: any, res) => {
     try {
       const deadline = await getTelegramRequirementDeadline();
       const user = req.currentUser;
-      const hasTelegramUsername = Boolean(normalizeTelegramUsername(user?.telegramUsername));
-      const requiredNow = Date.now() >= deadline.getTime();
-
       res.json({
-        hasTelegramUsername,
+        hasTelegramUsername: Boolean(normalizeTelegramUsername(user?.telegramUsername)),
         deadline: deadline.toISOString(),
-        requiredNow,
+        requiredNow: Date.now() >= deadline.getTime(),
       });
     } catch (error) {
       console.error("Error checking Telegram requirement:", error);
@@ -560,15 +446,14 @@ Please manually send this reset URL to the user via their preferred communicatio
     }
   });
 
-  // Allows a signed-in user to satisfy the Telegram requirement without
-  // opening their full profile, including when the deadline has passed.
   app.put("/api/auth/telegram-username", isAuthenticated, async (req: any, res) => {
     try {
       const telegramUsername = normalizeTelegramUsername(req.body?.telegramUsername);
       if (!telegramUsername) {
-        return res.status(400).json({ message: "Enter a valid Telegram username using 5-32 letters, numbers, or underscores." });
+        return res.status(400).json({
+          message: "Enter a valid Telegram username using 5-32 letters, numbers, or underscores.",
+        });
       }
-
       const updatedUser = await storage.updateUser(req.currentUser.id, { telegramUsername });
       const { password: _, ...userResponse } = updatedUser;
       res.json(userResponse);
@@ -581,17 +466,13 @@ Please manually send this reset URL to the user via their preferred communicatio
 
 export const isAuthenticated: RequestHandler = async (req: any, res, next) => {
   const userId = (req.session as any)?.userId;
-
-  if (!userId) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
   try {
     const user = await storage.getUser(userId);
     if (!user || user.status !== "active") {
       return res.status(401).json({ message: "Unauthorized" });
     }
-
     req.userId = userId;
     req.currentUser = user;
     next();
