@@ -884,6 +884,7 @@ export default function StorefrontPage() {
   const renderBoardPost = (post: BoardPost) => {
     const linkedIds: number[] = post.productIds ? (() => { try { return JSON.parse(post.productIds); } catch { return []; } })() : [];
     const hasLinkedProducts = linkedIds.length > 0;
+    const postText = post.text?.trim();
     const isActive = adProductFilter !== null && linkedIds.length > 0 && linkedIds.every(id => adProductFilter.includes(id));
     return (
       <div
@@ -923,15 +924,17 @@ export default function StorefrontPage() {
         ) : (
           <img src={post.imageUrl} alt="Board post" className="w-full h-auto object-contain block" />
         ))}
-        <div className="p-4">
-          {post.text && <p className="text-sm text-foreground whitespace-pre-wrap">{post.text}</p>}
-          {hasLinkedProducts && (
-            <div className={`flex items-center gap-1.5 mt-2 text-xs font-medium ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
-              <ShoppingBag className="w-3.5 h-3.5" />
-              {isActive ? 'Showing linked products — tap to clear' : `Tap to shop ${linkedIds.length === 1 ? 'this product' : `${linkedIds.length} products`}`}
-            </div>
-          )}
-        </div>
+        {(postText || hasLinkedProducts) && (
+          <div className="p-4">
+            {postText && <p className="text-sm text-foreground whitespace-pre-wrap">{postText}</p>}
+            {hasLinkedProducts && (
+              <div className={`flex items-center gap-1.5 ${postText ? 'mt-2' : ''} text-xs font-medium ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
+                <ShoppingBag className="w-3.5 h-3.5" />
+                {isActive ? 'Showing linked products — tap to clear' : `Tap to shop ${linkedIds.length === 1 ? 'this product' : `${linkedIds.length} products`}`}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
