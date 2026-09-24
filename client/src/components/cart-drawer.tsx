@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -95,6 +95,38 @@ function getEffectiveUnitPrice(product: any, size?: string): number {
   return applyProductDiscount(product, base);
 }
 
+function getDroppedImageUrl(dataTransfer: DataTransfer): string | null {
+  const html = dataTransfer.getData("text/html");
+  if (html) {
+    const imageSource = new DOMParser()
+      .parseFromString(html, "text/html")
+      .querySelector("img")
+      ?.getAttribute("src");
+    if (imageSource) {
+      try {
+        return new URL(imageSource, window.location.href).toString();
+      } catch {
+        // Continue checking the remaining drag payload formats.
+      }
+    }
+  }
+
+  const uriList = dataTransfer.getData("text/uri-list")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith("#"));
+  const plainText = dataTransfer.getData("text/plain").trim();
+  const candidate = uriList || plainText;
+  if (!candidate) return null;
+
+  try {
+    const url = new URL(candidate, window.location.href);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function CartDrawer({ children }: CartDrawerProps) {
   const { state, removeItem, updateQuantity, clearCart, getEffectivePrice, removeCgBag } = useCart();
   // Combined total includes both product items and customer-generated bag items
@@ -118,7 +150,11 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   });
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
   const [prePayPhotoFile, setPrePayPhotoFile] = useState<File | null>(null);
+  const [prePayPhotoUrl, setPrePayPhotoUrl] = useState<string | null>(null);
   const [prePayPhotoPreview, setPrePayPhotoPreview] = useState<string | null>(null);
+  const [isImportingPrePayPhoto, setIsImportingPrePayPhoto] = useState(false);
+  const [isPrePayPhotoDragOver, setIsPrePayPhotoDragOver] = useState(false);
+  const prePayPhotoInputRef = useRef<HTMLInputElement>(null);
   const currentHour = new Date().getHours();
   const isBeforeNoon = currentHour < 12;
   const isAfter5pm = currentHour >= 17;

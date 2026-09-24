@@ -1,6 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import path from "path";
+import { lookup as dnsLookup } from "node:dns/promises";
+import { isIP } from "node:net";
+import { request as httpsRequest } from "node:https";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import QRCode from "qrcode";
@@ -50,6 +53,161 @@ const requireRole = (roles: string[]) => {
 // Keep the higher multer ceiling limited by an explicit per-type check below.
 const MAX_AD_IMAGE_OR_VIDEO_SIZE = 20 * 1024 * 1024;
 const MAX_AD_GIF_SIZE = 100 * 1024 * 1024;
+const MAX_REMOTE_PAYMENT_PHOTO_SIZE = 10 * 1024 * 1024;
+
+function isPublicRemoteAddress(address: string): boolean {
+  const version = isIP(address);
+  if (version === 4) {
+    const octets = address.split(".").map(Number);
+    const [a, b, c] = octets;
+    if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+      return false;
+    }
+
+    return !(
+      a === 0 || a === 10 || a === 127 || a >= 224
+      || (a === 100 && b >= 64 && b <= 127)
+      || (a === 169 && b === 254)
+      || (a === 172 && b >= 16 && b <= 31)
+      || (a === 192 && b === 0 && c === 2)
+      || (a === 192 && b === 88 && c === 99)
+      || (a === 192 && b === 168)
+      || (a === 198 && (b === 18 || b === 19))
+      || (a === 198 && b === 51 && c === 100)
+      || (a === 203 && b === 0 && c === 113)
+    );
+  }
+
+  if (version !== 6) return false;
+
+  let normalized = address.toLowerCase().split("%")[0];
+  const embeddedIpv4 = normalized.match(/(?:^|:)(\d+\.\d+\.\d+\.\d+)$/);
+  if (embeddedIpv4) {
+    const octets = embeddedIpv4[1].split(".").map(Number);
+    if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+      return false;
+    }
+    const high = ((octets[0] << 8) | octets[1]).toString(16);
+    const low = ((octets[2] << 8) | octets[3]).toString(16);
+    normalized = normalized.replace(embeddedIpv4[1], `${high}:${low}`);
+  }
+
+  const halves = normalized.split("::");
+  if (halves.length > 2) return false;
+  const left = halves[0] ? halves[0].split(":") : [];
+  const right = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const missingGroups = 8 - left.length - right.length;
+  if ((halves.length === 1 && missingGroups !== 0) || (halves.length === 2 && missingGroups < 1)) return false;
+  const groups = [
+    ...left,
+    ...Array(halves.length === 2 ? missingGroups : 0).fill("0"),
+    ...right,
+  ].map((group) => Number.parseInt(group || "0", 16));
+  if (groups.length !== 8 || groups.some((group) => !Number.isInteger(group) || group < 0 || group > 0xffff)) {
+    return false;
+  }
+
+  const [first, second] = groups;
+  const isIpv4Mapped = groups.slice(0, 5).every((group) => group === 0) && groups[5] === 0xffff;
+  if (isIpv4Mapped) {
+    return isPublicRemoteAddress(`${groups[6] >> 8}.${groups[6] & 0xff}.${groups[7] >> 8}.${groups[7] & 0xff}`);
+  }
+
+  // Only accept globally routable unicast space. Exclude documentation and
+  // transition blocks that can encode private IPv4 destinations.
+  return (first & 0xe000) === 0x2000
+    && !(first === 0x2001 && second <= 0x01ff)
+    && !(first === 0x2001 && second === 0x0db8)
+    && first !== 0x2002
+    && !(first === 0x3fff && second <= 0x0fff);
+}
+
+async function fetchRemotePaymentImage(imageUrl: string): Promise<Buffer> {
+  let url: URL;
+  try {
+    url = new URL(imageUrl);
+  } catch {
+    throw new Error("Drop an image file or a direct image link.");
+  }
+  if (url.protocol !== "https:" || url.username || url.password || !url.hostname) {
+    throw new Error("Only public HTTPS image links can be imported.");
+  }
+
+  const resolvedAddresses = await dnsLookup(url.hostname, { all: true, verbatim: true });
+  if (resolvedAddresses.length === 0 || resolvedAddresses.some(({ address }) => !isPublicRemoteAddress(address))) {
+    throw new Error("That image link is not available from a public address.");
+  }
+  const pinnedAddress = resolvedAddresses[0];
+  const allowedContentTypes = new Set([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "image/avif",
+    "image/bmp",
+    "image/tiff",
+  ]);
+
+  const responseBuffer = await new Promise<Buffer>((resolve, reject) => {
+    const request = httpsRequest({
+      hostname: url.hostname,
+      port: url.port || 443,
+      path: `${url.pathname}${url.search}`,
+      method: "GET",
+      servername: url.hostname,
+      headers: {
+        Accept: "image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp,image/tiff",
+        "User-Agent": "Mozilla/5.0 (compatible; PaymentPhotoImporter/1.0)",
+      },
+      lookup: (_hostname, _options, callback) => {
+        callback(null, pinnedAddress.address, pinnedAddress.family);
+      },
+    }, (response) => {
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(new Error("The image link could not be downloaded. Try dragging the image itself."));
+        return;
+      }
+
+      const contentType = String(response.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+      if (!allowedContentTypes.has(contentType)) {
+        response.resume();
+        reject(new Error("The dropped link did not return a supported image."));
+        return;
+      }
+
+      const contentLength = Number(response.headers["content-length"]);
+      if (Number.isFinite(contentLength) && contentLength > MAX_REMOTE_PAYMENT_PHOTO_SIZE) {
+        response.resume();
+        reject(new Error("The image is too large. Choose an image under 10 MB."));
+        return;
+      }
+
+      const chunks: Buffer[] = [];
+      let totalBytes = 0;
+      response.on("data", (chunk: Buffer | string) => {
+        const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        totalBytes += bufferChunk.length;
+        if (totalBytes > MAX_REMOTE_PAYMENT_PHOTO_SIZE) {
+          response.destroy(new Error("The image is too large. Choose an image under 10 MB."));
+          return;
+        }
+        chunks.push(bufferChunk);
+      });
+      response.on("end", () => resolve(Buffer.concat(chunks)));
+      response.on("error", reject);
+    });
+
+    request.setTimeout(10000, () => request.destroy(new Error("The image download timed out. Try again.")));
+    request.on("error", reject);
+    request.end();
+  });
+
+  return sharp(responseBuffer, { limitInputPixels: 40_000_000 })
+    .rotate()
+    .jpeg({ quality: 88 })
+    .toBuffer();
+}
 
 // Configure media uploads for advertisements (memory storage for Object Storage)
 const upload = multer({
@@ -462,6 +620,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Payment photo upload error:', error);
       res.status(500).json({ message: 'Failed to upload photo' });
+    }
+  });
+
+  // Import a directly dropped image link. DNS is resolved and pinned to a
+  // validated public IP before connecting, and redirects are not followed.
+  app.post('/api/upload/payment-photo-from-url', isAuthenticated, async (req: any, res) => {
+    const imageUrl = req.body?.imageUrl;
+    if (typeof imageUrl !== "string" || imageUrl.length > 4096) {
+      return res.status(400).json({ message: "A valid image link is required." });
+    }
+
+    try {
+      const imageBuffer = await fetchRemotePaymentImage(imageUrl);
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const uniqueId = uuidv4();
+      const objectName = `payment-photos/${uniqueId}.jpg`;
+      const fullPath = `${privateDir}/${objectName}`;
+      const parts = fullPath.startsWith("/") ? fullPath.slice(1).split("/") : fullPath.split("/");
+      const bucketName = parts[0];
+      const objectKey = parts.slice(1).join("/");
+      const file = objectStorageClient.bucket(bucketName).file(objectKey);
+
+      await file.save(imageBuffer, {
+        metadata: { contentType: "image/jpeg" },
+      });
+
+      res.json({ photoUrl: `/api/payment-photos/${uniqueId}.jpg` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not import that image link.";
+      res.status(400).json({ message });
     }
   });
 
