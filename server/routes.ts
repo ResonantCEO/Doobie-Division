@@ -261,6 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     `);
     await db.execute(sql`ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS product_ids TEXT`);
     await db.execute(sql`ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL`);
+    await db.execute(sql`ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS after_category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL`);
     await db.execute(sql`ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`);
   } catch (e: any) {
     console.warn('[startup] Could not ensure board_posts table:', e?.message);
@@ -4782,6 +4783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const placements = z.array(z.object({
         id: z.number().int().positive(),
         categoryId: z.number().int().positive().nullable(),
+        afterCategoryId: z.number().int().positive().nullable().optional(),
         sortOrder: z.number().int().min(0),
       })).min(1).parse(req.body.placements);
       if (new Set(placements.map((placement) => placement.id)).size !== placements.length) {
@@ -4801,6 +4803,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const existingCategories = await db.select({ id: categories.id }).from(categories).where(inArray(categories.id, categoryIds));
         if (existingCategories.length !== categoryIds.length) {
           return res.status(400).json({ message: "One or more categories do not exist" });
+        }
+      }
+
+      const afterCategoryIds = Array.from(new Set(placements
+        .map((placement) => placement.afterCategoryId)
+        .filter((id): id is number => id !== null && id !== undefined)));
+      if (placements.some((placement) => placement.categoryId !== null && placement.afterCategoryId != null)) {
+        return res.status(400).json({ message: "Ads inside a category cannot also be placed between categories" });
+      }
+      if (afterCategoryIds.length > 0) {
+        const rootCategories = await db.select({ id: categories.id }).from(categories)
+          .where(and(inArray(categories.id, afterCategoryIds), sql`${categories.parentId} IS NULL`));
+        if (rootCategories.length !== afterCategoryIds.length) {
+          return res.status(400).json({ message: "Between-category placements must use a main category" });
         }
       }
 

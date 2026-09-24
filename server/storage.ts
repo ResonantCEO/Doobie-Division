@@ -5525,11 +5525,15 @@ export class DatabaseStorage implements IStorage {
     return results[0];
   }
 
-  async updateBoardPostLayout(placements: { id: number; categoryId: number | null; sortOrder: number }[]): Promise<void> {
+  async updateBoardPostLayout(placements: { id: number; categoryId: number | null; afterCategoryId?: number | null; sortOrder: number }[]): Promise<void> {
     await retryQuery(() => db.transaction(async (tx) => {
       for (const placement of placements) {
         await tx.update(boardPosts)
-          .set({ categoryId: placement.categoryId, sortOrder: placement.sortOrder })
+          .set({
+            categoryId: placement.categoryId,
+            afterCategoryId: placement.categoryId === null ? (placement.afterCategoryId ?? null) : null,
+            sortOrder: placement.sortOrder,
+          })
           .where(eq(boardPosts.id, placement.id));
       }
     }));

@@ -99,7 +99,7 @@ function CategoryReorderGrid({
 function SortableStorefrontAd({ post }: { post: BoardPost }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `board-post-${post.id}`,
-    data: { kind: "board-post", postId: post.id, categoryId: post.categoryId },
+    data: { kind: "board-post", postId: post.id, categoryId: post.categoryId, afterCategoryId: post.afterCategoryId },
   });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -130,15 +130,17 @@ function SortableStorefrontAd({ post }: { post: BoardPost }) {
 function StorefrontAdDropZone({
   id,
   categoryId,
+  afterCategoryId = null,
   children,
 }: {
   id: string;
   categoryId: number | null;
+  afterCategoryId?: number | null;
   children: React.ReactNode;
 }) {
   const { isOver, setNodeRef } = useDroppable({
     id,
-    data: { kind: "ad-zone", categoryId },
+    data: { kind: "ad-zone", categoryId, afterCategoryId },
   });
 
   return (
@@ -369,7 +371,7 @@ export default function StorefrontPage() {
   });
 
   const updateBoardPostLayoutMutation = useMutation({
-    mutationFn: async (placements: { id: number; categoryId: number | null; sortOrder: number }[]) => {
+    mutationFn: async (placements: { id: number; categoryId: number | null; afterCategoryId: number | null; sortOrder: number }[]) => {
       await apiRequest("PATCH", "/api/board-posts/layout", { placements });
     },
     onMutate: async (placements) => {
@@ -378,7 +380,7 @@ export default function StorefrontPage() {
       queryClient.setQueryData<BoardPost[]>(["/api/board-posts"], (posts = []) =>
         posts.map((post) => {
           const placement = placements.find((item) => item.id === post.id);
-          return placement ? { ...post, categoryId: placement.categoryId, sortOrder: placement.sortOrder } : post;
+          return placement ? { ...post, categoryId: placement.categoryId, afterCategoryId: placement.afterCategoryId, sortOrder: placement.sortOrder } : post;
         })
       );
       return { previousPosts };
@@ -592,6 +594,8 @@ export default function StorefrontPage() {
       .sort((a, b) => a.sortOrder - b.sortOrder),
     [boardPosts]
   );
+  const getUnassignedPostsAfter = (afterCategoryId: number | null) =>
+    unassignedBoardPosts.filter((post) => (post.afterCategoryId ?? null) === afterCategoryId);
 
   const rootCategoriesForLayout = useMemo(() => {
     const roots = categories
@@ -609,19 +613,30 @@ export default function StorefrontPage() {
 
   const handleStorefrontLayoutDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over) return;
-    const activeData = active.data.current as { kind?: string; postId?: number; categoryId?: number | null } | undefined;
-    const overData = over.data.current as { kind?: string; postId?: number; categoryId?: number | null } | undefined;
+    const activeData = active.data.current as { kind?: string; postId?: number; categoryId?: number | null; afterCategoryId?: number | null } | undefined;
+    const overData = over.data.current as { kind?: string; postId?: number; categoryId?: number | null; afterCategoryId?: number | null } | undefined;
     if (!activeData || !overData || active.id === over.id) return;
 
     if (activeData.kind === "category") {
       const activeCategoryId = activeData.categoryId;
-      const overCategoryId = overData.categoryId;
-      if (!activeCategoryId || !overCategoryId || activeCategoryId === overCategoryId) return;
+      if (!activeCategoryId) return;
       const oldIndex = rootCategoriesForLayout.findIndex((category) => category.id === activeCategoryId);
-      const newIndex = rootCategoriesForLayout.findIndex((category) => category.id === overCategoryId);
-      if (oldIndex < 0 || newIndex < 0) return;
+      if (oldIndex < 0) return;
 
-      const reordered = arrayMove(rootCategoriesForLayout, oldIndex, newIndex);
+      let reordered: Category[];
+      if (overData.categoryId === null && (overData.kind === "ad-zone" || overData.kind === "board-post")) {
+        const withoutActive = rootCategoriesForLayout.filter((category) => category.id !== activeCategoryId);
+        const afterIndex = withoutActive.findIndex((category) => category.id === overData.afterCategoryId);
+        reordered = [...withoutActive];
+        reordered.splice(afterIndex + 1, 0, rootCategoriesForLayout[oldIndex]);
+      } else {
+        const overCategoryId = overData.categoryId;
+        if (!overCategoryId || activeCategoryId === overCategoryId) return;
+        const newIndex = rootCategoriesForLayout.findIndex((category) => category.id === overCategoryId);
+        if (newIndex < 0) return;
+        reordered = arrayMove(rootCategoriesForLayout, oldIndex, newIndex);
+      }
+      if (reordered.every((category, index) => category.id === rootCategoriesForLayout[index].id)) return;
       setLocalRootCategoryOrder(reordered.map((category) => category.id));
       updateCategoryOrderMutation.mutate(reordered.map((category, index) => ({ id: category.id, sortOrder: index })));
       return;
@@ -632,28 +647,31 @@ export default function StorefrontPage() {
     if (!movingPost) return;
 
     let destinationCategoryId: number | null | undefined;
+    let destinationAfterCategoryId: number | null = null;
     if (overData.kind === "board-post" || overData.kind === "ad-zone" || overData.kind === "category") {
       destinationCategoryId = overData.categoryId;
+      destinationAfterCategoryId = destinationCategoryId === null ? (overData.afterCategoryId ?? null) : null;
     }
     if (destinationCategoryId === undefined) return;
 
     const sourceCategoryId = movingPost.categoryId;
+    const sourceAfterCategoryId = sourceCategoryId === null ? (movingPost.afterCategoryId ?? null) : null;
     const sourcePosts = sourceCategoryId === null
-      ? unassignedBoardPosts
+      ? getUnassignedPostsAfter(sourceAfterCategoryId)
       : getCategoryBoardPosts(sourceCategoryId);
     const destinationPosts = destinationCategoryId === null
-      ? unassignedBoardPosts
+      ? getUnassignedPostsAfter(destinationAfterCategoryId)
       : getCategoryBoardPosts(destinationCategoryId);
 
-    let placements: { id: number; categoryId: number | null; sortOrder: number }[];
-    if (sourceCategoryId === destinationCategoryId) {
+    let placements: { id: number; categoryId: number | null; afterCategoryId: number | null; sortOrder: number }[];
+    if (sourceCategoryId === destinationCategoryId && sourceAfterCategoryId === destinationAfterCategoryId) {
       const oldIndex = sourcePosts.findIndex((post) => post.id === movingPost.id);
       const overIndex = overData.kind === "board-post"
         ? sourcePosts.findIndex((post) => post.id === overData.postId)
         : sourcePosts.length - 1;
       if (oldIndex < 0 || overIndex < 0 || oldIndex === overIndex) return;
       placements = arrayMove(sourcePosts, oldIndex, overIndex)
-        .map((post, sortOrder) => ({ id: post.id, categoryId: sourceCategoryId, sortOrder }));
+        .map((post, sortOrder) => ({ id: post.id, categoryId: sourceCategoryId, afterCategoryId: sourceAfterCategoryId, sortOrder }));
     } else {
       const remainingSourcePosts = sourcePosts.filter((post) => post.id !== movingPost.id);
       const nextDestinationPosts = destinationPosts.filter((post) => post.id !== movingPost.id);
@@ -662,8 +680,8 @@ export default function StorefrontPage() {
         : nextDestinationPosts.length;
       nextDestinationPosts.splice(overIndex < 0 ? nextDestinationPosts.length : overIndex, 0, movingPost);
       placements = [
-        ...remainingSourcePosts.map((post, sortOrder) => ({ id: post.id, categoryId: sourceCategoryId, sortOrder })),
-        ...nextDestinationPosts.map((post, sortOrder) => ({ id: post.id, categoryId: destinationCategoryId, sortOrder })),
+        ...remainingSourcePosts.map((post, sortOrder) => ({ id: post.id, categoryId: sourceCategoryId, afterCategoryId: sourceAfterCategoryId, sortOrder })),
+        ...nextDestinationPosts.map((post, sortOrder) => ({ id: post.id, categoryId: destinationCategoryId, afterCategoryId: destinationAfterCategoryId, sortOrder })),
       ];
     }
     updateBoardPostLayoutMutation.mutate(placements);
@@ -1000,20 +1018,20 @@ export default function StorefrontPage() {
             <div>
               <h2 className="font-semibold">Organize storefront</h2>
               <p className="text-sm text-muted-foreground">
-                Drag categories to reorder them. Drag ads into a category, or back to Unassigned ads. Changes save automatically.
+                Drag categories to reorder them. Drop ads inside a category or in the spaces between categories to keep them unassigned. Changes save automatically.
               </p>
             </div>
 
             <StorefrontAdDropZone id="board-post-zone-unassigned" categoryId={null}>
               <p className="mb-2 text-sm font-medium">Unassigned ads</p>
               <SortableContext
-                items={unassignedBoardPosts.map((post) => `board-post-${post.id}`)}
+                items={getUnassignedPostsAfter(null).map((post) => `board-post-${post.id}`)}
                 strategy={verticalListSortingStrategy}
               >
                 <div className="space-y-2">
-                  {unassignedBoardPosts.length > 0
-                    ? unassignedBoardPosts.map((post) => <SortableStorefrontAd key={post.id} post={post} />)
-                    : <p className="py-2 text-xs text-muted-foreground">Drop an ad here to keep it at the top of the storefront.</p>}
+                  {getUnassignedPostsAfter(null).length > 0
+                    ? getUnassignedPostsAfter(null).map((post) => <SortableStorefrontAd key={post.id} post={post} />)
+                    : <p className="py-2 text-xs text-muted-foreground">Drop an ad here to show it before the categories.</p>}
                 </div>
               </SortableContext>
             </StorefrontAdDropZone>
@@ -1025,22 +1043,38 @@ export default function StorefrontPage() {
               <div className="space-y-3">
                 {rootCategoriesForLayout.map((category) => {
                   const categoryPosts = getCategoryBoardPosts(category.id);
+                  const betweenPosts = getUnassignedPostsAfter(category.id);
                   return (
-                    <SortableStorefrontCategory key={category.id} category={category}>
-                      <StorefrontAdDropZone id={`board-post-zone-${category.id}`} categoryId={category.id}>
-                        <p className="mb-2 text-xs text-muted-foreground">Ads shown in {category.name}</p>
+                    <div key={category.id} className="space-y-2">
+                      <SortableStorefrontCategory category={category}>
+                        <StorefrontAdDropZone id={`board-post-zone-${category.id}`} categoryId={category.id}>
+                          <p className="mb-2 text-xs text-muted-foreground">Ads shown in {category.name}</p>
+                          <SortableContext
+                            items={categoryPosts.map((post) => `board-post-${post.id}`)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <div className="space-y-2">
+                              {categoryPosts.length > 0
+                                ? categoryPosts.map((post) => <SortableStorefrontAd key={post.id} post={post} />)
+                                : <p className="py-2 text-xs text-muted-foreground">Drop an ad here to show it in this category.</p>}
+                            </div>
+                          </SortableContext>
+                        </StorefrontAdDropZone>
+                      </SortableStorefrontCategory>
+                      <StorefrontAdDropZone id={`board-post-zone-after-${category.id}`} categoryId={null} afterCategoryId={category.id}>
+                        <p className="mb-2 text-xs text-muted-foreground">Unassigned ads after {category.name}</p>
                         <SortableContext
-                          items={categoryPosts.map((post) => `board-post-${post.id}`)}
+                          items={betweenPosts.map((post) => `board-post-${post.id}`)}
                           strategy={verticalListSortingStrategy}
                         >
                           <div className="space-y-2">
-                            {categoryPosts.length > 0
-                              ? categoryPosts.map((post) => <SortableStorefrontAd key={post.id} post={post} />)
-                              : <p className="py-2 text-xs text-muted-foreground">Drop an ad here.</p>}
+                            {betweenPosts.length > 0
+                              ? betweenPosts.map((post) => <SortableStorefrontAd key={post.id} post={post} />)
+                              : <p className="py-2 text-xs text-muted-foreground">Drop an ad here to show it between categories.</p>}
                           </div>
                         </SortableContext>
                       </StorefrontAdDropZone>
-                    </SortableStorefrontCategory>
+                    </div>
                   );
                 })}
               </div>
@@ -1049,10 +1083,10 @@ export default function StorefrontPage() {
         </DndContext>
       )}
 
-      {/* Unassigned ads remain at the top of the storefront */}
-      {!isStorefrontLayoutMode && unassignedBoardPosts.length > 0 && (
+      {/* Unassigned ads without an anchor appear before the categories. */}
+      {!isStorefrontLayoutMode && getUnassignedPostsAfter(null).length > 0 && (
         <div className="space-y-3 mb-4">
-          {unassignedBoardPosts.map(renderBoardPost)}
+          {getUnassignedPostsAfter(null).map(renderBoardPost)}
         </div>
       )}
 
@@ -1479,7 +1513,7 @@ export default function StorefrontPage() {
           )}
         </div>
       )}
-      {products.length === 0 && !hasAssignedBoardPosts ? (
+      {products.length === 0 && !hasAssignedBoardPosts && unassignedBoardPosts.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground text-lg">No products found</p>
           <p className="text-muted-foreground/60 mt-2">Try adjusting your search or category filter</p>
@@ -1515,7 +1549,7 @@ export default function StorefrontPage() {
                 sections.push(
                   <div key={`${currentParentCategory}-direct`} className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 
+                      <h3
                         className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-primary transition-colors duration-200"
                         onClick={() => handleCategoryFilter(currentParentCategory)}
                       >
@@ -1648,7 +1682,7 @@ export default function StorefrontPage() {
             type SortedId = number | null | 'byb';
             const rawIds: SortedId[] = Array.from(productsByParentCategory.keys());
             rootCategoriesForLayout.forEach((category) => {
-              if (getCategoryBoardPosts(category.id).length > 0 && !rawIds.includes(category.id)) {
+              if ((getCategoryBoardPosts(category.id).length > 0 || getUnassignedPostsAfter(category.id).length > 0) && !rawIds.includes(category.id)) {
                 rawIds.push(category.id);
               }
             });
@@ -1739,7 +1773,10 @@ export default function StorefrontPage() {
               }
 
               const categoryProducts = productsByParentCategory.get(parentCategoryId) || [];
-              if (categoryProducts.length === 0 && (!parentCategoryId || getCategoryBoardPosts(parentCategoryId).length === 0)) return null;
+              if (categoryProducts.length === 0 && (!parentCategoryId || (
+                getCategoryBoardPosts(parentCategoryId).length === 0
+                && getUnassignedPostsAfter(parentCategoryId).length === 0
+              ))) return null;
 
               // Find the root category info
               const rootCategory = parentCategoryId 
@@ -1749,30 +1786,37 @@ export default function StorefrontPage() {
               const categoryName = rootCategory?.name || 'Uncategorized';
 
               return (
-                <div key={parentCategoryId || 'uncategorized'} className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 
-                      className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-primary transition-colors duration-200"
-                      onClick={() => {
-                        if (parentCategoryId) {
-                          handleCategoryFilter(parentCategoryId);
-                        }
-                      }}
-                    >
-                      {categoryName}
-                    </h3>
+                <div key={parentCategoryId || 'uncategorized'} className="space-y-8">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3
+                        className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-primary transition-colors duration-200"
+                        onClick={() => {
+                          if (parentCategoryId) {
+                            handleCategoryFilter(parentCategoryId);
+                          }
+                        }}
+                      >
+                        {categoryName}
+                      </h3>
+                    </div>
+
+                    {parentCategoryId ? renderCategoryBoardPosts(parentCategoryId) : null}
+
+                    {isReorderMode ? (
+                      <CategoryReorderGrid
+                        categoryKey={`root-${parentCategoryId ?? 'uncategorized'}`}
+                        products={getGroupProducts(`root-${parentCategoryId ?? 'uncategorized'}`, categoryProducts)}
+                        onReorder={handleReorder}
+                      />
+                    ) : (
+                      <ScrollableProductRow products={categoryProducts} />
+                    )}
                   </div>
-
-                  {parentCategoryId ? renderCategoryBoardPosts(parentCategoryId) : null}
-
-                  {isReorderMode ? (
-                    <CategoryReorderGrid
-                      categoryKey={`root-${parentCategoryId ?? 'uncategorized'}`}
-                      products={getGroupProducts(`root-${parentCategoryId ?? 'uncategorized'}`, categoryProducts)}
-                      onReorder={handleReorder}
-                    />
-                  ) : (
-                    <ScrollableProductRow products={categoryProducts} />
+                  {parentCategoryId && !selectedCategory && !debouncedSearchQuery && !showDealsOnly && !adProductFilter && getUnassignedPostsAfter(parentCategoryId).length > 0 && (
+                    <div className="space-y-3">
+                      {getUnassignedPostsAfter(parentCategoryId).map(renderBoardPost)}
+                    </div>
                   )}
                 </div>
               );
