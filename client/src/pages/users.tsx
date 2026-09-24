@@ -48,10 +48,22 @@ import {
   Trash2,
   Search,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown
 } from "lucide-react";
 import { format } from "date-fns";
 import type { User } from "@shared/schema";
+
+type UserSortField = "user" | "address" | "role" | "status" | "joined";
+const sortableColumns: { field: UserSortField; label: string }[] = [
+  { field: "user", label: "User" },
+  { field: "address", label: "Address" },
+  { field: "role", label: "Role" },
+  { field: "status", label: "Status" },
+  { field: "joined", label: "Joined" },
+];
 
 export default function UsersPage() {
   const { toast } = useToast();
@@ -75,6 +87,18 @@ export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<UserSortField>("joined");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const changeSort = (field: UserSortField) => {
+    if (field === sortBy) {
+      setSortDirection((direction) => direction === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(field);
+      setSortDirection(field === "joined" ? "desc" : "asc");
+    }
+    setCurrentPage(1);
+  };
 
   // Debounce search input — reset to page 1 on change
   useEffect(() => {
@@ -95,12 +119,14 @@ export default function UsersPage() {
     pendingCount: number;
     adminCount: number;
   }>({
-    queryKey: ["/api/users", currentPage, debouncedSearch],
+    queryKey: ["/api/users", currentPage, debouncedSearch, sortBy, sortDirection],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(currentPage),
         limit: String(PAGE_SIZE),
         search: debouncedSearch,
+        sortBy,
+        sortDirection,
       });
       const res = await fetch(`/api/users?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch users");
@@ -541,6 +567,34 @@ export default function UsersPage() {
           </div>
         </div>
         <CardContent className="p-0">
+          <div className="flex items-center gap-2 px-4 pt-4 md:hidden">
+            <Label htmlFor="mobile-user-sort" className="shrink-0 text-sm">Sort by</Label>
+            <Select value={sortBy} onValueChange={(value) => {
+              const field = value as UserSortField;
+              setSortBy(field);
+              setSortDirection(field === "joined" ? "desc" : "asc");
+              setCurrentPage(1);
+            }}>
+              <SelectTrigger id="mobile-user-sort" className="flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {sortableColumns.map(({ field, label }) => (
+                  <SelectItem key={field} value={field}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => changeSort(sortBy)}
+              aria-label={`Reverse ${sortBy} sort order`}
+              title="Reverse sort order"
+            >
+              {sortDirection === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+            </Button>
+          </div>
           {pagedUsers.length === 0 ? (
             <div className="text-center py-12">
               <UsersIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -756,12 +810,23 @@ export default function UsersPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Address</TableHead>
+                      {sortableColumns.slice(0, 2).map(({ field, label }) => (
+                        <TableHead key={field} aria-sort={sortBy === field ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => changeSort(field)} className="-ml-3 gap-1">
+                            {label}
+                            {sortBy !== field ? <ArrowUpDown className="h-3 w-3 opacity-50" /> : sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                          </Button>
+                        </TableHead>
+                      ))}
                       <TableHead>Photo</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Joined</TableHead>
+                      {sortableColumns.slice(2).map(({ field, label }) => (
+                        <TableHead key={field} aria-sort={sortBy === field ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => changeSort(field)} className="-ml-3 gap-1">
+                            {label}
+                            {sortBy !== field ? <ArrowUpDown className="h-3 w-3 opacity-50" /> : sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                          </Button>
+                        </TableHead>
+                      ))}
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>

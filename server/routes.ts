@@ -3380,7 +3380,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const page = Math.max(1, parseInt(String(req.query.page || '1')));
       const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '25'))));
       const search = String(req.query.search || '').trim();
-      const result = await storage.getUsersWithStatsPaginated({ page, limit, search });
+      const sortBy = z.enum(["user", "address", "role", "status", "joined"]).catch("joined").parse(req.query.sortBy);
+      const sortDirection = z.enum(["asc", "desc"]).catch("desc").parse(req.query.sortDirection);
+      const result = await storage.getUsersWithStatsPaginated({ page, limit, search, sortBy, sortDirection });
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch users" });

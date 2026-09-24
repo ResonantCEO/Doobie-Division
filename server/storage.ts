@@ -56,6 +56,7 @@ import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, 
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
 
+type UserSortField = "user" | "address" | "role" | "status" | "joined";
 type SnapshotDb = Pick<typeof db, "select" | "insert" | "delete">;
 
 type DiscountScheduleWindow = { startAt: string; endAt: string };
@@ -202,7 +203,7 @@ export interface IStorage {
 
   // User management
   getUsersWithStats(): Promise<(User & { orderCount?: number })[]>;
-  getUsersWithStatsPaginated(params: { page: number; limit: number; search: string }): Promise<{
+  getUsersWithStatsPaginated(params: { page: number; limit: number; search: string; sortBy?: UserSortField; sortDirection?: "asc" | "desc" }): Promise<{
     users: (User & { orderCount?: number })[];
     total: number;
     activeCount: number;
@@ -4161,9 +4162,20 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getUsersWithStatsPaginated({ page, limit, search }: { page: number; limit: number; search: string }) {
+  async getUsersWithStatsPaginated({ page, limit, search, sortBy = "joined", sortDirection = "desc" }: {
+    page: number; limit: number; search: string; sortBy?: UserSortField; sortDirection?: "asc" | "desc";
+  }) {
     const offset = (page - 1) * limit;
     const trimmed = search.trim();
+    const sortColumns = {
+      user: sql`lower(trim(concat_ws(' ', ${users.firstName}, ${users.lastName})))`,
+      address: sql`lower(coalesce(${users.address}, ''))`,
+      role: sql`lower(case when ${users.role} = 'user' then 'customer' else ${users.role} end)`,
+      status: sql`lower(${users.status})`,
+      joined: users.createdAt,
+    };
+    const sortColumn = sortColumns[sortBy] ?? sortColumns.joined;
+    const order = sortDirection === "asc" ? asc(sortColumn) : desc(sortColumn);
 
     const searchCondition = trimmed
       ? or(
@@ -4204,8 +4216,8 @@ export class DatabaseStorage implements IStorage {
     };
 
     const pagedRows = searchCondition
-      ? await db.select(selectFields).from(users).leftJoin(orders, eq(users.id, orders.customerId)).where(searchCondition).groupBy(users.id).orderBy(desc(users.createdAt)).limit(limit).offset(offset)
-      : await db.select(selectFields).from(users).leftJoin(orders, eq(users.id, orders.customerId)).groupBy(users.id).orderBy(desc(users.createdAt)).limit(limit).offset(offset);
+      ? await db.select(selectFields).from(users).leftJoin(orders, eq(users.id, orders.customerId)).where(searchCondition).groupBy(users.id).orderBy(order, asc(users.id)).limit(limit).offset(offset)
+      : await db.select(selectFields).from(users).leftJoin(orders, eq(users.id, orders.customerId)).groupBy(users.id).orderBy(order, asc(users.id)).limit(limit).offset(offset);
 
     const [{ total }] = searchCondition
       ? await db.select({ total: sql<number>`COUNT(*)` }).from(users).where(searchCondition)
