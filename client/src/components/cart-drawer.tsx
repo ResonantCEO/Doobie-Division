@@ -104,7 +104,8 @@ function getDroppedImageUrl(dataTransfer: DataTransfer): string | null {
       ?.getAttribute("src");
     if (imageSource) {
       try {
-        return new URL(imageSource, window.location.href).toString();
+        const url = new URL(imageSource, window.location.href);
+        if (url.protocol === "https:") return url.toString();
       } catch {
         // Continue checking the remaining drag payload formats.
       }
@@ -686,6 +687,9 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         setFormErrors({});
         setPromoInput("");
         setAppliedPromos([]);
+        setPrePayPhotoFile(null);
+        setPrePayPhotoUrl(null);
+        setPrePayPhotoPreview(null);
         setIsCheckingOut(false);
 
         toast({
@@ -717,37 +721,111 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   };
 
   const handlePrePayOrder = async () => {
-    if (!prePayPhotoFile) {
+    if (!prePayPhotoFile && !prePayPhotoUrl) {
       toast({ title: "Photo Required", description: "Please attach a payment photo to pre-pay.", variant: "destructive" });
       return;
     }
     setIsCheckingOut(true);
     try {
-      const formData = new FormData();
-      formData.append("photo", prePayPhotoFile);
-      const uploadRes = await fetch("/api/upload/payment-photo", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-      if (!uploadRes.ok) throw new Error("Failed to upload payment photo");
-      const { photoUrl } = await uploadRes.json();
+      let photoUrl = prePayPhotoUrl;
+      if (!photoUrl && prePayPhotoFile) {
+        const formData = new FormData();
+        formData.append("photo", prePayPhotoFile);
+        const uploadRes = await fetch("/api/upload/payment-photo", {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        if (!uploadRes.ok) {
+          const errorData = await uploadRes.json().catch(() => null);
+          throw new Error(errorData?.message || "Failed to upload payment photo");
+        }
+        ({ photoUrl } = await uploadRes.json());
+      }
       setIsCheckingOut(false);
       await handleConfirmOrder("prepay", photoUrl);
     } catch (error) {
       console.error("Pre-pay photo upload failed:", error);
-      toast({ title: "Upload Failed", description: "Could not upload payment photo. Please try again.", variant: "destructive" });
+      toast({
+        title: "Upload Failed",
+        description: error instanceof Error ? error.message : "Could not upload payment photo. Please try again.",
+        variant: "destructive",
+      });
       setIsCheckingOut(false);
     }
   };
 
-  const handlePrePayPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const selectPrePayPhotoFile = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Image Required", description: "Please choose or drop an image file.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "Image Too Large", description: "Choose an image under 10 MB.", variant: "destructive" });
+      return;
+    }
     setPrePayPhotoFile(file);
+    setPrePayPhotoUrl(null);
     const reader = new FileReader();
     reader.onload = (ev) => setPrePayPhotoPreview(ev.target?.result as string);
     reader.readAsDataURL(file);
+  };
+
+  const handlePrePayPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) selectPrePayPhotoFile(file);
+    e.target.value = "";
+  };
+
+  const importPrePayPhotoUrl = async (imageUrl: string) => {
+    setIsImportingPrePayPhoto(true);
+    try {
+      const response = await fetch("/api/upload/payment-photo-from-url", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.message || "Could not import that image.");
+      setPrePayPhotoFile(null);
+      setPrePayPhotoUrl(data.photoUrl);
+      setPrePayPhotoPreview(imageUrl);
+    } catch (error) {
+      toast({
+        title: "Image Import Failed",
+        description: error instanceof Error ? error.message : "Could not import that image link.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImportingPrePayPhoto(false);
+    }
+  };
+
+  const handlePrePayPhotoDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsPrePayPhotoDragOver(false);
+    const imageFile = Array.from(event.dataTransfer.files).find((file) => file.type.startsWith("image/"));
+    if (imageFile) {
+      selectPrePayPhotoFile(imageFile);
+      return;
+    }
+    const imageUrl = getDroppedImageUrl(event.dataTransfer);
+    if (imageUrl) {
+      await importPrePayPhotoUrl(imageUrl);
+      return;
+    }
+    toast({
+      title: "Image Required",
+      description: "Drop an image file or a direct public HTTPS image link.",
+      variant: "destructive",
+    });
+  };
+
+  const clearPrePayPhoto = () => {
+    setPrePayPhotoFile(null);
+    setPrePayPhotoUrl(null);
+    setPrePayPhotoPreview(null);
   };
 
   return (
@@ -1384,7 +1462,26 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             </div>
 
             {/* Pre-Pay Photo Upload Section */}
-            <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+            <div
+              className={`border rounded-lg p-4 space-y-3 transition-colors ${
+                isPrePayPhotoDragOver ? "border-primary bg-primary/5" : "bg-muted/30"
+              }`}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                setIsPrePayPhotoDragOver(true);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "copy";
+                setIsPrePayPhotoDragOver(true);
+              }}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setIsPrePayPhotoDragOver(false);
+                }
+              }}
+              onDrop={handlePrePayPhotoDrop}
+            >
               <div className="flex items-center gap-2">
                 <ImageIcon className="h-4 w-4 text-muted-foreground" />
                 <p className="text-sm font-medium">Pre-Pay Photo (optional)</p>
@@ -1395,19 +1492,32 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                   <img src={prePayPhotoPreview} alt="Payment" className="h-32 w-auto rounded-md object-cover border" />
                   <button
                     type="button"
-                    onClick={() => { setPrePayPhotoFile(null); setPrePayPhotoPreview(null); }}
+                    onClick={clearPrePayPhoto}
+                    aria-label="Remove payment photo"
                     className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
                   >
                     <X className="h-3 w-3" />
                   </button>
                 </div>
               ) : (
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground border border-dashed rounded-md p-3 transition-colors">
+                <button
+                  type="button"
+                  disabled={isImportingPrePayPhoto}
+                  onClick={() => prePayPhotoInputRef.current?.click()}
+                  className="flex w-full items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground border border-dashed rounded-md p-3 transition-colors disabled:cursor-wait disabled:opacity-60"
+                >
                   <Upload className="h-4 w-4" />
-                  <span>Click to attach photo</span>
-                  <input type="file" accept="image/*" className="hidden" onChange={handlePrePayPhotoChange} />
-                </label>
+                  <span>{isImportingPrePayPhoto ? "Importing image..." : "Click to attach photo or drag and drop"}</span>
+                </button>
               )}
+              <input
+                ref={prePayPhotoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePrePayPhotoChange}
+              />
+              <p className="text-xs text-muted-foreground">Drop an image file or a direct HTTPS image link (max 10 MB).</p>
             </div>
           </div>
 
@@ -1430,7 +1540,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             </Button>
             <Button
               onClick={handlePrePayOrder}
-              disabled={isCheckingOut || !prePayPhotoFile}
+              disabled={isCheckingOut || isImportingPrePayPhoto || (!prePayPhotoFile && !prePayPhotoUrl)}
               className="flex-1"
             >
               {isCheckingOut ? "Processing..." : (
