@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ProductCard from "@/components/product-card";
@@ -158,9 +159,13 @@ function StorefrontAdDropZone({
 function SortableStorefrontCategory({
   category,
   children,
+  onHeadingVisibilityChange,
+  headingSaving,
 }: {
   category: Category;
   children: React.ReactNode;
+  onHeadingVisibilityChange: (visible: boolean) => void;
+  headingSaving: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `storefront-category-${category.id}`,
@@ -174,13 +179,25 @@ function SortableStorefrontCategory({
 
   return (
     <div ref={setNodeRef} style={style} className="rounded-lg border bg-card p-3 shadow-sm">
-      <div
-        {...attributes}
-        {...listeners}
-        className="mb-2 flex cursor-grab touch-none items-center gap-2 font-medium active:cursor-grabbing"
-      >
-        <GripVertical className="h-4 w-4 text-muted-foreground" />
-        {category.name}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div
+          {...attributes}
+          {...listeners}
+          className="flex cursor-grab touch-none items-center gap-2 font-medium active:cursor-grabbing"
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+          {category.name}
+        </div>
+        <label htmlFor={`show-heading-${category.id}`} className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+          Show heading
+          <Switch
+            id={`show-heading-${category.id}`}
+            checked={category.showStorefrontHeading}
+            onCheckedChange={onHeadingVisibilityChange}
+            disabled={headingSaving}
+            aria-label={`Show ${category.name} section heading on storefront`}
+          />
+        </label>
       </div>
       {children}
     </div>
@@ -407,6 +424,18 @@ export default function StorefrontPage() {
     onError: () => {
       setLocalRootCategoryOrder(null);
       toast({ title: "Failed to save category order", variant: "destructive" });
+    },
+  });
+
+  const updateCategoryHeadingMutation = useMutation({
+    mutationFn: async ({ id, showStorefrontHeading }: { id: number; showStorefrontHeading: boolean }) => {
+      await apiRequest("PUT", `/api/categories/${id}`, { showStorefrontHeading });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to save category heading setting", variant: "destructive" });
     },
   });
 
@@ -1021,7 +1050,7 @@ export default function StorefrontPage() {
             <div>
               <h2 className="font-semibold">Organize storefront</h2>
               <p className="text-sm text-muted-foreground">
-                Drag categories to reorder them. Drop ads inside a category or in the spaces between categories to keep them unassigned. Changes save automatically.
+                Drag categories to reorder them. Drop ads inside a category or between categories. Use Show heading to hide a category title without hiding its products. Changes save automatically.
               </p>
             </div>
 
@@ -1049,7 +1078,13 @@ export default function StorefrontPage() {
                   const betweenPosts = getUnassignedPostsAfter(category.id);
                   return (
                     <div key={category.id} className="space-y-2">
-                      <SortableStorefrontCategory category={category}>
+                      <SortableStorefrontCategory
+                        category={category}
+                        onHeadingVisibilityChange={(showStorefrontHeading) =>
+                          updateCategoryHeadingMutation.mutate({ id: category.id, showStorefrontHeading })
+                        }
+                        headingSaving={updateCategoryHeadingMutation.isPending}
+                      >
                         <StorefrontAdDropZone id={`board-post-zone-${category.id}`} categoryId={category.id}>
                           <p className="mb-2 text-xs text-muted-foreground">Ads shown in {category.name}</p>
                           <SortableContext
@@ -1551,14 +1586,16 @@ export default function StorefrontPage() {
               if (parentDirectProducts.length > 0 || getCategoryBoardPosts(currentParentCategory).length > 0) {
                 sections.push(
                   <div key={`${currentParentCategory}-direct`} className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3
-                        className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-primary transition-colors duration-200"
-                        onClick={() => handleCategoryFilter(currentParentCategory)}
-                      >
-                        {parentCategory?.name || "All Products"}
-                      </h3>
-                    </div>
+                    {parentCategory?.showStorefrontHeading !== false && (
+                      <div className="flex items-center justify-between">
+                        <h3
+                          className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-primary transition-colors duration-200"
+                          onClick={() => handleCategoryFilter(currentParentCategory)}
+                        >
+                          {parentCategory?.name || "All Products"}
+                        </h3>
+                      </div>
+                    )}
                     {renderCategoryBoardPosts(currentParentCategory)}
                     {isReorderMode ? (
                       <CategoryReorderGrid
@@ -1618,14 +1655,16 @@ export default function StorefrontPage() {
 
                   return (
                     <div key={subcategory.id} className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 
-                          className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-primary transition-colors duration-200"
-                          onClick={() => handleCategoryFilter(subcategory.id)}
-                        >
-                          {subcategory.name}
-                        </h3>
-                      </div>
+                      {subcategory.showStorefrontHeading && (
+                        <div className="flex items-center justify-between">
+                          <h3
+                            className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-primary transition-colors duration-200"
+                            onClick={() => handleCategoryFilter(subcategory.id)}
+                          >
+                            {subcategory.name}
+                          </h3>
+                        </div>
+                      )}
                       {renderCategoryBoardPosts(subcategory.id)}
 
                       {isReorderMode ? (
@@ -1791,18 +1830,20 @@ export default function StorefrontPage() {
               return (
                 <div key={parentCategoryId || 'uncategorized'} className="space-y-8">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3
-                        className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-primary transition-colors duration-200"
-                        onClick={() => {
-                          if (parentCategoryId) {
-                            handleCategoryFilter(parentCategoryId);
-                          }
-                        }}
-                      >
-                        {categoryName}
-                      </h3>
-                    </div>
+                    {rootCategory?.showStorefrontHeading !== false && (
+                      <div className="flex items-center justify-between">
+                        <h3
+                          className="text-2xl font-bold text-gray-900 dark:text-white cursor-pointer hover:text-primary transition-colors duration-200"
+                          onClick={() => {
+                            if (parentCategoryId) {
+                              handleCategoryFilter(parentCategoryId);
+                            }
+                          }}
+                        >
+                          {categoryName}
+                        </h3>
+                      </div>
+                    )}
 
                     {parentCategoryId ? renderCategoryBoardPosts(parentCategoryId) : null}
 

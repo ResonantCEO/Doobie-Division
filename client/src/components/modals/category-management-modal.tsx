@@ -14,6 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
@@ -69,6 +70,7 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
       description: "",
       parentId: undefined,
       isActive: true,
+      showStorefrontHeading: true,
       sortOrder: 0,
     },
   });
@@ -235,6 +237,7 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
       description: category.description || "",
       parentId: category.parentId || undefined,
       isActive: category.isActive,
+      showStorefrontHeading: category.showStorefrontHeading,
       sortOrder: category.sortOrder,
     });
   };
@@ -449,6 +452,28 @@ export default function CategoryManagementModal({ open, onOpenChange, categories
                         <Textarea placeholder="Enter category description" {...field} />
                       </FormControl>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="showStorefrontHeading"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between gap-4 rounded-md border p-3">
+                      <div>
+                        <FormLabel>Show section heading on storefront</FormLabel>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Hiding the heading does not hide the category or its products.
+                        </p>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value ?? true}
+                          onCheckedChange={field.onChange}
+                          aria-label="Show section heading on storefront"
+                        />
+                      </FormControl>
                     </FormItem>
                   )}
                 />

@@ -67,6 +67,7 @@ export const categories = pgTable("categories", {
   description: text("description"),
   parentId: integer("parent_id"),
   isActive: boolean("is_active").notNull().default(true),
+  showStorefrontHeading: boolean("show_storefront_heading").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
@@ -589,6 +590,7 @@ export const insertCategorySchema = createInsertSchema(categories).omit({
 }).extend({
   parentId: z.number().nullable().optional(),
   isActive: z.boolean().optional(),
+  showStorefrontHeading: z.boolean().optional(),
   sortOrder: z.number().optional(),
 });
 

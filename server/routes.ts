@@ -227,6 +227,9 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
+  // Existing categories keep their storefront headings unless an admin hides them.
+  await db.execute(sql`ALTER TABLE categories ADD COLUMN IF NOT EXISTS show_storefront_heading BOOLEAN NOT NULL DEFAULT TRUE`);
+
   // Ensure quantity pricing table exists
   try {
     await db.execute(sql`
