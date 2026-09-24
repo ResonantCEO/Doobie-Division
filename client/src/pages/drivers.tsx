@@ -495,14 +495,14 @@ export default function DriversPage() {
                 onClick={() => setSelectedOrder(order)}
               >
                 <CardContent className="p-4 md:p-5">
-                  <div className="grid gap-4 md:grid-cols-[minmax(240px,1.35fr)_minmax(210px,1fr)_minmax(190px,0.9fr)_auto] md:items-center">
-                    <div className="min-w-0">
-                      <div className="flex items-start justify-between gap-3 md:block">
-                        <div>
-                          <h4 className="font-semibold text-gray-900 dark:text-white">
+                  <div className="grid min-w-0 gap-x-6 gap-y-5 md:grid-cols-2 lg:grid-cols-12 lg:items-start">
+                    <div className="min-w-0 md:col-span-2 lg:col-span-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h4 className="break-words font-semibold text-gray-900 dark:text-white">
                             {order.customerName}
                           </h4>
-                          <p className="mt-1 truncate text-sm text-muted-foreground">
+                          <p className="mt-1 break-words text-sm text-muted-foreground">
                             Telegram: {order.customerTelegramUsername
                               ? `@${order.customerTelegramUsername.replace(/^@+/, "")}`
                               : "Unavailable"}
@@ -510,29 +510,27 @@ export default function DriversPage() {
                         </div>
                         <Badge
                           variant="secondary"
-                          className={`shrink-0 md:hidden ${order.paymentMethod === "prepay"
-                            ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700"
-                            : "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700"}`}
+                          className={`shrink-0 lg:hidden ${order.paymentMethod === "prepay"
+                            ? "border-green-200 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/30 dark:text-green-300"
+                            : "border-orange-200 bg-orange-100 text-orange-800 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-300"}`}
                         >
                           {order.paymentMethod === "prepay" ? "Pre-Pay" : "PUA"}
                         </Badge>
                       </div>
                       <div className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
                         <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-                        <span className="truncate">{order.shippingAddress || "Address unavailable"}</span>
+                        <span className="min-w-0 break-words">{order.shippingAddress || "Address unavailable"}</span>
                       </div>
                     </div>
 
-                    <div className="flex min-w-0 items-center gap-5 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{order.notes || "No order notes"}</span>
-                      </div>
+                    <div className="flex min-w-0 items-start gap-2 text-sm text-muted-foreground md:col-span-2 lg:col-span-3">
+                      <FileText className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span className="min-w-0 break-words">{order.notes || "No order notes"}</span>
                       <Badge
                         variant="secondary"
-                        className={`hidden shrink-0 md:inline-flex ${order.paymentMethod === "prepay"
-                          ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700"
-                          : "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700"}`}
+                        className={`ml-auto hidden shrink-0 lg:inline-flex ${order.paymentMethod === "prepay"
+                          ? "border-green-200 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/30 dark:text-green-300"
+                          : "border-orange-200 bg-orange-100 text-orange-800 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-300"}`}
                       >
                         {order.paymentMethod === "prepay" ? "Pre-Pay" : "PUA"}
                       </Badge>
@@ -540,16 +538,16 @@ export default function DriversPage() {
 
                     {canAssignDrivers ? (
                       <div
-                        className="space-y-2"
+                        className="min-w-0 space-y-2 md:col-span-1 lg:col-span-2"
                         onClick={(event) => event.stopPropagation()}
                       >
-                        <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        <label className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
                           Assigned Driver
                         </label>
                         {order.status === "packed" ? (
-                          <div className="flex h-9 items-center gap-2 rounded-md border px-3 text-sm text-muted-foreground">
-                            <Badge variant="secondary">Packed</Badge>
-                            <span>Assignment available when shipped</span>
+                          <div className="flex min-h-9 items-start gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground">
+                            <Badge variant="secondary" className="shrink-0">Packed</Badge>
+                            <span className="min-w-0 break-words">Assignment available when shipped</span>
                           </div>
                         ) : (
                           <Select
@@ -560,7 +558,7 @@ export default function DriversPage() {
                             })}
                             disabled={assignDriverMutation.isPending}
                           >
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger className="h-auto min-h-9 w-full whitespace-normal py-2 text-left [&>span]:min-w-0 [&>span]:break-words [&>span]:line-clamp-none [&>svg]:shrink-0">
                               <SelectValue placeholder="Choose a driver" />
                             </SelectTrigger>
                             <SelectContent>
@@ -577,14 +575,14 @@ export default function DriversPage() {
                         )}
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Truck className="h-4 w-4 shrink-0" />
-                        <span>Assigned to you</span>
+                      <div className="flex items-start gap-2 text-sm text-muted-foreground md:col-span-1 lg:col-span-2">
+                        <Truck className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span className="break-words">Assigned to you</span>
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between gap-4 border-t pt-4 md:min-w-[150px] md:flex-col md:items-end md:border-t-0 md:pt-0">
-                      <div className="text-right">
+                    <div className="flex min-w-0 items-start justify-between gap-4 border-t pt-4 md:col-span-1 md:items-end lg:col-span-3 lg:flex-col lg:border-t-0 lg:pt-0">
+                      <div className="shrink-0 text-left md:text-right">
                         <div className="text-sm text-muted-foreground">
                           {items.length} {items.length === 1 ? "item" : "items"}
                         </div>
@@ -592,10 +590,10 @@ export default function DriversPage() {
                           ${Number(order.total).toFixed(2)}
                         </div>
                       </div>
-                      <div className="flex shrink-0 flex-col items-stretch gap-2 md:w-full">
+                      <div className="flex min-w-0 flex-1 flex-col items-stretch gap-2 md:w-full md:flex-none lg:w-full">
                         <Button
                           variant="secondary"
-                          className="shrink-0 w-full"
+                          className="w-full"
                           onClick={(event) => {
                             event.stopPropagation();
                             setSelectedOrder(order);
