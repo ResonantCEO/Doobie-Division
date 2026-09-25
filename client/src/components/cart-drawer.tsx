@@ -156,15 +156,23 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   const [isImportingPrePayPhoto, setIsImportingPrePayPhoto] = useState(false);
   const [isPrePayPhotoDragOver, setIsPrePayPhotoDragOver] = useState(false);
   const prePayPhotoInputRef = useRef<HTMLInputElement>(null);
-  const currentHour = new Date().getHours();
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  useEffect(() => {
+    if (!showConfirmation) return;
+    setCurrentTime(new Date());
+    const interval = setInterval(() => setCurrentTime(new Date()), 30_000);
+    return () => clearInterval(interval);
+  }, [showConfirmation]);
+  const currentHour = currentTime.getHours();
   const isBeforeNoon = currentHour < 12;
   const isAfter5pm = currentHour >= 17;
-  const [runPreference, setRunPreference] = useState<"1st" | "2nd">("2nd");
+  const [runPreference, setRunPreference] = useState<"1st" | "2nd" | null>(null);
 
   const { data: deliveryRunsSetting } = useQuery<{ key: string; value: string | null }>({
     queryKey: ["/api/settings/delivery_runs_enabled"],
   });
   const deliveryRunsEnabled = deliveryRunsSetting?.value !== "false";
+  const needsRunSelection = deliveryRunsEnabled && isBeforeNoon && !runPreference;
 
   // Compute BOGO savings against the normal product price. Free and partially
   // discounted BOGO items are already represented at their reduced price in
@@ -356,6 +364,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       }
 
       // Proceed with checkout if all items have sufficient stock
+      setRunPreference(null);
+      setCurrentTime(new Date());
       setShowConfirmation(true);
       setIsCheckingOut(false); // Reset checkout state when opening confirmation
 
@@ -450,6 +460,12 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
   const handleConfirmOrder = async (paymentMethod: "cod" | "prepay" = "cod", paymentPhotoUrl?: string) => {
     const { customerName, street, city, state: shippingState, zipCode } = shippingForm;
+
+    const checkoutHour = new Date().getHours();
+    if (deliveryRunsEnabled && checkoutHour < 12 && !runPreference) {
+      toast({ title: "Select a Delivery Run", description: "Choose 1st Run or 2nd Run before placing your order.", variant: "destructive" });
+      return;
+    }
 
     if (!validateForm()) {
       toast({
@@ -564,7 +580,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         paymentMethod,
         paymentPhotoUrl: paymentPhotoUrl || null,
         notes: deliveryRunsEnabled
-          ? [isAfter5pm ? "[Next Day 1st Run]" : `[${runPreference} Run]`, shippingForm.notes].filter(Boolean).join(" — ")
+          ? [checkoutHour >= 17 ? "[Next Day 1st Run]" : `[${checkoutHour < 12 ? runPreference : "2nd"} Run]`, shippingForm.notes].filter(Boolean).join(" — ")
           : shippingForm.notes || null,
         discountBreakdown,
       };
@@ -721,6 +737,10 @@ export default function CartDrawer({ children }: CartDrawerProps) {
   };
 
   const handlePrePayOrder = async () => {
+    if (deliveryRunsEnabled && new Date().getHours() < 12 && !runPreference) {
+      toast({ title: "Select a Delivery Run", description: "Choose 1st Run or 2nd Run before placing your order.", variant: "destructive" });
+      return;
+    }
     if (!prePayPhotoFile && !prePayPhotoUrl) {
       toast({ title: "Photo Required", description: "Please attach a payment photo to pre-pay.", variant: "destructive" });
       return;
@@ -743,7 +763,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         ({ photoUrl } = await uploadRes.json());
       }
       setIsCheckingOut(false);
-      await handleConfirmOrder("prepay", photoUrl);
+      await handleConfirmOrder("prepay", photoUrl ?? undefined);
     } catch (error) {
       console.error("Pre-pay photo upload failed:", error);
       toast({
@@ -1315,6 +1335,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                       <button
                         type="button"
                         onClick={() => setRunPreference("1st")}
+                        aria-pressed={runPreference === "1st"}
                         className={`flex-1 rounded-md border py-2.5 px-3 text-left transition-colors ${
                           runPreference === "1st"
                             ? "bg-primary text-primary-foreground border-primary"
@@ -1328,19 +1349,23 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                     <button
                       type="button"
                       onClick={() => setRunPreference("2nd")}
+                      aria-pressed={(isBeforeNoon ? runPreference : "2nd") === "2nd"}
                       className={`flex-1 rounded-md border py-2.5 px-3 text-left transition-colors ${
-                        runPreference === "2nd"
+                        (isBeforeNoon ? runPreference : "2nd") === "2nd"
                           ? "bg-primary text-primary-foreground border-primary"
                           : "bg-background text-foreground border-border hover:border-primary"
                       }`}
                     >
                       <p className="text-sm font-semibold leading-tight">2nd Run</p>
-                      <p className={`text-xs leading-tight mt-0.5 ${runPreference === "2nd" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>5:00pm Cutoff · 5:30pm Dispatch</p>
+                      <p className={`text-xs leading-tight mt-0.5 ${(isBeforeNoon ? runPreference : "2nd") === "2nd" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>5:00pm Cutoff · 5:30pm Dispatch</p>
                     </button>
                   </div>
                 )}
                 {!isBeforeNoon && !isAfter5pm && (
                   <p className="text-xs text-muted-foreground">1st run orders are only available before 12:00 PM.</p>
+                )}
+                {needsRunSelection && (
+                  <p className="text-xs text-muted-foreground">Select 1st Run or 2nd Run to continue.</p>
                 )}
               </div>
             )}
@@ -1528,7 +1553,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             <Button
               variant="outline"
               onClick={() => handleConfirmOrder("cod")}
-              disabled={isCheckingOut}
+              disabled={isCheckingOut || needsRunSelection}
               className="flex-1"
             >
               {isCheckingOut ? "Processing..." : (
@@ -1540,7 +1565,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             </Button>
             <Button
               onClick={handlePrePayOrder}
-              disabled={isCheckingOut || isImportingPrePayPhoto || (!prePayPhotoFile && !prePayPhotoUrl)}
+              disabled={isCheckingOut || needsRunSelection || isImportingPrePayPhoto || (!prePayPhotoFile && !prePayPhotoUrl)}
               className="flex-1"
             >
               {isCheckingOut ? "Processing..." : (
