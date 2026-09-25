@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/cart-context";
 import { useState, useMemo, useEffect, useRef } from "react";
 import AddToCartModal from "./add-to-cart-modal";
+import ProductManualBadges from "./product-manual-badges";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, Category, ProductSize } from "@shared/schema";
 import { getSellableStock, isLowStock, isOutOfStock as productIsOutOfStock } from "@shared/inventory";
@@ -199,6 +200,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out hover:scale-105 ${idx === currentImageIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
               />
             ))}
+            <ProductManualBadges badges={product.manualBadges} />
             {hasMultipleImages && (
               <>
                 <button

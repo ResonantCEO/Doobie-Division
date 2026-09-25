@@ -672,6 +672,7 @@ export class DatabaseStorage implements IStorage {
         discountExpiresAt: products.discountExpiresAt,
         bogoEnabled: products.bogoEnabled,
         bogoFreeOptionIndex: products.bogoFreeOptionIndex,
+        manualBadges: products.manualBadges,
         purchasePrice: products.purchasePrice,
         purchasePriceMethod: products.purchasePriceMethod,
         purchasePricePerGram: products.purchasePricePerGram,
@@ -687,6 +688,7 @@ export class DatabaseStorage implements IStorage {
           description: categories.description,
           parentId: categories.parentId,
           isActive: categories.isActive,
+          showStorefrontHeading: categories.showStorefrontHeading,
           sortOrder: categories.sortOrder,
           createdAt: categories.createdAt,
         },
@@ -933,7 +935,7 @@ export class DatabaseStorage implements IStorage {
     let product: any;
     try {
       const rawResult = await retryQuery(() =>
-        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, discount_price_override, discount_price_per_gram, discount_price_per_ounce, discount_price_per_eighth, discount_price_per_quarter, discount_price_per_half, discount_quantity_pricing, discount_schedule, discount_starts_at, discount_expires_at, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
+        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, discount_price_override, discount_price_per_gram, discount_price_per_ounce, discount_price_per_eighth, discount_price_per_quarter, discount_price_per_half, discount_quantity_pricing, discount_schedule, discount_starts_at, discount_expires_at, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value, manual_badges, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
       );
       
       const row = rawResult?.rows?.[0];
@@ -974,6 +976,7 @@ export class DatabaseStorage implements IStorage {
           bogoFreeOptionIndex: row.bogo_free_option_index != null ? parseInt(String(row.bogo_free_option_index)) : null,
           bogoDiscountType: String(row.bogo_discount_type || 'free'),
           bogoDiscountValue: String(row.bogo_discount_value ?? '0'),
+          manualBadges: row.manual_badges,
           purchasePrice: row.purchase_price,
           purchasePriceMethod: row.purchase_price_method,
           purchasePricePerGram: row.purchase_price_per_gram,
@@ -988,7 +991,7 @@ export class DatabaseStorage implements IStorage {
         if (product.categoryId) {
           try {
             const catResult = await retryQuery(() =>
-              db.execute(sql`SELECT id, name, description, parent_id, is_active, sort_order, created_at FROM categories WHERE id = ${product.categoryId}`)
+              db.execute(sql`SELECT id, name, description, parent_id, is_active, show_storefront_heading, sort_order, created_at FROM categories WHERE id = ${product.categoryId}`)
             );
             const catRow = catResult?.rows?.[0];
             if (catRow) {
@@ -998,6 +1001,7 @@ export class DatabaseStorage implements IStorage {
                 description: catRow.description,
                 parentId: catRow.parent_id,
                 isActive: catRow.is_active === true || catRow.is_active === 't' || catRow.is_active === 'true',
+                showStorefrontHeading: catRow.show_storefront_heading === true || catRow.show_storefront_heading === 't',
                 sortOrder: catRow.sort_order,
                 createdAt: catRow.created_at,
               };

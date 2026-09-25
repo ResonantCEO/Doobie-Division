@@ -35,6 +35,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Lock, Plus, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import ProductManualBadges, { PRODUCT_MANUAL_BADGES } from "@/components/product-manual-badges";
 import type { Product, Category, ProductSize } from "@shared/schema";
 
 interface CategoryWithChildren extends Category {
@@ -73,6 +74,7 @@ const formSchema = z.object({
   discountPricePerQuarter: z.string().optional(),
   discountPricePerHalf: z.string().optional(),
   discountDurationHours: z.string().optional(),
+  manualBadges: z.array(z.string()).default([]),
   isActive: z.boolean(),
   purchasePrice: z.string().optional(),
   purchasePriceMethod: z.enum(["units", "weight"]).default("units"),
@@ -213,6 +215,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       pricePerHalf: (product as any).standardPricePerHalf ?? (product as any).pricePerHalf ?? "",
       discountPercentage: (product as any).configuredDiscountPercentage ?? product.discountPercentage ?? "0",
       discountAmount: (product as any).configuredDiscountAmount ?? (product as any).discountAmount ?? "0",
+      manualBadges: product.manualBadges ?? [],
       discountPriceOverride: (product as any).configuredDiscountPriceOverride ?? (product as any).discountPriceOverride ?? "",
       discountPricePerGram: (product as any).configuredDiscountPricePerGram ?? (product as any).discountPricePerGram ?? "",
       discountPricePerOunce: (product as any).configuredDiscountPricePerOunce ?? (product as any).discountPricePerOunce ?? "",
@@ -266,6 +269,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         pricePerHalf: (product as any).standardPricePerHalf ?? (product as any).pricePerHalf ?? "",
         discountPercentage: (product as any).configuredDiscountPercentage ?? product.discountPercentage ?? "0",
         discountAmount: (product as any).configuredDiscountAmount ?? (product as any).discountAmount ?? "0",
+        manualBadges: product.manualBadges ?? [],
         discountPriceOverride: (product as any).configuredDiscountPriceOverride ?? (product as any).discountPriceOverride ?? "",
         discountPricePerGram: (product as any).configuredDiscountPricePerGram ?? (product as any).discountPricePerGram ?? "",
         discountPricePerOunce: (product as any).configuredDiscountPricePerOunce ?? (product as any).discountPricePerOunce ?? "",
@@ -520,6 +524,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         pricePerHalf: data.sellingMethod === "weight" ? formatPrice(data.pricePerHalf, 2) : null,
         discountPercentage: discountValue,
         discountAmount: data.discountAmount ? parseFloat(data.discountAmount).toFixed(2) : "0",
+        manualBadges: data.manualBadges,
         discountPriceOverride: formatPrice(data.discountPriceOverride, 2),
         discountPricePerGram: formatPrice(data.discountPricePerGram, 4),
         discountPricePerOunce: formatPrice(data.discountPricePerOunce, 2),
@@ -1636,6 +1641,41 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                   </Select>
                 </div>
               )}
+
+              <FormField
+                control={form.control}
+                name="manualBadges"
+                render={({ field }) => (
+                  <FormItem className="border-t pt-4 space-y-3">
+                    <div>
+                      <FormLabel className="text-base font-semibold">Badges</FormLabel>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Select the labels to show on the front of this product's card. Badges do not change discounts or pricing.
+                      </p>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {PRODUCT_MANUAL_BADGES.map((badge) => (
+                        <label
+                          key={badge.key}
+                          className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border bg-background/50 p-2 transition-colors hover:border-primary/60"
+                        >
+                          <Checkbox
+                            checked={field.value.includes(badge.key)}
+                            onCheckedChange={(checked) =>
+                              field.onChange(checked === true
+                                ? [...field.value, badge.key]
+                                : field.value.filter((key) => key !== badge.key))
+                            }
+                            aria-label={`Show ${badge.label} badge`}
+                          />
+                          <ProductManualBadges badges={[badge.key]} variant="preview" />
+                        </label>
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
             </div>
 

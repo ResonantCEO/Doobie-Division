@@ -181,6 +181,11 @@ app.use((req, res, next) => {
   // A single warmup query serializes startup and prevents the null-map crash.
   await warmupDatabase();
 
+  // Badge selections are independent of discount pricing and never expire automatically.
+  const { sql: migrationSql } = await import("./db");
+  await migrationSql.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS manual_badges JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  console.log("✓ Verified manual product badges column exists");
+
   // Size/flavor rows are the source of truth for products with variants. Keep the
   // cached parent totals aligned so in-stock flavors remain visible on the storefront.
   try {

@@ -113,6 +113,7 @@ export const products = pgTable("products", {
   bogoFreeOptionIndex: integer("bogo_free_option_index"), // which option index is free (null = same as purchased)
   bogoDiscountType: varchar("bogo_discount_type").default("free"), // 'free', 'percentage', 'amount'
   bogoDiscountValue: decimal("bogo_discount_value", { precision: 10, scale: 2 }).default("0"), // value for percentage/amount BOGO
+  manualBadges: jsonb("manual_badges").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }), // admin only - cost price per unit
   purchasePriceMethod: varchar("purchase_price_method").default("units"), // units or weight
   purchasePricePerGram: decimal("purchase_price_per_gram", { precision: 10, scale: 4 }), // admin only - cost per gram
@@ -638,6 +639,10 @@ export const insertProductSchema = createInsertSchema(products).omit({
   bogoFreeOptionIndex: z.number().int().nullable().optional(),
   bogoDiscountType: z.enum(["free", "percentage", "amount"]).optional(),
   bogoDiscountValue: z.string().nullable().optional(),
+  manualBadges: z.array(z.enum([
+    "clearance", "daily_deals", "staff_favorite", "new_item",
+    "pick_of_the_week", "thirsty_thursdays",
+  ])).max(6).optional(),
   imageUrl: z.string().nullable().optional(),
   imageUrls: z.string().nullable().optional(), // JSON array as string
   sizes: z.array(z.object({
