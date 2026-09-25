@@ -200,7 +200,6 @@ export default function ProductCard({ product }: ProductCardProps) {
                 className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out hover:scale-105 ${idx === currentImageIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
               />
             ))}
-            <ProductManualBadges badges={product.manualBadges} />
             {hasMultipleImages && (
               <>
                 <button
@@ -260,6 +259,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             <div className="flex-1 min-h-0"></div>
 
             <div className="space-y-1.5 sm:space-y-2 flex-shrink-0 mt-auto">
+              <ProductManualBadges badges={product.manualBadges} />
               {stockStatus && (
                 <div className="flex justify-center">
                   <Badge

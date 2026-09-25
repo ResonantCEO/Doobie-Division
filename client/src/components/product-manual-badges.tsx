@@ -141,7 +141,7 @@ export default function ProductManualBadges({
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-2 top-2 z-20 flex max-h-[90%] flex-wrap content-start gap-1 overflow-hidden sm:inset-x-3 sm:top-3 sm:gap-1.5"
+      className="flex flex-wrap justify-center gap-1 sm:gap-1.5"
       aria-label="Product badges"
     >
       {selectedBadges.map((badge) => (
