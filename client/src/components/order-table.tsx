@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,6 +52,47 @@ const formatOrderDate = (value: unknown, pattern: string) => {
   const date = new Date(value as string | number | Date);
   return Number.isNaN(date.getTime()) ? "N/A" : format(date, pattern);
 };
+
+function PaymentBadge({ order }: { order: Order }) {
+  const [open, setOpen] = useState(false);
+
+  if (order.paymentMethod !== "prepay") {
+    return <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700">PUA</Badge>;
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex rounded-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+          aria-label={`View pre-pay photo for order ${order.orderNumber}`}
+          onPointerEnter={(event) => { if (event.pointerType === "mouse") setOpen(true); }}
+          onPointerLeave={(event) => { if (event.pointerType === "mouse") setOpen(false); }}
+        >
+          <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700">Pre-Pay</Badge>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="center"
+        side="bottom"
+        className="w-[min(22rem,calc(100vw-2rem))] p-3"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
+        <p className="mb-2 text-sm font-medium">Pre-pay photo — {order.orderNumber}</p>
+        {order.paymentPhotoUrl ? (
+          <img
+            src={order.paymentPhotoUrl}
+            alt={`Pre-pay photo for order ${order.orderNumber}`}
+            className="max-h-[60vh] w-full rounded-md object-contain"
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">No pre-pay photo has been uploaded for this order.</p>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function OrderItemsRow({ orderId, colSpan }: { orderId: number; colSpan: number }) {
   const { toast } = useToast();
@@ -818,13 +860,6 @@ export default function OrderTable({ orders, user, activeTab, onActiveTabChange 
     }
   };
 
-  const getPaymentBadge = (paymentMethod: string) => {
-    if (paymentMethod === "prepay") {
-      return <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700">Pre-Pay</Badge>;
-    }
-    return <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700">PUA</Badge>;
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
@@ -947,7 +982,7 @@ export default function OrderTable({ orders, user, activeTab, onActiveTabChange 
                         ${Number(order.total).toFixed(2)}
                       </div>
                       <div className="mt-1">
-                        {getPaymentBadge(order.paymentMethod || "cod")}
+                        <PaymentBadge order={order} />
                       </div>
                     </div>
                   </div>
@@ -1144,7 +1179,7 @@ export default function OrderTable({ orders, user, activeTab, onActiveTabChange 
                     <TableCell className="font-medium text-gray-900 dark:text-white">
                       ${Number(order.total).toFixed(2)}
                     </TableCell>
-                    <TableCell>{getPaymentBadge(order.paymentMethod || "cod")}</TableCell>
+                    <TableCell><PaymentBadge order={order} /></TableCell>
                     <TableCell className="text-gray-900 dark:text-white">
                       {formatOrderDate(order.createdAt, "MMM dd, yyyy")}
                     </TableCell>
