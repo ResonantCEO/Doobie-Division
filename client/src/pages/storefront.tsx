@@ -248,8 +248,9 @@ export default function StorefrontPage() {
   // When editing, keep the existing image URL (so user can keep it without re-uploading)
   const [editingExistingImageUrl, setEditingExistingImageUrl] = useState<string | null>(null);
 
-  // Ad product filter — set when user taps a board post with linked products
-  const [adProductFilter, setAdProductFilter] = useState<number[] | null>(null);
+  // Keep the source ad with its linked products so other ads can be hidden in this view.
+  const [activeAdSelection, setActiveAdSelection] = useState<{ postId: number; productIds: number[] } | null>(null);
+  const adProductFilter = activeAdSelection?.productIds ?? null;
 
   // Customer Generated bag modal state
   const { addCgBag } = useCart();
@@ -617,11 +618,17 @@ export default function StorefrontPage() {
     return flattenCategories(categoriesResponse);
   }, [categoriesResponse]);
 
+  const visibleBoardPosts = useMemo(
+    () => activeAdSelection
+      ? boardPosts.filter((post) => post.id === activeAdSelection.postId)
+      : boardPosts,
+    [boardPosts, activeAdSelection]
+  );
   const unassignedBoardPosts = useMemo(
-    () => boardPosts
+    () => visibleBoardPosts
       .filter((post) => post.categoryId === null)
       .sort((a, b) => a.sortOrder - b.sortOrder),
-    [boardPosts]
+    [visibleBoardPosts]
   );
   const getUnassignedPostsAfter = (afterCategoryId: number | null) =>
     unassignedBoardPosts.filter((post) => (post.afterCategoryId ?? null) === afterCategoryId);
@@ -636,7 +643,7 @@ export default function StorefrontPage() {
   }, [categories, localRootCategoryOrder]);
 
   const getCategoryBoardPosts = (categoryId: number) =>
-    boardPosts
+    visibleBoardPosts
       .filter((post) => post.categoryId === categoryId)
       .sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -758,7 +765,7 @@ export default function StorefrontPage() {
     };
     setNavigationHistory(prev => [...prev, currentState]);
 
-    setAdProductFilter(null);
+    setActiveAdSelection(null);
     if (categoryId) {
       if (categories.length === 0) return;
 
@@ -894,7 +901,7 @@ export default function StorefrontPage() {
     const ids = new Set(categoriesWithProducts);
     const categoryById = new Map(categories.map((category) => [category.id, category]));
 
-    for (const post of boardPosts) {
+    for (const post of visibleBoardPosts) {
       let currentCategoryId = post.categoryId;
       const visited = new Set<number>();
       while (currentCategoryId && !visited.has(currentCategoryId)) {
@@ -904,7 +911,7 @@ export default function StorefrontPage() {
       }
     }
     return ids;
-  }, [boardPosts, categories, categoriesWithProducts]);
+  }, [visibleBoardPosts, categories, categoriesWithProducts]);
 
   // Helper function to check if a category has products or assigned ads (including descendants)
   const categoryHasProducts = useCallback((categoryId: number): boolean => {
@@ -915,16 +922,16 @@ export default function StorefrontPage() {
     const linkedIds: number[] = post.productIds ? (() => { try { return JSON.parse(post.productIds); } catch { return []; } })() : [];
     const hasLinkedProducts = linkedIds.length > 0;
     const postText = post.text?.trim();
-    const isActive = adProductFilter !== null && linkedIds.length > 0 && linkedIds.every(id => adProductFilter.includes(id));
+    const isActive = activeAdSelection?.postId === post.id;
     return (
       <div
         key={post.id}
         className={`relative rounded-xl border bg-card shadow-sm overflow-hidden ${hasLinkedProducts ? 'cursor-pointer hover:border-primary transition-colors' : ''} ${isActive ? 'border-primary ring-1 ring-primary' : 'border-border'}`}
         onClick={hasLinkedProducts ? () => {
           if (isActive) {
-            setAdProductFilter(null);
+            setActiveAdSelection(null);
           } else {
-            setAdProductFilter(linkedIds);
+            setActiveAdSelection({ postId: post.id, productIds: linkedIds });
             setTimeout(() => {
               document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 100);
@@ -975,7 +982,7 @@ export default function StorefrontPage() {
     return <div className="space-y-3">{posts.map(renderBoardPost)}</div>;
   };
 
-  const hasAssignedBoardPosts = boardPosts.some((post) => post.categoryId !== null);
+  const hasAssignedBoardPosts = visibleBoardPosts.some((post) => post.categoryId !== null);
 
   if (productsLoading || categoriesLoading) {
     return (
@@ -1136,7 +1143,7 @@ export default function StorefrontPage() {
             <ShoppingBag className="w-4 h-4" />
             Showing products from advertisement
           </span>
-          <button onClick={() => setAdProductFilter(null)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+          <button onClick={() => setActiveAdSelection(null)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
             <X className="w-3 h-3" /> Clear
           </button>
         </div>
@@ -1288,7 +1295,7 @@ export default function StorefrontPage() {
       </Dialog>
 
       {/* Hero Carousel - show if there are deals or active ads */}
-      {slides.length > 0 && (
+      {!activeAdSelection && slides.length > 0 && (
         <div className="relative rounded-2xl mb-12 overflow-hidden" style={{ minHeight: '260px' }}>
           {/* Slides */}
           {slides.map((slide, slideIdx) => {
@@ -1434,7 +1441,7 @@ export default function StorefrontPage() {
                 setCurrentParentCategory(null);
                 setSelectedCategory(null);
                 setShowDealsOnly(false);
-                setAdProductFilter(null);
+                setActiveAdSelection(null);
               }}
             >
               All Products
@@ -1858,7 +1865,7 @@ export default function StorefrontPage() {
                       <ScrollableProductRow products={categoryProducts} />
                     )}
                   </div>
-                  {parentCategoryId && !selectedCategory && !debouncedSearchQuery && !showDealsOnly && !adProductFilter && getUnassignedPostsAfter(parentCategoryId).length > 0 && (
+                  {parentCategoryId && !selectedCategory && !debouncedSearchQuery && !showDealsOnly && getUnassignedPostsAfter(parentCategoryId).length > 0 && (
                     <div className="space-y-3">
                       {getUnassignedPostsAfter(parentCategoryId).map(renderBoardPost)}
                     </div>
