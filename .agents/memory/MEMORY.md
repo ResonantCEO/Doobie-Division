@@ -17,4 +17,4 @@
 - [Combo quantity expansion](combo-quantity-expansion.md) — expanded component and discount rows must inherit the purchased combo quantity.
 - [Driver city routing](driver-city-routing.md) — canonical active delivery cities map to one driver; auto-routing only fills unassigned shipped orders.
 - [Storefront heading visibility](storefront-heading-visibility.md) — hiding a category heading must not remove its navigation label, products, or assigned ads.
-- [Manual product badges](manual-product-badges.md) — promotional labels are editor-controlled only; no badge changes prices, discount windows, or daily-deal eligibility.
+- [Manual product badges](manual-product-badges.md) — visual labels may have editor-chosen expiry or stay until unchecked; never tie them to discount pricing.

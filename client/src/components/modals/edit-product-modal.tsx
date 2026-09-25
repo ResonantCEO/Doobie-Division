@@ -36,6 +36,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Lock, Plus, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import ProductManualBadges, { PRODUCT_MANUAL_BADGES } from "@/components/product-manual-badges";
+import BadgeDurationDialog from "./badge-duration-dialog";
 import type { Product, Category, ProductSize } from "@shared/schema";
 
 interface CategoryWithChildren extends Category {
@@ -75,6 +76,7 @@ const formSchema = z.object({
   discountPricePerHalf: z.string().optional(),
   discountDurationHours: z.string().optional(),
   manualBadges: z.array(z.string()).default([]),
+  manualBadgeExpirations: z.record(z.string()).default({}),
   isActive: z.boolean(),
   purchasePrice: z.string().optional(),
   purchasePriceMethod: z.enum(["units", "weight"]).default("units"),
@@ -89,6 +91,7 @@ const formSchema = z.object({
 });
 
 type FormData = z.infer<typeof formSchema>;
+type ManualBadgeKey = (typeof PRODUCT_MANUAL_BADGES)[number]["key"];
 
 const toDateTimeLocalValue = (value: unknown): string => {
   if (!value) return "";
@@ -142,6 +145,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [pendingBadgeKey, setPendingBadgeKey] = useState<ManualBadgeKey | null>(null);
   const [stockLbs, setStockLbs] = useState("");
   const [stockOz, setStockOz] = useState("");
   const [stockG, setStockG] = useState("");
@@ -216,6 +220,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       discountPercentage: (product as any).configuredDiscountPercentage ?? product.discountPercentage ?? "0",
       discountAmount: (product as any).configuredDiscountAmount ?? (product as any).discountAmount ?? "0",
       manualBadges: product.manualBadges ?? [],
+      manualBadgeExpirations: product.manualBadgeExpirations ?? {},
       discountPriceOverride: (product as any).configuredDiscountPriceOverride ?? (product as any).discountPriceOverride ?? "",
       discountPricePerGram: (product as any).configuredDiscountPricePerGram ?? (product as any).discountPricePerGram ?? "",
       discountPricePerOunce: (product as any).configuredDiscountPricePerOunce ?? (product as any).discountPricePerOunce ?? "",
@@ -250,6 +255,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
 
   useEffect(() => {
     if (product && open) {
+      setPendingBadgeKey(null);
       const productHasSizes = !!(product.sizes && product.sizes.length > 0);
       form.reset({
         name: product.name,
@@ -270,6 +276,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         discountPercentage: (product as any).configuredDiscountPercentage ?? product.discountPercentage ?? "0",
         discountAmount: (product as any).configuredDiscountAmount ?? (product as any).discountAmount ?? "0",
         manualBadges: product.manualBadges ?? [],
+        manualBadgeExpirations: product.manualBadgeExpirations ?? {},
         discountPriceOverride: (product as any).configuredDiscountPriceOverride ?? (product as any).discountPriceOverride ?? "",
         discountPricePerGram: (product as any).configuredDiscountPricePerGram ?? (product as any).discountPricePerGram ?? "",
         discountPricePerOunce: (product as any).configuredDiscountPricePerOunce ?? (product as any).discountPricePerOunce ?? "",
@@ -525,6 +532,9 @@ export default function EditProductModal({ open, onOpenChange, product, categori
         discountPercentage: discountValue,
         discountAmount: data.discountAmount ? parseFloat(data.discountAmount).toFixed(2) : "0",
         manualBadges: data.manualBadges,
+        manualBadgeExpirations: Object.fromEntries(
+          Object.entries(data.manualBadgeExpirations).filter(([key]) => data.manualBadges.includes(key))
+        ),
         discountPriceOverride: formatPrice(data.discountPriceOverride, 2),
         discountPricePerGram: formatPrice(data.discountPricePerGram, 4),
         discountPricePerOunce: formatPrice(data.discountPricePerOunce, 2),
@@ -604,6 +614,22 @@ export default function EditProductModal({ open, onOpenChange, product, categori
 
   const onSubmit = (data: FormData) => {
     updateProductMutation.mutate(data);
+  };
+
+  const confirmBadgeDuration = (expiresAt: string | null) => {
+    if (!pendingBadgeKey) return;
+    const expirations = { ...form.getValues("manualBadgeExpirations") };
+    if (expiresAt) {
+      expirations[pendingBadgeKey] = expiresAt;
+    } else {
+      delete expirations[pendingBadgeKey];
+    }
+    form.setValue("manualBadgeExpirations", expirations, { shouldDirty: true });
+    const currentBadges = form.getValues("manualBadges");
+    if (!currentBadges.includes(pendingBadgeKey)) {
+      form.setValue("manualBadges", [...currentBadges, pendingBadgeKey], { shouldDirty: true });
+    }
+    setPendingBadgeKey(null);
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1661,14 +1687,28 @@ export default function EditProductModal({ open, onOpenChange, product, categori
                         >
                           <Checkbox
                             checked={field.value.includes(badge.key)}
-                            onCheckedChange={(checked) =>
-                              field.onChange(checked === true
-                                ? [...field.value, badge.key]
-                                : field.value.filter((key) => key !== badge.key))
-                            }
+                            onCheckedChange={(checked) => {
+                              if (checked === true) {
+                                setPendingBadgeKey(badge.key);
+                              } else {
+                                field.onChange(field.value.filter((key) => key !== badge.key));
+                                const expirations = { ...form.getValues("manualBadgeExpirations") };
+                                delete expirations[badge.key];
+                                form.setValue("manualBadgeExpirations", expirations, { shouldDirty: true });
+                              }
+                            }}
                             aria-label={`Show ${badge.label} badge`}
                           />
-                          <ProductManualBadges badges={[badge.key]} variant="preview" />
+                          <span className="min-w-0 space-y-1">
+                            <ProductManualBadges badges={[badge.key]} variant="preview" />
+                            {field.value.includes(badge.key) && (
+                              <span className="block text-[11px] text-muted-foreground">
+                                {form.watch("manualBadgeExpirations")[badge.key]
+                                  ? `Until ${new Date(form.watch("manualBadgeExpirations")[badge.key]).toLocaleString()}`
+                                  : "Until manually disengaged"}
+                              </span>
+                            )}
+                          </span>
                         </label>
                       ))}
                     </div>
@@ -1928,6 +1968,13 @@ export default function EditProductModal({ open, onOpenChange, product, categori
             </div>
           </form>
         </Form>
+        <BadgeDurationDialog
+          key={pendingBadgeKey ?? "closed"}
+          open={pendingBadgeKey !== null}
+          badgeLabel={PRODUCT_MANUAL_BADGES.find((badge) => badge.key === pendingBadgeKey)?.label ?? ""}
+          onCancel={() => setPendingBadgeKey(null)}
+          onConfirm={confirmBadgeDuration}
+        />
       </DialogContent>
     </Dialog>
   );

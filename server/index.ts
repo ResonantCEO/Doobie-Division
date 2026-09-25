@@ -184,6 +184,7 @@ app.use((req, res, next) => {
   // Badge selections are independent of discount pricing and never expire automatically.
   const { sql: migrationSql } = await import("./db");
   await migrationSql.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS manual_badges JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await migrationSql.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS manual_badge_expirations JSONB NOT NULL DEFAULT '{}'::jsonb`);
   console.log("✓ Verified manual product badges column exists");
 
   // Size/flavor rows are the source of truth for products with variants. Keep the
@@ -550,6 +551,17 @@ app.use((req, res, next) => {
   };
   runProductDiscountCleanup();
   setInterval(runProductDiscountCleanup, 60 * 1000);
+
+  const runProductBadgeCleanup = async () => {
+    try {
+      const { storage } = await import("./storage");
+      await storage.clearExpiredProductBadges();
+    } catch (error) {
+      console.error("Error clearing expired product badges:", error);
+    }
+  };
+  runProductBadgeCleanup();
+  setInterval(runProductBadgeCleanup, 60 * 1000);
 
   // Cleanup old closed support tickets every hour
   setInterval(async () => {

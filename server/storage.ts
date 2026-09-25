@@ -121,6 +121,7 @@ export interface IStorage {
   deleteCategory(id: number): Promise<void>;
 
   // Product operations
+  clearExpiredProductBadges(): Promise<void>;
   getProducts(filters?: { categoryId?: number; categoryIds?: number[]; search?: string; status?: string; isActive?: boolean }): Promise<(Product & { category: Category | null; sizes?: ProductSize[] })[]>;
   getProductBySku(sku: string): Promise<(Product & { category: Category | null }) | undefined>;
   getProduct(id: number): Promise<(Product & { category: Category | null; sizes?: ProductSize[] }) | undefined>;
@@ -601,6 +602,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Product operations
+  async clearExpiredProductBadges(): Promise<void> {
+    await retryQuery(() => db.execute(sql`
+      WITH expired AS (
+        SELECT p.id, array_agg(e.key) AS keys
+        FROM products AS p
+        CROSS JOIN LATERAL jsonb_each_text(p.manual_badge_expirations) AS e(key, value)
+        WHERE e.value IS NOT NULL AND e.value::timestamptz <= NOW()
+        GROUP BY p.id
+      )
+      UPDATE products AS p
+      SET manual_badges = COALESCE((
+            SELECT jsonb_agg(b.value)
+            FROM jsonb_array_elements_text(p.manual_badges) AS b(value)
+            WHERE NOT (b.value = ANY(expired.keys))
+          ), '[]'::jsonb),
+          manual_badge_expirations = p.manual_badge_expirations - expired.keys,
+          updated_at = NOW()
+      FROM expired
+      WHERE p.id = expired.id
+    `));
+  }
+
   async clearExpiredProductDiscounts(): Promise<void> {
     await retryQuery(() =>
       db.update(products)
@@ -633,6 +656,7 @@ export class DatabaseStorage implements IStorage {
     status?: string;
     isActive?: boolean;
   }): Promise<(Product & { category: Category | null; sizes?: ProductSize[] })[]> {
+    await this.clearExpiredProductBadges();
     await this.clearExpiredProductDiscounts().catch((error) => {
       console.warn("[getProducts] Could not clear expired product discounts:", error?.message);
     });
@@ -673,6 +697,7 @@ export class DatabaseStorage implements IStorage {
         bogoEnabled: products.bogoEnabled,
         bogoFreeOptionIndex: products.bogoFreeOptionIndex,
         manualBadges: products.manualBadges,
+        manualBadgeExpirations: products.manualBadgeExpirations,
         purchasePrice: products.purchasePrice,
         purchasePriceMethod: products.purchasePriceMethod,
         purchasePricePerGram: products.purchasePricePerGram,
@@ -920,6 +945,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProductBySku(sku: string): Promise<(Product & { category: Category | null }) | undefined> {
+    await this.clearExpiredProductBadges();
     await this.clearExpiredProductDiscounts().catch(() => {});
     const results = await retryQuery(() =>
       db.select().from(products).where(eq(products.sku, sku))
@@ -929,13 +955,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProduct(id: number): Promise<(Product & { category: Category | null; sizes?: ProductSize[] }) | undefined> {
+    await this.clearExpiredProductBadges();
     await this.clearExpiredProductDiscounts().catch((error) => {
       console.warn("[getProduct] Could not clear expired product discounts:", error?.message);
     });
     let product: any;
     try {
       const rawResult = await retryQuery(() =>
-        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, discount_price_override, discount_price_per_gram, discount_price_per_ounce, discount_price_per_eighth, discount_price_per_quarter, discount_price_per_half, discount_quantity_pricing, discount_schedule, discount_starts_at, discount_expires_at, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value, manual_badges, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
+        db.execute(sql`SELECT id, name, company, description, price, sku, category_id, image_url, image_urls, stock, physical_inventory, min_stock_threshold, selling_method, weight_unit, price_per_gram, price_per_ounce, price_per_eighth, price_per_quarter, price_per_half, discount_percentage, discount_amount, discount_price_override, discount_price_per_gram, discount_price_per_ounce, discount_price_per_eighth, discount_price_per_quarter, discount_price_per_half, discount_quantity_pricing, discount_schedule, discount_starts_at, discount_expires_at, bogo_enabled, bogo_free_option_index, bogo_discount_type, bogo_discount_value, manual_badges, manual_badge_expirations, purchase_price, purchase_price_method, purchase_price_per_gram, purchase_price_per_ounce, admin_notes, is_active, created_at, updated_at FROM products WHERE id = ${id}`)
       );
       
       const row = rawResult?.rows?.[0];
@@ -977,6 +1004,7 @@ export class DatabaseStorage implements IStorage {
           bogoDiscountType: String(row.bogo_discount_type || 'free'),
           bogoDiscountValue: String(row.bogo_discount_value ?? '0'),
           manualBadges: row.manual_badges,
+          manualBadgeExpirations: row.manual_badge_expirations,
           purchasePrice: row.purchase_price,
           purchasePriceMethod: row.purchase_price_method,
           purchasePricePerGram: row.purchase_price_per_gram,

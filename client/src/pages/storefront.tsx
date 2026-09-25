@@ -745,6 +745,7 @@ export default function StorefrontPage() {
       return response.json();
     },
     staleTime: 30000, // Cache for 30 seconds
+    refetchInterval: 60000, // Disengage timed badges on open storefronts without a reload
     gcTime: 300000, // Keep in cache for 5 minutes
   });
 

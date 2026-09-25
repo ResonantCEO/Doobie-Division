@@ -114,6 +114,7 @@ export const products = pgTable("products", {
   bogoDiscountType: varchar("bogo_discount_type").default("free"), // 'free', 'percentage', 'amount'
   bogoDiscountValue: decimal("bogo_discount_value", { precision: 10, scale: 2 }).default("0"), // value for percentage/amount BOGO
   manualBadges: jsonb("manual_badges").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  manualBadgeExpirations: jsonb("manual_badge_expirations").$type<Record<string, string>>().notNull().default(sql`'{}'::jsonb`),
   purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }), // admin only - cost price per unit
   purchasePriceMethod: varchar("purchase_price_method").default("units"), // units or weight
   purchasePricePerGram: decimal("purchase_price_per_gram", { precision: 10, scale: 4 }), // admin only - cost per gram
@@ -643,6 +644,10 @@ export const insertProductSchema = createInsertSchema(products).omit({
     "clearance", "daily_deals", "staff_favorite", "new_item",
     "pick_of_the_week", "thirsty_thursdays",
   ])).max(6).optional(),
+  manualBadgeExpirations: z.record(
+    z.enum(["clearance", "daily_deals", "staff_favorite", "new_item", "pick_of_the_week", "thirsty_thursdays"]),
+    z.string().datetime({ offset: true }),
+  ).optional(),
   imageUrl: z.string().nullable().optional(),
   imageUrls: z.string().nullable().optional(), // JSON array as string
   sizes: z.array(z.object({
