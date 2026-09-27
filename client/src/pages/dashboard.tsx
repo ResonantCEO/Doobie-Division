@@ -12,7 +12,6 @@ import OrdersPage from "./orders";
 import UsersPage from "./users";
 import AdminPage from "./admin";
 import DriversPage from "./drivers";
-import AnalyticsPage from "./analytics";
 
 import CustomerOrdersPage from "@/pages/customer-orders";
 
@@ -21,7 +20,7 @@ export default function Dashboard() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const [location] = useLocation();
 
-  const tab = location === "/analytics" ? "analytics" : location.split("/")[2] || "storefront";
+  const tab = location.split("/")[2] || "storefront";
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -59,8 +58,6 @@ export default function Dashboard() {
         return user.role === 'admin' || user.role === 'manager' || user.role === 'staff' ? <OrdersPage /> : <StorefrontWithGate />;
       case "drivers":
         return user.role === 'admin' || user.role === 'manager' || user.role === 'driver' ? <DriversPage /> : <StorefrontWithGate />;
-      case "analytics":
-        return user.role === 'admin' || user.role === 'manager' ? <AnalyticsPage /> : <StorefrontWithGate />;
       case "users":
         return user.role === 'admin' ? <UsersPage /> : <StorefrontWithGate />;
       case "admin":
