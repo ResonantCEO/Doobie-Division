@@ -618,12 +618,23 @@ export default function StorefrontPage() {
     return flattenCategories(categoriesResponse);
   }, [categoriesResponse]);
 
-  const visibleBoardPosts = useMemo(
-    () => activeAdSelection
-      ? boardPosts.filter((post) => post.id === activeAdSelection.postId)
-      : boardPosts,
-    [boardPosts, activeAdSelection]
-  );
+  const visibleBoardPosts = useMemo(() => {
+    // Organizing the storefront needs the full board, but browsing a category
+    // should never pull in unassigned or other categories' advertisements.
+    if (isStorefrontLayoutMode) return boardPosts;
+    if (activeAdSelection) return boardPosts.filter((post) => post.id === activeAdSelection.postId);
+    if (selectedCategory !== null) {
+      return boardPosts.filter((post) => post.categoryId === selectedCategory);
+    }
+    if (currentParentCategory !== null) {
+      const displayedCategoryIds = new Set([
+        currentParentCategory,
+        ...categories.filter((category) => category.parentId === currentParentCategory).map((category) => category.id),
+      ]);
+      return boardPosts.filter((post) => post.categoryId !== null && displayedCategoryIds.has(post.categoryId));
+    }
+    return boardPosts;
+  }, [boardPosts, activeAdSelection, selectedCategory, currentParentCategory, categories, isStorefrontLayoutMode]);
   const unassignedBoardPosts = useMemo(
     () => visibleBoardPosts
       .filter((post) => post.categoryId === null)
@@ -913,10 +924,34 @@ export default function StorefrontPage() {
     return ids;
   }, [visibleBoardPosts, categories, categoriesWithProducts]);
 
+  // Navigation reflects the whole catalog, not just the currently filtered
+  // product list or the ads shown in the selected category.
+  const navigableCategories = useMemo(() => {
+    const ids = new Set<number>();
+    const categoryById = new Map(categories.map((category) => [category.id, category]));
+    const addCategoryAndAncestors = (categoryId: number | null) => {
+      const visited = new Set<number>();
+      while (categoryId && !visited.has(categoryId)) {
+        ids.add(categoryId);
+        visited.add(categoryId);
+        categoryId = categoryById.get(categoryId)?.parentId ?? null;
+      }
+    };
+    for (const product of allProductsRaw) {
+      const sizes = (product as Product & { sizes?: { quantity: number }[] }).sizes;
+      const hasStock = sizes?.length
+        ? sizes.some((size) => Number(size.quantity) > 0)
+        : product.stock > 0;
+      if (hasStock) addCategoryAndAncestors(product.categoryId);
+    }
+    for (const post of boardPosts) addCategoryAndAncestors(post.categoryId);
+    return ids;
+  }, [allProductsRaw, boardPosts, categories]);
+
   // Helper function to check if a category has products or assigned ads (including descendants)
   const categoryHasProducts = useCallback((categoryId: number): boolean => {
-    return categoriesWithContent.has(categoryId);
-  }, [categoriesWithContent]);
+    return navigableCategories.has(categoryId);
+  }, [navigableCategories]);
 
   const renderBoardPost = (post: BoardPost) => {
     const linkedIds: number[] = post.productIds ? (() => { try { return JSON.parse(post.productIds); } catch { return []; } })() : [];
@@ -1295,7 +1330,7 @@ export default function StorefrontPage() {
       </Dialog>
 
       {/* Hero Carousel - show if there are deals or active ads */}
-      {!activeAdSelection && slides.length > 0 && (
+      {!activeAdSelection && !selectedCategory && !currentParentCategory && slides.length > 0 && (
         <div className="relative rounded-2xl mb-12 overflow-hidden" style={{ minHeight: '260px' }}>
           {/* Slides */}
           {slides.map((slide, slideIdx) => {
@@ -1732,7 +1767,10 @@ export default function StorefrontPage() {
             type SortedId = number | null | 'byb';
             const rawIds: SortedId[] = Array.from(productsByParentCategory.keys());
             rootCategoriesForLayout.forEach((category) => {
-              if ((getCategoryBoardPosts(category.id).length > 0 || getUnassignedPostsAfter(category.id).length > 0) && !rawIds.includes(category.id)) {
+              if ((getCategoryBoardPosts(category.id).length > 0
+                || (!selectedCategory && !currentParentCategory && getUnassignedPostsAfter(category.id).length > 0)
+                || (selectedCategory && categoriesWithContent.has(category.id)))
+                && !rawIds.includes(category.id)) {
                 rawIds.push(category.id);
               }
             });
@@ -1824,7 +1862,7 @@ export default function StorefrontPage() {
 
               const categoryProducts = productsByParentCategory.get(parentCategoryId) || [];
               if (categoryProducts.length === 0 && (!parentCategoryId || (
-                getCategoryBoardPosts(parentCategoryId).length === 0
+                getCategoryBoardPosts(selectedCategory ?? parentCategoryId).length === 0
                 && getUnassignedPostsAfter(parentCategoryId).length === 0
               ))) return null;
 
@@ -1853,7 +1891,7 @@ export default function StorefrontPage() {
                       </div>
                     )}
 
-                    {parentCategoryId ? renderCategoryBoardPosts(parentCategoryId) : null}
+                    {parentCategoryId ? renderCategoryBoardPosts(selectedCategory ?? parentCategoryId) : null}
 
                     {isReorderMode ? (
                       <CategoryReorderGrid
