@@ -62,6 +62,33 @@ test("pending sessions are restricted even on otherwise public catalog endpoints
   assert.equal(allowed.request.currentUser.status, "pending");
 });
 
+test("suspended sessions retain only their own support-ticket workflow", async () => {
+  for (const [method, path] of [
+    ["GET", "/api/auth/user"],
+    ["GET", "/api/support/my-tickets"],
+    ["POST", "/api/support/my-tickets"],
+    ["POST", "/api/support/ticket-images"],
+    ["GET", "/api/support-images/example.webp"],
+    ["POST", "/api/support/tickets/123/customer-reply"],
+    ["PUT", "/api/support/tickets/123/request-close"],
+    ["POST", "/api/auth/logout"],
+  ]) assert.equal((await runGuard("suspended", path, method)).didNext, true, path);
+  for (const [method, path] of [
+    ["GET", "/api/products"],
+    ["GET", "/api/orders"],
+    ["POST", "/api/orders"],
+    ["GET", "/api/users"],
+    ["PUT", "/api/auth/telegram-username"],
+    ["GET", "/api/support/tickets"],
+    ["POST", "/api/support/tickets/123/respond"],
+    ["DELETE", "/api/support/tickets/123"],
+  ]) {
+    const denied = await runGuard("suspended", path, method);
+    assert.equal(denied.statusCode, 403, path);
+    assert.equal(denied.body.code, "ACCOUNT_SUSPENDED");
+  }
+});
+
 test("approval restores access, while rejected and inactive accounts stay blocked", async () => {
   assert.equal((await runGuard("active", "/api/orders")).didNext, true);
   for (const status of ["inactive", "rejected", undefined]) {

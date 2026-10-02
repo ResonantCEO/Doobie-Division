@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
+import { isSupportOnlyAccount } from "@shared/account-access";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -314,7 +315,7 @@ function TicketConversation({
 export default function SupportPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  useWebSocket(user?.status !== "pending");
+  useWebSocket(user?.status === "active");
   const queryClient = useQueryClient();
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -422,14 +423,17 @@ export default function SupportPage() {
 
   return (
     <>
-      {user.status === "pending" ? (
+      {isSupportOnlyAccount(user.status) ? (
         <header className="border-b border-border bg-background p-4">
           <div className="max-w-4xl mx-auto flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-lg font-semibold">Account pending approval</h1>
+              <h1 className="text-lg font-semibold">
+                {user.status === "suspended" ? "Account suspended" : "Account pending approval"}
+              </h1>
               <p className="text-sm text-muted-foreground">
-                You can contact support and view your tickets while our team reviews your account.
-                Shopping and other account features will become available after approval.
+                {user.status === "suspended"
+                  ? "You can contact support and view your tickets while your account is suspended. Shopping and other account features are unavailable until your account is reinstated."
+                  : "You can contact support and view your tickets while our team reviews your account. Shopping and other account features will become available after approval."}
               </p>
             </div>
             <Button variant="outline" onClick={async () => {

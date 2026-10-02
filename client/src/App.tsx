@@ -23,6 +23,7 @@ import InactivityWarning from "@/components/InactivityWarning";
 import TelegramUsernamePrompt from "@/components/TelegramUsernamePrompt";
 import { useInactivityTimer } from "@/hooks/useInactivityTimer";
 import { Component, useCallback, useEffect, type ErrorInfo, type ReactNode } from "react";
+import { isSupportOnlyAccount } from "@shared/account-access";
 
 
 function Router() {
@@ -52,7 +53,7 @@ function Router() {
     );
   }
 
-  if (user?.status === "pending") {
+  if (isSupportOnlyAccount(user?.status)) {
     return (
       <Switch>
         <Route path="/support" component={SupportPage} />
@@ -131,8 +132,8 @@ class AppErrorBoundary extends Component<
 
 function AccountContent() {
   const { user, isLoading } = useAuth();
-  // Pending users must not mount shopping providers or their background requests.
-  if (isLoading || user?.status === "pending") return <Router />;
+  // Support-only users must not mount shopping providers or their background requests.
+  if (isLoading || isSupportOnlyAccount(user?.status)) return <Router />;
   return <CartProvider><Router /></CartProvider>;
 }
 

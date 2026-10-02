@@ -7,8 +7,8 @@ export function useAuth() {
     queryKey: ["/api/auth/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
-    // Pick up approval without requiring the pending user to sign out and back in.
-    refetchInterval: (query) => query.state.data?.status === "pending" ? 15000 : false,
+    // Pick up suspension, approval, or reinstatement without requiring another login.
+    refetchInterval: (query) => query.state.data ? 15000 : false,
   });
 
   return {

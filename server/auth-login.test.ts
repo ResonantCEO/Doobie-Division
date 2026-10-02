@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import bcrypt from "bcrypt";
-import { setupAuth } from "./auth";
+import { setupAuth, isAuthenticated } from "./auth";
 import { storage } from "./storage";
 
-test("pending users authenticate with their password without becoming active", async () => {
+test("pending and suspended users authenticate without becoming active", async () => {
   const originals = {
     getSiteSetting: storage.getSiteSetting,
     getUserByEmail: storage.getUserByEmail,
@@ -47,11 +47,36 @@ test("pending users authenticate with their password without becoming active", a
     const wrongPassword = await attempt("incorrect-fixture");
     assert.equal(wrongPassword.status, 401);
     assert.equal(wrongPassword.session.userId, undefined);
+    accountStatus = "suspended";
+    const suspended = await attempt("support-login-fixture");
+    assert.equal(suspended.status, 200);
+    assert.equal(suspended.body.user.status, "suspended");
+    assert.equal("password" in suspended.body.user, false);
+    assert.equal(suspended.session.userId, "pending-login-fixture");
+    assert.equal((await attempt("incorrect-fixture")).status, 401);
     accountStatus = "active";
     assert.equal((await attempt("support-login-fixture")).status, 200);
     accountStatus = "inactive";
     assert.equal((await attempt("support-login-fixture")).status, 401);
   } finally {
     Object.assign(storage, originals);
+  }
+});
+
+test("authenticated pending and suspended accounts can only call customer support endpoints", async () => {
+  for (const status of ["pending", "suspended", "active", "inactive", "rejected"]) {
+    for (const path of ["/api/auth/user", "/api/support/my-tickets", "/api/products", "/api/support/tickets"]) {
+      let didNext = false;
+      let statusCode = 200;
+      await isAuthenticated(
+        { session: { userId: "fixture" }, currentUser: { id: "fixture", status }, method: "GET", originalUrl: path } as any,
+        { status(code: number) { statusCode = code; return this; }, json() {} } as any,
+        () => { didNext = true; },
+      );
+      const restricted = status === "pending" || status === "suspended";
+      const allowed = status === "active" || (restricted && ["/api/auth/user", "/api/support/my-tickets"].includes(path));
+      assert.equal(didNext, allowed, `${status}: ${path}`);
+      assert.equal(statusCode, allowed ? 200 : restricted ? 403 : 401, `${status}: ${path}`);
+    }
   }
 });

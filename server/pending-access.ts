@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
+import { isSupportOnlyAccount, supportOnlyAccessMessage } from "@shared/account-access";
 
-/** Pending accounts may use only their own support-ticket workflow. */
+/** Pending and suspended accounts share this own-ticket-only allowlist. */
 export function canAccessWhilePending(method: string, url: string): boolean {
   const path = url.split("?")[0];
   if (method === "GET" && path === "/api/auth/user") return true;
@@ -23,15 +24,15 @@ export function createAccountAccessGuard<T extends { status: string }>(
     if (!userId) return next();
     try {
       const user = await loadUser(userId);
-      if (!user || !["active", "pending"].includes(user.status)) {
+      if (!user || (user.status !== "active" && !isSupportOnlyAccount(user.status))) {
         return res.status(401).json({ message: "Unauthorized" });
       }
       req.userId = userId;
       req.currentUser = user;
-      if (user.status === "pending" && !canAccessWhilePending(req.method, req.originalUrl)) {
+      if (isSupportOnlyAccount(user.status) && !canAccessWhilePending(req.method, req.originalUrl)) {
         return res.status(403).json({
-          code: "ACCOUNT_PENDING",
-          message: "Your account is pending approval. Only support tickets are available.",
+          code: user.status === "suspended" ? "ACCOUNT_SUSPENDED" : "ACCOUNT_PENDING",
+          message: supportOnlyAccessMessage(user.status),
         });
       }
       next();
