@@ -428,11 +428,11 @@ export default function SupportPage() {
           <div className="max-w-4xl mx-auto flex items-start justify-between gap-4">
             <div>
               <h1 className="text-lg font-semibold">
-                {user.status === "suspended" ? "Account suspended" : "Account pending approval"}
+                {user.status === "suspended" ? "Account Issues?" : "Account pending approval"}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {user.status === "suspended"
-                  ? "You can contact support and view your tickets while your account is suspended. Shopping and other account features are unavailable until your account is reinstated."
+                  ? "We see your account seems to be having some issues. Please submit a support ticket to get some help."
                   : "You can contact support and view your tickets while our team reviews your account. Shopping and other account features will become available after approval."}
               </p>
             </div>
