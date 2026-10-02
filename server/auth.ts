@@ -5,6 +5,7 @@ import type { Express, RequestHandler } from "express";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { canAccessWhilePending, createAccountAccessGuard } from "./pending-access";
 
 const SALT_ROUNDS = 12;
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -54,7 +55,11 @@ export function getSession() {
 
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
-  app.use(getSession());
+  const sessionMiddleware = getSession();
+  app.locals.authSessionMiddleware = sessionMiddleware;
+  app.use(sessionMiddleware);
+  // This also protects public catalog endpoints when a pending session is present.
+  app.use("/api", createAccountAccessGuard((id) => storage.getUser(id)));
   await getTelegramRequirementDeadline();
 
   app.post("/api/auth/check-email", async (req, res) => {
@@ -236,12 +241,7 @@ export async function setupAuth(app: Express) {
       const normalizedEmail = email.toLowerCase();
       const user = await storage.getUserByEmail(normalizedEmail);
       if (!user) return res.status(401).json({ message: "Invalid email or password" });
-      if (user.status !== "active") {
-        if (user.status === "pending") {
-          return res.status(401).json({
-            message: "Account is pending approval. Please wait for an administrator to activate your account.",
-          });
-        }
+      if (user.status !== "active" && user.status !== "pending") {
         return res.status(401).json({ message: "Account is inactive" });
       }
       if (!user.password) return res.status(401).json({ message: "Invalid email or password" });
@@ -469,9 +469,12 @@ export const isAuthenticated: RequestHandler = async (req: any, res, next) => {
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
   try {
-    const user = await storage.getUser(userId);
-    if (!user || user.status !== "active") {
+    const user = req.currentUser ?? await storage.getUser(userId);
+    if (!user || !["active", "pending"].includes(user.status)) {
       return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (user.status === "pending" && !canAccessWhilePending(req.method, req.originalUrl)) {
+      return res.status(403).json({ message: "Your account is pending approval. Only support tickets are available." });
     }
     req.userId = userId;
     req.currentUser = user;

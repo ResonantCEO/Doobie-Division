@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryClient, getQueryFn } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -37,7 +37,7 @@ function Router() {
     window.location.href = "/";
   }, [qc]);
 
-  const isCustomer = isAuthenticated && user?.role === "customer";
+  const isCustomer = isAuthenticated && user?.role === "customer" && user?.status === "active";
 
   const { showWarning, secondsLeft, stayLoggedIn } = useInactivityTimer({
     enabled: isCustomer,
@@ -49,6 +49,15 @@ function Router() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
+    );
+  }
+
+  if (user?.status === "pending") {
+    return (
+      <Switch>
+        <Route path="/support" component={SupportPage} />
+        <Route><Redirect to="/support" /></Route>
+      </Switch>
     );
   }
 
@@ -120,6 +129,13 @@ class AppErrorBoundary extends Component<
   }
 }
 
+function AccountContent() {
+  const { user, isLoading } = useAuth();
+  // Pending users must not mount shopping providers or their background requests.
+  if (isLoading || user?.status === "pending") return <Router />;
+  return <CartProvider><Router /></CartProvider>;
+}
+
 function App() {
   useEffect(() => {
     const preventScrollOnNumberInputs = (e: WheelEvent) => {
@@ -135,12 +151,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <CartProvider>
-          <AppErrorBoundary>
-            <Router />
-          </AppErrorBoundary>
-          <Toaster />
-        </CartProvider>
+        <AppErrorBoundary>
+          <AccountContent />
+        </AppErrorBoundary>
+        <Toaster />
       </ThemeProvider>
     </QueryClientProvider>
   );

@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-export function useWebSocket() {
+export function useWebSocket(enabled = true) {
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     // Determine WebSocket URL based on current location
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -68,7 +69,7 @@ export function useWebSocket() {
         wsRef.current.close();
       }
     };
-  }, [queryClient]);
+  }, [queryClient, enabled]);
 
   return wsRef.current;
 }

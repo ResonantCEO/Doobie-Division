@@ -18,3 +18,4 @@
 - [Driver city routing](driver-city-routing.md) — canonical active delivery cities map to one driver; auto-routing only fills unassigned shipped orders.
 - [Storefront heading visibility](storefront-heading-visibility.md) — hiding a category heading must not remove its navigation label, products, or assigned ads.
 - [Manual product badges](manual-product-badges.md) — visual labels may have editor-chosen expiry or stay until unchecked; never tie them to discount pricing.
+- [Pending account access](pending-account-access.md) — pending accounts may sign in, but only their own support-ticket workflow is available until approval.

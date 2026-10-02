@@ -314,7 +314,7 @@ function TicketConversation({
 export default function SupportPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  useWebSocket();
+  useWebSocket(user?.status !== "pending");
   const queryClient = useQueryClient();
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -422,7 +422,29 @@ export default function SupportPage() {
 
   return (
     <>
-      <Navigation user={user} currentTab="support" />
+      {user.status === "pending" ? (
+        <header className="border-b border-border bg-background p-4">
+          <div className="max-w-4xl mx-auto flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-lg font-semibold">Account pending approval</h1>
+              <p className="text-sm text-muted-foreground">
+                You can contact support and view your tickets while our team reviews your account.
+                Shopping and other account features will become available after approval.
+              </p>
+            </div>
+            <Button variant="outline" onClick={async () => {
+              try {
+                const response = await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+                if (!response.ok) throw new Error("Sign out failed");
+                queryClient.clear();
+                window.location.href = "/";
+              } catch {
+                toast({ title: "Unable to sign out. Please try again.", variant: "destructive" });
+              }
+            }}>Sign Out</Button>
+          </div>
+        </header>
+      ) : <Navigation user={user} currentTab="support" />}
       <div className="min-h-screen bg-background p-4 md:p-6">
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Header */}

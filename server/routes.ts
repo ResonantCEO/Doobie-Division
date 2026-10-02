@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
+import { createServer, ServerResponse, type Server } from "http";
 import path from "path";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { isIP } from "node:net";
@@ -3796,7 +3796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const bucket = objectStorageClient.bucket(bucketName);
       const file = bucket.file(objectKey);
-      await file.save(compressedBuffer, { metadata: { contentType: 'image/webp' } });
+      await file.save(compressedBuffer, { metadata: { contentType: 'image/webp', metadata: { uploadedBy: req.currentUser.id } } });
 
       res.json({ imageUrl: `/api/support-images/${uniqueId}.webp` });
     } catch (error) {
@@ -3822,9 +3822,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!exists) return res.status(404).json({ message: 'Image not found' });
 
       const [metadata] = await file.getMetadata();
+      if (req.currentUser.status === "pending" && metadata.metadata?.uploadedBy !== req.currentUser.id) {
+        const imageUrl = `/api/support-images/${req.params.filename}`;
+        const tickets = await storage.getCustomerTickets(req.currentUser.id);
+        // Staff attachments are accessible only in this user's conversations.
+        const belongsToStaffReply = tickets.some(({ responses }) => responses.some((response) => {
+          if (response.createdBy === req.currentUser.id || !response.imageUrls) return false;
+          try {
+            const urls = JSON.parse(response.imageUrls);
+            return Array.isArray(urls) && urls.includes(imageUrl);
+          } catch {
+            return false;
+          }
+        }));
+        if (!belongsToStaffReply) return res.status(403).json({ message: "You cannot access this support attachment." });
+      }
       res.set({
         'Content-Type': metadata.contentType || 'image/webp',
-        'Cache-Control': 'private, max-age=3600',
+        'Cache-Control': req.currentUser.status === "pending" ? 'private, no-store' : 'private, max-age=3600',
       });
       file.createReadStream().pipe(res);
     } catch (error) {
@@ -4728,7 +4743,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
   // Setup WebSocket server
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const wss = new WebSocketServer({
+    server: httpServer,
+    path: '/ws',
+    verifyClient: (info, done) => {
+      // Order broadcasts must never reach pending (or signed-out) accounts.
+      app.locals.authSessionMiddleware(info.req, new ServerResponse(info.req), async (error: unknown) => {
+        if (error) return done(false, 401, "Unauthorized");
+        try {
+          const userId = (info.req as any).session?.userId;
+          const user = userId ? await storage.getUser(userId) : undefined;
+          if (!user || user.status !== "active") return done(false, 403, "Account approval required");
+          done(true);
+        } catch {
+          done(false, 503, "Unable to verify account access");
+        }
+      });
+    },
+  });
 
   wss.on('connection', (ws) => {
     console.log('WebSocket client connected');
