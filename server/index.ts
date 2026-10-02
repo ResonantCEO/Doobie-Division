@@ -4,51 +4,7 @@ import { setupVite, log } from "./vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { checkDatabaseConnection, warmupDatabase } from "./db";
-
-// Separate rate limiting stores for different endpoint types to prevent cross-contamination
-const rateLimitStores = {
-  auth: new Map<string, { count: number; resetTime: number }>(),
-  upload: new Map<string, { count: number; resetTime: number }>(),
-  general: new Map<string, { count: number; resetTime: number }>(),
-};
-
-// Cleanup expired entries periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const store of Object.values(rateLimitStores)) {
-    for (const [key, data] of store.entries()) {
-      if (now > data.resetTime) {
-        store.delete(key);
-      }
-    }
-  }
-}, 5 * 60 * 1000); // Clean up every 5 minutes
-
-const createRateLimit = (store: Map<string, { count: number; resetTime: number }>, maxRequests: number, windowMs: number) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const clientIp = req.ip || 'unknown';
-    const now = Date.now();
-
-    if (!store.has(clientIp)) {
-      store.set(clientIp, { count: 1, resetTime: now + windowMs });
-      return next();
-    }
-
-    const clientData = store.get(clientIp)!;
-
-    if (now > clientData.resetTime) {
-      store.set(clientIp, { count: 1, resetTime: now + windowMs });
-      return next();
-    }
-
-    if (clientData.count >= maxRequests) {
-      return res.status(429).json({ message: 'Too many requests' });
-    }
-
-    clientData.count++;
-    next();
-  };
-};
+import { createApiRateLimiter } from "./rate-limit";
 
 // ES module compatible static file serving
 function customServeStatic(app: express.Express) {
@@ -128,21 +84,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
-// Rate limiting - apply specific routes BEFORE general routes
-// This prevents double rate limiting and ensures proper isolation
-
-// Auth endpoints - separate store to prevent interference from uploads
-app.use('/api/auth/login', createRateLimit(rateLimitStores.auth, 10, 15 * 60 * 1000)); // 10 login attempts per 15 minutes
-app.use('/api/auth/register', createRateLimit(rateLimitStores.auth, 10, 15 * 60 * 1000)); // 10 registration attempts per 15 minutes
-app.use('/api/auth/reset-password', createRateLimit(rateLimitStores.auth, 10, 15 * 60 * 1000)); // 10 reset-password attempts per 15 minutes
-app.use('/api/auth/', createRateLimit(rateLimitStores.auth, 100, 15 * 60 * 1000)); // 100 general auth requests per 15 minutes
-
-// Upload endpoints - separate store with higher limits for file operations
-app.use('/api/upload/', createRateLimit(rateLimitStores.upload, 100, 15 * 60 * 1000)); // 100 uploads per 15 minutes
-app.use('/api/objects/upload', createRateLimit(rateLimitStores.upload, 100, 15 * 60 * 1000)); // 100 object uploads per 15 minutes
-
-// General API routes - applied last to catch everything else
-app.use('/api/', createRateLimit(rateLimitStores.general, 500, 15 * 60 * 1000)); // 500 requests per 15 minutes
+app.use('/api', createApiRateLimiter());
 
 
 app.use((req, res, next) => {
