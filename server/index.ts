@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { checkDatabaseConnection, warmupDatabase } from "./db";
 import { createApiRateLimiter } from "./rate-limit";
+import { ensureDiscountCapSchema } from "./product-discount-cap";
 
 // ES module compatible static file serving
 function customServeStatic(app: express.Express) {
@@ -122,6 +123,9 @@ app.use((req, res, next) => {
   // Neon serverless HTTP can return null rows on cold-start concurrent requests.
   // A single warmup query serializes startup and prevents the null-map crash.
   await warmupDatabase();
+  // Additive, idempotent changes on the existing database; do not serve capped
+  // pricing if the reservation tables could not be initialized.
+  await ensureDiscountCapSchema();
 
   // Badge selections are independent of discount pricing and never expire automatically.
   const { sql: migrationSql } = await import("./db");

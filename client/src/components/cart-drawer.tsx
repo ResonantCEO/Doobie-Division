@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -129,7 +129,8 @@ function getDroppedImageUrl(dataTransfer: DataTransfer): string | null {
 }
 
 export default function CartDrawer({ children }: CartDrawerProps) {
-  const { state, removeItem, updateQuantity, clearCart, getEffectivePrice, removeCgBag } = useCart();
+  const { state, removeItem, updateQuantity, clearCart, getEffectivePrice, getCartItemPricing, removeCgBag } = useCart();
+  const queryClient = useQueryClient();
   // Combined total includes both product items and customer-generated bag items
   const combinedTotal = state.total + state.cgBagTotal;
   const { toast } = useToast();
@@ -184,7 +185,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         (item.customPrice !== undefined && item.product.bogoEnabled === true);
       if (!isDiscountedBogo) continue;
       const regularUnitPrice = getEffectiveUnitPrice(item.product, item.size);
-      const chargedUnitPrice = item.isFree ? 0 : Math.max(0, item.customPrice || 0);
+      const chargedUnitPrice = getCartItemPricing(item).unitPrice;
       total += item.quantity * Math.max(0, regularUnitPrice - chargedUnitPrice);
     }
     return Math.round(total * 100) / 100;
@@ -639,7 +640,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       };
 
       const orderItems = state.items.map(item => {
-        if (item.isFree) {
+        const cappedPrice = getCartItemPricing(item);
+        if (item.isFree && item.product.discountItemLimit == null) {
           return {
             productId: item.product.id,
             productName: item.size ? `${item.product.name} (Size: ${item.size})` : item.product.name,
@@ -647,10 +649,13 @@ export default function CartDrawer({ children }: CartDrawerProps) {
             quantity: item.quantity,
             subtotal: "0.00",
             size: item.size,
+            metadata: { isFree: true },
           };
         }
         let itemPrice: number;
-        if (item.product.sellingMethod === "weight" && item.customPrice === undefined) {
+        if (item.product.discountItemLimit != null) {
+          itemPrice = cappedPrice.unitPrice;
+        } else if (item.product.sellingMethod === "weight" && item.customPrice === undefined) {
           // getEffectivePrice handles oz-bucket pricing (or per-item tier when GWP is off)
           itemPrice = getEffectivePrice(item.product.id, item.size);
         } else {
@@ -674,6 +679,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
           quantity: item.quantity,
           subtotal: (itemPrice * item.quantity).toString(),
           size: item.size,
+          metadata: { isFree: Boolean(item.isFree), bogoDiscounted: item.customPrice !== undefined },
         };
       });
 
@@ -697,6 +703,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
       if (response.ok) {
         const responseData = await response.json();
         clearCart();
+        queryClient.invalidateQueries({ predicate: query => String(query.queryKey[0]).startsWith("/api/products") || String(query.queryKey[0]).startsWith("/api/discounts/item-allowances") });
         setIsOpen(false);
         setShowConfirmation(false);
         setShippingForm({ customerName: "", street: "", city: "", state: "", zipCode: "", notes: "" });
@@ -714,6 +721,9 @@ export default function CartDrawer({ children }: CartDrawerProps) {
         });
       } else {
         const errorData = await response.json();
+        if (errorData.code === "ITEM_DISCOUNTS_CHANGED") {
+          queryClient.invalidateQueries({ predicate: query => String(query.queryKey[0]).startsWith("/api/products") || String(query.queryKey[0]).startsWith("/api/discounts/item-allowances") });
+        }
         console.error("Order creation failed:", errorData);
         setIsCheckingOut(false);
         const description = errorData?.errors?.length
@@ -920,9 +930,8 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                       ? `BOGO $${bogoValue.toFixed(2)} OFF`
                       : "BOGO FREE";
                   const regularUnitPrice = getEffectiveUnitPrice(item.product, item.size);
-                  const displayedUnitPrice = item.customPrice !== undefined
-                    ? item.customPrice
-                    : getEffectivePrice(item.product.id, item.size);
+                  const displayedUnitPrice = getCartItemPricing(item).unitPrice;
+                  const isTrulyFree = item.isFree && displayedUnitPrice === 0;
                   return (
                   <div key={itemKey} className={`flex items-start gap-4 p-4 border rounded-lg ${item.isFree ? 'border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10' : isDiscountedBogoItem ? 'border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-900/10' : ''}`}>
                     <div className="relative">
@@ -931,7 +940,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         alt={item.product.name}
                         className="w-16 h-16 object-cover rounded-md"
                       />
-                      {item.isFree && (
+                      {isTrulyFree && (
                         <span className="absolute -top-1.5 -right-1.5 bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                           FREE
                         </span>
@@ -945,7 +954,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-1">
                         <h4 className="font-medium text-sm line-clamp-2">{item.product.name}</h4>
-                        {item.isFree && (
+                        {isTrulyFree && (
                           <span className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700 px-1.5 py-0.5 rounded-full">
                             <Gift className="h-2.5 w-2.5" /> BOGO FREE
                           </span>
@@ -982,7 +991,7 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         ) : null;
                       })()}
                       <div className="mt-1">
-                        {item.isFree ? (
+                        {item.isFree && displayedUnitPrice === 0 ? (
                           <p className="font-semibold text-green-600 dark:text-green-400">FREE</p>
                         ) : (
                           <div>
@@ -1047,12 +1056,17 @@ export default function CartDrawer({ children }: CartDrawerProps) {
 
                       {/* Subtotal */}
                       <p className="text-sm font-medium mt-2">
-                        {item.isFree ? (
+                        {item.isFree && displayedUnitPrice === 0 ? (
                           <span className="text-green-600 dark:text-green-400">Subtotal: FREE</span>
                         ) : (
                           <>Subtotal: ${(displayedUnitPrice * item.quantity).toFixed(2)}</>
                         )}
                       </p>
+                      {item.product.discountItemLimit != null && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {getCartItemPricing(item).discountedQuantity} discounted · {item.quantity - getCartItemPricing(item).discountedQuantity} at normal pricing
+                        </p>
+                      )}
                     </div>
                   </div>
                   );
@@ -1232,12 +1246,12 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                     <span>
                       {item.product.name}
                       {item.size && <span className="text-xs text-muted-foreground"> (Size: {item.size})</span>}
-                      {item.isFree && <span className="text-xs font-bold text-green-600 dark:text-green-400"> [FREE]</span>}
+                       {item.isFree && getCartItemPricing(item).subtotal === 0 && <span className="text-xs font-bold text-green-600 dark:text-green-400"> [FREE]</span>}
                       {isDiscountedBogoItem && <span className="text-xs font-bold text-blue-600 dark:text-blue-400"> [{bogoItemLabel}]</span>}
                       {' '}x {item.quantity}
                     </span>
                     <span className={item.isFree ? "text-green-600 dark:text-green-400 font-semibold" : isDiscountedBogoItem ? "text-blue-600 dark:text-blue-400 font-semibold" : ""}>
-                      {item.isFree ? "FREE" : `$${((item.customPrice !== undefined ? item.customPrice : getEffectiveUnitPrice(item.product, item.size)) * item.quantity).toFixed(2)}`}
+                      {getCartItemPricing(item).subtotal === 0 ? "FREE" : `$${getCartItemPricing(item).subtotal.toFixed(2)}`}
                     </span>
                   </div>
                   );

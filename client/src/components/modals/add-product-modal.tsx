@@ -118,6 +118,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [discountItemLimit, setDiscountItemLimit] = useState("");
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isDuplicateSku, setIsDuplicateSku] = useState(false);
   const [stockLbs, setStockLbs] = useState("");
@@ -330,6 +331,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
         pricePerQuarter: data.pricePerQuarter ? parseFloat(data.pricePerQuarter).toFixed(2) : null,
         pricePerHalf: data.pricePerHalf ? parseFloat(data.pricePerHalf).toFixed(2) : null,
         discountPercentage: data.discountPercentage ? parseFloat(data.discountPercentage).toFixed(2) : null,
+        discountItemLimit: discountItemLimit.trim() ? Number(discountItemLimit) : null,
         discountAmount: data.discountAmount ? parseFloat(data.discountAmount).toFixed(2) : null,
         isActive: data.isActive,
         imageUrl: imageUrl || null,
@@ -362,6 +364,7 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
       });
       onOpenChange(false);
       form.reset();
+      setDiscountItemLimit("");
       setSelectedFiles([]);
       setImagePreviews([]);
       setIsDuplicateSku(false);
@@ -961,6 +964,12 @@ export default function AddProductModal({ open, onOpenChange, categories }: AddP
               </>
             )}
 
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="new-discount-item-limit">Discounted Items Per User</label>
+              <Input id="new-discount-item-limit" type="number" min="1" step="1"
+                value={discountItemLimit} onChange={event => setDiscountItemLimit(event.target.value)} placeholder="Unlimited" />
+              <p className="text-xs text-muted-foreground">Leave blank for unlimited. Each new discount window starts with a fresh allowance.</p>
+            </div>
             {/* Discount Amount Field */}
             <FormField
               control={form.control}

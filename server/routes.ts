@@ -21,6 +21,7 @@ import { ObjectPermission } from "./objectAcl";
 import sharp from "sharp";
 import { normalizeInventoryOption } from "@shared/inventory";
 import { isSupportOnlyAccount } from "@shared/account-access";
+import { attachDiscountAllowances, getCartPricingProducts, quoteDiscountCaps, DiscountCapChangedError } from "./product-discount-cap";
 
 // WebSocket connection store
 const wsConnections = new Set<WebSocket>();
@@ -838,7 +839,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const products = await storage.getProducts(filters);
-      res.json(products);
+      res.set("Cache-Control", "private, no-store");
+      res.json(await attachDiscountAllowances(products, (req as any).currentUser?.id));
     } catch (error) {
       console.error('Error fetching products:', error);
       res.status(500).json({ message: "Failed to fetch products" });
@@ -882,7 +884,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       
 
-      res.json(product);
+      res.set("Cache-Control", "private, no-store");
+      res.json((await attachDiscountAllowances([product], (req as any).currentUser?.id))[0]);
     } catch (error) {
       console.error('[GET /api/products/:id] error:', error);
       res.status(500).json({ message: "Failed to fetch product" });
@@ -1525,11 +1528,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return null;
   }
 
+  app.get('/api/discounts/item-allowances', async (req, res) => {
+    const ids = Array.from(new Set(String(req.query.productIds || "").split(",").map(Number).filter(id => Number.isSafeInteger(id) && id > 0)));
+    if (ids.length > 100) return res.status(400).json({ message: "Too many products requested." });
+    try {
+      res.set("Cache-Control", "private, no-store");
+      res.json(await getCartPricingProducts(ids, (req as any).currentUser?.id));
+    } catch {
+      res.status(503).json({ message: "Unable to verify item discount allowances. Please try again." });
+    }
+  });
+
   app.post('/api/orders', async (req, res) => {
     try {
       const { order, items, cgBags: cgBagsInput = [] } = req.body;
 
       const orderData = insertOrderSchema.parse(order);
+      const currentUser = (req as any).currentUser;
+      if (currentUser && !["admin", "manager", "staff"].includes(currentUser.role)) {
+        // Discount usage must belong to the signed-in customer, never a submitted ID.
+        orderData.customerId = currentUser.id;
+      }
+      const discountOwnerId = currentUser ? orderData.customerId || currentUser.id : null;
+      if (discountOwnerId) orderData.customerId = discountOwnerId;
+      if (!currentUser) orderData.customerId = null;
+      // Only server-expanded bags may bypass standalone product pricing or stock checks.
+      for (const item of items) {
+        if (item.metadata && typeof item.metadata === "object") {
+          item.metadata = { ...item.metadata };
+          delete item.metadata.fromCgBag;
+          delete item.metadata.fromStandardBag;
+          delete item.metadata.itemPromoCode;
+        }
+      }
+      const globalWeightPricing = await storage.getSiteSetting("global_weight_pricing_enabled") === "true";
+      const discountCapReservations = await quoteDiscountCaps(items, discountOwnerId, globalWeightPricing);
 
       const submittedPromoCodes = Array.isArray(req.body.promoCodes)
         ? req.body.promoCodes.map((code: unknown) => String(code).trim()).filter(Boolean)
@@ -2106,7 +2139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`[CG-ORDER] Creating order with ${itemsData.length} items (cgBags: ${cgBagsInput_typed.length})`);
-      const newOrder = await storage.createOrder(orderData, itemsData);
+      const newOrder = await storage.createOrder(orderData, itemsData, discountCapReservations);
 
       // Sync grab bag availability — disables any bag products whose component items are now out of stock
       syncGrabBagAvailability().catch(() => {});
@@ -2176,6 +2209,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(newOrder);
     } catch (error) {
       console.error('Order creation error:', error);
+      if (error instanceof DiscountCapChangedError) {
+        return res.status(error.status).json({ code: error.code, message: error.message });
+      }
       if (error instanceof z.ZodError) {
         console.error('Validation errors:', error.errors);
         return res.status(400).json({ message: "Invalid order data", errors: error.errors });

@@ -19,3 +19,5 @@
 - [Storefront heading visibility](storefront-heading-visibility.md) — hiding a category heading must not remove its navigation label, products, or assigned ads.
 - [Manual product badges](manual-product-badges.md) — visual labels may have editor-chosen expiry or stay until unchecked; never tie them to discount pricing.
 - [Support-only account access](pending-account-access.md) — pending and suspended accounts may sign in, but only their own support tickets are available until approved or reinstated.
+- [Per-user item discount caps](item-discount-cap-policy.md) — count discounted items, not orders or grams; fresh windows get fresh allowances.
+- [Patch hunk ordering](patch-hunk-ordering.md) — list changes in source order when applying multipart V4A patches.

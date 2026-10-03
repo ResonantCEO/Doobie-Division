@@ -17,6 +17,7 @@ import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { supportTelegramSchema } from "./support-contact";
+import { primaryKey } from "drizzle-orm/pg-core";
 
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
@@ -107,9 +108,11 @@ export const products = pgTable("products", {
   discountPricePerQuarter: decimal("discount_price_per_quarter", { precision: 10, scale: 2 }),
   discountPricePerHalf: decimal("discount_price_per_half", { precision: 10, scale: 2 }),
   discountQuantityPricing: jsonb("discount_quantity_pricing").$type<Array<{ minQuantity: number; pricePerItem: string }>>(),
-  discountSchedule: jsonb("discount_schedule").$type<Array<{ startAt: string; endAt: string }>>(),
+  discountSchedule: jsonb("discount_schedule").$type<Array<{ id?: string; startAt: string; endAt: string }>>(),
   discountStartsAt: timestamp("discount_starts_at"), // optional scheduled start for product discounts
   discountExpiresAt: timestamp("discount_expires_at"), // clears product discounts and BOGO when reached
+  discountItemLimit: integer("discount_item_limit"),
+  discountCampaignId: varchar("discount_campaign_id").notNull().default(sql`gen_random_uuid()::text`),
   bogoEnabled: boolean("bogo_enabled").notNull().default(false), // buy one get one free
   bogoFreeOptionIndex: integer("bogo_free_option_index"), // which option index is free (null = same as purchased)
   bogoDiscountType: varchar("bogo_discount_type").default("free"), // 'free', 'percentage', 'amount'
@@ -153,6 +156,16 @@ export const productQuantityPricing = pgTable("product_quantity_pricing", {
   productIdIdx: index("IDX_pqp_product_id").on(table.productId),
 }));
 
+export const productDiscountUsage = pgTable("product_discount_usage", {
+  productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  cycleKey: varchar("cycle_key").notNull(),
+  usedItems: integer("used_items").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, table => ({
+  pk: primaryKey({ name: "product_discount_usage_pkey", columns: [table.productId, table.userId, table.cycleKey] }),
+}));
+
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   orderNumber: varchar("order_number").notNull().unique(),
@@ -164,6 +177,7 @@ export const orders = pgTable("orders", {
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   originalTotal: decimal("original_total", { precision: 10, scale: 2 }),
   discountTotal: decimal("discount_total", { precision: 10, scale: 2 }).notNull().default("0"),
+  discountCapUsage: jsonb("discount_cap_usage").$type<Array<{ productId: number; cycleKey: string; quantity: number }>>().notNull().default([]),
   promoCodeId: integer("promo_code_id"),
   promoCode: varchar("promo_code"),
   promoDiscount: decimal("promo_discount", { precision: 10, scale: 2 }).notNull().default("0"),
@@ -613,6 +627,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
   company: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   discountPercentage: z.string().nullable().optional(),
+  discountItemLimit: z.number().int().positive().max(2147483647).nullable().optional(),
   discountAmount: z.string().nullable().optional(),
   discountPriceOverride: z.string().nullable().optional(),
   discountPricePerGram: z.string().nullable().optional(),
@@ -625,6 +640,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
     pricePerItem: z.string().or(z.number()).transform(val => String(val)),
   })).nullable().optional(),
   discountSchedule: z.array(z.object({
+    id: z.string().optional(),
     startAt: z.coerce.date(),
     endAt: z.coerce.date(),
   })).nullable().optional(),
@@ -662,6 +678,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
 });
 
 export const insertOrderSchema = createInsertSchema(orders).omit({
+  discountCapUsage: true,
   id: true,
   orderNumber: true,
   createdAt: true,

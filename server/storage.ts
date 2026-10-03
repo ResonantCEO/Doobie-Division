@@ -55,6 +55,9 @@ import { db } from "./db";
 import { eq, sql, desc, and, gte, lt, inArray, or, ne, asc, ilike, exists, lte, isNull, isNotNull, like, gt } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
 import { queryCache, categoriesCache, productsCache, analyticsCache, generateCacheKey, invalidateCache, withCache } from "./cache";
+import { randomUUID } from "node:crypto";
+import { hasProductDiscount, preserveDiscountWindowKeys } from "@shared/product-discounts";
+import { reserveDiscountCaps, releaseDiscountCaps, type DiscountCapReservation } from "./product-discount-cap";
 
 type UserSortField = "user" | "address" | "role" | "status" | "joined";
 type SnapshotDb = Pick<typeof db, "select" | "insert" | "delete">;
@@ -138,7 +141,7 @@ export interface IStorage {
   getOrders(filters?: { status?: string; statuses?: string[]; customerId?: string; assignedUserId?: string; archived?: boolean; hideOldDelivered?: boolean }): Promise<Order[]>;
   getNewOrderCount(): Promise<number>;
   getOrder(id: number): Promise<(Order & { items: (OrderItem & { product: Product | null })[] }) | undefined>;
-  createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
+  createOrder(order: InsertOrder, items: InsertOrderItem[], reservations?: DiscountCapReservation[]): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
   reopenOrderIfUnfulfilled(id: number): Promise<Order>;
   updateOrderTotal(id: number, total: number): Promise<Order>;
@@ -694,6 +697,8 @@ export class DatabaseStorage implements IStorage {
          discountSchedule: products.discountSchedule,
          discountStartsAt: products.discountStartsAt,
         discountExpiresAt: products.discountExpiresAt,
+        discountItemLimit: products.discountItemLimit,
+        discountCampaignId: products.discountCampaignId,
         bogoEnabled: products.bogoEnabled,
         bogoFreeOptionIndex: products.bogoFreeOptionIndex,
         manualBadges: products.manualBadges,
@@ -1467,6 +1472,20 @@ export class DatabaseStorage implements IStorage {
     };
 
     const updateData: Record<string, any> = { ...dataWithoutSizes };
+    // Routine edits and cap changes do not reset usage. Removing the promotion,
+    // or starting a new one after expiration, creates a new campaign.
+    delete updateData.discountCampaignId;
+    const [previousDiscount] = await db.select().from(products).where(eq(products.id, id)).limit(1);
+    if (previousDiscount) {
+      if (Array.isArray(updateData.discountSchedule)) {
+        updateData.discountSchedule = preserveDiscountWindowKeys(previousDiscount, updateData.discountSchedule);
+      }
+      const nextDiscount = { ...previousDiscount, ...updateData };
+      if (hasProductDiscount(nextDiscount) && (!hasProductDiscount(previousDiscount)
+        || (previousDiscount.discountExpiresAt && new Date(previousDiscount.discountExpiresAt).getTime() <= Date.now()))) {
+        updateData.discountCampaignId = randomUUID();
+      }
+    }
     delete updateData.enableSizes;
     // A non-empty sizes array replaces authoritative variant inventory.
     // An empty array only means existing variants are being disabled, so
@@ -2291,7 +2310,7 @@ export class DatabaseStorage implements IStorage {
     return { ...order, items };
   }
 
-  async createOrder(orderData: InsertOrder, items: InsertOrderItem[]): Promise<Order> {
+  async createOrder(orderData: InsertOrder, items: InsertOrderItem[], reservations: DiscountCapReservation[] = []): Promise<Order> {
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
@@ -2318,9 +2337,11 @@ export class DatabaseStorage implements IStorage {
     const orderNumber = `${datePrefix}-${nextSequential}`;
 
     const order = await db.transaction(async (tx) => {
+      const discountCapUsage = await reserveDiscountCaps(tx, reservations, items, orderData.customerId);
       const [createdOrder] = await tx.insert(orders).values({
         ...orderData,
         orderNumber,
+        discountCapUsage,
       }).returning();
       if (!createdOrder) throw new Error("Failed to create order");
 
@@ -2444,6 +2465,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Cancelled orders cannot be reopened; create a new order instead");
       }
       if (status === "cancelled") {
+        await releaseDiscountCaps(tx, order);
         const items = await tx.select().from(orderItems)
           .where(and(eq(orderItems.orderId, orderId), eq(orderItems.removed, false)))
           .for("update");

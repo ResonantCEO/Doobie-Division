@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/cart-context";
+import { priceCartItems, type PricingItem } from "@shared/cart-pricing";
 import { ShoppingCart, Minus, Plus, Gift } from "lucide-react";
 import type { Product, Category, ProductSize } from "@shared/schema";
 
@@ -351,6 +352,16 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
       .filter(Boolean) as { name: string; price: string }[];
 
   const getPrice = () => {
+    if (product.discountItemLimit != null) {
+      const selected: PricingItem[] = hasSizes
+        ? product.sizes!.map(size => ({ product, size: size.size, quantity: sizeQuantities[size.size] || 0 }))
+        : hasWeightOptions
+          ? weightOptions.map(option => ({ product, size: option.label, quantity: weightOptionQuantities[option.key] || 0 }))
+          : [{ product, quantity: isWeightBased ? weight : quantity }];
+      const added = selected.filter(item => item.quantity > 0);
+      return priceCartItems([...cartState.items, ...added], cartState.globalWeightPricing)
+        .slice(cartState.items.length).reduce((total, item) => total + item.subtotal, 0).toFixed(2);
+    }
     if (isGrabBag) return getOriginalPrice(); // price is already the final sell price
     const totalPrice = parseFloat(getOriginalPrice());
     if (product.discountPercentage && parseFloat(product.discountPercentage) > 0) {
@@ -433,6 +444,12 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
         <DialogDescription>
           {bogoStepDesc} Choose which {paidQtyForBogo === 1 ? 'one' : 'ones'} you'd like.
         </DialogDescription>
+        {product.discountItemLimit != null && (product as any).discountWindowActive && (
+          <p className="text-sm text-muted-foreground">
+            {(product as any).discountRequiresLogin ? "Sign in to use this product’s item discounts."
+              : `${(product as any).discountRemainingItems ?? product.discountItemLimit} discounted items remaining for this discount window. Additional items use normal pricing.`}
+          </p>
+        )}
       </DialogHeader>
 
       <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
@@ -617,6 +634,12 @@ export default function AddToCartModal({ open, onOpenChange, product }: AddToCar
         <DialogDescription>
           Select the {isWeightBased ? 'weight' : 'quantity'} you want to add to your cart.
         </DialogDescription>
+        {product.discountItemLimit != null && (product as any).discountWindowActive && (
+          <p className="text-sm text-muted-foreground">
+            {(product as any).discountRequiresLogin ? "Sign in to use this product’s item discounts."
+              : `${(product as any).discountRemainingItems ?? product.discountItemLimit} discounted items remaining for this window. Additional items use normal pricing.`}
+          </p>
+        )}
       </DialogHeader>
 
       <div className="space-y-4 overflow-y-auto flex-1 min-h-0">

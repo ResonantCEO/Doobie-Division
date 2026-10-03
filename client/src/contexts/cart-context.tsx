@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Product, Category } from "@shared/schema";
+import { priceCartItems, type ItemPricing } from "@shared/cart-pricing";
+import { useAuth } from "@/hooks/useAuth";
 
 interface QuantityTier {
   minQuantity: number;
@@ -56,240 +58,11 @@ const initialState: CartState = {
   globalWeightPricing: true,
 };
 
-function getWeightOptionPrice(product: Product & { category: Category | null }, size?: string): number {
-  if (!size) {
-    return Number(product.pricePerGram) || 0;
-  }
-  const normalizedSize = size.toLowerCase().trim();
-  if (normalizedSize.includes('1/8') || normalizedSize.includes('⅛')) {
-    return Number((product as any).pricePerEighth) || 0;
-  }
-  if (normalizedSize.includes('1/4') || normalizedSize.includes('¼')) {
-    return Number((product as any).pricePerQuarter) || 0;
-  }
-  if (normalizedSize.includes('1/2') || normalizedSize.includes('½')) {
-    return Number((product as any).pricePerHalf) || 0;
-  }
-  if (normalizedSize.includes('1 oz') || normalizedSize === '1 oz' || normalizedSize === 'ounce') {
-    return Number(product.pricePerOunce) || 0;
-  }
-  return Number(product.pricePerGram) || 0;
-}
-
-export type WeightTier = 'oz' | 'half' | 'quarter' | 'eighth' | 'gram';
-
-export function sizeToGrams(size?: string): number {
-  if (!size) return 1;
-  const norm = size.toLowerCase().trim();
-  if (norm.includes('1 oz') || norm === 'ounce') return 28;
-  if (norm.includes('1/2') || norm.includes('½')) return 14;
-  if (norm.includes('1/4') || norm.includes('¼')) return 7;
-  if (norm.includes('1/8') || norm.includes('⅛')) return 3.5;
-  return 1;
-}
-
-export function getWeightTier(totalGrams: number): WeightTier {
-  if (totalGrams >= 28) return 'oz';
-  if (totalGrams >= 14) return 'half';
-  if (totalGrams >= 7) return 'quarter';
-  if (totalGrams >= 3.5) return 'eighth';
-  return 'gram';
-}
-
-function pricePerGramForTier(product: any, tier: WeightTier): number {
-  switch (tier) {
-    case 'oz': return (Number(product.pricePerOunce) || 0) / 28;
-    case 'half': return (Number(product.pricePerHalf) || 0) / 14;
-    case 'quarter': return (Number(product.pricePerQuarter) || 0) / 7;
-    case 'eighth': return (Number(product.pricePerEighth) || 0) / 3.5;
-    case 'gram': return Number(product.pricePerGram) || 0;
-  }
-}
-
-export function getWeightItemEffectivePrice(product: any, size: string | undefined, tier: WeightTier): number {
-  const grams = sizeToGrams(size);
-  const pgAtTier = pricePerGramForTier(product, tier);
-  if (pgAtTier === 0) {
-    return getWeightOptionPrice(product as any, size);
-  }
-  return pgAtTier * grams;
-}
-
-// Returns true if a product should use quantity pricing tiers instead of weight-tier pricing
-function usesQuantityPricing(product: any): boolean {
-  if (product.bogoEnabled === true) return false;
-  const tiers = product.quantityPricing;
-  return Array.isArray(tiers) && tiers.length > 0;
-}
-
-export function greedyOzBucketPricing(
-  paidItems: Array<{ product: any; size?: string; quantity: number; isFree?: boolean; customPrice?: number }>,
-  makeKey: (productId: number, size?: string) => string
-): Map<string, number> {
-  const weightItems = paidItems.filter(
-    i => !i.isFree && i.product.sellingMethod === 'weight' && i.customPrice === undefined
-      && !usesQuantityPricing(i.product)
-  );
-
-  // Expand into individual units (one entry per unit, not per line)
-  type Unit = { product: any; size?: string; itemKey: string; grams: number };
-  const units: Unit[] = [];
-  for (const item of weightItems) {
-    const key = makeKey(item.product.id, item.size);
-    const grams = sizeToGrams(item.size);
-    for (let q = 0; q < item.quantity; q++) {
-      units.push({ product: item.product, size: item.size, itemKey: key, grams });
-    }
-  }
-
-  // Primary: largest grams first so exact larger buckets are formed first.
-  // Secondary: cheapest own-tier price first within the same size. This keeps
-  // allocation deterministic when different products share a bucket.
-  units.sort((a, b) => {
-    if (b.grams !== a.grams) return b.grams - a.grams;
-    const ownTierA = getWeightItemEffectivePrice(a.product, a.size, getWeightTier(a.grams));
-    const ownTierB = getWeightItemEffectivePrice(b.product, b.size, getWeightTier(b.grams));
-    return ownTierA - ownTierB;
-  });
-
-  // A promotion is valid only when the combined weight exactly reaches a
-  // named tier. A partial bucket must not promote its contents:
-  //   7g + 3.5g = 10.5g -> keep quarter and eighth pricing
-  //   7g + 7g = 14g -> price both at the half tier
-  //
-  // Work in half-grams so the 3.5g eighth-ounce tier is represented exactly.
-  // Dynamic programming finds exact combinations and avoids the old behavior
-  // of promoting any bucket that merely crossed a lower threshold.
-  const OZ_GRAMS = 28;
-  type Bucket = Unit[];
-  const buckets: Bucket[] = [];
-  let remainingUnits = [...units];
-  const halfGrams = (grams: number) => Math.round(grams * 2);
-
-  const findExactSubset = (targetGrams: number): Unit[] | null => {
-    const target = halfGrams(targetGrams);
-    const paths: Array<number[] | null> = Array.from({ length: target + 1 }, () => null);
-    paths[0] = [];
-
-    for (let unitIndex = 0; unitIndex < remainingUnits.length; unitIndex++) {
-      const unitValue = halfGrams(remainingUnits[unitIndex].grams);
-      if (unitValue <= 0 || unitValue > target) continue;
-      for (let sum = target - unitValue; sum >= 0; sum--) {
-        if (!paths[sum] || paths[sum + unitValue]) continue;
-        paths[sum + unitValue] = [...paths[sum], unitIndex];
-      }
-    }
-
-    const selectedIndexes = paths[target];
-    if (!selectedIndexes || selectedIndexes.length === 0) return null;
-    const selected = new Set(selectedIndexes);
-    const subset = remainingUnits.filter((_, index) => selected.has(index));
-    remainingUnits = remainingUnits.filter((_, index) => !selected.has(index));
-    return subset;
-  };
-
-  // Resolve the largest exact tiers first, then smaller exact tiers.
-  for (const tierGrams of [OZ_GRAMS, 14, 7, 3.5]) {
-    let exactSubset: Unit[] | null;
-    while ((exactSubset = findExactSubset(tierGrams)) !== null) {
-      buckets.push(exactSubset);
-    }
-  }
-
-  // Items which cannot form an exact higher tier retain their own tier.
-  for (const unit of remainingUnits) {
-    buckets.push([unit]);
-  }
-
-  // Price each bucket: only an exact named tier can promote its contents.
-  const subtotals = new Map<string, number>();
-  for (const item of weightItems) {
-    subtotals.set(makeKey(item.product.id, item.size), 0);
-  }
-
-  for (const bucket of buckets) {
-    const bucketGrams = bucket.reduce((s, u) => s + u.grams, 0);
-    const tier = getWeightTier(bucketGrams);
-    for (const unit of bucket) {
-      const unitPrice = applyProductDiscount(
-        unit.product,
-        getWeightItemEffectivePrice(unit.product, unit.size, tier)
-      );
-      subtotals.set(unit.itemKey, (subtotals.get(unit.itemKey) || 0) + unitPrice);
-    }
-  }
-
-  return subtotals;
-}
-
-function applyProductDiscount(product: any, price: number): number {
-  const discPct = parseFloat(product.discountPercentage || "0");
-  if (discPct > 0) return price * (1 - discPct / 100);
-  const discAmt = parseFloat(product.discountAmount || "0");
-  if (discAmt > 0) return Math.max(0, price - discAmt);
-  return price;
-}
-
-function getItemPrice(product: Product & { category: Category | null }, size?: string): number {
-  let price: number;
-  if (product.sellingMethod === "weight") {
-    price = getWeightOptionPrice(product, size);
-  } else {
-    price = Number(product.price) || 0;
-  }
-  return applyProductDiscount(product, price);
-}
-
-function getApplicableTierPrice(product: Product & { category: Category | null; quantityPricing?: QuantityTier[] }, size: string | undefined, totalProductQty: number): number {
-  const basePrice = getItemPrice(product, size);
-  if ((product as any).bogoEnabled === true) return basePrice;
-  const tiers = (product as any).quantityPricing as QuantityTier[] | undefined;
-  if (!tiers || tiers.length === 0) return basePrice;
-  const sortedTiers = [...tiers].sort((a, b) => b.minQuantity - a.minQuantity);
-  const applicable = sortedTiers.find(t => totalProductQty >= t.minQuantity);
-  if (!applicable) return basePrice;
-  // Bundle covers `applicable.minQuantity` items at the tier price;
-  // any extras beyond the bundle revert to the normal base price.
-  const bundleTotal = Number(applicable.pricePerItem) * applicable.minQuantity;
-  const extraTotal = (totalProductQty - applicable.minQuantity) * basePrice;
-  // Return effective unit price so callers can multiply by item.quantity normally.
-  return (bundleTotal + extraTotal) / totalProductQty;
-}
+export { sizeToGrams, getWeightTier, getWeightItemEffectivePrice, greedyOzBucketPricing } from "@shared/cart-pricing";
+export type { WeightTier } from "@shared/cart-pricing";
 
 function computeTotal(items: CartItem[], globalWeightPricing: boolean): number {
-  const paidItems = items.filter(i => !i.isFree);
-
-  // Oz-bucket subtotals for weight items when global weight pricing is on
-  const weightSubtotals: Map<string, number> | null = globalWeightPricing
-    ? greedyOzBucketPricing(paidItems, (id, size) => makeItemKey(id, size, false))
-    : null;
-
-  // For non-weight items AND weight items that use quantity pricing: quantity-based tier pricing per product
-  const productQtyMap = new Map<number, number>();
-  for (const item of paidItems) {
-    if (item.product.sellingMethod !== 'weight' || usesQuantityPricing(item.product)) {
-      productQtyMap.set(item.product.id, (productQtyMap.get(item.product.id) || 0) + item.quantity);
-    }
-  }
-
-  return paidItems.reduce((sum, item) => {
-    if (item.customPrice !== undefined) {
-      return sum + item.customPrice * item.quantity;
-    }
-    if (item.product.sellingMethod === 'weight' && !usesQuantityPricing(item.product)) {
-      if (weightSubtotals) {
-        // Bucket-priced: subtotal already covers all units
-        const key = makeItemKey(item.product.id, item.size, false);
-        return sum + (weightSubtotals.get(key) || 0);
-      }
-      // GWP off: each item priced at its own size's tier
-      const tier = getWeightTier(sizeToGrams(item.size));
-      const unitPrice = applyProductDiscount(item.product, getWeightItemEffectivePrice(item.product, item.size, tier));
-      return sum + unitPrice * item.quantity;
-    }
-    const totalQty = productQtyMap.get(item.product.id) || item.quantity;
-    return sum + getApplicableTierPrice(item.product, item.size, totalQty) * item.quantity;
-  }, 0);
+  return priceCartItems(items, globalWeightPricing).reduce((sum, price) => sum + price.subtotal, 0);
 }
 
 function makeItemKey(id: number, size?: string, isFree?: boolean): string {
@@ -469,6 +242,7 @@ interface CartContextType {
   updateQuantity: (productId: number, quantity: number, size?: string, isFree?: boolean) => void;
   clearCart: () => void;
   getEffectivePrice: (productId: number, size?: string) => number;
+  getCartItemPricing: (item: CartItem) => ItemPricing;
   addCgBag: (bag: CgBagCartItem) => void;
   removeCgBag: (cartId: string) => void;
 }
@@ -477,6 +251,32 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, initialState);
+  const cartPricing = React.useMemo(() => priceCartItems(state.items, state.globalWeightPricing), [state.items, state.globalWeightPricing]);
+  const { user } = useAuth();
+  const productIds = Array.from(new Set(state.items.map(item => item.product.id))).sort((a, b) => a - b);
+  const allowanceUrl = `/api/discounts/item-allowances?productIds=${productIds.join(",")}`;
+  const { data: currentPricingProducts } = useQuery<any[]>({
+    queryKey: [allowanceUrl, user?.id ?? "anonymous"],
+    queryFn: async () => {
+      const response = await fetch(allowanceUrl, { credentials: "include" });
+      if (!response.ok) throw new Error("Unable to verify item discounts");
+      return response.json();
+    },
+    enabled: productIds.length > 0,
+    refetchInterval: 15000,
+    staleTime: 0,
+  });
+  useEffect(() => {
+    if (!currentPricingProducts) return;
+    const fresh = new Map(currentPricingProducts.map(product => [product.id, product]));
+    const refreshed = state.items.map(item => ({
+      ...item,
+      product: fresh.has(item.product.id) ? { ...item.product, ...fresh.get(item.product.id) } : item.product,
+    }));
+    if (refreshed.some((item, index) => JSON.stringify(item.product) !== JSON.stringify(state.items[index].product))) {
+      dispatch({ type: "LOAD_CART", payload: refreshed });
+    }
+  }, [currentPricingProducts]);
 
   // Sync global weight pricing setting from the server
   const { data: weightPricingData } = useQuery<{ key: string; value: string | null }>({
@@ -584,43 +384,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const getEffectivePrice = (productId: number, size?: string): number => {
-    const paidItems = state.items.filter(i => !i.isFree);
-    const item = paidItems.find(i => i.product.id === productId && i.size === size);
-    if (!item) return 0;
-
-    // Discounted BOGO items carry their final unit price separately from the
-    // product's regular price. Use it for cart display and subtotals.
-    if (item.customPrice !== undefined) {
-      return item.customPrice;
-    }
-
-    if (item.product.sellingMethod === 'weight' && !usesQuantityPricing(item.product) && item.customPrice === undefined) {
-      if (state.globalWeightPricing) {
-        // Bucket pricing: subtotal covers all units; divide to get avg unit price for display
-        const subtotals = greedyOzBucketPricing(paidItems, (id, sz) => makeItemKey(id, sz, false));
-        const key = makeItemKey(productId, size, false);
-        const subtotal = subtotals.get(key) || 0;
-        return item.quantity > 0 ? subtotal / item.quantity : 0;
-      }
-      // GWP off: each item at its own size's tier
-      const tier = getWeightTier(sizeToGrams(size));
-      return applyProductDiscount(item.product, getWeightItemEffectivePrice(item.product, size, tier));
-    }
-
-    if (item.customPrice !== undefined) return item.customPrice;
-
-    const productQtyMap = new Map<number, number>();
-    for (const i of paidItems) {
-      if (i.product.sellingMethod !== 'weight' || usesQuantityPricing(i.product)) {
-        productQtyMap.set(i.product.id, (productQtyMap.get(i.product.id) || 0) + i.quantity);
-      }
-    }
-    const totalQty = productQtyMap.get(productId) || 0;
-    return getApplicableTierPrice(item.product, size, totalQty);
+    const matching = state.items.find(item => item.product.id === productId && item.size === size && !item.isFree && item.customPrice === undefined)
+      ?? state.items.find(item => item.product.id === productId && item.size === size);
+    return matching ? getCartItemPricing(matching).unitPrice : 0;
   };
 
+  const getCartItemPricing = (item: CartItem): ItemPricing => {
+    const index = state.items.indexOf(item);
+    return cartPricing[index]
+      ?? priceCartItems([item], state.globalWeightPricing)[0];
+  };
+
+
   return (
-    <CartContext.Provider value={{ state, addItem, addFreeItem, addDiscountedItem, removeItem, updateQuantity, clearCart, getEffectivePrice, addCgBag, removeCgBag }}>
+    <CartContext.Provider value={{ state, addItem, addFreeItem, addDiscountedItem, removeItem, updateQuantity, clearCart, getEffectivePrice, getCartItemPricing, addCgBag, removeCgBag }}>
       {children}
     </CartContext.Provider>
   );

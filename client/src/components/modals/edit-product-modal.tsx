@@ -344,6 +344,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       setBogoDiscountType((product as any).configuredBogoDiscountType ?? (product as any).bogoDiscountType ?? "free");
       setBogoDiscountValue((product as any).configuredBogoDiscountValue ?? (product as any).bogoDiscountValue ?? "0");
       setDiscountDurationHours("");
+      setDiscountItemLimit(product.discountItemLimit == null ? "" : String(product.discountItemLimit));
       setDiscountScheduleWindows(getInitialDiscountWindows(product));
 
       // Pre-populate lb/oz/g fields from grams for weight-based products
@@ -511,6 +512,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
           : undefined;
 
       const productData: any = {
+        discountItemLimit: discountItemLimit.trim() ? Number(discountItemLimit) : null,
         name: data.name,
         company: data.company || null,
         description: data.description || null,
@@ -566,6 +568,9 @@ export default function EditProductModal({ open, onOpenChange, product, categori
       };
       
       // Remove undefined values to avoid sending them
+      if (productData.discountItemLimit !== null && (!Number.isSafeInteger(productData.discountItemLimit) || productData.discountItemLimit < 1)) {
+        throw new Error("Discounted items per user must be a positive whole number, or blank for unlimited.");
+      }
       Object.keys(productData).forEach(key => {
         if (productData[key] === undefined) {
           delete productData[key];
@@ -701,6 +706,7 @@ export default function EditProductModal({ open, onOpenChange, product, categori
   const [bogoDiscountType, setBogoDiscountType] = useState<string>((product as any).configuredBogoDiscountType ?? (product as any).bogoDiscountType ?? "free");
   const [bogoDiscountValue, setBogoDiscountValue] = useState<string>((product as any).configuredBogoDiscountValue ?? (product as any).bogoDiscountValue ?? "0");
   const [discountDurationHours, setDiscountDurationHours] = useState("");
+  const [discountItemLimit, setDiscountItemLimit] = useState("");
   const [discountScheduleWindows, setDiscountScheduleWindows] = useState<DiscountScheduleWindowInput[]>(() => getInitialDiscountWindows(product));
 
   return (
@@ -1196,6 +1202,14 @@ export default function EditProductModal({ open, onOpenChange, product, categori
             {/* Discount Fields */}
             <div className="rounded-lg border p-4 space-y-4">
               <Label className="text-base font-semibold">Discounts</Label>
+              <div className="space-y-2">
+                <Label htmlFor="discount-item-limit">Discounted Items Per User</Label>
+                <Input id="discount-item-limit" type="number" min="1" step="1"
+                  value={discountItemLimit} onChange={event => setDiscountItemLimit(event.target.value)} placeholder="Unlimited" />
+                <p className="text-xs text-muted-foreground">
+                  Leave blank for unlimited. Each discounted item counts once, shared across this product’s flavors and weight options. Resets for each new discount window.
+                </p>
+              </div>
 
               <div className="space-y-3">
                 <div>
