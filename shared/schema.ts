@@ -16,6 +16,7 @@ import { relations } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { supportTelegramSchema } from "./support-contact";
 
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
@@ -721,6 +722,11 @@ export const insertSupportTicketSchema = createInsertSchema(supportTickets).exte
   customerTelegram: z.string().optional().nullable(),
   userId: z.string().nullable().optional(),
   imageUrls: z.string().optional().nullable(),
+});
+
+// Require a submitted contact handle only for the signed-in support form.
+export const insertCustomerSupportTicketSchema = insertSupportTicketSchema.extend({
+  customerTelegram: supportTelegramSchema,
 });
 
 export const insertSupportTicketResponseSchema = createInsertSchema(supportTicketResponses).omit({

@@ -11,7 +11,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { normalizeSubmittedPromoCodes } from "./promo-stack";
 import { setupAuth, isAuthenticated, normalizeTelegramUsername } from "./auth";
-import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema, insertSupportTicketSchema, insertCityPurchaseLimitSchema } from "@shared/schema";
+import { insertProductSchema, insertCategorySchema, insertOrderSchema, insertOrderItemSchema, insertSupportTicketSchema, insertCustomerSupportTicketSchema, insertCityPurchaseLimitSchema } from "@shared/schema";
 import { z } from "zod";
 import { db, sql as rawPool } from "./db";
 import { orders, products, orderItems, users, supportTickets, notifications, categories, boardPosts } from "@shared/schema";
@@ -3731,12 +3731,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authenticated self-service support: always link the ticket to the signed-in user.
   app.post('/api/support/my-tickets', isAuthenticated, async (req: any, res) => {
     try {
-      const ticketData = insertSupportTicketSchema.parse(req.body);
+      const ticketData = insertCustomerSupportTicketSchema.parse(req.body);
       const { userId: _ignoredUserId, ...rest } = ticketData;
       const ticket = await storage.createSupportTicket({
         ...rest,
         userId: req.currentUser.id,
-        customerTelegram: req.currentUser.telegramUsername || null,
       });
 
       broadcastToClients({ type: 'new_support_ticket', ticketId: ticket.id });

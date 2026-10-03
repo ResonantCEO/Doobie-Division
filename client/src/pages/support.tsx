@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { isSupportOnlyAccount } from "@shared/account-access";
+import { supportTelegramSchema } from "@shared/support-contact";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -321,6 +322,7 @@ export default function SupportPage() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [contactForm, setContactForm] = useState({
     customerName: "",
+    customerTelegram: user?.telegramUsername || "",
     message: "",
   });
   const [pendingPhotos, setPendingPhotos] = useState<{ file: File; preview: string }[]>([]);
@@ -361,6 +363,11 @@ export default function SupportPage() {
 
   const handleSubmitContact = async (e: React.FormEvent) => {
     e.preventDefault();
+    const telegram = supportTelegramSchema.safeParse(contactForm.customerTelegram);
+    if (!telegram.success) {
+      toast({ title: "Telegram name is required", description: telegram.error.issues[0].message, variant: "destructive" });
+      return;
+    }
     try {
       // Upload any pending photos first
       let imageUrls: string[] = [];
@@ -390,6 +397,7 @@ export default function SupportPage() {
         message: contactForm.message,
         priority: "normal",
         customerName: contactForm.customerName,
+        customerTelegram: telegram.data,
         imageUrls: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
       };
 
@@ -403,7 +411,7 @@ export default function SupportPage() {
       if (response.ok) {
         const ticket = await response.json();
         toast({ title: "Support ticket created", description: "You can now continue the conversation below." });
-        setContactForm({ customerName: "", message: "" });
+        setContactForm({ customerName: "", customerTelegram: user?.telegramUsername || "", message: "" });
         setPendingPhotos([]);
         setShowNewForm(false);
         await queryClient.invalidateQueries({ queryKey: ["/api/support/my-tickets"] });
@@ -484,6 +492,16 @@ export default function SupportPage() {
                       value={contactForm.customerName}
                       onChange={(e) => setContactForm((p) => ({ ...p, customerName: e.target.value }))}
                       placeholder="Your full name"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="support-telegram" className="text-sm font-medium mb-1 block">Telegram Name *</label>
+                    <Input
+                      id="support-telegram"
+                      value={contactForm.customerTelegram}
+                      onChange={(e) => setContactForm((p) => ({ ...p, customerTelegram: e.target.value }))}
+                      placeholder="@your_username"
                       required
                     />
                   </div>
