@@ -4505,6 +4505,7 @@ export class DatabaseStorage implements IStorage {
             id: supportTicketResponses.id,
             message: supportTicketResponses.message,
             type: supportTicketResponses.type,
+            imageUrls: supportTicketResponses.imageUrls,
             createdAt: supportTicketResponses.createdAt,
             createdBy: {
               id: users.id,
