@@ -622,19 +622,23 @@ export default function StorefrontPage() {
     // Organizing the storefront needs the full board, but browsing a category
     // should never pull in unassigned or other categories' advertisements.
     if (isStorefrontLayoutMode) return boardPosts;
-    if (activeAdSelection) return boardPosts.filter((post) => post.id === activeAdSelection.postId);
+    // Hide category banners during searches, including while results debounce.
+    const browsingPosts = searchQuery.trim() || debouncedSearchQuery.trim()
+      ? boardPosts.filter((post) => post.categoryId === null)
+      : boardPosts;
+    if (activeAdSelection) return browsingPosts.filter((post) => post.id === activeAdSelection.postId);
     if (selectedCategory !== null) {
-      return boardPosts.filter((post) => post.categoryId === selectedCategory);
+      return browsingPosts.filter((post) => post.categoryId === selectedCategory);
     }
     if (currentParentCategory !== null) {
       const displayedCategoryIds = new Set([
         currentParentCategory,
         ...categories.filter((category) => category.parentId === currentParentCategory).map((category) => category.id),
       ]);
-      return boardPosts.filter((post) => post.categoryId !== null && displayedCategoryIds.has(post.categoryId));
+      return browsingPosts.filter((post) => post.categoryId !== null && displayedCategoryIds.has(post.categoryId));
     }
-    return boardPosts;
-  }, [boardPosts, activeAdSelection, selectedCategory, currentParentCategory, categories, isStorefrontLayoutMode]);
+    return browsingPosts;
+  }, [boardPosts, activeAdSelection, selectedCategory, currentParentCategory, categories, isStorefrontLayoutMode, searchQuery, debouncedSearchQuery]);
   const unassignedBoardPosts = useMemo(
     () => visibleBoardPosts
       .filter((post) => post.categoryId === null)

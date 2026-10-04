@@ -17,6 +17,7 @@
 - [Combo quantity expansion](combo-quantity-expansion.md) — expanded component and discount rows must inherit the purchased combo quantity.
 - [Driver city routing](driver-city-routing.md) — canonical active delivery cities map to one driver; auto-routing only fills unassigned shipped orders.
 - [Storefront heading visibility](storefront-heading-visibility.md) — hiding a category heading must not remove its navigation label, products, or assigned ads.
+- [Storefront search ads](storefront-search-ads.md) — product searches hide all category-assigned ads, not only ads in categories without matches.
 - [Manual product badges](manual-product-badges.md) — visual labels may have editor-chosen expiry or stay until unchecked; never tie them to discount pricing.
 - [Support-only account access](pending-account-access.md) — pending and suspended accounts may sign in, but only their own support tickets are available until approved or reinstated.
 - [Per-user item discount caps](item-discount-cap-policy.md) — count discounted items, not orders or grams; fresh windows get fresh allowances.
