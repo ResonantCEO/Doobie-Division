@@ -7,7 +7,7 @@ The user chose “Each discounted item,” not each order. A cap of three with f
 
 The allowance is per user and product, shared across flavors and weight options. Weight-option quantities count selected packages, not the grams inside them. BOGO counts benefit items, not the normal-price qualifying purchases.
 
-When a cap is set, clearly advertise the configured per-person limit on the front of the product card, not only the remaining allowance.
+When a cap is set, clearly advertise the configured per-person limit on the front of the product card, directly under the price and above Add to Cart, not only the remaining allowance.
 
 **Why:** The user explicitly wants customers to see the discount restriction without opening the card or guessing from a remaining count.
 

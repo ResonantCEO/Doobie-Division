@@ -37,6 +37,17 @@ test("front card advertises configured per-person cap and remaining allowance", 
     /2 discounted items left/);
 });
 
+test("discount limit sits immediately between the price and Add to Cart", () => {
+  const expression = label!.parent;
+  const container = expression.parent;
+  assert.ok(ts.isJsxElement(container));
+  const children = container.children.filter((child) => !ts.isJsxText(child));
+  const index = children.indexOf(expression as ts.JsxChild);
+  assert.ok(index > 0);
+  assert.match(children[index - 1].getText(ast), /product\.sellingMethod === "weight"/);
+  assert.match(children[index + 1].getText(ast), /^<Button\s+onClick=\{handleAddToCart\}/);
+});
+
 test("cap remains advertised outside an active window without claiming eligibility", () => {
   const html = markup({ discountItemLimit: 1, discountWindowActive: false, discountRemainingItems: 0 });
   assert.match(html, /Discount limit: 1 item per person/);

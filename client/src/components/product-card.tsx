@@ -266,18 +266,6 @@ export default function ProductCard({ product }: ProductCardProps) {
               >
                 {product.name}
               </h4>
-              {hasDiscountItemLimit && (
-                <div className="mx-auto mt-1.5 w-fit max-w-full rounded-md border border-purple-200 bg-purple-50 px-2 py-1 text-center dark:border-purple-800 dark:bg-purple-950/50">
-                  <p className="text-[11px] font-bold leading-tight text-purple-800 dark:text-purple-200 sm:text-xs">
-                    Discount limit: {discountItemLimit} {discountItemLimit === 1 ? "item" : "items"} per person
-                  </p>
-                  {discountAllowanceStatus && (
-                    <p className="mt-0.5 text-[10px] font-medium leading-tight text-purple-700 dark:text-purple-300 sm:text-[11px]">
-                      {discountAllowanceStatus}
-                    </p>
-                  )}
-                </div>
-              )}
               {(product as any).company && (
                 <p className="text-xs sm:text-sm font-medium text-orange-600 dark:text-orange-400 uppercase tracking-wide mt-0.5">{(product as any).company}</p>
               )}
@@ -432,6 +420,19 @@ export default function ProductCard({ product }: ProductCardProps) {
                   </div>
                 )}
               </div>
+
+              {hasDiscountItemLimit && (
+                <div className="mx-auto mt-1.5 w-fit max-w-full rounded-md border border-purple-200 bg-purple-50 px-2 py-1 text-center dark:border-purple-800 dark:bg-purple-950/50">
+                  <p className="text-[11px] font-bold leading-tight text-purple-800 dark:text-purple-200 sm:text-xs">
+                    Discount limit: {discountItemLimit} {discountItemLimit === 1 ? "item" : "items"} per person
+                  </p>
+                  {discountAllowanceStatus && (
+                    <p className="mt-0.5 text-[10px] font-medium leading-tight text-purple-700 dark:text-purple-300 sm:text-[11px]">
+                      {discountAllowanceStatus}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <Button
                 onClick={handleAddToCart}
