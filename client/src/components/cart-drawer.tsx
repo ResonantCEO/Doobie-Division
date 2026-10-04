@@ -26,6 +26,7 @@ import { useCart, sizeToGrams, getWeightTier, getWeightItemEffectivePrice, type 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ShoppingCart, Minus, Plus, Trash2, CreditCard, Tag, Gift, Upload, X, ImageIcon } from "lucide-react";
+import { CartDiscountPriceBreakdown } from "./cart-discount-price-breakdown";
 
 interface CartDrawerProps {
   children: React.ReactNode;
@@ -930,7 +931,11 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                       ? `BOGO $${bogoValue.toFixed(2)} OFF`
                       : "BOGO FREE";
                   const regularUnitPrice = getEffectiveUnitPrice(item.product, item.size);
-                  const displayedUnitPrice = getCartItemPricing(item).unitPrice;
+                  const pricing = getCartItemPricing(item);
+                  const displayedUnitPrice = pricing.unitPrice;
+                  const isMixedPriceRow = item.product.discountItemLimit != null
+                    && pricing.discountedQuantity > 0
+                    && pricing.discountedQuantity < item.quantity;
                   const isTrulyFree = item.isFree && displayedUnitPrice === 0;
                   return (
                   <div key={itemKey} className={`flex items-start gap-4 p-4 border rounded-lg ${item.isFree ? 'border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10' : isDiscountedBogoItem ? 'border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-900/10' : ''}`}>
@@ -991,7 +996,9 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         ) : null;
                       })()}
                       <div className="mt-1">
-                        {item.isFree && displayedUnitPrice === 0 ? (
+                        {isMixedPriceRow ? (
+                          <CartDiscountPriceBreakdown quantity={item.quantity} pricing={pricing} />
+                        ) : item.isFree && displayedUnitPrice === 0 ? (
                           <p className="font-semibold text-green-600 dark:text-green-400">FREE</p>
                         ) : (
                           <div>
@@ -1059,12 +1066,12 @@ export default function CartDrawer({ children }: CartDrawerProps) {
                         {item.isFree && displayedUnitPrice === 0 ? (
                           <span className="text-green-600 dark:text-green-400">Subtotal: FREE</span>
                         ) : (
-                          <>Subtotal: ${(displayedUnitPrice * item.quantity).toFixed(2)}</>
+                          <>Subtotal: ${pricing.subtotal.toFixed(2)}</>
                         )}
                       </p>
-                      {item.product.discountItemLimit != null && (
+                      {item.product.discountItemLimit != null && !isMixedPriceRow && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          {getCartItemPricing(item).discountedQuantity} discounted · {item.quantity - getCartItemPricing(item).discountedQuantity} at normal pricing
+                          {pricing.discountedQuantity} discounted · {item.quantity - pricing.discountedQuantity} at normal pricing
                         </p>
                       )}
                     </div>

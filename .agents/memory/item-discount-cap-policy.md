@@ -13,6 +13,12 @@ When a cap is set, clearly advertise the configured per-person limit on the fron
 
 **How to apply:** Keep the configured limit visible and distinguish it from current-window eligibility and customer-specific remaining allowances.
 
+Mixed-price cart rows must show separate discounted and normal-priced quantities, unit prices, and amounts instead of a blended unit price.
+
+**Why:** The user wants to see what the discounted items cost and what the normal-priced items cost.
+
+**How to apply:** Use the pricing engine's offer and normal subtotals to display each group; preserve the charged subtotal and checkout calculation.
+
 **Why:** The user specifically wants future discount windows to be usable again after an earlier allowance is exhausted.
 
 **How to apply:** Cover the product Discounts group: percentage, fixed amount, temporary unit/weight prices, temporary quantity tiers, and BOGO. Distinct non-overlapping windows receive fresh allowances. An uninterrupted overlapping promotion shares an allowance. Routine product edits must not reset it; indefinite offers retain usage until disabled and re-enabled.
